@@ -1,5 +1,26 @@
 {
   "tasks": {
+    "dev": "deno run -RWNE --allow-run --env-file=.env src/main.ts --watch",
+    "start": "deno run -RWNE --allow-run --env-file=.env src/main.ts",
+    "thot": "deno run -RWNE --allow-run=pdftotext --env-file=.env src/cli.ts",
+    "test": "deno test -RWNE --allow-run=pdftotext tests/",
+    "check": "deno fmt --check && deno lint && deno check src/ tests/ && deno task frontiere && deno task test",
+    "frontiere": "! grep -rnE \"from ['\\\"](\\.\\./)+app/\" src/core/",
     "board": "npx -y github:theopaolo/repoboard"
+  },
+  "imports": {
+    "hono": "jsr:@hono/hono@^4.9",
+    "hono/": "jsr:/@hono/hono@^4.9/",
+    "@std/assert": "jsr:@std/assert@^1",
+    "@std/path": "jsr:@std/path@^1",
+    "@std/cli/": "jsr:/@std/cli@^1/",
+    "snowball": "npm:snowball-stemmers@0.6.0"
+  },
+  "fmt": {
+    "lineWidth": 100,
+    "exclude": ["static/vendor/", "tasks/", "*.md", "docs/", "evaluation/"]
+  },
+  "lint": {
+    "exclude": ["static/vendor/"]
   }
 }

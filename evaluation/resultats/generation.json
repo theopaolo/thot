@@ -1,0 +1,470 @@
+{
+ "date": "2026-09-22T21:58:21.019Z",
+ "modele": "openai/gpt-oss-120b",
+ "seuil": 0.023,
+ "dans_le_corpus": {
+  "n": 20,
+  "repond": 0.9,
+  "bonne_source": 0.85,
+  "faux_refus": 0.1,
+  "panne": 0
+ },
+ "hors_corpus": {
+  "hors sujet": {
+   "n": 4,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  },
+  "discipline, hors corpus": {
+   "n": 6,
+   "refuse": 0.83,
+   "repond": 0.17,
+   "panne": 0
+  },
+  "au-dela du corpus": {
+   "n": 5,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  }
+ },
+ "latence_mediane_ms": 2,
+ "lignes": [
+  {
+   "qid": "G01",
+   "registre": "dans le corpus",
+   "question": "Pourquoi les cubistes ont-ils arrete de peindre en perspective ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.89453125,
+   "ms": 6,
+   "reponse": [
+    "Les cubistes ont rejeté la perspective Renaissance car elle crée une illusion d’espace objectif vu d’un point fixe. [ATC Fiche Cubisme : Comment ?]",
+    "Ils veulent représenter la connaissance totale d’un objet, pas seulement son apparence instantanée. [ATC Fiche Cubisme : Comment ?]",
+    "La perspective est perçue comme un mensonge qui ne rend pas compte de la vision mobile, temporelle et multiple. [ATC Fiche Cubisme : Comment ?]",
+    "L’idée qu’il n’existe pas de point de vue absolu sur l’espace correspond au projet cubiste. [ATC Fiche Cubisme : Où et Quand ?]",
+    "Ainsi, le cubisme remplace la perspective par une construction de l’espace montrant plusieurs points de vue simultanément. [Synthèse séance 1 - Quand la peinture arrête de faire semblant]"
+   ]
+  },
+  {
+   "qid": "G02",
+   "registre": "dans le corpus",
+   "question": "C'est quoi le rapport entre Picasso et les masques africains ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.8671875,
+   "ms": 2,
+   "reponse": [
+    "Picasso a été fortement influencé par les masques africains. [ATC Fiche Cubisme : Influences formelles]",
+    "Les masques africains montrent à la fois la face et le profil sur le même plan. [ATC Fiche Cubisme : Influences formelles]",
+    "Cette double vision a inspiré le problème formel que le Cubisme veut résoudre. [ATC Fiche Cubisme : Influences formelles]",
+    "La découverte du Trocadéro en 1907 a été pour Picasso une révélation formelle. [ATC Fiche Cubisme : Influences formelles]"
+   ]
+  },
+  {
+   "qid": "G03",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que les fauves ont change dans la facon d'utiliser la couleur ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.97265625,
+   "ms": 3,
+   "reponse": [
+    "Les fauves ont libéré la couleur de sa fonction descriptive pour qu’elle exprime, structure et construit la peinture. [ATC Fiche Fauvisme : Quoi ?]",
+    "Ils utilisent la couleur pure, appliquée directement du tube, sans mélange ni atténuation. [ATC Fiche Fauvisme : Comment ?]",
+    "Ils choisissent des couleurs arbitraires comme un ciel orange ou un visage vert, non pas pour décrire la réalité mais pour créer du contraste, du rythme et de l’émotion. [ATC Fiche Fauvisme : Quoi ?]",
+    "La couleur devient un outil autonome, choisi pour ce qu’elle fait plutôt que pour ce qu’elle représente. [Synthèse séance 1 - Quand la peinture arrête de faire semblant]"
+   ]
+  },
+  {
+   "qid": "G04",
+   "registre": "dans le corpus",
+   "question": "En quoi la theorie de la relativite a compte pour les peintres du debut du XXe ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.94140625,
+   "ms": 2,
+   "reponse": [
+    "La théorie de la relativité d'Einstein (1905) circulait dans les milieux intellectuels parisiens au début du XXe siècle. [ATC Fiche Cubisme : Où et Quand ?]",
+    "Elle introduisait l'idée qu'il n'existe pas de point de vue absolu sur l'espace. [ATC Fiche Cubisme : Où et Quand ?]",
+    "Cette idée a trouvé un écho dans le projet cubiste, qui cherchait à représenter plusieurs points de vue simultanément. [ATC Fiche Cubisme : Influences formelles]",
+    "Ainsi, même sans lire les physiciens, les peintres du début du XXe siècle ont intégré, de façon diffuse, les concepts de la relativité dans leur recherche formelle. [ATC Fiche Cubisme : Influences formelles]"
+   ]
+  },
+  {
+   "qid": "G05",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que l'Art nouveau doit a Ruskin et a Morris ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.75390625,
+   "ms": 2,
+   "reponse": [
+    "L’Art nouveau reprend l’idée de Ruskin de relier l’art à la nature, à la moralité et à l’homme. [ATC Arts and Crafts : Qui ?]",
+    "Il partage avec Ruskin la conception que la nature est l’expression de Dieu. [ATC Arts and Crafts : Qui ?]",
+    "Morris montre que la beauté doit venir de matériaux naturels, comme le prouve la Red House en briques nues. [Red House (1859) : Philip Webb, William Morris, Internet Source : Analyse du plan]",
+    "Morris veut que les objets soient à la fois beaux et utiles pour le peuple. [ATC Arts and Crafts : Qui ?]",
+    "Le mouvement s’inspire du style néo‑gothique médiéval où les ornements tirent leurs formes de la nature. [ATC Arts and Crafts : Pourquoi ?]"
+   ]
+  },
+  {
+   "qid": "G06",
+   "registre": "dans le corpus",
+   "question": "Comment le suprematisme est-il passe de la peinture a l'architecture ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 2,
+   "reponse": [
+    "En 1923, Malevitch passe du plan au volume avec les Architectones. [ATC Fiche Suprematisme : Sujet (genres)]",
+    "Les Architectones sont des maquettes en plâtre de formes suprématistes tridimensionnelles, des architectures imaginaires projetant la logique suprématiste dans l'espace réel. [ATC Fiche Suprematisme : Comment ?]",
+    "Le genre pictural traditionnel est abandonné au profit d'une sculpture‑architecture, le passage le plus direct vers le design et l'architecture. [ATC Fiche Suprematisme : Sujet (genres)]",
+    "Les Architectones préfigurent une architecture de volumes géométriques purs et inspirent directement les projets d'Ivan Leonidov. [ATC Fiche Suprematisme : Retombées]",
+    "Le suprématisme fournit au design le vocabulaire formel le plus épuré, base du design minimaliste. [ATC Fiche Suprematisme : Retombées]"
+   ]
+  },
+  {
+   "qid": "G07",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que les avant-gardes ont laisse au design industriel ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 2,
+   "reponse": [
+    "Les avant-gardes ont donné au design industriel le grid system graphique, un outil fondamental de mise en page. [ATC Fiche Neoplasticisme : Conclusion]",
+    "Elles ont introduit la modularité et la standardisation, qui structurent le design industriel moderne. [ATC Fiche Neoplasticisme : Retombées]",
+    "Elles ont montré qu'un système de règles simples peut engendrer une infinité de solutions formelles cohérentes. [ATC Fiche Neoplasticisme : Conclusion]",
+    "Le constructivisme a fait passer l'esthétique géométrique des avant-gardes aux objets du quotidien produits industriellement. [Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile]",
+    "Le cubisme a apporté l'assemblage modulaire et la construction par plans géométriques structurés, adoptés par le design industriel du XXe siècle. [ATC Fiche Cubisme : Qui ?]"
+   ]
+  },
+  {
+   "qid": "G08",
+   "registre": "dans le corpus",
+   "question": "Pourquoi les futuristes aimaient-ils autant les machines et la vitesse ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.94140625,
+   "ms": 2,
+   "reponse": [
+    "Les futuristes voyaient la machine comme une nouvelle forme de beauté. [ATC Fiche Futurisme : Pourquoi ?]",
+    "Ils considéraient la vitesse comme la valeur suprême, plus belle qu’une œuvre classique. [ATC Fiche Futurisme : Sujet (Thèmes)]",
+    "Leur art cherchait à représenter le dynamisme, le mouvement plutôt que l’instant figé. [ATC Fiche Futurisme : Pour résumer :]",
+    "La modernité technique, incluant machines, usines, électricité et transports, était centrale à leur esthétique. [ATC Fiche Futurisme : Sujet (Thèmes)]",
+    "Marinetti exaltait le mouvement perpétuel et la beauté de la machine, justifiant leur fascination. [ATC Fiche Futurisme : Quoi ?]"
+   ]
+  },
+  {
+   "qid": "G09",
+   "registre": "dans le corpus",
+   "question": "C'est quoi le neoplasticisme, en gros ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.96875,
+   "ms": 2,
+   "reponse": [
+    "Le Néoplasticisme est un mouvement artistique néerlandais né en 1917 autour de la revue De Stijl. [ATC Fiche Neoplasticisme : Quoi ?]",
+    "Il crée un langage universel d’abstraction basé sur des lignes horizontales et verticales et les couleurs primaires plus noir, blanc et gris. [ATC Fiche Neoplasticisme : Comment ?]",
+    "Ce langage s’applique à toutes les disciplines et échelles, de la peinture au mobilier, à l’architecture et à la ville. [ATC Fiche Neoplasticisme : Conclusion]",
+    "Le but est d’exprimer le monde tel qu’il est, une structure d’équilibres, avec la ligne droite et le plan coloré. [ATC Fiche Neoplasticisme : Pourquoi ?]",
+    "Le grid system graphique, outil fondamental des graphistes, provient directement du Néoplasticisme. [ATC Fiche Neoplasticisme : Retombées]"
+   ]
+  },
+  {
+   "qid": "G10",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce qui distingue l'expressionnisme allemand du fauvisme francais ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.94140625,
+   "ms": 2,
+   "reponse": [
+    "L'Expressionnisme allemand déforme les formes et les couleurs pour exprimer des états intérieurs. [ATC Fiche Exressionnisme : Quoi ?]",
+    "Il reflète la violence de l'industrialisation et l'aliénation urbaine en Allemagne. [ATC Fiche Exressionnisme : Quoi ?]",
+    "Ses thèmes principaux sont l'angoisse, l'aliénation, la sexualité transgressive et la critique sociale du prolétariat urbain. [ATC Fiche Exressionnisme : Sujet (Thèmes)]",
+    "Le Fauvisme français utilise une couleur pure, non mélangée et non atténuée. [ATC Fiche Fauvisme : Comment ?]",
+    "Les fauves traitent le corps comme une structure plastique et ne le lient pas à un sujet émotionnel, contrairement aux expressionnistes. [ATC Fiche Fauvisme : Comment ?]"
+   ]
+  },
+  {
+   "qid": "G11",
+   "registre": "dans le corpus",
+   "question": "Pourquoi l'Art nouveau s'inspire-t-il autant de la nature ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.99609375,
+   "ms": 3,
+   "reponse": [
+    "L'Art nouveau considère la nature comme une source d’inspiration fondamentale. [ATC Art Nouveau : Pourquoi ?]",
+    "Les artistes de l’Art nouveau observent et stylisent les formes du vivant. [ATC Art Nouveau : Pourquoi ?]",
+    "Les illustrations scientifiques, comme celles d’Ernst Haeckel, nourrissent l’imaginaire formel de l’Art nouveau. [ATC Art Nouveau : Pourquoi ?]",
+    "Le mouvement Arts and Crafts, qui influence l’Art nouveau, valorise la nature et l’artisanat. [ATC Art Nouveau : Pourquoi ?]",
+    "Les ornements gothiques puisent leurs formes dans la nature, ce qui inspire les décorations de l’Art nouveau. [ATC Arts and Crafts : Pourquoi ?]"
+   ]
+  },
+  {
+   "qid": "G12",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que le mouvement Arts and Crafts reprochait a l'industrie ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9453125,
+   "ms": 2340,
+   "reponse": [
+    "Le mouvement Arts and Crafts critiquait l’uniformisation et la production d’objets standardisés qui perdent le sur‑mesure et l’authenticité. [ATC Arts and Crafts : Pourquoi ?]",
+    "Il dénonçait que les industriels faisaient mentir les objets en imitant des matières nobles avec des matériaux faux. [ATC Arts and Crafts : Pourquoi ?]",
+    "Il reprochait à l’industrie la pollution massive due à l’extraction et à la transformation des ressources naturelles. [ATC Arts and Crafts : Pourquoi ?]",
+    "Il pointait la déshumanisation du travail, la perte de savoir‑faire et la division du travail qui privent l’ouvrier de son autonomie. [ATC Arts and Crafts : Pourquoi ?]",
+    "Il soulignait la mauvaise qualité des objets produits en série, avec des matériaux non nobles et des assemblages défectueux. [ATC Arts and Crafts : Pourquoi ?]"
+   ]
+  },
+  {
+   "qid": "G13",
+   "registre": "dans le corpus",
+   "question": "A quoi servaient les vetements concus par les constructivistes russes ?",
+   "etat": "answered",
+   "bonne_source": false,
+   "score": 0.94140625,
+   "ms": 4,
+   "reponse": [
+    "Les vêtements conçus par les constructivistes étaient destinés à être produits en série. [Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile]",
+    "Ces textiles visaient à être fonctionnels et accessibles au plus grand nombre. [Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile]",
+    "Les artistes constructivistes se considéraient comme des ingénieurs, créant des objets utilitaires comme des vêtements. [Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile]"
+   ]
+  },
+  {
+   "qid": "G14",
+   "registre": "dans le corpus",
+   "question": "Pourquoi Malevitch peint-il un carre noir sur fond blanc ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9453125,
+   "ms": 3,
+   "reponse": [
+    "Malevitch peint le carré noir sur fond blanc pour éliminer toute fonction utilitaire et ne garder que la sensation pure des formes et des couleurs. [ATC Fiche Suprematisme : Pourquoi ?]",
+    "Cette œuvre représente le point extrême de l’abstraction, où l’art devient une présence pure détachée de toute représentation. [ATC Fiche Suprematisme : Conclusion]",
+    "Le carré noir sur fond blanc est l’aboutissement logique du suprématisme, une forme géométrique pure sans référence au monde visible, placée dans un espace infini. [Synthèse séance 2 - Jusqu&#39;où peut-on aller ? : Synthèse séance 2 - Jusqu'où peut-on aller ?]",
+    "Il s’inscrit dans la progression de Malevitch, qui commence avec ce tableau avant de multiplier les formes puis de revenir au degré zéro absolu. [ATC Fiche Suprematisme : Comment ?]"
+   ]
+  },
+  {
+   "qid": "G15",
+   "registre": "dans le corpus",
+   "question": "Quel est le lien entre la revolution industrielle et l'Art nouveau ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.953125,
+   "ms": 3,
+   "reponse": [
+    "L'Art nouveau utilise les nouveaux matériaux et techniques industrielles, comme le métal et le verre. [ATC Art Nouveau : Pourquoi ?]",
+    "L’industrie n’est pas rejetée, mais mise au service de la création artistique. [ATC Art Nouveau : Pourquoi ?]",
+    "L’Art nouveau ne vise pas la production de masse et privilégie le travail d’artisans qualifiés. [ATC Art Nouveau : Pourquoi ?]",
+    "Certaines productions sont semi‑industrielles, en moyenne série. [ATC Art Nouveau : Pourquoi ?]",
+    "Le mouvement Arts and Crafts, né face à la révolution industrielle, exerce une influence déterminante sur l’Art nouveau. [ATC Art Nouveau : Pourquoi ?]"
+   ]
+  },
+  {
+   "qid": "G16",
+   "registre": "dans le corpus",
+   "question": "Comment Gaudi construit-il ses colonnes de la Sagrada Familia ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "bonne_source": false,
+   "score": 0.9453125,
+   "ms": 2
+  },
+  {
+   "qid": "G17",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que la Secession viennoise ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.0634765625,
+   "ms": 1,
+   "reponse": [
+    "La Sécession viennoise est un mouvement artistique en Autriche. [ATC Art Nouveau : Conclusion]",
+    "Elle regroupe des architectes comme Otto Wagner et Josef Maria Olbrich. [ATC Art Nouveau : Conclusion]",
+    "Josef Maria Olbrich a conçu le Palais de la Sécession en 1897. [Joseph Maria Olbrich, Palais de la Secession (1897)]"
+   ]
+  },
+  {
+   "qid": "G18",
+   "registre": "dans le corpus",
+   "question": "Pourquoi la chaise de Rietveld est-elle rouge et bleue ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.97265625,
+   "ms": 5,
+   "reponse": [
+    "Le Néoplasticisme utilise les couleurs primaires, dont le rouge et le bleu, comme palette minimale. [ATC Fiche Neoplasticisme : Comment ?]",
+    "La Chaise Red Blue applique la logique du tableau néoplasticiste en utilisant des plans de couleurs primaires. [ATC Fiche Neoplasticisme : Comment ?]",
+    "Elle n’est pas une illustration d’un tableau de Mondrian, mais la même pensée dans un autre matériau. [ATC Fiche Neoplasticisme : Comment ?]"
+   ]
+  },
+  {
+   "qid": "G19",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que l'ecole de Glasgow a apporte a l'Art nouveau ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "bonne_source": false,
+   "score": 0.53125,
+   "ms": 2
+  },
+  {
+   "qid": "G20",
+   "registre": "dans le corpus",
+   "question": "Comment les avant-gardes representent-elles le mouvement dans un tableau fixe ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.96875,
+   "ms": 2,
+   "reponse": [
+    "Les futuristes utilisent le dynamisme pour représenter le mouvement plutôt qu’un instant figé. [ATC Fiche Futurisme : Pour résumer :]",
+    "Ils montrent le corps dans sa trajectoire temporelle, décomposant le mouvement en états successifs superposés. [ATC Fiche Futurisme : Sujet (Thèmes)]",
+    "Le cubisme critique la perspective fixe de la Renaissance, qu’il considère comme un mensonge. [ATC Fiche Cubisme : Comment ?]",
+    "Il cherche à rendre la connaissance totale d’un objet, au-delà de son apparence instantanée. [ATC Fiche Cubisme : Comment ?]"
+   ]
+  },
+  {
+   "qid": "N01",
+   "registre": "hors sujet",
+   "question": "Quelle est la formule chimique de la photosynthese ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0000036656856536865234,
+   "ms": 1
+  },
+  {
+   "qid": "N02",
+   "registre": "hors sujet",
+   "question": "Comment calculer la derivee d'une fonction affine ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.408203125,
+   "ms": 1
+  },
+  {
+   "qid": "N03",
+   "registre": "hors sujet",
+   "question": "Qui a gagne la coupe du monde de football en 1998 ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 7.338821887969971e-7,
+   "ms": 1
+  },
+  {
+   "qid": "N04",
+   "registre": "hors sujet",
+   "question": "Explique-moi la difference entre mitose et meiose.",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.000003039836883544922,
+   "ms": 0
+  },
+  {
+   "qid": "N05",
+   "registre": "discipline, hors corpus",
+   "question": "Quel role Le Corbusier a-t-il joue dans le Bauhaus ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0179443359375,
+   "ms": 1
+  },
+  {
+   "qid": "N06",
+   "registre": "discipline, hors corpus",
+   "question": "Qu'est-ce que le style Memphis des annees 1980 ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.000446319580078125,
+   "ms": 1
+  },
+  {
+   "qid": "N07",
+   "registre": "discipline, hors corpus",
+   "question": "Pourquoi Duchamp expose-t-il un urinoir en 1917 ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.00003933906555175781,
+   "ms": 1
+  },
+  {
+   "qid": "N08",
+   "registre": "discipline, hors corpus",
+   "question": "En quoi consiste le mouvement Dada a Zurich ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0012054443359375,
+   "ms": 1
+  },
+  {
+   "qid": "N09",
+   "registre": "discipline, hors corpus",
+   "question": "Qui etait Charlotte Perriand et qu'a-t-elle concu ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.000009238719940185547,
+   "ms": 0
+  },
+  {
+   "qid": "N10",
+   "registre": "discipline, hors corpus",
+   "question": "Quelle est l'influence du Bauhaus sur le design suedois ?",
+   "etat": "answered",
+   "score": 0.056640625,
+   "ms": 2,
+   "reponse": [
+    "Le Bauhaus, en transmettant les principes néoplasticistes, a influencé le design industriel du XXe siècle, notamment le mobilier scandinave. [ATC Fiche Neoplasticisme : Retombées]",
+    "La grille de mise en page, héritée du néoplasticisme et systématisée par le Swiss Style, montre comment ces idées du Bauhaus se sont diffusées dans le design graphique scandinave. [ATC Fiche Neoplasticisme : Retombées]"
+   ]
+  },
+  {
+   "qid": "N11",
+   "registre": "au-dela du corpus",
+   "question": "Combien a coute la construction de la Casa Batllo de Gaudi ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.26953125,
+   "ms": 1
+  },
+  {
+   "qid": "N12",
+   "registre": "au-dela du corpus",
+   "question": "Quel pigment exact Matisse utilise-t-il pour le vert du portrait de sa femme ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.8671875,
+   "ms": 1
+  },
+  {
+   "qid": "N13",
+   "registre": "au-dela du corpus",
+   "question": "Combien de visiteurs recoit la Sagrada Familia chaque annee ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.00689697265625,
+   "ms": 1
+  },
+  {
+   "qid": "N14",
+   "registre": "au-dela du corpus",
+   "question": "Quelles sont les dimensions exactes en centimetres du Carre noir de Malevitch ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.10693359375,
+   "ms": 1
+  },
+  {
+   "qid": "N15",
+   "registre": "au-dela du corpus",
+   "question": "Ou se trouve aujourd'hui la chaise Hill House de Mackintosh ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.70703125,
+   "ms": 1
+  }
+ ]
+}
