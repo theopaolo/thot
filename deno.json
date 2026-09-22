@@ -1,0 +1,5 @@
+{
+  "tasks": {
+    "board": "npx -y github:theopaolo/repoboard"
+  }
+}

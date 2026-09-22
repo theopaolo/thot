@@ -1,0 +1,32 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+.svelte-kit/
+build/
+dist/
+coverage/
+
+# Données d'établissement et projections régénérables
+/content/
+/data/
+/var/
+
+# Modèles et caches locaux
+*.gguf
+*.safetensors
+*.npy
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+
+
+# Board kandepo, régénéré à chaque lancement
+kanban.html
