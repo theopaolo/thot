@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { assembler, decouper } from "../src/core/document.ts";
 import { racines } from "../src/core/recherche.ts";
-import { longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
+import { contexte, longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
 
 Deno.test("les offsets comptent des points de code, pas des unités UTF-16", () => {
   const s = "Clé 𝄞 de sol";
@@ -55,4 +55,21 @@ Deno.test("une citation coupée par des points de suspension passe si chaque fra
   assertEquals(r && tranche(texte, r[0], r[1]).endsWith("émancipateur"), true);
   assertEquals(trouverFragments(texte, "Son travail est donc… Il possède un savoir-faire"), null);
   assertEquals(trouverFragments(texte, "Il possède un savoir-fait et une marge"), null);
+});
+
+Deno.test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot", () => {
+  const doc = "Art\n\nNouveau\n\nL'art nouveau est un mouvement. On parle d'art total.\n\nSuite";
+  const debut = doc.indexOf("On parle");
+  const fin = debut + "On parle d'art total.".length;
+  assertEquals(contexte(doc, debut, fin), {
+    avant: "L'art nouveau est un mouvement. ",
+    milieu: "On parle d'art total.",
+    apres: "",
+    coupeAvant: false,
+    coupeApres: false,
+  });
+  const long = "alpha beta gamma delta epsilon zeta";
+  const d = long.indexOf("gamma");
+  const r = contexte(long, d, d + 5, 8);
+  assertEquals([r.avant, r.apres, r.coupeAvant, r.coupeApres], ["beta ", " delta", true, true]);
 });

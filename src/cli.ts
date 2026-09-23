@@ -7,7 +7,7 @@ import { chercher, chercherFts } from "./core/recherche.ts";
 import { creerCompte, type Role } from "./app/comptes.ts";
 import { config, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
-import { controlerFichier, deposer, nomSur, PUBLICS, sha256 } from "./app/depot.ts";
+import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
 import { indexer, revendiquer, statuer, traiter } from "./app/ingestion.ts";
 import { genererSuggestions } from "./app/suggestions.ts";
 
@@ -104,7 +104,7 @@ async function ingest(chemin: string) {
         resume: "",
         objectifs: "",
         evaluation: "",
-        publics: PUBLICS.map((p) => p.value),
+        publics: PUBLICS_PAR_DEFAUT,
       },
       nomFichier: nom,
       octets,

@@ -15,6 +15,7 @@ due: 2026-09-26
 
 - [x] sur la page de chapitre : une image, l'élève tape l'artiste ou le mouvement
 - [x] comparaison sans casse ni accents avec `quiz_reponse`, saisie par l'enseignant
+- [x] un mot entier de la réponse suffit (« Morris » pour « William Morris »). Réponse fausse : « Pas tout à fait. La réponse attendue : … »
 
 ## Terminé quand
 

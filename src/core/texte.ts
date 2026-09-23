@@ -11,6 +11,31 @@ export const tranche = (s: string, debut: number, fin: number) =>
   Array.from(s).slice(debut, fin).join("");
 
 /**
+ * Ce qu'on montre autour d'une citation: le paragraphe qui la contient, au plus `marge` points
+ * de code de chaque côté, coupé sur une espace. `coupe*` dit s'il faut des points de suspension.
+ */
+export function contexte(texte: string, debut: number, fin: number, marge = 300) {
+  const c = Array.from(texte);
+  const limiteA = Math.max(0, debut - marge);
+  let a = debut;
+  while (a > limiteA && !(c[a - 1] === "\n" && c[a - 2] === "\n")) a--;
+  const coupeAvant = a === limiteA && a > 0 && !(c[a - 1] === "\n" && c[a - 2] === "\n");
+  if (coupeAvant) { while (a < debut && !/\s/.test(c[a - 1])) a++; }
+  const limiteZ = Math.min(c.length, fin + marge);
+  let z = fin;
+  while (z < limiteZ && !(c[z] === "\n" && c[z + 1] === "\n")) z++;
+  const coupeApres = z === limiteZ && z < c.length && !(c[z] === "\n" && c[z + 1] === "\n");
+  if (coupeApres) { while (z > fin && !/\s/.test(c[z])) z--; }
+  return {
+    avant: c.slice(a, debut).join(""),
+    milieu: c.slice(debut, fin).join(""),
+    apres: c.slice(fin, z).join("").trimEnd(),
+    coupeAvant,
+    coupeApres,
+  };
+}
+
+/**
  * Forme de comparaison: apostrophes et guillemets unifiés, espaces réduites, casse ignorée.
  * Une puce compte comme une espace: le modèle recolle les listes en une phrase.
  */

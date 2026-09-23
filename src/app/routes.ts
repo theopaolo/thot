@@ -1,12 +1,13 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { csrf } from "hono/csrf";
+import { HTTPException } from "hono/http-exception";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { serveStatic } from "hono/deno";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
 import { type Affirmation, demander, type Resultat } from "../core/reponse.ts";
-import { tranche } from "../core/texte.ts";
+import { contexte } from "../core/texte.ts";
 import {
   authentifier,
   type Compte,
@@ -53,8 +54,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     return next();
   });
 
-  const rendre = (c: { get(k: "compte"): Compte }, titre: string, corps: unknown, classe = "") =>
-    V.page(titre, c.get("compte") ?? null, corps, classe);
+  const rendre = (
+    c: { get(k: "compte"): Compte; req: { path: string } },
+    titre: string,
+    corps: unknown,
+    classe = "",
+  ) => V.page(titre, c.get("compte") ?? null, corps, classe, c.req.path);
 
   // ------------------------------------------------------------ connexion
   app.get("/connexion", (c) => c.html(V.page("Connexion", null, V.connexion())));
@@ -85,6 +90,9 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.redirect("/");
   });
   app.post("/deconnexion", (c) => {
+    // Invalide aussi les cookies copiés ou restés sur un autre appareil.
+    db.prepare("UPDATE comptes SET session_version = session_version + 1 WHERE id = ?")
+      .run(c.get("compte").id);
     deleteCookie(c, SESSION, { path: "/" });
     return c.redirect("/connexion");
   });
@@ -108,28 +116,29 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
 
   // ------------------------------------------------------------ enseignant
-  const lignes = (statut: string) =>
+  const lignes = (statut: string, chapitre: string) =>
     db.prepare(
       `SELECT s.id, s.titre, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
-       WHERE s.school_id = ? AND (? = '' OR s.statut = ?)
+       WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
-    ).all(config.schoolId, statut, statut) as unknown as V.LigneSource[];
+    ).all(config.schoolId, statut, statut, chapitre, chapitre) as unknown as V.LigneSource[];
+  const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
+    statut: c.req.query("statut") ?? "",
+    chapitre: c.req.query("chapitre") ?? "",
+  });
 
   app.get("/prof", (c) => {
-    const statut = c.req.query("statut") ?? "";
-    const compteurs: Record<string, number> = { "": 0 };
-    for (
-      const l of db.prepare(
-        "SELECT statut, count(*) n FROM sources WHERE school_id = ? GROUP BY statut",
-      ).all(config.schoolId)
-    ) {
-      compteurs[l.statut as string] = l.n as number;
-      compteurs[""] += l.n as number;
-    }
-    return c.html(rendre(c, "Sources", V.sources(lignes(statut), statut, compteurs)));
+    const f = filtres(c);
+    const repartition = db.prepare(
+      `SELECT coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre, statut, count(*) AS n
+       FROM sources WHERE school_id = ? GROUP BY 1, 2`,
+    ).all(config.schoolId) as { chapitre: string; statut: string; n: number }[];
+    return c.html(
+      rendre(c, "Sources", V.sources(lignes(f.statut, f.chapitre), f, repartition)),
+    );
   });
   app.get("/prof/eleves", (c) => {
     const eleves = db.prepare(
@@ -182,15 +191,15 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.html(rendre(c, "Questions des élèves", V.questionsProf(messages)));
   });
   app.get("/prof/lignes", (c) => {
-    const statut = c.req.query("statut") ?? "";
-    return c.html(V.lignesSources(lignes(statut), statut ? `statut=${statut}` : ""));
+    const f = filtres(c);
+    return c.html(V.lignesSources(lignes(f.statut, f.chapitre), new URLSearchParams(f).toString()));
   });
   app.post("/prof/sources/statut", async (c) => {
     const b = await c.req.parseBody({ all: true });
     const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
     const ids = [b.ids ?? []].flat().map(String);
     for (const id of ids) statuer(db, id, statut, c.get("compte").nom);
-    return c.redirect("/prof");
+    return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
   });
 
   app.get("/prof/depot", (c) => c.html(rendre(c, "Déposer", V.depot({}))));
@@ -309,13 +318,24 @@ export function creerApp(db: Db, modeles: Modeles) {
     ).get(config.schoolId, imageId ?? "") as V.ALegender | undefined;
     return i && { ...i, restantes };
   };
+  // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
+  const fileLegendes = () =>
+    db.prepare(
+      `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id
+       WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
+       ORDER BY json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 12`,
+    ).all(config.schoolId) as { id: string; titre: string }[];
   app.get("/prof/legendes", (c) =>
     c.html(rendre(
       c,
       "Légendes",
       html`
-        <h1>Relire les légendes</h1>${V.legende(aLegender(c.req.query("image")))}${V
-          .raccourciEdition}
+        <h1>Relire les légendes</h1>
+        <p class="raccourcis discret">
+          <kbd>V</kbd> valider, <kbd>E</kbd> éditer, <kbd>R</kbd> rejeter, <kbd>↑</kbd> <kbd
+          >↓</kbd> image précédente ou suivante
+        </p>
+        ${V.legende(aLegender(c.req.query("image")), fileLegendes())}${V.raccourciEdition}
       `,
     )));
   app.post("/prof/legendes/:action{certified|rejected}", async (c) => {
@@ -327,14 +347,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       String(b.texte ?? ""),
       c.get("compte").nom,
     );
-    return c.html(V.legende(aLegender()));
+    return c.html(V.legende(aLegender(), fileLegendes()));
   });
 
   // ------------------------------------------------------------ élève
   const sourceCertifiee = (id: string) =>
     db.prepare(
-      "SELECT id, titre, json_extract(metadonnees, '$.sequence') AS sequence FROM sources WHERE id = ? AND statut = 'certifiee' AND school_id = ?",
-    ).get(id, config.schoolId) as { id: string; titre: string; sequence: string } | undefined;
+      `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
+         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
+         coalesce(json_extract(metadonnees, '$.date'), '') AS date
+       FROM sources WHERE id = ? AND statut = 'certifiee' AND school_id = ?`,
+    ).get(id, config.schoolId) as V.SourceLue | undefined;
 
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
@@ -356,7 +379,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       ch.questions = questions.get(ch.nom === "Sans chapitre" ? "" : ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
-    const oeuvres = rangs.filter((s) => s.image_id);
+    // Une vignette de vidéo n'est pas une œuvre: elle reste dans son chapitre, pas dans « Le saviez-vous ».
+    const oeuvres = rangs.filter((s) =>
+      s.image_id && !/vid[ée]o|\d+ ?mn\b/i.test(`${s.titre} ${s.seance}`)
+    );
     const fait = faitAuHasard(db);
     const oeuvre = (!fait || Math.random() < 0.5) && oeuvres.length
       ? oeuvres[Math.floor(Math.random() * oeuvres.length)]
@@ -379,12 +405,54 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(s.metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
-         AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ? ORDER BY s.titre`,
+         AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?
+       ORDER BY seance = '', seance, s.titre`,
     ).all(config.schoolId, nom) as V.SourceChapitre[];
     if (!sources.length) return c.notFound();
+    // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
+    const doc = sources.find((s) => s.id === c.req.query("doc")) ??
+      sources.find((s) => s.image_id) ?? sources[0];
     return c.html(
-      rendre(c, nom, V.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [])),
+      rendre(
+        c,
+        nom,
+        V.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [], apercu(doc.id)),
+      ),
     );
+  });
+
+  const apercu = (id: string): V.Apercu | undefined => {
+    const s = db.prepare(
+      `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
+         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
+         coalesce(json_extract(metadonnees, '$.date'), '') AS date
+       FROM sources WHERE id = ? AND statut = 'certifiee' AND school_id = ?`,
+    ).get(id, config.schoolId) as Omit<V.Apercu, "image_id" | "legende" | "images" | "extrait">;
+    if (!s) return undefined;
+    const images = db.prepare(
+      `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
+       FROM images WHERE source_id = ? ORDER BY position`,
+    ).all(id) as { id: string; legende: string | null }[];
+    let extrait = "";
+    try {
+      const texte = lireDocument(id).blocs.filter((b) =>
+        b.texte !== s.titre && b.texte !== b.section && !V.COMPTEUR_DIAPO.test(b.texte)
+      )
+        .map((b) => b.texte).join(" ");
+      extrait = texte.length > 320 ? texte.slice(0, 320).replace(/\s+\S*$/, "") + " …" : texte;
+    } catch { /* document sans texte extrait */ }
+    return {
+      ...s,
+      image_id: images[0]?.id ?? null,
+      legende: images[0]?.legende ?? null,
+      images: images.length,
+      extrait,
+    };
+  };
+
+  app.get("/eleve/documents/:id/apercu", (c) => {
+    const a = apercu(c.req.param("id"));
+    return a ? c.html(V.lecteur(a)) : c.notFound();
   });
 
   app.get("/eleve/sources/:id", (c) => {
@@ -400,7 +468,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       ? [debut, fin] as [number, number]
       : undefined;
     return c.html(
-      rendre(c, s.titre, V.lectureSource(s, images, lireDocument(s.id).blocs, marque), "lecture"),
+      rendre(
+        c,
+        s.titre,
+        V.lectureSource(
+          s,
+          images,
+          lireDocument(s.id).blocs.filter((b) => !V.COMPTEUR_DIAPO.test(b.texte)),
+          marque,
+        ),
+        "lecture",
+      ),
     );
   });
 
@@ -410,7 +488,16 @@ export function creerApp(db: Db, modeles: Modeles) {
     )
       .all(compteId) as V.MessageVue[];
 
-  const ideesPour = (r: Resultat, question = "") => {
+  const ideesPour = (r: Resultat, question = "", messageId = "") => {
+    // Hors cours: les questions que couvre le chapitre du passage le plus proche, ou du chapitre posé.
+    if (r.etat === "out_of_corpus") {
+      const m = db.prepare(
+        `SELECT coalesce(nullif(m.chapitre, ''), json_extract(s.metadonnees, '$.sequence'), '') AS nom
+         FROM messages m LEFT JOIN sources s ON s.id = json_extract(m.journal, '$.candidats[0].source_id')
+         WHERE m.id = ?`,
+      ).get(messageId) as { nom: string } | undefined;
+      return m?.nom ? (suggestionsParChapitre(db).get(m.nom) ?? []).slice(0, 3) : [];
+    }
     if (r.etat !== "answered") return [];
     const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
     if (!ids.length) return [];
@@ -433,8 +520,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     (c) => {
       const messages = messagesDe(c.get("compte").id);
       const dernier = [...messages].reverse().find((m) => m.resultat);
-      const idees = dernier ? ideesPour(JSON.parse(dernier.resultat!), dernier.question) : [];
-      return c.html(rendre(c, "Question", V.chat(messages, idees)));
+      const idees = dernier
+        ? ideesPour(JSON.parse(dernier.resultat!), dernier.question, dernier.id)
+        : [];
+      return c.html(rendre(c, "Question", V.chat(messages, idees), "page-chat"));
     },
   );
 
@@ -518,7 +607,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           const r = JSON.parse(m.resultat) as Resultat;
           await flux.writeSSE({
             event: "reponse",
-            data: String(await V.reponse(id, r, null, ideesPour(r, m.question), true)).replace(
+            data: String(await V.reponse(id, r, null, ideesPour(r, m.question, id), true)).replace(
               /\n/g,
               " ",
             ),
@@ -546,18 +635,26 @@ export function creerApp(db: Db, modeles: Modeles) {
     const a: Affirmation | undefined = r?.etat === "answered"
       ? r.affirmations[Number(c.req.param("n"))]
       : undefined;
-    if (!a || !sourceCertifiee(a.source_id)) return c.html(V.panneauSource());
-    if (a.debut === undefined || a.fin === undefined) return c.html(V.panneauSource(a));
+    const source = a && sourceCertifiee(a.source_id);
+    if (!a || !source) return c.html(V.panneauSource());
+    const suite = {
+      id: c.req.param("id"),
+      n: Number(c.req.param("n")),
+      total: r?.etat === "answered" ? r.affirmations.length : 0,
+    };
+    if (a.debut === undefined || a.fin === undefined) {
+      return c.html(V.panneauSource({ ...a, enseignant: source.enseignant }, suite));
+    }
     const texte = lireDocument(a.source_id).texte;
     return c.html(V.panneauSource({
       ...a,
-      avant: tranche(texte, Math.max(0, a.debut - 300), a.debut),
-      milieu: tranche(texte, a.debut, a.fin),
-      apres: tranche(texte, a.fin, a.fin + 300),
-    }));
+      enseignant: source.enseignant,
+      ...contexte(texte, a.debut, a.fin),
+    }, suite));
   });
 
   app.onError((e, c) => {
+    if (e instanceof HTTPException) return e.getResponse();
     console.error(e);
     return c.text("Erreur interne.", 500);
   });

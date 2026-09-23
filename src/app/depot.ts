@@ -32,9 +32,12 @@ export const CLASSES = [
 export const PUBLICS = [
   { value: "enseignants", label: "Enseignants" },
   { value: "eleves", label: "Élèves" },
-  { value: "thot", label: "Thot" },
+  { value: "thot", label: "Thot (réponses aux élèves)" },
   { value: "consultants", label: "Consultants extérieurs" },
 ];
+
+/** Cochés d'office au dépôt. Les consultants extérieurs restent un choix explicite. */
+export const PUBLICS_PAR_DEFAUT = ["enseignants", "eleves", "thot"];
 
 export type Metadonnees = {
   titre: string;
@@ -105,7 +108,7 @@ export function controlerFichier(octets: Uint8Array): { format: Format } | { err
     return { erreur: `Fichier trop lourd, ${MAX_OCTETS / 1024 / 1024} Mo au maximum.` };
   }
   const format = detecterFormat(octets);
-  if (!format) return { erreur: `Format non reconnu. Acceptés: ${FORMATS.join(", ")}.` };
+  if (!format) return { erreur: `Format non reconnu. Acceptés : ${FORMATS.join(", ")}.` };
   return { format };
 }
 

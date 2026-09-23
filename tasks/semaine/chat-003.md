@@ -1,6 +1,6 @@
 ---
 title: CHAT-003 Rendre le chat et la navigation plus directs
-status: in_progress
+status: done
 context: shallow
 energy: 3
 # pleasure: 1 2 3 5 8 13 21
@@ -22,8 +22,9 @@ due: 2026-09-25
 ## Terminé quand
 
 - [x] balisage vérifié par HTTP : première citation en `click, load`, liste des sources, « Pour continuer », avis
-- [ ] vérifié à l'écran dans Helium, bureau et mobile, clavier seul compris
+- [x] vérifié à l'écran dans Helium le 23/09, bureau et mobile, clavier seul compris
 - [x] commité dans b211003
+- [x] commité avec la refonte d'interface [[ui-001]]
 
 ## Dépend de
 

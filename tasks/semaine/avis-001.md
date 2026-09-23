@@ -1,6 +1,6 @@
 ---
 title: AVIS-001 Recueillir l'avis de l'élève sur une réponse
-status: in_progress
+status: done
 context: shallow
 energy: 2
 # pleasure: 1 2 3 5 8 13 21
@@ -20,7 +20,7 @@ due: 2026-09-25
 ## Terminé quand
 
 - [x] l'avis donné reste marqué après rechargement, test à l'appui
-- [ ] vérifié à l'écran dans Helium
+- [x] vérifié à l'écran dans Helium le 23/09 : le bouton choisi reste marqué
 - [x] commité dans b211003
 - [x] commiter la correction de `aria-pressed`
 

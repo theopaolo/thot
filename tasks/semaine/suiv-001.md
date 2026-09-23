@@ -16,11 +16,14 @@ due: 2026-09-25
 - [x] `/prof/questions` : questions groupées par chapitre
 - [x] les refus « hors du cours » d'abord, puis les réponses signalées fausses, puis les plus récentes
 - [x] le chapitre vient de la question posée dans un chapitre, sinon de la source citée
+- [x] les refus « Hors cours » forment leur propre groupe en tête, sans chapitre deviné
+- [x] dates écrites en français, mêmes colonnes d'un chapitre à l'autre
 
 ## Terminé quand
 
 - [x] vérifié par HTTP le 23/09 : groupé par chapitre, refus « Hors cours » en tête, avis « Fausse » affiché
-- [ ] vérifié à l'écran dans Helium, puis sur les vraies questions du pilote
+- [x] vérifié à l'écran dans Helium le 23/09, bureau et mobile
+- [ ] revu sur les vraies questions du pilote
 - [x] commité
 
 ## Dépend de
