@@ -422,13 +422,15 @@ figcaption {
   margin-bottom: 1.5rem;
 }
 .apercu-oeuvres {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: .4rem;
   margin: .75rem 0;
 }
 .apercu-oeuvres img {
-  width: 5rem;
-  height: 5rem;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
   border: 1px solid var(--line);
 }

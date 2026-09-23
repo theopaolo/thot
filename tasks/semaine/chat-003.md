@@ -21,8 +21,9 @@ due: 2026-09-25
 
 ## Terminé quand
 
-- [ ] vérifié dans Helium, bureau et mobile, clavier seul compris
-- [ ] commité
+- [x] balisage vérifié par HTTP : première citation en `click, load`, liste des sources, « Pour continuer », avis
+- [ ] vérifié à l'écran dans Helium, bureau et mobile, clavier seul compris
+- [x] commité dans b211003
 
 ## Dépend de
 

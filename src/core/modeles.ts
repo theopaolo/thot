@@ -118,13 +118,17 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     if (raisonnement === false) corps.reasoning = { enabled: false };
     else if (typeof raisonnement === "string") corps.reasoning = { effort: raisonnement };
     const json = await post("/chat/completions", corps, cacheable);
-    return (json.choices?.[0]?.message?.content ?? "") as string;
+    const choix = json.choices?.[0];
+    return {
+      texte: (choix?.message?.content ?? "") as string,
+      coupe: choix?.finish_reason === "length",
+    };
   }
 
   return {
     async legender(image, mime) {
       const url = `data:${mime};base64,${base64(image)}`;
-      const texte = await chat(
+      const { texte } = await chat(
         config.legende,
         [{
           role: "user",
@@ -158,14 +162,22 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       // gpt-oss raisonne sur le même budget de sortie. Une réponse vide à 2 400 tokens est
       // retentée à 6 000 avant d'être déclarée vide, comme dans le banc d'essai.
       for (const budget of [2400, 6000]) {
-        const texte = await chat(config.generation, messages, budget, config.effort ?? true);
-        if (texte.trim()) return { texte, modele: config.generation };
+        const { texte, coupe } = await chat(
+          config.generation,
+          messages,
+          budget,
+          config.effort ?? true,
+        );
+        // Une sortie coupée au budget n'est pas un JSON complet: on la retente plus large.
+        if (texte.trim() && (!coupe || budget === 6000)) {
+          return { texte, modele: config.generation };
+        }
       }
       throw new PanneModele("Le générateur a rendu une sortie vide.", "MODEL_EMPTY_RESPONSE");
     },
 
     async reformuler(questionPrecedente, question) {
-      const texte = await chat(
+      const { texte } = await chat(
         config.generation,
         [
           {
@@ -178,8 +190,9 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
             content: `Question précédente : ${questionPrecedente}\nNouvelle question : ${question}`,
           },
         ],
-        120,
-        false,
+        // gpt-oss refuse `reasoning: {enabled: false}` (400). Le raisonnement compte dans le budget.
+        600,
+        "low",
       );
       return texte.trim();
     },

@@ -431,6 +431,11 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
     })).status,
     200,
   );
+  // hono/html rend `true` en attribut vide: l'avis choisi doit rester marqué au rechargement.
+  assertStringIncludes(
+    await (await eleve.requete("/eleve/chat")).text(),
+    'aria-pressed="true" name="avis" value="faux"',
+  );
   const prof = await session(db, fauxModeles().modeles, "enseignant");
   const revue = await (await prof.requete("/prof/questions")).text();
   assertStringIncludes(revue, "ATC Art Nouveau");

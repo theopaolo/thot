@@ -19,8 +19,9 @@ due: 2026-09-25
 
 ## Terminé quand
 
-- [ ] vérifié dans Helium sur les vraies questions du pilote
-- [ ] commité
+- [x] vérifié par HTTP le 23/09 : groupé par chapitre, refus « Hors cours » en tête, avis « Fausse » affiché
+- [ ] vérifié à l'écran dans Helium, puis sur les vraies questions du pilote
+- [x] commité
 
 ## Dépend de
 

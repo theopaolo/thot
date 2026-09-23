@@ -33,6 +33,12 @@ Deno.test("une citation se retrouve malgré les apostrophes, la casse et les esp
   assertEquals(trouver(texte, "une phrase absente"), null);
 });
 
+Deno.test("une citation qui recolle une liste à puces se retrouve", () => {
+  const texte = "par un artisan :\n• Possibilité de personnaliser\n• Marge de manoeuvre";
+  const [a, b] = trouver(texte, "par un artisan : Possibilité de personnaliser")!;
+  assertEquals(tranche(texte, a, b), "par un artisan :\n• Possibilité de personnaliser");
+});
+
 Deno.test("la racinisation retire l'élision et rapproche les formes", () => {
   assertEquals(racines("d'architecture"), racines("architecture"));
   assertEquals(racines("peintres")[0], racines("peintre")[0]);

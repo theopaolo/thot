@@ -10,12 +10,15 @@ export const longueur = (s: string) => {
 export const tranche = (s: string, debut: number, fin: number) =>
   Array.from(s).slice(debut, fin).join("");
 
-/** Forme de comparaison: apostrophes et guillemets unifiés, espaces réduites, casse ignorée. */
+/**
+ * Forme de comparaison: apostrophes et guillemets unifiés, espaces réduites, casse ignorée.
+ * Une puce compte comme une espace: le modèle recolle les listes en une phrase.
+ */
 const plier = (c: string) => {
   if ("’‘ʼ`´".includes(c)) return "'";
   if ("«»“”„".includes(c)) return '"';
   if ("‐‑‒–—−".includes(c)) return "-";
-  if (/\s/.test(c)) return " ";
+  if (/\s/.test(c) || "•▪◦".includes(c)) return " ";
   return c.toLowerCase();
 };
 
@@ -35,7 +38,7 @@ export function trouver(texte: string, citation: string): [number, number] | nul
     }
     i++;
   }
-  const cible = Array.from(citation.trim()).map(plier).join("").replace(/ +/g, " ");
+  const cible = Array.from(citation).map(plier).join("").replace(/ +/g, " ").trim();
   if (!cible) return null;
   const at = src.join("").indexOf(cible);
   if (at < 0) return null;

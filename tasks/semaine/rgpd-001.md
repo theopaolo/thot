@@ -23,7 +23,7 @@ due: 2026-09-26
 
 - [ ] l'établissement complète et valide la notice : responsable, base légale, contact, durée
 - [ ] fournisseurs et lieux de traitement confirmés. Routage européen activé sur le compte OpenRouter, ou transfert hors UE accepté par écrit
-- [ ] commité
+- [x] commité dans b211003
 
 ## Dépend de
 

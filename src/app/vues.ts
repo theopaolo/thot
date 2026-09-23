@@ -845,7 +845,7 @@ export const pageChapitre = (nom: string, sources: SourceChapitre[], questions: 
     <form method="post" action="/eleve/questions" class="question-rapide">
       <label for="texte">Une question sur ce chapitre ?</label>
       <div
-        class="barre"><input id="texte" name="texte" required maxlength="1000" placeholder="Pose ta question">
+        class="barre"><input type="text" id="texte" name="texte" required maxlength="1000" placeholder="Pose ta question">
         <input type="hidden" name="chapitre" value="${nom}"><button class="principal">Demander</button></div>
     </form>
     ${questions.length
@@ -927,7 +927,9 @@ export const avis = (id: string, choix: string | null) =>
         [valeur, libelle],
       ) =>
         html`
-          <button type="button" aria-pressed="${choix === valeur}" name="avis" value="${valeur}"
+          <button type="button" aria-pressed="${String(
+            choix === valeur,
+          )}" name="avis" value="${valeur}"
             hx-post="/eleve/messages/${id}/avis" hx-include="this" hx-target="#avis-${id}"
             hx-swap="outerHTML">${libelle}</button>
         `
@@ -952,7 +954,7 @@ export const reponse = (
         html`
           <span>${a.texte}</span><button
             class="citation"
-            aria-pressed="${auto && n === 0}"
+            aria-pressed="${String(auto && n === 0)}"
             aria-label="Source ${n + 1}: ${a.titre}"
             hx-get="/eleve/messages/${id}/citations/${n}"
             hx-trigger="${auto && n === 0 ? "click, load" : "click"}"

@@ -19,8 +19,8 @@ due: 2026-09-26
 ## Terminé quand
 
 - [ ] au moins une œuvre par chapitre porte une réponse de quiz
-- [ ] vérifié dans Helium
-- [ ] commité
+- [x] affiché sur la page de chapitre dès qu'une œuvre porte une réponse, vérifié sur une copie
+- [x] commité dans b211003
 
 ## Dépend de
 
@@ -30,3 +30,5 @@ due: 2026-09-26
 ## Notes
 
 Premier morceau de [[revi-101]], sans rien de généré. La réponse attendue est dans la page : c'est un exercice, pas une évaluation.
+
+Le 23/09, aucune source réelle ne porte de `quiz_reponse` : le quiz n'apparaît nulle part tant que l'enseignant n'en saisit pas.
