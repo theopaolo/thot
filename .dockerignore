@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+data/
+.impeccable/
+evaluation/
+tasks/
+docs/
+tests/
+kanban.html

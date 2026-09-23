@@ -85,7 +85,9 @@ export function creerApp(db: Db, modeles: Modeles) {
       sameSite: "Lax",
       path: "/",
       maxAge: 12 * 3600,
-      secure: new URL(c.req.url).protocol === "https:",
+      // Derrière un proxy (Coolify, Traefik), le TLS s'arrête avant l'application.
+      secure: new URL(c.req.url).protocol === "https:" ||
+        c.req.header("x-forwarded-proto") === "https",
     });
     return c.redirect("/");
   });
