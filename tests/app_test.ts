@@ -4,7 +4,12 @@ import { PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
 import { migrer, purgerMessages } from "../src/app/db.ts";
-import { authentifier, lireListe } from "../src/app/comptes.ts";
+import {
+  authentifier,
+  creerCompte,
+  lireListe,
+  reinitialiserMotDePasse,
+} from "../src/app/comptes.ts";
 import { detecterFormat, nomSur } from "../src/app/depot.ts";
 import { relireLegende, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import {
@@ -351,6 +356,22 @@ Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la s
     400,
   );
   assertEquals(db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n, 2);
+});
+
+Deno.test("un mot de passe enseignant se renouvelle sans ouvrir le reset élève", async () => {
+  const { db } = await environnement();
+  const ancien = await creerCompte(db, "prof-test", "Prof", "enseignant");
+  const id = db.prepare("SELECT id FROM comptes WHERE identifiant = 'prof-test'").get()!
+    .id as string;
+  assertEquals(await reinitialiserMotDePasse(db, id), undefined);
+  const nouveau = await reinitialiserMotDePasse(db, id, "enseignant");
+  assert(nouveau);
+  assertEquals(await authentifier(db, "prof-test", ancien), null);
+  assertEquals((await authentifier(db, "prof-test", nouveau))?.role, "enseignant");
+  assertEquals(
+    db.prepare("SELECT session_version FROM comptes WHERE id = ?").get(id)!.session_version,
+    1,
+  );
 });
 
 Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la question", async () => {

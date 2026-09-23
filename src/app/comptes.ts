@@ -152,9 +152,9 @@ export async function importerEleves(db: Db, csv: string) {
   return resultats.map(({ identifiant, nom, motDePasse }) => ({ identifiant, nom, motDePasse }));
 }
 
-export async function reinitialiserMotDePasse(db: Db, id: string) {
+export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "eleve") {
   const compte = db.prepare("SELECT role FROM comptes WHERE id = ?").get(id);
-  if (compte?.role !== "eleve") return undefined;
+  if (compte?.role !== role) return undefined;
   const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   db.prepare(

@@ -18,6 +18,9 @@ deno task thot compte lea "Léa" eleve
 deno task dev                      # serveur et worker, http://127.0.0.1:8000
 ```
 
+Mot de passe enseignant oublié : `deno task thot reinitialiser prof` affiche un nouveau mot
+de passe et invalide les sessions ouvertes.
+
 Après la création du compte enseignant, `/prof/eleves` importe les élèves depuis un
 CSV UTF-8 à deux colonnes :
 

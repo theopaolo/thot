@@ -4,7 +4,7 @@ import { decoder, rubriquesSommaire } from "./core/html.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
 import { chercher, chercherFts } from "./core/recherche.ts";
-import { creerCompte, type Role } from "./app/comptes.ts";
+import { creerCompte, reinitialiserMotDePasse, type Role } from "./app/comptes.ts";
 import { config, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
@@ -16,6 +16,7 @@ const AIDE = `thot <commande>
   migrer                                    applique les migrations
   compte <identifiant> <nom> <enseignant|eleve>
                                             crée un compte et affiche son mot de passe
+  reinitialiser <identifiant>               renouvelle le mot de passe enseignant
   ingest <dossier|fichier> [--matiere=arts-appliques] [--classe=terminale] [--type=cours]
          [--enseignant="M. Detienne"]
                                             dépose chaque fichier, chapitre tiré du dossier
@@ -334,6 +335,29 @@ switch (commande) {
     }
     console.log(
       `Mot de passe de ${identifiant}: ${await creerCompte(db, identifiant, nom, role as Role)}`,
+    );
+    break;
+  }
+  case "reinitialiser": {
+    const identifiant = reste[0]?.trim().toLowerCase();
+    if (!identifiant || reste.length !== 1) {
+      console.error("usage: thot reinitialiser <identifiant enseignant>");
+      Deno.exit(2);
+    }
+    const compte = db.prepare(
+      "SELECT id FROM comptes WHERE identifiant = ? AND role = 'enseignant'",
+    )
+      .get(identifiant);
+    if (!compte) {
+      console.error(`Compte enseignant introuvable : ${identifiant}`);
+      Deno.exit(1);
+    }
+    console.log(
+      `Nouveau mot de passe de ${identifiant}: ${await reinitialiserMotDePasse(
+        db,
+        compte.id as string,
+        "enseignant",
+      )}`,
     );
     break;
   }
