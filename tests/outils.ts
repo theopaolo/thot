@@ -28,6 +28,7 @@ export function fauxModeles(o: { score?: number; sorties?: string[]; legende?: s
       if (texte === undefined) throw new Error("plus de sortie prévue");
       return Promise.resolve({ texte, modele: "faux-llm" });
     },
+    reformuler: (_precedente, question) => Promise.resolve(question),
   };
   return { modeles, vus };
 }

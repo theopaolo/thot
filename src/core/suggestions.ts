@@ -5,7 +5,7 @@ import { demander } from "./reponse.ts";
 
 /** Une question qui renvoie à un support que l'élève n'a pas sous les yeux. */
 const RENVOI =
-  /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage)\b/i;
+  /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage|le motif|cette (œuvre|oeuvre|image)|l['’]image)\b/i;
 
 const CONSIGNE = `Voici un extrait d'un cours de lycee.
 
@@ -13,7 +13,8 @@ Ecris deux questions qu'un eleve de Terminale pourrait poser, dont la reponse se
 dans cet extrait et seulement dans cet extrait. Questions courtes, 6 a 15 mots, en
 francais simple, comme un eleve les poserait. Une question porte sur une idee, une cause
 ou une oeuvre, jamais sur un detail de mise en page. L'eleve ne voit pas l'extrait :
-une question ne mentionne jamais « l'extrait », « le texte », « le document » ou « le passage ».
+une question nomme l'œuvre ou l'artiste si elle porte sur une image ou un motif. Elle ne
+mentionne jamais « l'extrait », « le texte », « le document » ou « le passage ».
 
 Rends uniquement un objet JSON : {"questions": ["...", "..."]}`;
 

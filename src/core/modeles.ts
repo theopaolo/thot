@@ -12,12 +12,14 @@ export interface Modeles {
   legender(image: Uint8Array, mime: string): Promise<{ texte: string; modele: string }>;
   reclasser(question: string, documents: string[]): Promise<{ index: number; score: number }[]>;
   generer(messages: Message[]): Promise<{ texte: string; modele: string }>;
+  reformuler(questionPrecedente: string, question: string): Promise<string>;
 }
 
 export type Cache = { lire(cle: string): string | undefined; ecrire(cle: string, v: string): void };
 
 export type ConfigModeles = {
   cle?: string;
+  url?: string;
   legende: string;
   reclasseur: string;
   generation: string;
@@ -41,8 +43,6 @@ N'invente jamais de nom d'auteur, de date ni de lieu que tu ne lis pas dans
 l'image. Si un texte est ecrit dans l'image, recopie-le entre guillemets.
 Ne reprends aucune formulation de cette consigne.`;
 
-const OPENROUTER = "https://openrouter.ai/api/v1";
-
 async function empreinte(s: string) {
   const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
   return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, "0")).join("");
@@ -57,12 +57,12 @@ const base64 = (octets: Uint8Array) => {
 };
 
 export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
-  async function post(chemin: string, corps: unknown) {
+  async function post(chemin: string, corps: unknown, cacheable = false) {
     if (!config.cle) {
       throw new PanneModele("OPENROUTER_API_KEY absente: aucun modèle n'est joignable.", "NO_KEY");
     }
     const cle = await empreinte(chemin + JSON.stringify(corps));
-    const connu = cache?.lire(cle);
+    const connu = cacheable ? cache?.lire(cle) : undefined;
     if (connu) return JSON.parse(connu);
     // Une seconde tentative après une panne passagère: réseau, 429, 5xx, erreur dans le corps.
     let derniere = "";
@@ -70,9 +70,13 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       if (attente) await new Promise((r) => setTimeout(r, attente));
       let reponse: Response;
       try {
-        reponse = await fetch(OPENROUTER + chemin, {
+        reponse = await fetch((config.url ?? "https://openrouter.ai/api/v1") + chemin, {
           method: "POST",
-          headers: { authorization: `Bearer ${config.cle}`, "content-type": "application/json" },
+          headers: {
+            authorization: `Bearer ${config.cle}`,
+            "content-type": "application/json",
+            "X-OpenRouter-Cache": "false",
+          },
           body: JSON.stringify(corps),
           signal: AbortSignal.timeout(90_000),
         });
@@ -90,7 +94,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         derniere = `OpenRouter: ${JSON.stringify(json.error).slice(0, 300)}`;
         continue;
       }
-      cache?.ecrire(cle, JSON.stringify(json));
+      if (cacheable) cache?.ecrire(cle, JSON.stringify(json));
       return json;
     }
     throw new PanneModele(derniere);
@@ -101,6 +105,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     messages: unknown[],
     maxTokens: number,
     raisonnement: boolean | string = true,
+    cacheable = false,
   ) {
     const corps: Record<string, unknown> = {
       model: modele,
@@ -109,10 +114,10 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       max_tokens: maxTokens,
     };
     // Même modèle, hébergeur le plus rapide: la latence d'une réponse élève en dépend.
-    corps.provider = { sort: "throughput" };
+    corps.provider = { sort: "throughput", zdr: true, data_collection: "deny" };
     if (raisonnement === false) corps.reasoning = { enabled: false };
     else if (typeof raisonnement === "string") corps.reasoning = { effort: raisonnement };
-    const json = await post("/chat/completions", corps);
+    const json = await post("/chat/completions", corps, cacheable);
     return (json.choices?.[0]?.message?.content ?? "") as string;
   }
 
@@ -130,6 +135,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         }],
         400,
         false,
+        true,
       );
       if (!texte.trim()) throw new PanneModele("Légende vide.", "MODEL_EMPTY_RESPONSE");
       return { texte: texte.trim(), modele: config.legende };
@@ -141,6 +147,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         model: config.reclasseur,
         query: question,
         documents: documents.map((d) => d.slice(0, 8000)),
+        provider: { zdr: true, data_collection: "deny" },
       });
       return (json.results as { index: number; relevance_score: number }[])
         .map((r) => ({ index: r.index, score: r.relevance_score }))
@@ -155,6 +162,26 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         if (texte.trim()) return { texte, modele: config.generation };
       }
       throw new PanneModele("Le générateur a rendu une sortie vide.", "MODEL_EMPTY_RESPONSE");
+    },
+
+    async reformuler(questionPrecedente, question) {
+      const texte = await chat(
+        config.generation,
+        [
+          {
+            role: "system",
+            content:
+              "Reformule la deuxième question pour qu'elle se comprenne seule, en ajoutant seulement le contexte nécessaire de la première. Si elle est déjà autonome, recopie-la. Une seule question, sans commentaire ni réponse.",
+          },
+          {
+            role: "user",
+            content: `Question précédente : ${questionPrecedente}\nNouvelle question : ${question}`,
+          },
+        ],
+        120,
+        false,
+      );
+      return texte.trim();
     },
   };
 }

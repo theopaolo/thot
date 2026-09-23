@@ -7,11 +7,18 @@ import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
 import { type Affirmation, demander, type Resultat } from "../core/reponse.ts";
 import { tranche } from "../core/texte.ts";
-import { authentifier, type Compte, lireCompte, secretSession } from "./comptes.ts";
+import {
+  authentifier,
+  type Compte,
+  importerEleves,
+  lireCompte,
+  reinitialiserMotDePasse,
+  secretSession,
+} from "./comptes.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { controlerFichier, deposer, valider } from "./depot.ts";
-import { lireDocument, relireLegende, statuer } from "./ingestion.ts";
+import { indexer, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsParChapitre } from "./suggestions.ts";
 import * as V from "./vues.ts";
 
@@ -30,9 +37,14 @@ export function creerApp(db: Db, modeles: Modeles) {
   // Session: un cookie signé qui porte l'identifiant du compte, relu en base à chaque requête.
   app.use("*", async (c, next) => {
     const id = await getSignedCookie(c, secret, SESSION);
-    const compte = id ? lireCompte(db, id) : undefined;
+    const [compteId, version] = typeof id === "string" ? id.split(":") : [];
+    const trouve = compteId ? lireCompte(db, compteId) : undefined;
+    const compte = trouve && String(trouve.session_version) === version ? trouve : undefined;
     if (compte) c.set("compte", compte);
     const p = c.req.path;
+    if (!p.startsWith("/static/") && !p.startsWith("/media/")) {
+      c.header("Cache-Control", "no-store");
+    }
     if (p === "/connexion" || p.startsWith("/static/")) return next();
     if (!compte) return c.redirect("/connexion");
     if (p.startsWith("/prof") && compte.role !== "enseignant") {
@@ -63,7 +75,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         401,
       );
     }
-    await setSignedCookie(c, SESSION, compte.id, secret, {
+    await setSignedCookie(c, SESSION, `${compte.id}:${compte.session_version}`, secret, {
       httpOnly: true,
       sameSite: "Lax",
       path: "/",
@@ -81,8 +93,8 @@ export function creerApp(db: Db, modeles: Modeles) {
   // ------------------------------------------------------------ images
   app.get("/media/:id", async (c) => {
     const i = db.prepare(
-      "SELECT i.fichier, i.mime, i.source_id, s.statut FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ?",
-    ).get(c.req.param("id")) as
+      "SELECT i.fichier, i.mime, i.source_id, s.statut FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ? AND s.school_id = ?",
+    ).get(c.req.param("id"), config.schoolId) as
       | { fichier: string; mime: string; source_id: string; statut: string }
       | undefined;
     if (!i || (c.get("compte").role !== "enseignant" && i.statut !== "certifiee")) {
@@ -118,6 +130,56 @@ export function creerApp(db: Db, modeles: Modeles) {
       compteurs[""] += l.n as number;
     }
     return c.html(rendre(c, "Sources", V.sources(lignes(statut), statut, compteurs)));
+  });
+  app.get("/prof/eleves", (c) => {
+    const eleves = db.prepare(
+      "SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve' ORDER BY nom",
+    )
+      .all() as { id: string; identifiant: string; nom: string }[];
+    return c.html(rendre(c, "Élèves", V.eleves(eleves)));
+  });
+  app.post("/prof/eleves/importer", async (c) => {
+    const fichier = (await c.req.parseBody()).fichier;
+    if (!(fichier instanceof File) || fichier.size > 100_000) {
+      return c.text("Fichier CSV invalide (100 Ko maximum).", 400);
+    }
+    try {
+      const comptes = await importerEleves(db, await fichier.text());
+      c.header("Cache-Control", "no-store");
+      return c.html(
+        rendre(c, "Identifiants élèves", V.feuilleIdentifiants(comptes, new URL(c.req.url).origin)),
+      );
+    } catch (e) {
+      return c.html(rendre(c, "Élèves", V.eleves([], (e as Error).message)), 400);
+    }
+  });
+  app.post("/prof/eleves/:id/reinitialiser", async (c) => {
+    const id = c.req.param("id");
+    const eleve = db.prepare("SELECT identifiant, nom FROM comptes WHERE id = ? AND role = 'eleve'")
+      .get(id) as { identifiant: string; nom: string } | undefined;
+    if (!eleve) return c.notFound();
+    const motDePasse = await reinitialiserMotDePasse(db, id);
+    c.header("Cache-Control", "no-store");
+    return c.html(
+      rendre(
+        c,
+        "Nouveau mot de passe",
+        V.feuilleIdentifiants([{ ...eleve, motDePasse: motDePasse! }], new URL(c.req.url).origin),
+      ),
+    );
+  });
+  app.get("/prof/questions", (c) => {
+    const messages = db.prepare(
+      `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
+         coalesce(nullif(m.chapitre, ''), json_extract(s.metadonnees, '$.sequence'),
+           json_extract(s2.metadonnees, '$.sequence'), '') AS chapitre
+       FROM messages m JOIN comptes c ON c.id = m.compte_id
+       LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
+       LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
+       WHERE c.role = 'eleve'
+       ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
+    ).all() as V.QuestionProf[];
+    return c.html(rendre(c, "Questions des élèves", V.questionsProf(messages)));
   });
   app.get("/prof/lignes", (c) => {
     const statut = c.req.query("statut") ?? "";
@@ -207,6 +269,27 @@ export function creerApp(db: Db, modeles: Modeles) {
     const d = detail(c.req.param("id"));
     return d ? c.html(rendre(c, d.source.titre, V.detailSource(d))) : c.notFound();
   });
+  app.post("/prof/sources/:id/modifier", async (c) => {
+    const d = detail(c.req.param("id"));
+    if (!d) return c.notFound();
+    const b = await c.req.parseBody();
+    const titre = String(b.titre ?? "").trim();
+    const sequence = String(b.sequence ?? "").trim();
+    const date = String(b.date ?? "").trim();
+    const quiz = String(b.quiz_reponse ?? "").trim();
+    if (
+      !titre || titre.length > 200 || sequence.length > 120 || date.length > 40 || quiz.length > 120
+    ) {
+      return c.text("Titre ou chapitre invalide.", 400);
+    }
+    const meta = { ...d.meta, titre, sequence, date, quiz_reponse: quiz };
+    db.prepare(
+      "UPDATE sources SET titre = ?, metadonnees = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
+    )
+      .run(titre, JSON.stringify(meta), d.source.id, config.schoolId);
+    if (d.source.statut === "certifiee") indexer(db, d.source.id);
+    return c.redirect(`/prof/sources/${d.source.id}`, 303);
+  });
   app.post("/prof/sources/:id/:statut{certifiee|rejetee}", (c) => {
     const id = c.req.param("id");
     if (!detail(id)) return c.notFound();
@@ -256,9 +339,12 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
       `SELECT id, titre, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
-         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance
+         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
+         coalesce(json_extract(metadonnees, '$.date'), '') AS date,
+         coalesce(json_extract(metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
+         (SELECT id FROM images WHERE source_id = sources.id ORDER BY position LIMIT 1) AS image_id
        FROM sources WHERE statut = 'certifiee' AND school_id = ? ORDER BY sequence, seance, titre`,
-    ).all(config.schoolId) as { id: string; titre: string; sequence: string; seance: string }[];
+    ).all(config.schoolId) as V.SourceChapitre[];
     const chapitres: V.ChapitreVue[] = [];
     for (const r of rangs) {
       const nom = r.sequence || "Sans chapitre";
@@ -270,7 +356,35 @@ export function creerApp(db: Db, modeles: Modeles) {
       ch.questions = questions.get(ch.nom === "Sans chapitre" ? "" : ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
-    return c.html(rendre(c, "Accueil", V.accueilEleve(prenom, chapitres, faitAuHasard(db))));
+    const oeuvres = rangs.filter((s) => s.image_id);
+    const fait = faitAuHasard(db);
+    const oeuvre = (!fait || Math.random() < 0.5) && oeuvres.length
+      ? oeuvres[Math.floor(Math.random() * oeuvres.length)]
+      : undefined;
+    return c.html(
+      rendre(
+        c,
+        "Accueil",
+        V.accueilEleve(prenom, chapitres, oeuvre ? undefined : fait, oeuvre),
+        "accueil",
+      ),
+    );
+  });
+
+  app.get("/eleve/chapitres/:nom", (c) => {
+    const nom = c.req.param("nom");
+    const sources = db.prepare(
+      `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
+         coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
+         coalesce(json_extract(s.metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
+         (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
+       FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
+         AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ? ORDER BY s.titre`,
+    ).all(config.schoolId, nom) as V.SourceChapitre[];
+    if (!sources.length) return c.notFound();
+    return c.html(
+      rendre(c, nom, V.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [])),
+    );
   });
 
   app.get("/eleve/sources/:id", (c) => {
@@ -292,28 +406,54 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   const messagesDe = (compteId: string) =>
     db.prepare(
-      "SELECT id, question, etat, resultat FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
+      "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
     )
-      .all(compteId) as { id: string; question: string; etat: string; resultat: string | null }[];
+      .all(compteId) as V.MessageVue[];
+
+  const ideesPour = (r: Resultat, question = "") => {
+    if (r.etat !== "answered") return [];
+    const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
+    if (!ids.length) return [];
+    const memesSources = db.prepare(
+      `SELECT sg.question FROM suggestions sg JOIN sources s ON s.id = sg.source_id
+       WHERE sg.source_id IN (${ids.map(() => "?").join(",")}) AND s.statut = 'certifiee'
+         AND s.school_id = ? AND sg.question != ? ORDER BY random() LIMIT 3`,
+    ).all(...ids, config.schoolId, question).map((x) => x.question as string);
+    if (memesSources.length) return memesSources;
+    const chapitre = db.prepare(
+      "SELECT json_extract(metadonnees, '$.sequence') AS nom FROM sources WHERE id = ? AND school_id = ?",
+    ).get(ids[0], config.schoolId)?.nom as string | undefined;
+    return chapitre
+      ? (suggestionsParChapitre(db).get(chapitre) ?? []).filter((q) => q !== question)
+      : [];
+  };
 
   app.get(
     "/eleve/chat",
     (c) => {
-      const idees = [...suggestionsParChapitre(db, 2).values()].flat()
-        .sort(() => Math.random() - 0.5).slice(0, 4);
-      return c.html(rendre(c, "Question", V.chat(messagesDe(c.get("compte").id), idees)));
+      const messages = messagesDe(c.get("compte").id);
+      const dernier = [...messages].reverse().find((m) => m.resultat);
+      const idees = dernier ? ideesPour(JSON.parse(dernier.resultat!), dernier.question) : [];
+      return c.html(rendre(c, "Question", V.chat(messages, idees)));
     },
   );
 
   app.post("/eleve/questions", async (c) => {
-    const texte = String((await c.req.parseBody()).texte ?? "").trim().slice(0, 1000);
+    const b = await c.req.parseBody();
+    const texte = String(b.texte ?? "").trim().slice(0, 1000);
     if (!texte) return c.text("Question vide.", 400);
+    const chapitre = String(b.chapitre ?? "");
+    if (
+      chapitre && !db.prepare(
+        "SELECT id FROM sources WHERE school_id = ? AND statut = 'certifiee' AND json_extract(metadonnees, '$.sequence') = ? LIMIT 1",
+      ).get(config.schoolId, chapitre)
+    ) return c.text("Chapitre indisponible.", 400);
     const id = crypto.randomUUID();
     const t = maintenant();
     db.prepare(
-      "INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le) VALUES (?, ?, ?, 'en_attente', ?, ?)",
+      "INSERT INTO messages (id, compte_id, question, chapitre, etat, cree_le, maj_le) VALUES (?, ?, ?, ?, 'en_attente', ?, ?)",
     )
-      .run(id, c.get("compte").id, texte, t, t);
+      .run(id, c.get("compte").id, texte, chapitre, t, t);
     // Hors HTMX (accueil, idée proposée), la conversation s'ouvre et le flux démarre là-bas.
     if (!c.req.header("HX-Request")) return c.redirect("/eleve/chat", 303);
     return c.html(html`
@@ -342,16 +482,22 @@ export function creerApp(db: Db, modeles: Modeles) {
          WHERE id = ? AND compte_id = ? AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le < ?))`,
       ).run(maintenant(), id, compte.id, perime).changes;
       if (pris) {
-        const m = db.prepare("SELECT question FROM messages WHERE id = ?").get(id) as {
+        const m = db.prepare("SELECT question, chapitre FROM messages WHERE id = ?").get(id) as {
           question: string;
+          chapitre: string;
         };
+        const precedente = db.prepare(
+          `SELECT question FROM messages WHERE compte_id = ? AND rowid < (SELECT rowid FROM messages WHERE id = ?)
+           AND chapitre = ? ORDER BY rowid DESC LIMIT 1`,
+        ).get(compte.id, id, m.chapitre)?.question as string | undefined;
         const { resultat, journal } = await demander(
           db,
           modeles,
           m.question,
-          { schoolId: config.schoolId },
+          { schoolId: config.schoolId, chapitre: m.chapitre || undefined },
           config.seuil,
           (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
+          precedente,
         );
         db.prepare(
           "UPDATE messages SET etat = ?, resultat = ?, journal = ?, maj_le = ? WHERE id = ?",
@@ -359,24 +505,38 @@ export function creerApp(db: Db, modeles: Modeles) {
           .run(resultat.etat, JSON.stringify(resultat), JSON.stringify(journal), maintenant(), id);
       }
       for (let i = 0; i < 240; i++) {
-        const m = db.prepare("SELECT resultat FROM messages WHERE id = ? AND compte_id = ?").get(
+        const m = db.prepare(
+          "SELECT question, resultat FROM messages WHERE id = ? AND compte_id = ?",
+        ).get(
           id,
           compte.id,
         ) as
-          | { resultat: string | null }
+          | { question: string; resultat: string | null }
           | undefined;
         if (!m) return;
         if (m.resultat) {
           const r = JSON.parse(m.resultat) as Resultat;
           await flux.writeSSE({
             event: "reponse",
-            data: String(await V.reponse(id, r)).replace(/\n/g, " "),
+            data: String(await V.reponse(id, r, null, ideesPour(r, m.question), true)).replace(
+              /\n/g,
+              " ",
+            ),
           });
           return;
         }
         await flux.sleep(500);
       }
     });
+  });
+
+  app.post("/eleve/messages/:id/avis", async (c) => {
+    const avis = String((await c.req.parseBody()).avis ?? "");
+    if (!["utile", "confus", "faux"].includes(avis)) return c.text("Avis invalide.", 400);
+    const r = db.prepare(
+      "UPDATE messages SET avis = ? WHERE id = ? AND compte_id = ? AND etat = 'answered'",
+    ).run(avis, c.req.param("id"), c.get("compte").id);
+    return r.changes ? c.html(V.avis(c.req.param("id"), avis)) : c.notFound();
   });
 
   app.get("/eleve/messages/:id/citations/:n", (c) => {

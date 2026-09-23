@@ -9,6 +9,7 @@ export type Affirmation = {
   source_id: string;
   chunk_id: string;
   titre: string;
+  image_id?: string;
   /** offsets dans `document.txt`, absents quand la citation vient d'une légende certifiée */
   debut?: number;
   fin?: number;
@@ -104,11 +105,21 @@ export async function demander(
   p: Perimetre,
   seuil: number,
   etape: (nom: string) => void = () => {},
+  questionPrecedente?: string,
 ): Promise<{ resultat: Resultat; journal: Journal }> {
   const journal: Journal = { seuil };
   try {
+    let recherche = question;
+    if (questionPrecedente) {
+      etape("Mise en contexte de la question");
+      try {
+        const reformulee = await modeles.reformuler(questionPrecedente, question);
+        if (reformulee && reformulee.length <= 1000) recherche = reformulee;
+      } catch { /* Une reformulation indisponible ne bloque pas la question. */ }
+      journal.question_recherche = recherche;
+    }
     etape("Recherche dans les documents du cours");
-    const r = await chercher(db, modeles, question, p, seuil);
+    const r = await chercher(db, modeles, recherche, p, seuil);
     journal.score = r.score;
     journal.candidats = r.candidats.map((c) => ({
       id: c.id,
@@ -123,7 +134,9 @@ export async function demander(
       { role: "system", content: SYSTEME },
       {
         role: "user",
-        content: `Extraits du corpus :\n\n${bloc(r.retenus)}\n\nQuestion de l'eleve : ${question}`,
+        content: `Extraits du corpus :\n\n${bloc(r.retenus)}\n\n${
+          questionPrecedente ? `Question précédente : ${questionPrecedente}\n` : ""
+        }Question de l'eleve : ${question}`,
       },
     ];
     const tentatives: unknown[] = [];
@@ -136,6 +149,18 @@ export async function demander(
       tentatives.push({ sortie: texte, erreurs: v.erreurs });
       if (v.refus) return { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       if (!v.erreurs.length) {
+        for (const a of v.affirmations) {
+          const images = db.prepare(
+            "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
+          ).all(a.source_id) as { id: string; legende: string | null; legende_statut: string }[];
+          const image = images.find((i) =>
+            a.debut === undefined && i.legende_statut === "certified" && i.legende &&
+            trouverFragments(i.legende, a.citation)
+          ) ?? images[0];
+          if (image) {
+            a.image_id = image.id as string;
+          }
+        }
         return { resultat: { etat: "answered", affirmations: v.affirmations }, journal };
       }
       messages.push(

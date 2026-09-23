@@ -18,7 +18,7 @@
   },
   "fmt": {
     "lineWidth": 100,
-    "exclude": ["static/vendor/", "tasks/", "*.md", "docs/", "evaluation/"]
+    "exclude": ["static/vendor/", "tasks/", "*.md", "docs/", "evaluation/", ".impeccable/"]
   },
   "lint": {
     "exclude": ["static/vendor/"]

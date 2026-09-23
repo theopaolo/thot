@@ -1,9 +1,10 @@
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { join } from "@std/path";
 import { PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
-import { migrer } from "../src/app/db.ts";
+import { migrer, purgerMessages } from "../src/app/db.ts";
+import { authentifier, lireListe } from "../src/app/comptes.ts";
 import { detecterFormat, nomSur } from "../src/app/depot.ts";
 import { relireLegende, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import {
@@ -280,7 +281,12 @@ Deno.test("une question proposée n'est gardée que si Thot y répond avec une c
   const f = fauxModeles({
     sorties: [
       JSON.stringify({
-        questions: ["Pourquoi Gaudí refuse-t-il la ligne droite ?", "Quel âge avait Gaudí ?"],
+        questions: [
+          "Pourquoi le motif alterne-t-il le vert et le bleu ?",
+          "Que montre cette œuvre ?",
+          "Pourquoi Gaudí refuse-t-il la ligne droite ?",
+          "Quel âge avait Gaudí ?",
+        ],
       }),
       bonne,
       '{"refus": true}',
@@ -304,4 +310,199 @@ Deno.test("le saviez-vous recopie une phrase certifiée et pointe sa position ex
   const fait = faitAuHasard(db)!;
   const texte = await Deno.readTextFile(`${config.donnees}/content/${id}/document.txt`);
   assertEquals(Array.from(texte).slice(fait.debut, fait.fin).join(""), fait.phrase);
+});
+
+Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la session", async () => {
+  const { db } = await environnement();
+  assertEquals(lireListe('identifiant;nom\r\nlea;"Léa, Martin"\r\n'), [{
+    identifiant: "lea",
+    nom: "Léa, Martin",
+  }]);
+  assertThrows(() => lireListe('identifiant,nom\nlea,"Léa" Martin\n'));
+  const { requete, app } = await session(db, fauxModeles().modeles, "enseignant");
+  const fichier = new FormData();
+  fichier.append(
+    "fichier",
+    new File(["identifiant,nom\nlea,Léa Martin\nnoe,Noé Petit\n"], "classe.csv"),
+  );
+  const reponse = await requete("/prof/eleves/importer", { method: "POST", body: fichier });
+  assertEquals(reponse.status, 200);
+  assertEquals(reponse.headers.get("cache-control"), "no-store");
+  const feuille = await reponse.text();
+  assertStringIncludes(feuille, "Léa Martin");
+  assertEquals(db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n, 2);
+  const ancien = feuille.match(
+    /Identifiant : <strong>lea<\/strong>.*?Mot de passe : <strong>([a-f0-9]+)<\/strong>/s,
+  )?.[1];
+  assert(ancien);
+  const connexion = await app.request("/connexion", {
+    method: "POST",
+    headers: { origin: "http://localhost" },
+    body: new URLSearchParams({ identifiant: "lea", mot_de_passe: ancien }),
+  });
+  const cookie = connexion.headers.get("set-cookie")!.split(";")[0];
+  const id = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea'").get()!.id as string;
+  const reset = await requete(`/prof/eleves/${id}/reinitialiser`, { method: "POST" });
+  assertEquals(reset.status, 200);
+  assertEquals((await app.request("/eleve", { headers: { cookie } })).status, 302);
+  assertEquals(await authentifier(db, "lea", ancien), null);
+  assertEquals(
+    (await requete("/prof/eleves/importer", { method: "POST", body: fichier })).status,
+    400,
+  );
+  assertEquals(db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n, 2);
+});
+
+Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la question", async () => {
+  const { db } = await environnement();
+  const source = await sourceTraitee(db);
+  statuer(db, source, "certifiee", "test");
+  const bonne = JSON.stringify({
+    affirmations: [{
+      texte: "Gaudí refuse la ligne droite.",
+      extrait: 1,
+      citation: "Gaudí refuse la ligne droite dans toute la façade",
+    }],
+  });
+  const f = fauxModeles({ sorties: [bonne, bonne, bonne] });
+  let reformulation = "";
+  f.modeles.reformuler = (precedente, question) => {
+    reformulation = `${precedente} / ${question}`;
+    return Promise.resolve("Casa Batlló façade ligne droite");
+  };
+  const eleve = await session(db, f.modeles, "eleve");
+  const premier = await eleve.requete("/eleve/questions", {
+    method: "POST",
+    headers: { "HX-Request": "true" },
+    body: new URLSearchParams({
+      texte: "Pourquoi Gaudí refuse la ligne droite ?",
+      chapitre: "ATC Art Nouveau",
+    }),
+  });
+  const id1 = (await premier.text()).match(/messages\/([\w-]+)\/flux/)![1];
+  assertStringIncludes(
+    await (await eleve.requete(`/eleve/messages/${id1}/flux`)).text(),
+    "Gaudí refuse",
+  );
+  const second = await eleve.requete("/eleve/questions", {
+    method: "POST",
+    headers: { "HX-Request": "true" },
+    body: new URLSearchParams({ texte: "Et la façade ?", chapitre: "ATC Art Nouveau" }),
+  });
+  const id2 = (await second.text()).match(/messages\/([\w-]+)\/flux/)![1];
+  assertStringIncludes(
+    await (await eleve.requete(`/eleve/messages/${id2}/flux`)).text(),
+    "Gaudí refuse",
+  );
+  assertStringIncludes(reformulation, "Pourquoi Gaudí refuse la ligne droite ? / Et la façade ?");
+  const demande = f.vus.at(-1)![1].content as string;
+  assertStringIncludes(demande, "Question précédente : Pourquoi Gaudí refuse la ligne droite ?");
+  assertStringIncludes(demande, "Question de l'eleve : Et la façade ?");
+  assert(!demande.includes("Casa Batlló façade ligne droite"));
+  assertEquals(
+    JSON.parse(db.prepare("SELECT journal FROM messages WHERE id = ?").get(id2)!.journal as string)
+      .question_recherche,
+    "Casa Batlló façade ligne droite",
+  );
+  reformulation = "";
+  const sansChapitre = await eleve.requete("/eleve/questions", {
+    method: "POST",
+    headers: { "HX-Request": "true" },
+    body: new URLSearchParams({ texte: "Et Gaudí ?" }),
+  });
+  const id3 = (await sansChapitre.text()).match(/messages\/([\w-]+)\/flux/)![1];
+  await eleve.requete(`/eleve/messages/${id3}/flux`);
+  assertEquals(
+    reformulation,
+    "",
+    "une question sans chapitre ne reprend pas le chapitre précédent",
+  );
+  assertEquals(
+    (await eleve.requete("/eleve/questions", {
+      method: "POST",
+      body: new URLSearchParams({ texte: "Question", chapitre: "Chapitre absent" }),
+    })).status,
+    400,
+  );
+  assertEquals(
+    (await eleve.requete(`/eleve/messages/${id2}/avis`, {
+      method: "POST",
+      body: new URLSearchParams({ avis: "faux" }),
+    })).status,
+    200,
+  );
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const revue = await (await prof.requete("/prof/questions")).text();
+  assertStringIncludes(revue, "ATC Art Nouveau");
+  assertStringIncludes(revue, "Fausse");
+  assertEquals(
+    chercherFts(db, "Gaudí", { schoolId: "pilote", chapitre: "Chapitre absent" }).length,
+    0,
+  );
+});
+
+Deno.test("titre édité réindexé, image certifiée liée à la réponse et messages purgés", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db);
+  statuer(db, id, "certifiee", "test");
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const r = await prof.requete(`/prof/sources/${id}/modifier`, {
+    method: "POST",
+    body: new URLSearchParams({
+      titre: "Casa Batlló corrigée",
+      sequence: "Architecture",
+      date: "1906",
+      quiz_reponse: "Gaudí",
+    }),
+  });
+  assertEquals(r.status, 303);
+  assertStringIncludes(
+    chercherFts(db, "corrigée", { schoolId: "pilote", chapitre: "Architecture" })[0].titre,
+    "corrigée",
+  );
+  relireLegende(db, `${id}-0`, "certified", "", "test");
+  const bonne = JSON.stringify({
+    affirmations: [{
+      texte: "Les balcons ressemblent à des masques.",
+      extrait: 1,
+      citation: "façade ondulée aux balcons en forme de masques",
+    }],
+  });
+  const { resultat } = await demander(
+    db,
+    fauxModeles({ sorties: [bonne] }).modeles,
+    "balcons masques",
+    { schoolId: "pilote" },
+    0.023,
+  );
+  assertEquals(resultat.etat, "answered");
+  if (resultat.etat === "answered") assertEquals(resultat.affirmations[0].image_id, `${id}-0`);
+  const texteCite = JSON.stringify({
+    affirmations: [{
+      texte: "Gaudí refuse la ligne droite.",
+      extrait: 1,
+      citation: "Gaudí refuse la ligne droite dans toute la façade",
+    }],
+  });
+  const texteResultat = await demander(
+    db,
+    fauxModeles({ sorties: [texteCite] }).modeles,
+    "ligne droite",
+    { schoolId: "pilote" },
+    0.023,
+  );
+  assertEquals(texteResultat.resultat.etat, "answered");
+  if (texteResultat.resultat.etat === "answered") {
+    assertEquals(texteResultat.resultat.affirmations[0].image_id, `${id}-0`);
+  }
+  const eleve = await session(db, fauxModeles().modeles, "eleve");
+  const accueil = await (await eleve.requete("/eleve")).text();
+  assertStringIncludes(accueil, "Casa Batlló corrigée");
+  assertStringIncludes(await (await eleve.requete("/eleve/chapitres/Architecture")).text(), "1906");
+  const compte =
+    db.prepare("SELECT id FROM comptes WHERE role = 'eleve' ORDER BY rowid DESC LIMIT 1").get()!.id;
+  db.prepare(
+    "INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le) VALUES ('ancien', ?, 'question', 'en_attente', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')",
+  ).run(compte);
+  assertEquals(purgerMessages(db, 90, Date.UTC(2026, 8, 23)), 1);
 });

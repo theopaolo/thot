@@ -26,7 +26,7 @@ export type ChunkIndexe = {
 
 export type Candidat = ChunkIndexe & { rang_fts: number; score?: number };
 
-export type Perimetre = { schoolId: string };
+export type Perimetre = { schoolId: string; chapitre?: string };
 
 export type Recherche = {
   candidats: Candidat[];
@@ -73,9 +73,17 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   // Le filtre d'établissement s'applique dans la même requête que le classement.
   const lignes = db.prepare(
     `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
+     JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ?
+       AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
-  ).all(termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "), p.schoolId, k);
+  ).all(
+    termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
+    p.schoolId,
+    p.chapitre ?? "",
+    p.chapitre ?? "",
+    k,
+  );
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));
 }
 

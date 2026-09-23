@@ -18,6 +18,27 @@ deno task thot compte lea "Léa" eleve
 deno task dev                      # serveur et worker, http://127.0.0.1:8000
 ```
 
+Après la création du compte enseignant, `/prof/eleves` importe les élèves depuis un
+CSV UTF-8 à deux colonnes :
+
+```csv
+identifiant,nom
+lea.martin,Léa Martin
+noe.petit,Noé Petit
+```
+
+La page affiche une feuille d'identifiants imprimable une seule fois. Elle permet aussi de
+réinitialiser un mot de passe oublié. Le nouveau mot de passe invalide les sessions ouvertes.
+`/prof/questions` regroupe les questions par chapitre, avec les refus et les avis « fausse »
+en tête.
+
+Les échanges sont supprimés automatiquement après `THOT_RETENTION_JOURS` (90 jours par défaut).
+Les appels aux modèles demandent une conservation nulle et refusent la collecte par les
+fournisseurs. L'adresse OpenRouter par défaut ne garantit pas un traitement dans l'Union
+européenne. Le routage régional peut être configuré avec `THOT_OPENROUTER_URL` si le compte
+OpenRouter y a accès. Avant un pilote avec des mineurs, faire valider la durée, le fournisseur,
+les transferts et le [projet de notice aux familles](docs/notice-familles.md) par l'établissement.
+
 Importer le corpus pilote, sans passer par le formulaire:
 
 ```bash

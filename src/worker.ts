@@ -1,6 +1,6 @@
 import { openrouter } from "./core/modeles.ts";
 import { config } from "./app/config.ts";
-import { cacheModeles, connexion } from "./app/db.ts";
+import { cacheModeles, connexion, purgerMessages } from "./app/db.ts";
 import { revendiquer, traiter } from "./app/ingestion.ts";
 import {
   genererSuggestions,
@@ -11,10 +11,15 @@ import {
 const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 let arret = false;
+let prochainePurge = 0;
 Deno.addSignalListener("SIGTERM", () => arret = true);
 
 console.log("worker: en attente de travaux");
 while (!arret) {
+  if (Date.now() >= prochainePurge) {
+    purgerMessages(db, config.retentionJours);
+    prochainePurge = Date.now() + 3_600_000;
+  }
   const job = revendiquer(db);
   if (job) {
     await traiter(db, job, modeles);

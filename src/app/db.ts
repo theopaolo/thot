@@ -7,6 +7,14 @@ export type Db = DatabaseSync;
 
 export const maintenant = () => new Date().toISOString().slice(0, 19) + "Z";
 
+export function purgerMessages(db: Db, jours: number, date = Date.now()) {
+  if (!Number.isInteger(jours) || jours < 1) {
+    throw new Error("THOT_RETENTION_JOURS doit être un entier positif.");
+  }
+  const limite = new Date(date - jours * 86_400_000).toISOString().slice(0, 19) + "Z";
+  return db.prepare("DELETE FROM messages WHERE cree_le < ?").run(limite).changes;
+}
+
 /** Une connexion par processus. WAL laisse lire pendant une écriture du worker. */
 export function connexion(chemin = join(config.donnees, "state.sqlite3")): Db {
   Deno.mkdirSync(config.donnees, { recursive: true });
