@@ -19,6 +19,7 @@ import {
   suggestionsParChapitre,
 } from "../src/app/suggestions.ts";
 import { config } from "../src/app/config.ts";
+import { reponse } from "../src/app/vues.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
 const CHAMPS = {
@@ -283,6 +284,26 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
   });
   const repare = await demander(db, fauxModeles({ sorties: [fausse, bonne] }).modeles, q, p, 0.023);
   assertEquals(repare.resultat.etat, "answered", "une réparation est permise");
+  const melange = JSON.stringify({
+    affirmations: [
+      JSON.parse(bonne).affirmations[0],
+      JSON.parse(fausse).affirmations[0],
+    ],
+  });
+  const partielle = await demander(
+    db,
+    fauxModeles({ sorties: [melange, fausse] }).modeles,
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(partielle.resultat.etat, "answered");
+  if (partielle.resultat.etat === "answered") {
+    assertEquals(partielle.resultat.affirmations.length, 1);
+    assertEquals(partielle.resultat.affirmations[0].texte, "Gaudí refuse la ligne droite.");
+    assertEquals(partielle.resultat.partielle, true);
+    assertStringIncludes(String(reponse("test", partielle.resultat)), "Réponse partielle");
+  }
   const refuse = await demander(
     db,
     fauxModeles({ sorties: [fausse, fausse] }).modeles,
@@ -291,6 +312,10 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
     0.023,
   );
   assertEquals(refuse.resultat.etat, "failed");
+  if (refuse.resultat.etat === "failed") {
+    assertEquals(refuse.resultat.code, "CITATION_UNVERIFIED");
+    assertStringIncludes(String(reponse("test", refuse.resultat)), "vérifier les citations");
+  }
 
   const vide = fauxModeles();
   vide.modeles.generer = () => {
@@ -523,6 +548,14 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
   const revue = await (await prof.requete("/prof/questions")).text();
   assertStringIncludes(revue, "ATC Art Nouveau");
   assertStringIncludes(revue, "Fausse");
+  db.prepare("UPDATE messages SET etat = 'failed', resultat = ? WHERE id = ?").run(
+    JSON.stringify({ etat: "failed", code: "CITATION_UNVERIFIED", message: "" }),
+    id3,
+  );
+  assertStringIncludes(
+    await (await prof.requete("/prof/questions")).text(),
+    "Citation non vérifiée",
+  );
   assertEquals(
     chercherFts(db, "Gaudí", { schoolId: "pilote", chapitre: "Chapitre absent" }).length,
     0,

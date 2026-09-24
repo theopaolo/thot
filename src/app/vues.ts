@@ -441,6 +441,7 @@ export type QuestionProf = {
   id: string;
   question: string;
   etat: string;
+  code: string | null;
   avis: string | null;
   cree_le: string;
   nom: string;
@@ -475,7 +476,7 @@ const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
                   <td>${m.etat === "answered"
                     ? "Répondue"
                     : m.etat === "failed"
-                    ? "Panne"
+                    ? m.code === "CITATION_UNVERIFIED" ? "Citation non vérifiée" : "Panne"
                     : "En cours"}</td>
                   <td>${AVIS[m.avis ?? ""] ?? ""}</td>
                 `
@@ -1324,7 +1325,9 @@ export const reponse = (
     const sources = [...new Map(r.affirmations.map((a) => [a.titre, a.source_id])).entries()];
     return html`
       <article class="reponse" id="reponse-${id}">
-        <p class="reponse-note">Réponse vérifiée dans les cours validés</p>
+        <p class="reponse-note">${r.partielle
+          ? "Réponse partielle : seuls les passages vérifiés sont affichés"
+          : "Réponse vérifiée dans les cours validés"}</p>
         <p class="texte-reponse">${r.affirmations.map((a: Affirmation, n: number) =>
           html`
             ${n ? " " : ""}<span>${a.texte}</span>&nbsp;<button
@@ -1380,8 +1383,12 @@ export const reponse = (
   }
   return html`
     <article class="reponse panne" id="reponse-${id}">
-      <p><strong>Thot n'a pas pu répondre, à cause d'une panne technique.</strong></p>
-      <p>Ce n'est pas une limite du cours. Ta question est conservée.</p>
+      <p><strong>${r.code === "CITATION_UNVERIFIED"
+        ? "Je n'ai pas pu vérifier les citations de cette réponse."
+        : "Thot n'a pas pu répondre, à cause d'une panne technique."}</strong></p>
+      <p>${r.code === "CITATION_UNVERIFIED"
+        ? "Ta question est conservée. Réessaie ou demande à ton professeur."
+        : "Ce n'est pas une limite du cours. Ta question est conservée."}</p>
       <button
         hx-post="/eleve/messages/${id}/relancer"
         hx-target="#reponse-${id}"

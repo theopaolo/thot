@@ -16,7 +16,7 @@ export type Affirmation = {
 };
 
 export type Resultat =
-  | { etat: "answered"; affirmations: Affirmation[] }
+  | { etat: "answered"; affirmations: Affirmation[]; partielle?: boolean }
   | { etat: "out_of_corpus"; raison: "seuil" | "refus_modele" }
   | { etat: "failed"; code: string; message: string };
 
@@ -108,6 +108,25 @@ export async function demander(
   questionPrecedente?: string,
 ): Promise<{ resultat: Resultat; journal: Journal }> {
   const journal: Journal = { seuil };
+  let gardees: Affirmation[] = [];
+  const repondre = (affirmations: Affirmation[], partielle = false) => {
+    for (const a of affirmations) {
+      const images = db.prepare(
+        "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
+      ).all(a.source_id) as { id: string; legende: string | null; legende_statut: string }[];
+      const image = images.find((i) =>
+        a.debut === undefined && i.legende_statut === "certified" && i.legende &&
+        trouverFragments(i.legende, a.citation)
+      ) ?? images[0];
+      if (image) {
+        a.image_id = image.id;
+      }
+    }
+    return {
+      resultat: { etat: "answered" as const, affirmations, ...(partielle && { partielle }) },
+      journal,
+    };
+  };
   try {
     let recherche = question;
     if (questionPrecedente) {
@@ -147,22 +166,13 @@ export async function demander(
       etape("Vérification des citations");
       const v = verifier(lire(texte), r.retenus);
       tentatives.push({ sortie: texte, erreurs: v.erreurs });
-      if (v.refus) return { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
-      if (!v.erreurs.length) {
-        for (const a of v.affirmations) {
-          const images = db.prepare(
-            "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
-          ).all(a.source_id) as { id: string; legende: string | null; legende_statut: string }[];
-          const image = images.find((i) =>
-            a.debut === undefined && i.legende_statut === "certified" && i.legende &&
-            trouverFragments(i.legende, a.citation)
-          ) ?? images[0];
-          if (image) {
-            a.image_id = image.id as string;
-          }
-        }
-        return { resultat: { etat: "answered", affirmations: v.affirmations }, journal };
+      if (v.refus) {
+        return gardees.length
+          ? repondre(gardees, true)
+          : { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       }
+      if (v.affirmations.length > gardees.length) gardees = v.affirmations;
+      if (!v.erreurs.length) return repondre(v.affirmations);
       messages.push(
         { role: "assistant", content: texte },
         {
@@ -172,6 +182,7 @@ export async function demander(
         },
       );
     }
+    if (gardees.length) return repondre(gardees, true);
     return {
       resultat: {
         etat: "failed",
@@ -183,6 +194,11 @@ export async function demander(
   } catch (e) {
     const code = e instanceof PanneModele ? e.code : "INTERNAL_ERROR";
     journal.erreur = (e as Error).message;
+    if (gardees.length) {
+      try {
+        return repondre(gardees, true);
+      } catch { /* Une erreur de base reste une panne. */ }
+    }
     return { resultat: { etat: "failed", code, message: (e as Error).message }, journal };
   }
 }

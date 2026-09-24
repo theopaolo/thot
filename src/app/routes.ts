@@ -187,6 +187,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof/questions", (c) => {
     const messages = db.prepare(
       `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
+         json_extract(m.resultat, '$.code') AS code,
          coalesce(nullif(m.chapitre, ''), json_extract(s.metadonnees, '$.sequence'),
            json_extract(s2.metadonnees, '$.sequence'), '') AS chapitre
        FROM messages m JOIN comptes c ON c.id = m.compte_id
