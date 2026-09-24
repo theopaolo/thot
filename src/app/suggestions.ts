@@ -12,6 +12,8 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
   const passages = db.prepare(
     `SELECT c.source_id, c.titre, c.texte FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE c.source_id = ? AND s.statut = 'certifiee' AND length(c.texte) >= ?
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
      ORDER BY length(c.texte) DESC LIMIT ?`,
   ).all(sourceId, LONGUEUR_MIN, PASSAGES_PAR_SOURCE) as {
     source_id: string;
@@ -43,7 +45,10 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
 /** Prochaine source certifiée sans suggestions, pour le worker. */
 export const sourceSansSuggestions = (db: Db) =>
   db.prepare(
-    "SELECT id FROM sources WHERE statut = 'certifiee' AND suggestions_le IS NULL LIMIT 1",
+    `SELECT id FROM sources s WHERE statut = 'certifiee' AND suggestions_le IS NULL
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+     LIMIT 1`,
   ).get()?.id as string | undefined;
 
 export const marquerSuggestions = (db: Db, sourceId: string) =>
@@ -56,7 +61,10 @@ export function suggestionsParChapitre(db: Db, parChapitre = 3): Map<string, str
   const lignes = db.prepare(
     `SELECT sg.question, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS chapitre
      FROM suggestions sg JOIN sources s ON s.id = sg.source_id
-     WHERE s.statut = 'certifiee' AND s.school_id = ? ORDER BY random()`,
+     WHERE s.statut = 'certifiee' AND s.school_id = ?
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+     ORDER BY random()`,
   ).all(config.schoolId) as Suggestion[];
   const out = new Map<string, string[]>();
   for (const l of lignes) {
@@ -96,6 +104,7 @@ export function faitAuHasard(db: Db): Fait | undefined {
   const passages = db.prepare(
     `SELECT c.source_id, c.titre, c.texte, c.debut FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE s.statut = 'certifiee' AND c.school_id = ? AND length(c.texte) >= 300
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
      ORDER BY random() LIMIT 10`,
   ).all(config.schoolId) as { source_id: string; titre: string; texte: string; debut: number }[];
   for (const p of passages) {

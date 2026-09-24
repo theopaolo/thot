@@ -75,6 +75,8 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
     `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ?
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
   ).all(

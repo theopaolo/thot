@@ -15,6 +15,7 @@ import { relireLegende, revendiquer, statuer, traiter } from "../src/app/ingesti
 import {
   faitAuHasard,
   genererSuggestions,
+  sourceSansSuggestions,
   suggestionsParChapitre,
 } from "../src/app/suggestions.ts";
 import { config } from "../src/app/config.ts";
@@ -28,11 +29,15 @@ const CHAMPS = {
   sequence: "ATC Art Nouveau",
 };
 
-const formulaire = (champs: Record<string, string>, fichier: Uint8Array, nom = "fiche.pdf") => {
+const formulaire = (
+  champs: Record<string, string>,
+  fichier: Uint8Array,
+  nom = "fiche.pdf",
+  publics = ["enseignants", "eleves", "thot"],
+) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(champs)) f.append(k, v);
-  f.append("publics", "enseignants");
-  f.append("publics", "eleves");
+  for (const publicCible of publics) f.append("publics", publicCible);
   f.append("fichier", new File([fichier as Uint8Array<ArrayBuffer>], nom));
   return f;
 };
@@ -71,7 +76,7 @@ Deno.test("dépôt complet: original écrit, source et travail créés", async (
   assertStringIncludes(await r.text(), "est déposé");
   const s = db.prepare("SELECT id, metadonnees, format FROM sources").get()!;
   assertEquals(s.format, "pdf");
-  assertEquals(JSON.parse(s.metadonnees as string).publics, ["enseignants", "eleves"]);
+  assertEquals(JSON.parse(s.metadonnees as string).publics, ["enseignants", "eleves", "thot"]);
   const original = await Deno.readTextFile(
     join(dir, "content", s.id as string, "original", "fiche.pdf"),
   );
@@ -122,9 +127,13 @@ Deno.test("une session élève reçoit 403 sur chaque route enseignant", async (
 async function sourceTraitee(
   db: Parameters<typeof traiter>[0],
   legende = "Façade ondulée aux balcons en forme de masques.",
+  publics?: string[],
 ) {
   const { requete } = await session(db, fauxModeles().modeles, "enseignant");
-  await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+  await requete("/prof/depot", {
+    method: "POST",
+    body: formulaire(CHAMPS, PAGE, "casa.html", publics),
+  });
   const job = revendiquer(db)!;
   await traiter(db, job, fauxModeles({ legende }).modeles);
   return db.prepare("SELECT id FROM sources").get()!.id as string;
@@ -163,6 +172,59 @@ Deno.test("une source non certifiée n'apparaît sur aucune route élève ni dan
   statuer(db, id, "rejetee", "test");
   assertEquals((await requete(`/eleve/sources/${id}`)).status, 404);
   assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+});
+
+Deno.test("sans public Élèves, une source certifiée reste invisible aux élèves et à Thot", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db, undefined, ["enseignants", "thot"]);
+  statuer(db, id, "certifiee", "test");
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const eleve = await session(db, fauxModeles().modeles, "eleve");
+
+  assertEquals((await prof.requete(`/prof/sources/${id}`)).status, 200);
+  assertEquals((await prof.requete(`/media/${id}-0`)).status, 200);
+  assert(!(await (await eleve.requete("/eleve")).text()).includes(CHAMPS.titre));
+  for (
+    const chemin of [
+      `/eleve/chapitres/${encodeURIComponent(CHAMPS.sequence)}`,
+      `/eleve/documents/${id}/apercu`,
+      `/eleve/sources/${id}`,
+      `/media/${id}-0`,
+    ]
+  ) assertEquals((await eleve.requete(chemin)).status, 404, chemin);
+  assertEquals(
+    (await eleve.requete("/eleve/questions", {
+      method: "POST",
+      body: new URLSearchParams({ texte: "Pourquoi ?", chapitre: CHAMPS.sequence }),
+    })).status,
+    400,
+  );
+  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+  assertEquals(faitAuHasard(db), undefined);
+  assertEquals(sourceSansSuggestions(db), undefined);
+});
+
+Deno.test("sans public Thot, une source reste lisible mais ne sert pas aux réponses", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db, undefined, ["enseignants", "eleves"]);
+  statuer(db, id, "certifiee", "test");
+  const { requete } = await session(db, fauxModeles().modeles, "eleve");
+
+  assertStringIncludes(await (await requete("/eleve")).text(), CHAMPS.titre);
+  assertEquals((await requete(`/eleve/sources/${id}`)).status, 200);
+  assertEquals((await requete(`/media/${id}-0`)).status, 200);
+  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+  assertEquals(sourceSansSuggestions(db), undefined);
+  assertEquals(
+    (await demander(
+      db,
+      fauxModeles().modeles,
+      "Pourquoi Gaudí refuse la ligne droite ?",
+      { schoolId: "pilote" },
+      0.023,
+    )).resultat.etat,
+    "out_of_corpus",
+  );
 });
 
 Deno.test("une légende non relue aide la recherche mais n'atteint jamais le générateur", async () => {

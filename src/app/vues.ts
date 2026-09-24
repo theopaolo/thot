@@ -759,8 +759,8 @@ export const detailSource = (d: Detail) =>
     </form>
     ${statutSource(d.source)}
     <p class="discret">
-      Certifier la source l'ouvre aux élèves. Les légendes d'images se relisent à part : une légende non
-      relue aide la recherche mais n'est jamais citée.
+      Certifier la source la rend disponible selon les publics choisis au dépôt. Les légendes d'images
+      se relisent à part : une légende non relue n'est jamais citée.
     </p>
     ${d.job?.etat === "failed"
       ? html`

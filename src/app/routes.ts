@@ -103,11 +103,16 @@ export function creerApp(db: Db, modeles: Modeles) {
   // ------------------------------------------------------------ images
   app.get("/media/:id", async (c) => {
     const i = db.prepare(
-      "SELECT i.fichier, i.mime, i.source_id, s.statut FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ? AND s.school_id = ?",
+      `SELECT i.fichier, i.mime, i.source_id, s.statut,
+         EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves') AS visible
+       FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ? AND s.school_id = ?`,
     ).get(c.req.param("id"), config.schoolId) as
-      | { fichier: string; mime: string; source_id: string; statut: string }
+      | { fichier: string; mime: string; source_id: string; statut: string; visible: number }
       | undefined;
-    if (!i || (c.get("compte").role !== "enseignant" && i.statut !== "certifiee")) {
+    if (
+      !i || (c.get("compte").role !== "enseignant" &&
+        (i.statut !== "certifiee" || !i.visible))
+    ) {
       return c.notFound();
     }
     const octets = await Deno.readFile(contenu(i.source_id, "assets", i.fichier));
@@ -358,7 +363,8 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources WHERE id = ? AND statut = 'certifiee' AND school_id = ?`,
+       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
     ).get(id, config.schoolId) as V.SourceLue | undefined;
 
   app.get("/eleve", (c) => {
@@ -367,8 +373,10 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          coalesce(json_extract(metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
-         (SELECT id FROM images WHERE source_id = sources.id ORDER BY position LIMIT 1) AS image_id
-       FROM sources WHERE statut = 'certifiee' AND school_id = ? ORDER BY sequence, seance, titre`,
+         (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
+       FROM sources s WHERE statut = 'certifiee' AND school_id = ?
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       ORDER BY sequence, seance, titre`,
     ).all(config.schoolId) as V.SourceChapitre[];
     const chapitres: V.ChapitreVue[] = [];
     for (const r of rangs) {
@@ -407,6 +415,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(s.metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?
        ORDER BY seance = '', seance, s.titre`,
     ).all(config.schoolId, nom) as V.SourceChapitre[];
@@ -428,7 +437,8 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources WHERE id = ? AND statut = 'certifiee' AND school_id = ?`,
+       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
     ).get(id, config.schoolId) as Omit<V.Apercu, "image_id" | "legende" | "images" | "extrait">;
     if (!s) return undefined;
     const images = db.prepare(
@@ -506,7 +516,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     const memesSources = db.prepare(
       `SELECT sg.question FROM suggestions sg JOIN sources s ON s.id = sg.source_id
        WHERE sg.source_id IN (${ids.map(() => "?").join(",")}) AND s.statut = 'certifiee'
-         AND s.school_id = ? AND sg.question != ? ORDER BY random() LIMIT 3`,
+         AND s.school_id = ? AND sg.question != ?
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+       ORDER BY random() LIMIT 3`,
     ).all(...ids, config.schoolId, question).map((x) => x.question as string);
     if (memesSources.length) return memesSources;
     const chapitre = db.prepare(
@@ -536,7 +549,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     const chapitre = String(b.chapitre ?? "");
     if (
       chapitre && !db.prepare(
-        "SELECT id FROM sources WHERE school_id = ? AND statut = 'certifiee' AND json_extract(metadonnees, '$.sequence') = ? LIMIT 1",
+        `SELECT id FROM sources s WHERE school_id = ? AND statut = 'certifiee'
+           AND json_extract(metadonnees, '$.sequence') = ?
+           AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+         LIMIT 1`,
       ).get(config.schoolId, chapitre)
     ) return c.text("Chapitre indisponible.", 400);
     const id = crypto.randomUUID();
