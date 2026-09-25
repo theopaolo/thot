@@ -6,7 +6,7 @@ Statut: accepté
 ## Décision
 
 L'ingestion produit un artefact de plus, `fiche.json`, décrit au §7 de
-`../../ARCHITECTURE.md`. Il porte des champs typés: chapitre, notions, repères,
+l'[architecture v2](https://github.com/theopaolo/thot/blob/29048a9/ARCHITECTURE.md). Il porte des champs typés: chapitre, notions, repères,
 exercices, prérequis, objectifs. Chaque champ cite un passage exact de
 `document.txt` par `block_id` et offsets.
 

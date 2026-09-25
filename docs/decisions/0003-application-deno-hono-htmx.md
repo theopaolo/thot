@@ -46,7 +46,7 @@ Python reste pour les évaluations et, si un besoin d'OCR le justifie, comme
 outil appelé par le worker.
 
 Cette décision remplace SvelteKit, FastAPI et le worker Python des §2 et §3
-de l'[architecture v2](../../ARCHITECTURE.md). Elle adapte le transport HTTP
+de l'[architecture v2](https://github.com/theopaolo/thot/blob/29048a9/ARCHITECTURE.md). Elle adapte le transport HTTP
 du §13 et les vérifications de runtime du §18. Les
 [choix RAG mesurés](0001-pile-rag-mesuree.md), la
 [fiche de chapitre ancrée](0002-fiche-de-chapitre-ancree.md) et les
