@@ -19,7 +19,7 @@ import {
   suggestionsParChapitre,
 } from "../src/app/suggestions.ts";
 import { config } from "../src/app/config.ts";
-import { reponse } from "../src/app/vues.ts";
+import { reponse } from "../src/app/vues/eleve.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
 const CHAMPS = {
@@ -175,6 +175,127 @@ Deno.test("une source non certifiée n'apparaît sur aucune route élève ni dan
   assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
 });
 
+Deno.test("une génération en cours conserve les légendes relues par un enseignant", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+    for (const action of ["certified", "rejected"] as const) {
+      await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+      const job = revendiquer(db)!;
+      const appele = Promise.withResolvers<void>();
+      const termine = Promise.withResolvers<{ texte: string; modele: string }>();
+      const { modeles } = fauxModeles();
+      modeles.legender = () => {
+        appele.resolve();
+        return termine.promise;
+      };
+      const travail = traiter(db, job, modeles);
+      await appele.promise;
+      const texte = action === "certified" ? "Légende corrigée par le professeur." : "";
+      relireLegende(db, `${job.source_id}-0`, action, texte, "Prof");
+      const avant = db.prepare("SELECT * FROM images WHERE source_id = ?").get(job.source_id);
+      termine.resolve({ texte: "Légende générée jamais relue.", modele: "faux-vl" });
+      await travail;
+      assertEquals(
+        db.prepare("SELECT * FROM images WHERE source_id = ?").get(job.source_id),
+        avant,
+      );
+      assertEquals(
+        db.prepare("SELECT etat FROM ingestion_jobs WHERE id = ?").get(job.id)!.etat,
+        "awaiting_review",
+      );
+    }
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("une certification prématurée ne publie rien après le passage du worker", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+    await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+    const id = db.prepare("SELECT id FROM sources").get()!.id as string;
+    for (const etat of ["received", "extracting", "enriching", "failed"]) {
+      db.prepare("UPDATE ingestion_jobs SET etat = ? WHERE source_id = ?").run(etat, id);
+      assertThrows(() => statuer(db, id, "certifiee", "Prof"), Error, "pas prête");
+      const source = db.prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
+        .get(id)!;
+      assertEquals([source.statut, source.statut_par, source.statut_le], ["a_relire", null, null]);
+    }
+    db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
+    await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+    assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    assertEquals((await eleve.requete(`/eleve/sources/${id}`)).status, 404);
+    statuer(db, id, "certifiee", "Prof");
+    assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 1);
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("un échec d'indexation annule aussi la certification", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const id = await sourceTraitee(db);
+    db.exec(`CREATE TRIGGER index_indisponible BEFORE INSERT ON chunks
+      BEGIN SELECT RAISE(ABORT, 'Index indisponible'); END`);
+    assertThrows(() => statuer(db, id, "certifiee", "Prof"), Error, "Index indisponible");
+    const source = db.prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
+      .get(id)!;
+    assertEquals([source.statut, source.statut_par, source.statut_le], ["a_relire", null, null]);
+    assertEquals(db.prepare("SELECT count(*) n FROM chunks").get()!.n, 0);
+    assertEquals(db.prepare("SELECT count(*) n FROM chunks_fts").get()!.n, 0);
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("les documents sans chapitre ont leur propre route, distincte d'un chapitre homonyme", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+    const ids: string[] = [];
+    for (const sequence of ["", "Sans chapitre"]) {
+      await requete("/prof/depot", {
+        method: "POST",
+        body: formulaire(
+          { ...CHAMPS, titre: sequence ? "Cours nommé" : "Cours non classé", sequence },
+          PAGE,
+          "casa.html",
+        ),
+      });
+      const job = revendiquer(db)!;
+      await traiter(db, job, fauxModeles().modeles);
+      statuer(db, job.source_id, "certifiee", "Prof");
+      ids.push(job.source_id);
+    }
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const accueil = await (await eleve.requete("/eleve")).text();
+    const chemins = ["/eleve/sans-chapitre", "/eleve/chapitres/Sans%20chapitre"];
+    for (const [i, chemin] of chemins.entries()) {
+      assertStringIncludes(accueil, `href="${chemin}"`);
+      const r = await eleve.requete(`${chemin}?doc=${ids[i]}`);
+      assertEquals(r.status, 200);
+      const page = await r.text();
+      assertStringIncludes(page, `href="/eleve/sources/${ids[i]}"`);
+      assert(!page.includes(ids[1 - i]));
+      assertStringIncludes(page, `hx-push-url="${chemin}?doc=${ids[i]}"`);
+      const document = await (await eleve.requete(`/eleve/sources/${ids[i]}`)).text();
+      assertStringIncludes(document, `href="${chemin}?doc=${ids[i]}"`);
+    }
+    statuer(db, ids[0], "rejetee", "Prof");
+    assertEquals((await eleve.requete("/eleve/sans-chapitre")).status, 404);
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
 Deno.test("sans public Élèves, une source certifiée reste invisible aux élèves et à Thot", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db, undefined, ["enseignants", "thot"]);
@@ -277,9 +398,9 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
 
   const fausse = JSON.stringify({
     affirmations: [{
-      texte: "Gaudí aimait le béton.",
+      texte: "Gaudí utilisait du plutonium.",
       extrait: 1,
-      citation: "Gaudí aimait profondément le béton armé",
+      citation: "Gaudí refuse la ligne droite … plutonium radioactif",
     }],
   });
   const repare = await demander(db, fauxModeles({ sorties: [fausse, bonne] }).modeles, q, p, 0.023);

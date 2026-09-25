@@ -55,6 +55,13 @@ Deno.test("une citation coupée par des points de suspension passe si chaque fra
   assertEquals(r && tranche(texte, r[0], r[1]).endsWith("émancipateur"), true);
   assertEquals(trouverFragments(texte, "Son travail est donc… Il possède un savoir-faire"), null);
   assertEquals(trouverFragments(texte, "Il possède un savoir-fait et une marge"), null);
+  const facade = "La façade est bleue et blanche.";
+  for (const fragment of ["plutonium", "plutonium radioactif"]) {
+    assertEquals(trouverFragments(facade, `La façade est bleue … ${fragment}`), null);
+    assertEquals(trouverFragments(facade, `${fragment} … La façade est bleue`), null);
+  }
+  assertEquals(trouverFragments(facade, "… La façade … blanche …"), [0, facade.length - 1]);
+  assertEquals(trouverFragments(facade, "… […] ..."), null);
 });
 
 Deno.test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot", () => {

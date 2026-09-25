@@ -21,7 +21,9 @@ import { type Db, maintenant } from "./db.ts";
 import { controlerFichier, deposer, valider } from "./depot.ts";
 import { indexer, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsParChapitre } from "./suggestions.ts";
-import * as V from "./vues.ts";
+import { connexion as formulaireConnexion, page } from "./vues/page.ts";
+import * as Prof from "./vues/prof.ts";
+import * as Eleve from "./vues/eleve.ts";
 
 type Env = { Variables: { compte: Compte } };
 
@@ -32,6 +34,10 @@ export function creerApp(db: Db, modeles: Modeles) {
   const app = new Hono<Env>();
   const secret = secretSession();
 
+  app.use("/static/dist/*", async (c, next) => {
+    c.header("Cache-Control", "no-cache");
+    await next();
+  });
   app.use("/static/*", serveStatic({ root: "./" }));
   app.use("*", csrf());
 
@@ -59,10 +65,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     titre: string,
     corps: unknown,
     classe = "",
-  ) => V.page(titre, c.get("compte") ?? null, corps, classe, c.req.path);
+  ) => page(titre, c.get("compte") ?? null, corps, classe, c.req.path);
 
   // ------------------------------------------------------------ connexion
-  app.get("/connexion", (c) => c.html(V.page("Connexion", null, V.connexion())));
+  app.get("/connexion", (c) => c.html(page("Connexion", null, formulaireConnexion())));
   app.post("/connexion", async (c) => {
     const b = await c.req.parseBody();
     const compte = await authentifier(
@@ -72,10 +78,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
     if (!compte) {
       return c.html(
-        V.page(
+        page(
           "Connexion",
           null,
-          V.connexion("Identifiant ou mot de passe incorrect.", String(b.identifiant ?? "")),
+          formulaireConnexion(
+            "Identifiant ou mot de passe incorrect.",
+            String(b.identifiant ?? ""),
+          ),
         ),
         401,
       );
@@ -131,7 +140,7 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
-    ).all(config.schoolId, statut, statut, chapitre, chapitre) as unknown as V.LigneSource[];
+    ).all(config.schoolId, statut, statut, chapitre, chapitre) as unknown as Prof.LigneSource[];
   const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
     statut: c.req.query("statut") ?? "",
     chapitre: c.req.query("chapitre") ?? "",
@@ -144,7 +153,7 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources WHERE school_id = ? GROUP BY 1, 2`,
     ).all(config.schoolId) as { chapitre: string; statut: string; n: number }[];
     return c.html(
-      rendre(c, "Sources", V.sources(lignes(f.statut, f.chapitre), f, repartition)),
+      rendre(c, "Sources", Prof.sources(lignes(f.statut, f.chapitre), f, repartition)),
     );
   });
   app.get("/prof/eleves", (c) => {
@@ -152,7 +161,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       "SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve' ORDER BY nom",
     )
       .all() as { id: string; identifiant: string; nom: string }[];
-    return c.html(rendre(c, "Élèves", V.eleves(eleves)));
+    return c.html(rendre(c, "Élèves", Prof.eleves(eleves)));
   });
   app.post("/prof/eleves/importer", async (c) => {
     const fichier = (await c.req.parseBody()).fichier;
@@ -163,10 +172,14 @@ export function creerApp(db: Db, modeles: Modeles) {
       const comptes = await importerEleves(db, await fichier.text());
       c.header("Cache-Control", "no-store");
       return c.html(
-        rendre(c, "Identifiants élèves", V.feuilleIdentifiants(comptes, new URL(c.req.url).origin)),
+        rendre(
+          c,
+          "Identifiants élèves",
+          Prof.feuilleIdentifiants(comptes, new URL(c.req.url).origin),
+        ),
       );
     } catch (e) {
-      return c.html(rendre(c, "Élèves", V.eleves([], (e as Error).message)), 400);
+      return c.html(rendre(c, "Élèves", Prof.eleves([], (e as Error).message)), 400);
     }
   });
   app.post("/prof/eleves/:id/reinitialiser", async (c) => {
@@ -180,7 +193,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Nouveau mot de passe",
-        V.feuilleIdentifiants([{ ...eleve, motDePasse: motDePasse! }], new URL(c.req.url).origin),
+        Prof.feuilleIdentifiants(
+          [{ ...eleve, motDePasse: motDePasse! }],
+          new URL(c.req.url).origin,
+        ),
       ),
     );
   });
@@ -195,12 +211,14 @@ export function creerApp(db: Db, modeles: Modeles) {
        LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
        WHERE c.role = 'eleve'
        ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
-    ).all() as V.QuestionProf[];
-    return c.html(rendre(c, "Questions des élèves", V.questionsProf(messages)));
+    ).all() as Prof.QuestionProf[];
+    return c.html(rendre(c, "Questions des élèves", Prof.questionsProf(messages)));
   });
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
-    return c.html(V.lignesSources(lignes(f.statut, f.chapitre), new URLSearchParams(f).toString()));
+    return c.html(
+      Prof.lignesSources(lignes(f.statut, f.chapitre), new URLSearchParams(f).toString()),
+    );
   });
   app.post("/prof/sources/statut", async (c) => {
     const b = await c.req.parseBody({ all: true });
@@ -210,7 +228,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
   });
 
-  app.get("/prof/depot", (c) => c.html(rendre(c, "Déposer", V.depot({}))));
+  app.get("/prof/depot", (c) => c.html(rendre(c, "Déposer", Prof.depot({}))));
   app.post("/prof/depot", async (c) => {
     const b = await c.req.parseBody({ all: true });
     const champs = Object.fromEntries(
@@ -220,7 +238,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     ) as Record<string, string>;
     const publics = [b.publics ?? []].flat().map(String);
     const refus = (erreurs: Record<string, string>) =>
-      c.html(rendre(c, "Déposer", V.depot({ champs, publics, erreurs })), 400);
+      c.html(rendre(c, "Déposer", Prof.depot({ champs, publics, erreurs })), 400);
 
     const v = valider(champs, publics);
     const fichier = b.fichier;
@@ -246,7 +264,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Déposer",
-        V.depot({
+        Prof.depot({
           ok:
             `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans les sources.`,
         }),
@@ -254,12 +272,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
-  const detail = (id: string): V.Detail | undefined => {
+  const detail = (id: string): Prof.Detail | undefined => {
     const source = db.prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?").get(
       id,
       config.schoolId,
     ) as
-      | V.Detail["source"] & { metadonnees: string }
+      | Prof.Detail["source"] & { metadonnees: string }
       | undefined;
     if (!source) return undefined;
     const job = db.prepare(
@@ -267,7 +285,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     ).get(id) as
       | { etat: string; erreur: string | null; avertissements: string }
       | undefined;
-    let blocs: V.Detail["blocs"] = [];
+    let blocs: Prof.Detail["blocs"] = [];
     try {
       blocs = lireDocument(id).blocs;
     } catch { /* pas encore extrait */ }
@@ -277,14 +295,14 @@ export function creerApp(db: Db, modeles: Modeles) {
       job: job && { ...job, avertissements: JSON.parse(job.avertissements) },
       images: db.prepare("SELECT * FROM images WHERE source_id = ? ORDER BY position").all(
         id,
-      ) as unknown as V.ImageVue[],
+      ) as unknown as Prof.ImageVue[],
       blocs,
     };
   };
 
   app.get("/prof/sources/:id", (c) => {
     const d = detail(c.req.param("id"));
-    return d ? c.html(rendre(c, d.source.titre, V.detailSource(d))) : c.notFound();
+    return d ? c.html(rendre(c, d.source.titre, Prof.detailSource(d))) : c.notFound();
   });
   app.post("/prof/sources/:id/modifier", async (c) => {
     const d = detail(c.req.param("id"));
@@ -311,7 +329,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const id = c.req.param("id");
     if (!detail(id)) return c.notFound();
     statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
-    return c.html(V.statutSource(detail(id)!.source));
+    return c.html(Prof.statutSource(detail(id)!.source));
   });
 
   const aLegender = (imageId?: string) => {
@@ -323,7 +341,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id
        WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
        ORDER BY (i.id = ?) DESC, json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 1`,
-    ).get(config.schoolId, imageId ?? "") as V.ALegender | undefined;
+    ).get(config.schoolId, imageId ?? "") as Prof.ALegender | undefined;
     return i && { ...i, restantes };
   };
   // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
@@ -337,14 +355,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     c.html(rendre(
       c,
       "Légendes",
-      html`
-        <h1>Relire les légendes</h1>
-        <p class="raccourcis discret">
-          <kbd>V</kbd> valider, <kbd>E</kbd> éditer, <kbd>R</kbd> rejeter, <kbd>↑</kbd> <kbd
-          >↓</kbd> image précédente ou suivante
-        </p>
-        ${V.legende(aLegender(c.req.query("image")), fileLegendes())}${V.raccourciEdition}
-      `,
+      Prof.pageLegendes(aLegender(c.req.query("image")), fileLegendes()),
     )));
   app.post("/prof/legendes/:action{certified|rejected}", async (c) => {
     const b = await c.req.parseBody();
@@ -355,7 +366,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       String(b.texte ?? ""),
       c.get("compte").nom,
     );
-    return c.html(V.legende(aLegender(), fileLegendes()));
+    return c.html(Prof.legende(aLegender(), fileLegendes()));
   });
 
   // ------------------------------------------------------------ élève
@@ -366,7 +377,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, config.schoolId) as V.SourceLue | undefined;
+    ).get(id, config.schoolId) as Eleve.SourceLue | undefined;
 
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
@@ -378,16 +389,16 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources s WHERE statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        ORDER BY sequence, seance, titre`,
-    ).all(config.schoolId) as V.SourceChapitre[];
-    const chapitres: V.ChapitreVue[] = [];
+    ).all(config.schoolId) as Eleve.SourceChapitre[];
+    const chapitres: Eleve.ChapitreVue[] = [];
     for (const r of rangs) {
-      const nom = r.sequence || "Sans chapitre";
+      const nom = r.sequence ?? "";
       if (chapitres.at(-1)?.nom !== nom) chapitres.push({ nom, sources: [], questions: [] });
       chapitres.at(-1)!.sources.push(r);
     }
     const questions = suggestionsParChapitre(db);
     for (const ch of chapitres) {
-      ch.questions = questions.get(ch.nom === "Sans chapitre" ? "" : ch.nom) ?? [];
+      ch.questions = questions.get(ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
     // Une vignette de vidéo n'est pas une œuvre: elle reste dans son chapitre, pas dans « Le saviez-vous ».
@@ -402,14 +413,14 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Accueil",
-        V.accueilEleve(prenom, chapitres, oeuvre ? undefined : fait, oeuvre),
+        Eleve.accueilEleve(prenom, chapitres, oeuvre ? undefined : fait, oeuvre),
         "accueil",
       ),
     );
   });
 
-  app.get("/eleve/chapitres/:nom", (c) => {
-    const nom = c.req.param("nom");
+  app.on("GET", ["/eleve/sans-chapitre", "/eleve/chapitres/:nom"], (c) => {
+    const nom = c.req.param("nom") ?? "";
     const sources = db.prepare(
       `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
@@ -419,7 +430,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?
        ORDER BY seance = '', seance, s.titre`,
-    ).all(config.schoolId, nom) as V.SourceChapitre[];
+    ).all(config.schoolId, nom) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
     const doc = sources.find((s) => s.id === c.req.query("doc")) ??
@@ -427,20 +438,20 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.html(
       rendre(
         c,
-        nom,
-        V.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [], apercu(doc.id)),
+        nom || "Sans chapitre",
+        Eleve.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [], apercu(doc.id)),
       ),
     );
   });
 
-  const apercu = (id: string): V.Apercu | undefined => {
+  const apercu = (id: string): Eleve.Apercu | undefined => {
     const s = db.prepare(
       `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, config.schoolId) as Omit<V.Apercu, "image_id" | "legende" | "images" | "extrait">;
+    ).get(id, config.schoolId) as Omit<Eleve.Apercu, "image_id" | "legende" | "images" | "extrait">;
     if (!s) return undefined;
     const images = db.prepare(
       `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
@@ -449,7 +460,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     let extrait = "";
     try {
       const texte = lireDocument(id).blocs.filter((b) =>
-        b.texte !== s.titre && b.texte !== b.section && !V.COMPTEUR_DIAPO.test(b.texte)
+        b.texte !== s.titre && b.texte !== b.section && !Eleve.COMPTEUR_DIAPO.test(b.texte)
       )
         .map((b) => b.texte).join(" ");
       extrait = texte.length > 320 ? texte.slice(0, 320).replace(/\s+\S*$/, "") + " …" : texte;
@@ -465,7 +476,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.get("/eleve/documents/:id/apercu", (c) => {
     const a = apercu(c.req.param("id"));
-    return a ? c.html(V.lecteur(a)) : c.notFound();
+    return a ? c.html(Eleve.lecteur(a)) : c.notFound();
   });
 
   app.get("/eleve/sources/:id", (c) => {
@@ -484,10 +495,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         s.titre,
-        V.lectureSource(
+        Eleve.lectureSource(
           s,
           images,
-          lireDocument(s.id).blocs.filter((b) => !V.COMPTEUR_DIAPO.test(b.texte)),
+          lireDocument(s.id).blocs.filter((b) => !Eleve.COMPTEUR_DIAPO.test(b.texte)),
           marque,
         ),
         "lecture",
@@ -499,7 +510,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     db.prepare(
       "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
     )
-      .all(compteId) as V.MessageVue[];
+      .all(compteId) as Eleve.MessageVue[];
 
   const ideesPour = (r: Resultat, question = "", messageId = "") => {
     // Hors cours: les questions que couvre le chapitre du passage le plus proche, ou du chapitre posé.
@@ -539,7 +550,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       const idees = dernier
         ? ideesPour(JSON.parse(dernier.resultat!), dernier.question, dernier.id)
         : [];
-      return c.html(rendre(c, "Question", V.chat(messages, idees), "page-chat"));
+      return c.html(rendre(c, "Question", Eleve.chat(messages, idees), "page-chat"));
     },
   );
 
@@ -565,7 +576,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     // Hors HTMX (accueil, idée proposée), la conversation s'ouvre et le flux démarre là-bas.
     if (!c.req.header("HX-Request")) return c.redirect("/eleve/chat", 303);
     return c.html(html`
-      ${V.question(texte)}${V.attente(id)}
+      ${Eleve.question(texte)}${Eleve.attente(id)}
     `);
   });
 
@@ -573,7 +584,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const r = db.prepare(
       "UPDATE messages SET etat = 'en_attente', resultat = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat = 'failed'",
     ).run(maintenant(), c.req.param("id"), c.get("compte").id);
-    return r.changes ? c.html(V.attente(c.req.param("id"))) : c.notFound();
+    return r.changes ? c.html(Eleve.attente(c.req.param("id"))) : c.notFound();
   });
 
   /**
@@ -626,10 +637,11 @@ export function creerApp(db: Db, modeles: Modeles) {
           const r = JSON.parse(m.resultat) as Resultat;
           await flux.writeSSE({
             event: "reponse",
-            data: String(await V.reponse(id, r, null, ideesPour(r, m.question, id), true)).replace(
-              /\n/g,
-              " ",
-            ),
+            data: String(await Eleve.reponse(id, r, null, ideesPour(r, m.question, id), true))
+              .replace(
+                /\n/g,
+                " ",
+              ),
           });
           return;
         }
@@ -644,7 +656,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const r = db.prepare(
       "UPDATE messages SET avis = ? WHERE id = ? AND compte_id = ? AND etat = 'answered'",
     ).run(avis, c.req.param("id"), c.get("compte").id);
-    return r.changes ? c.html(V.avis(c.req.param("id"), avis)) : c.notFound();
+    return r.changes ? c.html(Eleve.avis(c.req.param("id"), avis)) : c.notFound();
   });
 
   app.get("/eleve/messages/:id/citations/:n", (c) => {
@@ -655,17 +667,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       ? r.affirmations[Number(c.req.param("n"))]
       : undefined;
     const source = a && sourceCertifiee(a.source_id);
-    if (!a || !source) return c.html(V.panneauSource());
+    if (!a || !source) return c.html(Eleve.panneauSource());
     const suite = {
       id: c.req.param("id"),
       n: Number(c.req.param("n")),
       total: r?.etat === "answered" ? r.affirmations.length : 0,
     };
     if (a.debut === undefined || a.fin === undefined) {
-      return c.html(V.panneauSource({ ...a, enseignant: source.enseignant }, suite));
+      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
     }
     const texte = lireDocument(a.source_id).texte;
-    return c.html(V.panneauSource({
+    return c.html(Eleve.panneauSource({
       ...a,
       enseignant: source.enseignant,
       ...contexte(texte, a.debut, a.fin),

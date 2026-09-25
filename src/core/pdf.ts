@@ -41,7 +41,7 @@ export function decouperPdf(brut: string): Extraction {
   // En-têtes et pieds de page: une ligne présente sur au moins la moitié des pages.
   const vues = new Map<string, number>();
   for (const p of pages) for (const l of new Set(p)) if (l) vues.set(l, (vues.get(l) ?? 0) + 1);
-  const repetee = (l: string) => pages.length > 1 && (vues.get(l) ?? 0) >= pages.length / 2;
+  const repetee = (l: string) => (vues.get(l) ?? 0) >= Math.max(2, pages.length / 2);
 
   const parties: Partie[] = [];
   const avertissements: string[] = [];

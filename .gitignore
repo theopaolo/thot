@@ -30,3 +30,6 @@ coverage/
 
 # Board kandepo, régénéré à chaque lancement
 kanban.html
+
+# JavaScript navigateur produit par deno bundle
+/static/dist/

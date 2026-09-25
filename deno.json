@@ -1,12 +1,13 @@
 {
   "tasks": {
-    "dev": "deno run -RWNE --allow-run --env-file=.env src/main.ts --watch",
-    "start": "deno run -RWNE --allow-run --env-file=.env src/main.ts",
+    "dev": "deno task build && deno run -RWNE --allow-run --env-file=.env src/main.ts --watch",
+    "start": "deno task build && deno run -RWNE --allow-run --env-file=.env src/main.ts",
     "thot": "deno run -RWNE --allow-run=pdftotext --env-file=.env src/cli.ts",
     "test": "deno test -RWNE --allow-run=pdftotext tests/",
-    "check": "deno fmt --check && deno lint && deno check src/ tests/ && deno task frontiere && deno task test",
+    "check": "deno fmt --check && deno lint && deno check src/main.ts src/server.ts src/worker.ts src/cli.ts tests/ && deno check --config src/app/client/deno.json src/app/client/ && deno task build && deno task frontiere && deno task test",
     "frontiere": "! grep -rnE \"from ['\\\"](\\.\\./)+app/\" src/core/",
-    "board": "npx -y github:theopaolo/repoboard"
+    "board": "npx -y github:theopaolo/repoboard",
+    "build": "deno bundle --platform=browser --minify --sourcemap=linked -o static/dist/app.js src/app/client/index.ts"
   },
   "imports": {
     "hono": "jsr:@hono/hono@^4.9",
@@ -18,9 +19,23 @@
   },
   "fmt": {
     "lineWidth": 100,
-    "exclude": ["static/vendor/", "tasks/", "*.md", "docs/", "evaluation/", ".impeccable/"]
+    "exclude": [
+      "static/vendor/",
+      "tasks/",
+      "*.md",
+      "docs/",
+      "evaluation/",
+      ".impeccable/",
+      "static/dist/"
+    ]
   },
   "lint": {
-    "exclude": ["static/vendor/"]
-  }
+    "exclude": [
+      "static/vendor/",
+      "static/dist/"
+    ]
+  },
+  "exclude": [
+    ".claude/"
+  ]
 }

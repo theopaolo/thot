@@ -137,7 +137,7 @@ function importerLegendes(chemin: string) {
     const sequence = rel.split("/").at(-2) ?? "";
     const r = db.prepare(
       `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
-       WHERE position = 0 AND legende IS NULL AND source_id IN (
+       WHERE position = 0 AND legende IS NULL AND legende_statut = 'unreviewed' AND source_id IN (
          SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?)`,
     ).run(legende, modele, nomSur(basename(rel)), sequence);
     n += Number(r.changes);

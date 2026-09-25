@@ -1,7 +1,7 @@
 # 0003. Unifier l'application avec Deno, Hono, `hono/html` et HTMX
 
 Date: 12/09/2026  
-Statut: accepté. Le 22/09/2026, le code SvelteKit et FastAPI est archivé avant portage, dans `archive/thot-mvp-python-sveltekit/` du dépôt de recherche. Le dépôt ne contient plus que la cible.  
+Statut: accepté. Le 22/09/2026, le code SvelteKit et FastAPI est archivé avant portage, dans `archive/thot-mvp-python-sveltekit/` du dépôt de recherche. Le dépôt ne contient plus que la cible. Le 25/09/2026, le JavaScript navigateur passe en TypeScript compilé par `deno bundle`, voir Livraison.  
 Portée: application du pilote, espaces professeur et élève
 
 ## Contexte
@@ -163,8 +163,16 @@ chargement coûteux, rouvrirait cette frontière.
 
 ### Livraison
 
-Le projet n'a ni bundler ni build frontend: HTMX, JS et CSS sont servis
-localement. Deno et les dépendances sont verrouillés.
+HTMX et le CSS sont servis tels quels. Le JavaScript local est écrit en
+TypeScript dans `src/app/client/`, et `deno bundle` le compile en un fichier
+`static/dist/app.js`, généré et hors de Git. Deno et les dépendances sont
+verrouillés.
+
+Ce build date du 25/09/2026. Les scripts du navigateur avaient grandi jusqu'à
+trois modules et 219 lignes, et le TypeScript vérifie leurs accès au DOM
+avec `deno check`. Bun a d'abord fait la compilation. `deno bundle` produit
+le même fichier de 5 Ko avec l'outil déjà installé, ce qui retire une
+version de Bun à verrouiller et une étape de l'image Docker.
 
 L'unité de livraison est une image Docker. Elle contient Deno, le code, les
 assets, les migrations, Poppler et, si l'OCR local est activé, Python et ses
@@ -251,6 +259,10 @@ du HTML lisible et du balisage vérifié à la compilation.
   Une balise non fermée passe la CI et casse l'écran.
 - Chaque interaction qui doit répondre sans aller-retour demande du JS
   écrit à la main. Au-delà de quelques scripts, Svelte redevient moins cher.
+- `deno bundle` est marqué expérimental dans Deno 2.9. Un changement de
+  ses options peut casser `deno task build` lors d'une mise à jour de Deno.
+  Le code client n'a pas de dépendance, donc esbuild appelé directement
+  ou des modules ES servis sans build restent des replis simples.
 - Le code SvelteKit et FastAPI déjà écrit est jeté. Il est petit, 369
   lignes côté backend, et c'est la raison de décider maintenant.
 

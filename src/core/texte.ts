@@ -80,7 +80,7 @@ export function trouver(texte: string, citation: string): [number, number] | nul
  */
 export function trouverFragments(texte: string, citation: string): [number, number] | null {
   const fragments = citation.split(/\s*(?:\[…\]|\(…\)|…|\.\.\.)\s*/).map((f) => f.trim())
-    .filter((f) => f.split(/\s+/).length >= 3);
+    .filter(Boolean);
   if (!fragments.length) return null;
   let debut = -1;
   let fin = 0;

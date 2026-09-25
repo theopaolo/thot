@@ -27,6 +27,17 @@ Deno.test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, pag
   ]);
 });
 
+Deno.test("un PDF de deux pages conserve le texte propre à chaque page", () => {
+  const { parties } = decouperPdf(
+    "Fiche ATC\n\nLe cubisme transforme la peinture.\f" +
+      "Fiche ATC\n\nLe fauvisme emploie des couleurs vives.\f",
+  );
+  assertEquals(parties.map((p) => [p.page, p.texte]), [
+    [1, "Le cubisme transforme la peinture."],
+    [2, "Le fauvisme emploie des couleurs vives."],
+  ]);
+});
+
 const corpus = fromFileUrl(new URL("../../corpus/", import.meta.url));
 const fiches = (() => {
   try {

@@ -116,7 +116,8 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     etat(db, job, "enriching", avertissements);
 
     const aLegender = db.prepare(
-      "SELECT id, fichier, mime FROM images WHERE source_id = ? AND legende IS NULL",
+      `SELECT id, fichier, mime FROM images
+       WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
     ).all(s.id) as { id: string; fichier: string; mime: string }[];
     for (const img of aLegender) {
       try {
@@ -125,7 +126,8 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
           img.mime,
         );
         db.prepare(
-          "UPDATE images SET legende = ?, legende_origine = 'generated', modele = ? WHERE id = ?",
+          `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
+           WHERE id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
         ).run(texte, modele, img.id);
       } catch (e) {
         avertissements.push(`Légende non produite: ${(e as Error).message}`);
@@ -200,9 +202,18 @@ export function indexer(db: Db, sourceId: string) {
 }
 
 export function statuer(db: Db, sourceId: string, statut: "certifiee" | "rejetee", par: string) {
-  db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?")
-    .run(statut, par, maintenant(), sourceId);
-  indexer(db, sourceId);
+  transaction(db, () => {
+    if (
+      statut === "certifiee" &&
+      db.prepare("SELECT etat FROM ingestion_jobs WHERE source_id = ?").get(sourceId)?.etat !==
+        "awaiting_review"
+    ) {
+      throw new Error("La source n'est pas prête à être certifiée.");
+    }
+    db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?")
+      .run(statut, par, maintenant(), sourceId);
+    indexerSource(db, sourceId, statut === "certifiee" ? chunksSource(db, sourceId) : []);
+  });
 }
 
 export function relireLegende(

@@ -55,14 +55,20 @@ migrations/
 src/
   core/      ingestion, recherche, réponse ancrée, accès aux modèles
   app/       routes, vues, worker, comptes, certification
+    vues/    gabarits hono/html : page commune, professeur, élève, document
+    client/  interactions navigateur en TypeScript, compilées par deno bundle
   server.ts
   worker.ts
   cli.ts     thot ingest / thot ask / thot rebuild / thot eval
-static/      htmx, extension SSE, CSS, JS local
+static/      htmx, extension SSE, CSS, dist/app.js généré
 tests/
 evaluation/  jeux annotés et scripts Python de comparaison
 docs/decisions/
 ```
+
+`deno task build` produit le JavaScript navigateur avec `deno bundle`, sans autre
+outil. L'image Docker lance la même tâche. Les types du navigateur sont vérifiés
+séparément avec les bibliothèques DOM de TypeScript.
 
 `core/` n'importe rien de `app/`. `deno task check` le vérifie. `core/` reçoit
 ses dépendances et le périmètre des sources consultables en paramètre, jamais

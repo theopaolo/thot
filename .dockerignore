@@ -8,3 +8,5 @@ tasks/
 docs/
 tests/
 kanban.html
+
+static/dist/

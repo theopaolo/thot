@@ -9,7 +9,7 @@ affirmations reliées à un passage certifié.
 
 ## Lancer
 
-Il faut Deno 2.6 et `pdftotext` (Poppler).
+Il faut Deno 2.9.7 et `pdftotext` (Poppler).
 
 ```bash
 cp .env.example .env               # renseigner OPENROUTER_API_KEY
@@ -17,6 +17,18 @@ deno task thot compte prof "M. Detienne" enseignant    # affiche le mot de passe
 deno task thot compte lea "Léa" eleve
 deno task dev                      # serveur et worker, http://127.0.0.1:8000
 ```
+
+`deno task dev` construit le JavaScript navigateur puis surveille ses fichiers TypeScript.
+`deno task start` le construit aussi avant de lancer l'application. `deno task build` permet
+de le reconstruire seul avec `deno bundle`. L'image Docker lance la même tâche pendant
+sa construction.
+
+Les vues serveur sont dans `src/app/vues/` : `page.ts` pour la structure commune,
+`prof.ts` et `eleve.ts` pour les deux espaces, `document.ts` pour le texte des sources.
+Les interactions navigateur sont dans `src/app/client/`, avec leurs types DOM propres.
+Les attributs HTMX restent dans les vues, les gestionnaires d'événements sont en TypeScript.
+Le bundle `static/dist/app.js` et sa source map sont générés et exclus de Git.
+`deno task check` vérifie séparément les types serveur et navigateur, puis construit le bundle.
 
 Mot de passe enseignant oublié : `deno task thot reinitialiser prof` affiche un nouveau mot
 de passe et invalide les sessions ouvertes.
