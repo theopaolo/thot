@@ -70,7 +70,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string) => {
   `;
 };
 
-type Filtres = { statut: string; chapitre: string };
+type Filtres = { statut: string; sequence: string };
 
 /** Une ligne de liens-filtres. Le compte de chaque lien tient compte de l'autre filtre. */
 const filtre = (
@@ -98,14 +98,14 @@ const filtre = (
 export const sources = (
   lignes: LigneSource[],
   f: Filtres,
-  repartition: { chapitre: string; statut: string; n: number }[],
+  repartition: { sequence: string; statut: string; n: number }[],
 ) => {
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
     repartition.filter(garde).reduce((t, r) => t + r.n, 0);
-  const chapitres = [...new Set(repartition.map((r) => r.chapitre))].filter(Boolean).sort();
+  const sequences = [...new Set(repartition.map((r) => r.sequence))].filter(Boolean).sort();
   const requete = new URLSearchParams(f).toString();
   return html`
-    <h1>Sources</h1>
+    <h1>Bibliothèque</h1>
     ${filtre(
       "Statut",
       "statut",
@@ -114,13 +114,13 @@ export const sources = (
         "Rejetées",
       ]],
       f,
-      (v) => somme((r) => (!v || r.statut === v) && (!f.chapitre || r.chapitre === f.chapitre)),
+      (v) => somme((r) => (!v || r.statut === v) && (!f.sequence || r.sequence === f.sequence)),
     )} ${filtre(
-      "Chapitre",
-      "chapitre",
-      [["", "Tous"], ...chapitres.map((c): [string, string] => [c, c])],
+      "Séquence",
+      "sequence",
+      [["", "Toutes"], ...sequences.map((s): [string, string] => [s, s])],
       f,
-      (v) => somme((r) => (!v || r.chapitre === v) && (!f.statut || r.statut === f.statut)),
+      (v) => somme((r) => (!v || r.sequence === v) && (!f.statut || r.statut === f.statut)),
     )}
     ${lignes.length
       ? html`
@@ -286,7 +286,7 @@ export const questionsProf = (messages: QuestionProf[]) => {
   const refus = messages.filter((m) => m.etat === "out_of_corpus");
   const groupes = Map.groupBy(
     messages.filter((m) => m.etat !== "out_of_corpus"),
-    (m) => m.chapitre || "Sans chapitre",
+    (m) => m.chapitre || "Sans séquence",
   );
   return html`
     <h1>Questions des élèves</h1>
@@ -440,9 +440,9 @@ export const depot = (
           valeur: c.sous_matiere,
         })} ${champ({
           nom: "sequence",
-          label: "Chapitre",
+          label: "Séquence",
           valeur: c.sequence,
-          aide: "Les élèves trouvent le document sous ce chapitre.",
+          aide: "Les élèves trouvent le document sous cette séquence.",
         })} ${champ({ nom: "seance", label: "Séance", valeur: c.seance })}
       </div>
       ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })} ${champ({
@@ -527,9 +527,19 @@ export const statutSource = (s: Detail["source"]) =>
     </div>
   `;
 
-export const detailSource = (d: Detail) =>
-  html`
-    <p><a href="/prof">Sources</a></p>
+export const detailSource = (d: Detail) => {
+  // Une proposition de Thot remplit un champ encore vide. Enregistrer la valide.
+  const propositions = (d.meta.propositions ?? {}) as Record<string, string>;
+  const propose = (nom: string) => !d.meta[nom] && Boolean(propositions[nom]);
+  const information = (nom: string, label: string) =>
+    champ({
+      nom,
+      label,
+      valeur: String(d.meta[nom] || propositions[nom] || ""),
+      aide: propose(nom) ? "Proposé par Thot, à vérifier." : undefined,
+    });
+  return html`
+    <p><a href="/prof">Bibliothèque</a></p>
     <h1>${d.source.titre}</h1>
     <p class="discret">${d.meta.sequence ?? ""} ${d.meta.seance ? `· ${d.meta.seance}` : ""} · ${d
       .source.format} · ${d.source.fichier}</p>
@@ -542,16 +552,21 @@ export const detailSource = (d: Detail) =>
     <form method="post" action="/prof/sources/${d.source
       .id}/modifier" class="etroit edition-source">
       <h2>Modifier les informations</h2>
+      ${["date", "artiste", "mouvement"].some(propose)
+        ? html`
+          <p class="note">
+            Thot a lu ces informations dans le titre, le nom du fichier ou le texte. Les élèves les
+            voient une fois enregistrées.
+          </p>
+        `
+        : ""}
       <div class="deux">
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
-        ${champ({ nom: "sequence", label: "Chapitre", valeur: String(d.meta.sequence ?? "") })}
-        ${champ({ nom: "date", label: "Date de l'œuvre", valeur: String(d.meta.date ?? "") })}
-        ${champ({
-          nom: "quiz_reponse",
-          label: "Artiste ou mouvement pour le quiz",
-          valeur: String(d.meta.quiz_reponse ?? ""),
-        })}
+        ${champ({ nom: "sequence", label: "Séquence", valeur: String(d.meta.sequence ?? "") })}
+        ${information("date", "Date de l'œuvre")} ${information("artiste", "Artiste")}
+        ${information("mouvement", "Mouvement")}
       </div>
+      <p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>
       <button>Enregistrer</button>
     </form>
     ${statutSource(d.source)}
@@ -606,6 +621,7 @@ export const detailSource = (d: Detail) =>
     <h2>Texte extrait</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
   `;
+};
 
 const LEGENDES: Record<string, string> = {
   unreviewed: "non relue",

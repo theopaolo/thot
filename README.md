@@ -16,6 +16,7 @@ deno task thot compte prof "M. Detienne" enseignant   # affiche le mot de passe
 deno task dev                                         # serveur et worker, http://127.0.0.1:8000
 ```
 
+- `deno task dev` accepte n'importe quel mot de passe : seul l'identifiant compte
 - `deno task check` : format, lint, types serveur et navigateur, frontière `core/`/`app/`, tests
 - `deno task thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
 - `deno task board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878

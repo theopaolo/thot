@@ -1,7 +1,12 @@
 import { openrouter } from "./core/modeles.ts";
 import { config } from "./app/config.ts";
 import { cacheModeles, connexion, purgerMessages } from "./app/db.ts";
-import { revendiquer, traiter } from "./app/ingestion.ts";
+import {
+  proposerInformations,
+  revendiquer,
+  sourceSansInformations,
+  traiter,
+} from "./app/ingestion.ts";
 import {
   genererSuggestions,
   marquerSuggestions,
@@ -26,7 +31,12 @@ while (!arret) {
     await traiter(db, job, modeles);
     continue;
   }
-  // File vide: les sources certifiées reçoivent leurs questions suggérées, une à la fois.
+  // File vide: date, artiste et mouvement proposés, puis questions suggérées, une source à la fois.
+  const aDecrire = sourceSansInformations(db);
+  if (aDecrire) {
+    await proposerInformations(db, modeles, aDecrire);
+    continue;
+  }
   const source = sourceSansSuggestions(db);
   if (source) {
     try {

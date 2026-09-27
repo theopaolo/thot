@@ -14,6 +14,7 @@ const lancer = (fichier: string, droits: string[]) =>
   new Deno.Command(Deno.execPath(), {
     args: ["run", ...droits, ...envFile, ...surveiller, fichier],
     cwd: RACINE,
+    env: dev ? { THOT_DEV: "1" } : {},
     stdin: "null",
   }).spawn();
 

@@ -7,6 +7,7 @@ import { serveStatic } from "hono/deno";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
 import { type Affirmation, demander, type Resultat } from "../core/reponse.ts";
+import { type Candidat, chercher, chercherFts } from "../core/recherche.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
@@ -29,6 +30,9 @@ type Env = { Variables: { compte: Compte } };
 
 const SESSION = "thot_session";
 const PERIMETRE_MS = 3 * 60_000;
+/** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
+const QUIZ = `trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
+  coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') AS quiz_reponse`;
 
 export function creerApp(db: Db, modeles: Modeles) {
   const app = new Hono<Env>();
@@ -132,7 +136,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
 
   // ------------------------------------------------------------ enseignant
-  const lignes = (statut: string, chapitre: string) =>
+  const lignes = (statut: string, sequence: string) =>
     db.prepare(
       `SELECT s.id, s.titre, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
          j.etat, j.erreur,
@@ -140,20 +144,20 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
-    ).all(config.schoolId, statut, statut, chapitre, chapitre) as unknown as Prof.LigneSource[];
+    ).all(config.schoolId, statut, statut, sequence, sequence) as unknown as Prof.LigneSource[];
   const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
     statut: c.req.query("statut") ?? "",
-    chapitre: c.req.query("chapitre") ?? "",
+    sequence: c.req.query("sequence") ?? "",
   });
 
   app.get("/prof", (c) => {
     const f = filtres(c);
     const repartition = db.prepare(
-      `SELECT coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre, statut, count(*) AS n
+      `SELECT coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence, statut, count(*) AS n
        FROM sources WHERE school_id = ? GROUP BY 1, 2`,
-    ).all(config.schoolId) as { chapitre: string; statut: string; n: number }[];
+    ).all(config.schoolId) as { sequence: string; statut: string; n: number }[];
     return c.html(
-      rendre(c, "Sources", Prof.sources(lignes(f.statut, f.chapitre), f, repartition)),
+      rendre(c, "Bibliothèque", Prof.sources(lignes(f.statut, f.sequence), f, repartition)),
     );
   });
   app.get("/prof/eleves", (c) => {
@@ -217,7 +221,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
     return c.html(
-      Prof.lignesSources(lignes(f.statut, f.chapitre), new URLSearchParams(f).toString()),
+      Prof.lignesSources(lignes(f.statut, f.sequence), new URLSearchParams(f).toString()),
     );
   });
   app.post("/prof/sources/statut", async (c) => {
@@ -266,7 +270,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         "Déposer",
         Prof.depot({
           ok:
-            `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans les sources.`,
+            `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
         }),
       ),
     );
@@ -320,13 +324,18 @@ export function creerApp(db: Db, modeles: Modeles) {
     const titre = String(b.titre ?? "").trim();
     const sequence = String(b.sequence ?? "").trim();
     const date = String(b.date ?? "").trim();
-    const quiz = String(b.quiz_reponse ?? "").trim();
+    const artiste = String(b.artiste ?? "").trim();
+    const mouvement = String(b.mouvement ?? "").trim();
     if (
-      !titre || titre.length > 200 || sequence.length > 120 || date.length > 40 || quiz.length > 120
+      !titre || titre.length > 200 || sequence.length > 120 || date.length > 40 ||
+      artiste.length > 120 || mouvement.length > 120
     ) {
-      return c.text("Titre ou chapitre invalide.", 400);
+      return c.text("Titre ou séquence invalide.", 400);
     }
-    const meta = { ...d.meta, titre, sequence, date, quiz_reponse: quiz };
+    // Enregistrer valide ce que Thot proposait: la proposition n'a plus d'objet.
+    const meta: Record<string, unknown> = { ...d.meta, titre, sequence, date, artiste, mouvement };
+    delete meta.propositions;
+    delete meta.quiz_reponse;
     db.prepare(
       "UPDATE sources SET titre = ?, metadonnees = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
     )
@@ -393,7 +402,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT id, titre, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
-         coalesce(json_extract(metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
+         ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
@@ -428,12 +437,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
-  app.on("GET", ["/eleve/sans-chapitre", "/eleve/chapitres/:nom"], (c) => {
+  app.on("GET", ["/eleve/sans-sequence", "/eleve/sequences/:nom"], (c) => {
     const nom = c.req.param("nom") ?? "";
     const sources = db.prepare(
       `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
-         coalesce(json_extract(s.metadonnees, '$.quiz_reponse'), '') AS quiz_reponse,
+         ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
@@ -447,7 +456,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.html(
       rendre(
         c,
-        nom || "Sans chapitre",
+        nom || "Sans séquence",
         Eleve.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [], apercu(doc.id)),
       ),
     );
@@ -515,6 +524,42 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
+  // Recherche sans rédaction: les documents les plus proches, au-dessus du seuil des réponses.
+  // Une légende non relue aide à trouver l'image mais n'est pas montrée.
+  app.get("/eleve/recherche", async (c) => {
+    const q = (c.req.query("q") ?? "").trim().slice(0, 300);
+    if (!q) return c.html(rendre(c, "Chercher", Eleve.recherche("")));
+    const p = { schoolId: config.schoolId, bibliotheque: true };
+    let proches: Candidat[];
+    try {
+      const r = await chercher(db, modeles, q, p, config.seuil);
+      // ponytail: seuil relatif fixé à l'œil sur quatre recherches. À mesurer sur les familles E et F.
+      proches = r.candidats.filter((x) => x.score! >= Math.max(config.seuil, r.score / 4))
+        .sort((a, b) => b.score! - a.score!);
+    } catch {
+      proches = chercherFts(db, q, p); // reclasseur indisponible: l'ordre de FTS5
+    }
+    const ids = [...new Set(proches.map((x) => x.source_id))].slice(0, 12);
+    const sources = new Map(
+      db.prepare(
+        `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS sequence,
+           coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
+           (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
+         FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})`,
+      ).all(...ids).map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
+    );
+    const trouves = ids.map((id) => {
+      const texte = proches.find((x) => x.source_id === id)!.texte.replace(/\s+/g, " ").trim();
+      const s = sources.get(id)!;
+      const reste = texte.startsWith(s.titre) ? texte.slice(s.titre.length).trim() : texte;
+      return {
+        ...s,
+        extrait: reste.length > 180 ? reste.slice(0, 180).replace(/\s+\S*$/, "") + " …" : reste,
+      };
+    });
+    return c.html(rendre(c, "Chercher", Eleve.recherche(q, trouves)));
+  });
+
   const messagesDe = (compteId: string) =>
     db.prepare(
       "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
@@ -575,7 +620,7 @@ export function creerApp(db: Db, modeles: Modeles) {
            AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          LIMIT 1`,
       ).get(config.schoolId, chapitre)
-    ) return c.text("Chapitre indisponible.", 400);
+    ) return c.text("Séquence indisponible.", 400);
     const id = crypto.randomUUID();
     const t = maintenant();
     db.prepare(

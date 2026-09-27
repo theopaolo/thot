@@ -1,5 +1,6 @@
 import { html } from "hono/html";
 import type { Compte } from "../comptes.ts";
+import { config } from "../config.ts";
 import { type Icone, icone } from "../icones.ts";
 
 export const page = (
@@ -70,10 +71,10 @@ const navEleve = (c: Compte, chemin: string) =>
     <nav aria-label="Navigation principale" hx-boost="true">
       ${lienNav(
         "/eleve",
-        "Chapitres",
+        "Séquences",
         "books",
-        chemin === "/eleve" || chemin === "/eleve/sans-chapitre" ||
-          chemin.startsWith("/eleve/chapitres") ||
+        chemin === "/eleve" || chemin === "/eleve/sans-sequence" ||
+          chemin.startsWith("/eleve/sequences") ||
           chemin.startsWith("/eleve/sources"),
       )}
       ${lienNav(
@@ -97,7 +98,7 @@ const rail = (c: Compte, chemin: string) =>
       <nav aria-label="Navigation enseignant" hx-boost="true">
         ${lienNav(
           "/prof",
-          "Sources",
+          "Bibliothèque",
           "file-text",
           chemin === "/prof" || chemin.startsWith("/prof/sources"),
         )}
@@ -105,9 +106,9 @@ const rail = (c: Compte, chemin: string) =>
         ${lienNav("/prof/legendes", "Légendes", "image", chemin.startsWith("/prof/legendes"))}
         ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
         ${lienNav("/prof/questions", "Questions", "question", chemin.startsWith("/prof/questions"))}
-        ${lienNav("/eleve", "Vue élève", "books", false, false)}
       </nav>
       <div class="rail-pied">
+        ${lienNav("/eleve", "Vue élève", "books", false, false)}
         <strong>${c.nom}</strong>
         <form method="post" action="/deconnexion">
           <button class="lien">${icone("sign-out")}Se déconnecter</button>
@@ -144,7 +145,7 @@ export const connexion = (erreur?: string, identifiant = "") =>
           id="mot_de_passe"
           name="mot_de_passe"
           autocomplete="current-password"
-          required
+          ${config.dev ? html`placeholder="Ignoré en dev"` : html`required`}
         >
       </div>
       <button class="principal">Se connecter</button>

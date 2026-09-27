@@ -380,7 +380,8 @@ body.prof {
   flex-direction: column;
   gap: var(--s1);
 }
-.rail nav a {
+.rail nav a,
+.rail-pied > a {
   display: flex;
   align-items: center;
   gap: var(--s3);
@@ -391,7 +392,8 @@ body.prof {
   font-weight: 700;
   text-decoration: none;
 }
-.rail nav a:hover {
+.rail nav a:hover,
+.rail-pied > a:hover {
   background: var(--surface);
 }
 .rail nav a[aria-current="page"] {
@@ -417,7 +419,7 @@ body.prof main {
   body.prof {
     display: block;
   }
-  /* Marque et déconnexion sur une ligne, les six liens en deux rangées de trois. */
+  /* Marque, vue élève et déconnexion sur une ligne, les cinq liens en deux rangées. */
   .rail {
     position: static;
     height: auto;
@@ -444,6 +446,8 @@ body.prof main {
     padding: 0 var(--s2);
   }
   .rail-pied {
+    flex-direction: row;
+    align-items: center;
     margin: 0;
     padding: 0;
     border: 0;
@@ -556,6 +560,7 @@ label {
 }
 input[type="text"],
 input[type="password"],
+input[type="search"],
 select,
 textarea {
   width: 100%;
@@ -975,6 +980,17 @@ button.idee .icone {
 }
 .tuile[aria-current="true"] .tuile-titre {
   font-weight: 700;
+}
+.resultats {
+  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 40vw), 1fr));
+}
+.tuile-extrait {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
 }
 .tuile-titre {
   display: -webkit-box;

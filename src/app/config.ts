@@ -5,6 +5,8 @@ const env = (cle: string, defaut: string) => Deno.env.get(cle) || defaut;
 export const RACINE = fromFileUrl(new URL("../../", import.meta.url));
 
 export const config = {
+  // Posé par `deno task dev` (src/main.ts). Les mots de passe ne sont plus vérifiés.
+  dev: Deno.env.get("THOT_DEV") === "1",
   donnees: env("THOT_DATA_DIR", join(RACINE, "data")),
   port: Number(env("THOT_PORT", "8000")),
   schoolId: env("THOT_SCHOOL_ID", "pilote"),

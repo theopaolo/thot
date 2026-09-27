@@ -11,7 +11,16 @@ import {
   reinitialiserMotDePasse,
 } from "../src/app/comptes.ts";
 import { detecterFormat, nomSur } from "../src/app/depot.ts";
-import { reextraire, relireLegende, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
+import {
+  lireInformations,
+  proposerInformations,
+  reextraire,
+  relireLegende,
+  revendiquer,
+  sourceSansInformations,
+  statuer,
+  traiter,
+} from "../src/app/ingestion.ts";
 import {
   faitAuHasard,
   genererSuggestions,
@@ -271,12 +280,12 @@ Deno.test("un échec d'indexation annule aussi la certification", async () => {
   }
 });
 
-Deno.test("les documents sans chapitre ont leur propre route, distincte d'un chapitre homonyme", async () => {
+Deno.test("les documents sans séquence ont leur propre route, distincte d'une séquence homonyme", async () => {
   const { db, dir } = await environnement();
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
     const ids: string[] = [];
-    for (const sequence of ["", "Sans chapitre"]) {
+    for (const sequence of ["", "Sans séquence"]) {
       await requete("/prof/depot", {
         method: "POST",
         body: formulaire(
@@ -292,7 +301,7 @@ Deno.test("les documents sans chapitre ont leur propre route, distincte d'un cha
     }
     const eleve = await session(db, fauxModeles().modeles, "eleve");
     const accueil = await (await eleve.requete("/eleve")).text();
-    const chemins = ["/eleve/sans-chapitre", "/eleve/chapitres/Sans%20chapitre"];
+    const chemins = ["/eleve/sans-sequence", "/eleve/sequences/Sans%20s%C3%A9quence"];
     for (const [i, chemin] of chemins.entries()) {
       assertStringIncludes(accueil, `href="${chemin}"`);
       const r = await eleve.requete(`${chemin}?doc=${ids[i]}`);
@@ -305,7 +314,7 @@ Deno.test("les documents sans chapitre ont leur propre route, distincte d'un cha
       assertStringIncludes(document, `href="${chemin}?doc=${ids[i]}"`);
     }
     statuer(db, ids[0], "rejetee", "Prof");
-    assertEquals((await eleve.requete("/eleve/sans-chapitre")).status, 404);
+    assertEquals((await eleve.requete("/eleve/sans-sequence")).status, 404);
   } finally {
     db.close();
     await Deno.remove(dir, { recursive: true });
@@ -324,7 +333,7 @@ Deno.test("sans public Élèves, une source certifiée reste invisible aux élè
   assert(!(await (await eleve.requete("/eleve")).text()).includes(CHAMPS.titre));
   for (
     const chemin of [
-      `/eleve/chapitres/${encodeURIComponent(CHAMPS.sequence)}`,
+      `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`,
       `/eleve/documents/${id}/apercu`,
       `/eleve/sources/${id}`,
       `/media/${id}-0`,
@@ -380,6 +389,24 @@ Deno.test("une légende non relue aide la recherche mais n'atteint jamais le gé
   const g = fauxModeles({ sorties: ['{"refus": true}'] });
   await demander(db, g.modeles, "dragon turquoise", { schoolId: "pilote" }, 0.023);
   assertStringIncludes(JSON.stringify(g.vus), "Image : Carapace de dragon");
+});
+
+Deno.test("la recherche trouve une image par sa légende non relue sans la montrer", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.", [
+    "enseignants",
+    "eleves",
+  ]);
+  statuer(db, id, "certifiee", "test");
+  const { requete } = await session(db, fauxModeles().modeles, "eleve");
+
+  const page = await (await requete("/eleve/recherche?q=dragon%20turquoise")).text();
+  assertStringIncludes(page, `/media/${id}-0`);
+  assertStringIncludes(page, CHAMPS.titre);
+  assert(!page.includes("Carapace"), "légende non relue montrée à l'élève");
+  // Sous le seuil, la page ne montre rien.
+  const { requete: bas } = await session(db, fauxModeles({ score: 0.01 }).modeles, "eleve");
+  assert(!(await (await bas("/eleve/recherche?q=dragon")).text()).includes(`/media/${id}-0`));
 });
 
 Deno.test("trois états de réponse distincts, et une citation fausse ne passe jamais", async () => {
@@ -758,6 +785,53 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
   );
 });
 
+Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db);
+  statuer(db, id, "certifiee", "test");
+  assertEquals(
+    lireInformations(
+      '{"artiste": "Gaudí, Picasso", "mouvement": "Art nouveau"}',
+      "Gaudí Art-Nouveau",
+    ),
+    { date: "", artiste: "", mouvement: "Art nouveau" },
+  );
+  assertEquals(sourceSansInformations(db), id);
+  const sortie = JSON.stringify({
+    date: "1906",
+    artiste: "Antoni Gaudí",
+    mouvement: "Art nouveau",
+  });
+  await proposerInformations(db, fauxModeles({ sorties: [sortie] }).modeles, id);
+  assertEquals(sourceSansInformations(db), undefined);
+
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const fiche = await (await prof.requete(`/prof/sources/${id}`)).text();
+  assertStringIncludes(fiche, 'value="Antoni Gaudí"');
+  assertStringIncludes(fiche, "Proposé par Thot");
+  assert(!fiche.includes('value="1906"'), "une date absente de la fiche n'est pas proposée");
+  const eleve = await session(db, fauxModeles().modeles, "eleve");
+  const chapitre = `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`;
+  assert(!(await (await eleve.requete(chapitre)).text()).includes("data-verifier-quiz"));
+
+  await prof.requete(`/prof/sources/${id}/modifier`, {
+    method: "POST",
+    body: new URLSearchParams({
+      titre: CHAMPS.titre,
+      sequence: CHAMPS.sequence,
+      date: "",
+      artiste: "Antoni Gaudí",
+      mouvement: "Art nouveau",
+    }),
+  });
+  assert(!(await (await prof.requete(`/prof/sources/${id}`)).text()).includes("Proposé par Thot"));
+  assertStringIncludes(
+    await (await eleve.requete(chapitre)).text(),
+    'data-answer="Antoni Gaudí|Art nouveau"',
+  );
+  assertEquals(sourceSansInformations(db), undefined);
+});
+
 Deno.test("titre édité réindexé, image certifiée liée à la réponse et messages purgés", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
@@ -769,7 +843,7 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
       titre: "Casa Batlló corrigée",
       sequence: "Architecture",
       date: "1906",
-      quiz_reponse: "Gaudí",
+      artiste: "Gaudí",
     }),
   });
   assertEquals(r.status, 303);
@@ -815,7 +889,7 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
   const eleve = await session(db, fauxModeles().modeles, "eleve");
   const accueil = await (await eleve.requete("/eleve")).text();
   assertStringIncludes(accueil, "Casa Batlló corrigée");
-  assertStringIncludes(await (await eleve.requete("/eleve/chapitres/Architecture")).text(), "1906");
+  assertStringIncludes(await (await eleve.requete("/eleve/sequences/Architecture")).text(), "1906");
   const compte =
     db.prepare("SELECT id FROM comptes WHERE role = 'eleve' ORDER BY rowid DESC LIMIT 1").get()!.id;
   db.prepare(

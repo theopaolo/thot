@@ -26,7 +26,12 @@ export type ChunkIndexe = {
 
 export type Candidat = ChunkIndexe & { rang_fts: number; score?: number };
 
-export type Perimetre = { schoolId: string; chapitre?: string };
+export type Perimetre = {
+  schoolId: string;
+  chapitre?: string;
+  /** recherche de la bibliothèque: toute source lue par les élèves, même sans le public Thot */
+  bibliotheque?: boolean;
+};
 
 export type Recherche = {
   candidats: Candidat[];
@@ -76,12 +81,13 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ?
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
-       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+       AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
   ).all(
     termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
     p.schoolId,
+    p.bibliotheque ? 1 : 0,
     p.chapitre ?? "",
     p.chapitre ?? "",
     k,

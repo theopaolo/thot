@@ -176,7 +176,8 @@ export async function authentifier(db: Db, identifiant: string, motDePasse: stri
   for (let i = 0; i < empreinte.length; i++) {
     diff |= empreinte.charCodeAt(i) ^ l.empreinte.charCodeAt(i);
   }
-  return diff === 0
+  // `deno task dev` accepte n'importe quel mot de passe.
+  return diff === 0 || config.dev
     ? {
       id: l.id,
       identifiant: l.identifiant,

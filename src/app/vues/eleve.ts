@@ -69,7 +69,8 @@ export const accueilEleve = (
     </form>
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
-        <h2 id="tes-chapitres">Tes chapitres</h2>
+        <h2 id="tes-chapitres">Tes séquences</h2>
+        ${formRecherche("")}
         ${chapitres.length
           ? html`
             <ul class="chapitres">${chapitres.map((c) =>
@@ -77,7 +78,7 @@ export const accueilEleve = (
                 <li class="chapitre">
                   <div class="chapitre-tete">
                     <h3><a href="${lienChapitre(c.nom)}">${nomChapitre(
-                      c.nom || "Sans chapitre",
+                      c.nom || "Sans séquence",
                     )}</a></h3>
                     <span class="discret">${c.sources.length} documents</span>
                   </div>
@@ -100,7 +101,7 @@ export const accueilEleve = (
                     : ""}
                   <a class="bouton" href="${lienChapitre(c.nom)}">${icone(
                     "arrow-right",
-                  )}Ouvrir le chapitre</a>
+                  )}Ouvrir la séquence</a>
                 </li>
               `
             )}</ul>
@@ -139,8 +140,62 @@ export const accueilEleve = (
     </div>
   `;
 
+const formRecherche = (q: string) =>
+  html`
+    <form method="get" action="/eleve/recherche" class="question-rapide" role="search">
+      <label for="q">Chercher une œuvre ou un document</label>
+      <div class="saisie">
+        <input type="search" id="q" name="q" value="${q}" required maxlength="300"
+          placeholder="Un toit coloré en vagues au-dessus d'un hall">
+        <button>${icone("magnifying-glass")}Chercher</button>
+      </div>
+    </form>
+  `;
+
+export type Trouve = {
+  id: string;
+  titre: string;
+  sequence: string;
+  date: string;
+  image_id: string | null;
+  /** début du passage trouvé, sans le titre */
+  extrait: string;
+};
+
+/** Les documents les plus proches de la recherche, du plus proche au moins proche. */
+export const recherche = (q: string, trouves: Trouve[] = []) =>
+  html`
+    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
+    <h1>Chercher dans le cours</h1>
+    ${formRecherche(q)}
+    ${!q ? "" : trouves.length
+      ? html`
+        <p class="sous-titre">${trouves.length === 1
+          ? "Un document proche"
+          : `${trouves.length} documents proches`} de ta recherche, du plus proche au moins proche.</p>
+        <div class="tuiles resultats">${trouves.map((s) =>
+          html`
+            <a class="tuile" href="${lienChapitre(s.sequence, s.id)}">
+              <span class="passe-partout">${s.image_id
+                ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
+                : html`<span class="sans-image">${icone("file-text")}</span>`}</span>
+              <span class="tuile-titre">${s.titre}</span>
+              <span class="discret">${[nomChapitre(s.sequence), s.date].filter(Boolean).join(
+                ", ",
+              )}</span>
+              ${s.extrait ? html`<span class="tuile-extrait">${s.extrait}</span>` : ""}
+            </a>
+          `
+        )}</div>
+      `
+      : html`
+        <p>Rien dans le cours ne ressemble à « ${q} ». Essaie d'autres mots.</p>
+        ${idee(q, false, "Poser la question à Thot")}
+      `}
+  `;
+
 const lienChapitre = (nom: string, doc?: string) =>
-  `${nom ? `/eleve/chapitres/${encodeURIComponent(nom)}` : "/eleve/sans-chapitre"}${
+  `${nom ? `/eleve/sequences/${encodeURIComponent(nom)}` : "/eleve/sans-sequence"}${
     doc ? `?doc=${doc}` : ""
   }`;
 
@@ -175,7 +230,7 @@ const cartel = (d: { seance: string; chapitre: string; date: string; enseignant:
         : ""}
       ${d.chapitre
         ? html`
-          <dt>Chapitre</dt>
+          <dt>Séquence</dt>
           <dd>${nomChapitre(d.chapitre)}</dd>
         `
         : ""}
@@ -267,12 +322,12 @@ export const pageChapitre = (
   return html`
     <div class="mur-lecteur" data-feuille>
       <div class="mur">
-    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Tous les chapitres</a>
-    <h1>${nomChapitre(nom || "Sans chapitre")}</h1>
+    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
+    <h1>${nomChapitre(nom || "Sans séquence")}</h1>
     <p class="sous-titre">${sources
       .length} documents publiés par tes enseignants, rangés par séance.</p>
     <form method="post" action="/eleve/questions" class="question-rapide">
-      <label for="texte">Une question sur ce chapitre ?</label>
+      <label for="texte">Une question sur cette séquence ?</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
           placeholder="Pose ta question">
@@ -324,7 +379,7 @@ export const lectureSource = (
   html`
     <a class="bouton retour" href="${lienChapitre(s.sequence, s.id)}">${icone(
       "arrow-left",
-    )}${nomChapitre(s.sequence || "Sans chapitre")}</a>
+    )}${nomChapitre(s.sequence || "Sans séquence")}</a>
     <article class="document">
       <h1>${s.titre}</h1>
       <div class="document-tete">

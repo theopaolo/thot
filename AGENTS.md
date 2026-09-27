@@ -19,4 +19,5 @@ ne dit pas : une règle du produit, une raison, une contrainte extérieure.
 
 Emplacements : `README.md` pour lancer le projet, `docs/architecture.md` pour les règles du
 produit, `docs/exploitation.md` pour faire tourner le pilote, `evaluation/README.md` pour les
-mesures, `docs/decisions/` pour les ADR.
+mesures, `docs/decisions/` pour les ADR, `docs/vocabulaire.md` pour les termes que l'interface
+emploie.

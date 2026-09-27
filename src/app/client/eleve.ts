@@ -34,11 +34,15 @@ function verifierQuiz(bouton: HTMLButtonElement) {
     texte.trim().toLocaleLowerCase("fr").normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
   const r = plier(champ.value);
-  const a = plier(reponse);
+  // L'artiste ou le mouvement, séparés par `|`.
+  const admises = reponse.split("|");
+  const juste = admises.find((x) => {
+    const a = plier(x);
+    return r === a || (r.length >= 4 && (` ${a} `).includes(` ${r} `));
+  });
   if (!r) sortie.textContent = "Écris une réponse avant de vérifier.";
-  else if (r === a || (r.length >= 4 && (` ${a} `).includes(` ${r} `))) {
-    sortie.textContent = `Bravo, c'est bien ${reponse}.`;
-  } else sortie.textContent = `Pas tout à fait. La réponse attendue : ${reponse}.`;
+  else if (juste) sortie.textContent = `Bravo, c'est bien ${juste}.`;
+  else sortie.textContent = `Pas tout à fait. La réponse attendue : ${admises.join(" ou ")}.`;
 }
 
 function suivreConversation(conversation: HTMLElement) {
