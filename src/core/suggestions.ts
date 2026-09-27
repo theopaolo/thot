@@ -33,16 +33,16 @@ export async function questionsVerifiees(
     { role: "system", content: CONSIGNE },
     { role: "user", content: `${passage.titre}\n\n${passage.texte}` },
   ]);
-  let questions: string[] = [];
+  let questions: unknown;
   try {
-    questions = JSON.parse(texte.slice(texte.indexOf("{"), texte.lastIndexOf("}") + 1)).questions ??
-      [];
+    questions = JSON.parse(texte.slice(texte.indexOf("{"), texte.lastIndexOf("}") + 1)).questions;
   } catch {
     return [];
   }
+  if (!Array.isArray(questions)) return [];
   const gardees = [];
   for (
-    const q of questions.filter((q) =>
+    const q of questions.filter((q): q is string =>
       typeof q === "string" && q.trim().endsWith("?") && !RENVOI.test(q)
     ).slice(0, 2)
   ) {

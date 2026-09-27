@@ -1,0 +1,759 @@
+{
+ "date": "2026-09-27T09:46:08.132Z",
+ "modele": "z-ai/glm-5.3",
+ "n": 103,
+ "non_annotees": 0,
+ "auc": 0.893,
+ "faux_rejets": 0.21,
+ "faux_passages": 0.03,
+ "par_famille": {
+  "sortie": {
+   "n": 70,
+   "erreurs_a_0_5": 0.16
+  },
+  "inversion": {
+   "n": 9,
+   "erreurs_a_0_5": 0
+  },
+  "généralisation": {
+   "n": 6,
+   "erreurs_a_0_5": 0
+  },
+  "attribution": {
+   "n": 8,
+   "erreurs_a_0_5": 0
+  },
+  "ajout": {
+   "n": 6,
+   "erreurs_a_0_5": 0
+  },
+  "chiffre": {
+   "n": 4,
+   "erreurs_a_0_5": 0
+  }
+ },
+ "latence_mediane_ms": 311,
+ "lignes": [
+  {
+   "id": "G01-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 767
+  },
+  {
+   "id": "G01-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999898714273163,
+   "ms": 476
+  },
+  {
+   "id": "G01-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.00009474806951049656,
+   "ms": 549
+  },
+  {
+   "id": "G01-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.18143046320193573,
+   "ms": 272
+  },
+  {
+   "id": "G01-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 459
+  },
+  {
+   "id": "G02-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9627045664669737,
+   "ms": 221
+  },
+  {
+   "id": "G02-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 446
+  },
+  {
+   "id": "G02-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9985534025672639,
+   "ms": 215
+  },
+  {
+   "id": "G03-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 564
+  },
+  {
+   "id": "G03-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.04699349963707101,
+   "ms": 346
+  },
+  {
+   "id": "G03-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999952160099708,
+   "ms": 309
+  },
+  {
+   "id": "G03-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 342
+  },
+  {
+   "id": "G03-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 476
+  },
+  {
+   "id": "G04-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999840525433616,
+   "ms": 1674
+  },
+  {
+   "id": "G04-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998512546574845,
+   "ms": 287
+  },
+  {
+   "id": "G04-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000007306697774497237,
+   "ms": 312
+  },
+  {
+   "id": "G06-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 261
+  },
+  {
+   "id": "G06-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997591202893961,
+   "ms": 430
+  },
+  {
+   "id": "G06-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.00001070130965563184,
+   "ms": 723
+  },
+  {
+   "id": "G07-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 322
+  },
+  {
+   "id": "G07-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 1340
+  },
+  {
+   "id": "G07-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9989961227873483,
+   "ms": 762
+  },
+  {
+   "id": "G07-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9817396172839757,
+   "ms": 294
+  },
+  {
+   "id": "G07-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.8344792683938151,
+   "ms": 351
+  },
+  {
+   "id": "G08-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998140646883746,
+   "ms": 253
+  },
+  {
+   "id": "G08-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9932254619947776,
+   "ms": 363
+  },
+  {
+   "id": "G08-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997600109623674,
+   "ms": 230
+  },
+  {
+   "id": "G08-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 413
+  },
+  {
+   "id": "G08-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.866112162469402,
+   "ms": 218
+  },
+  {
+   "id": "G09-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 213
+  },
+  {
+   "id": "G09-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999810786990034,
+   "ms": 264
+  },
+  {
+   "id": "G09-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999750588349908,
+   "ms": 298
+  },
+  {
+   "id": "G09-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999793872496011,
+   "ms": 249
+  },
+  {
+   "id": "G09-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999877845409245,
+   "ms": 515
+  },
+  {
+   "id": "G10-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 830
+  },
+  {
+   "id": "G10-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 353
+  },
+  {
+   "id": "G10-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.2670249290782244,
+   "ms": 248
+  },
+  {
+   "id": "G10-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999102111739027,
+   "ms": 365
+  },
+  {
+   "id": "G11-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999955070103473,
+   "ms": 240
+  },
+  {
+   "id": "G11-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 414
+  },
+  {
+   "id": "G11-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 747
+  },
+  {
+   "id": "G11-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.9983762731286131,
+   "ms": 750
+  },
+  {
+   "id": "G11-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998840564297928,
+   "ms": 286
+  },
+  {
+   "id": "G12-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999446986238507,
+   "ms": 221
+  },
+  {
+   "id": "G12-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.99999346089103,
+   "ms": 412
+  },
+  {
+   "id": "G12-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997645839718574,
+   "ms": 296
+  },
+  {
+   "id": "G12-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999167787072563,
+   "ms": 233
+  },
+  {
+   "id": "G13-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000012741736422069115,
+   "ms": 352
+  },
+  {
+   "id": "G13-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000008871719170565641,
+   "ms": 566
+  },
+  {
+   "id": "G14-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 256
+  },
+  {
+   "id": "G14-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 289
+  },
+  {
+   "id": "G14-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 344
+  },
+  {
+   "id": "G14-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9995033416337994,
+   "ms": 241
+  },
+  {
+   "id": "G14-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 249
+  },
+  {
+   "id": "G15-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9996966444929624,
+   "ms": 250
+  },
+  {
+   "id": "G15-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999957782697007,
+   "ms": 1866
+  },
+  {
+   "id": "G15-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999798589456621,
+   "ms": 294
+  },
+  {
+   "id": "G15-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 251
+  },
+  {
+   "id": "G15-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 247
+  },
+  {
+   "id": "G17-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.8798419057399088,
+   "ms": 372
+  },
+  {
+   "id": "G17-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997327109415374,
+   "ms": 346
+  },
+  {
+   "id": "G17-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998064983384731,
+   "ms": 612
+  },
+  {
+   "id": "G18-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 513
+  },
+  {
+   "id": "G18-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998582012710976,
+   "ms": 1342
+  },
+  {
+   "id": "G18-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 291
+  },
+  {
+   "id": "G20-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000008852325220038067,
+   "ms": 410
+  },
+  {
+   "id": "G20-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.00002014032680365582,
+   "ms": 728
+  },
+  {
+   "id": "G20-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.00009567933941592359,
+   "ms": 224
+  },
+  {
+   "id": "N10-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 347
+  },
+  {
+   "id": "N10-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 337
+  },
+  {
+   "id": "G02-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 1238
+  },
+  {
+   "id": "G03-3-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 232
+  },
+  {
+   "id": "G08-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 236
+  },
+  {
+   "id": "G09-4-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 265
+  },
+  {
+   "id": "G15-3-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 243
+  },
+  {
+   "id": "G15-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 323
+  },
+  {
+   "id": "G12-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 257
+  },
+  {
+   "id": "G11-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 291
+  },
+  {
+   "id": "G14-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 226
+  },
+  {
+   "id": "G03-3-gén2",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 211
+  },
+  {
+   "id": "G08-1-gén2",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 294
+  },
+  {
+   "id": "G09-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 389
+  },
+  {
+   "id": "G10-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 873
+  },
+  {
+   "id": "G12-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 382
+  },
+  {
+   "id": "G11-5-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0.0008018106755529215,
+   "ms": 270
+  },
+  {
+   "id": "G02-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 312
+  },
+  {
+   "id": "G06-1-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 235
+  },
+  {
+   "id": "G09-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 253
+  },
+  {
+   "id": "G17-3-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 241
+  },
+  {
+   "id": "G18-2-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 326
+  },
+  {
+   "id": "G10-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 313
+  },
+  {
+   "id": "G04-1-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 231
+  },
+  {
+   "id": "G08-3-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 318
+  },
+  {
+   "id": "G06-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 282
+  },
+  {
+   "id": "G03-3-ajo3",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 311
+  },
+  {
+   "id": "G12-4-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 213
+  },
+  {
+   "id": "G15-1-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 296
+  },
+  {
+   "id": "G09-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0.0002558569179942828,
+   "ms": 264
+  },
+  {
+   "id": "G11-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 240
+  },
+  {
+   "id": "G17-3-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 653
+  },
+  {
+   "id": "G09-1-chi3",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 277
+  },
+  {
+   "id": "G08-3-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 417
+  },
+  {
+   "id": "G04-1-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 228
+  }
+ ]
+}

@@ -59,6 +59,22 @@ export const decoder = (s: string) =>
 
 const sansBalises = (s: string) => decoder(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
 
+/**
+ * Les synthèses Pearltrees marquent leurs parties en gras, sans balise de titre: un paragraphe
+ * court entièrement en gras, ou un gras suivi d'un tiret long (« <b>Les Fauves</b> — libérer la
+ * couleur »). Un gras suivi de deux-points (« <b>Dimensions</b> : 81 cm ») reste une étiquette.
+ */
+function intertitreGras(morceau: string) {
+  const m = morceau.match(
+    /^\s*(?:<(?!b\b|strong\b)[^>]+>\s*)*<(b|strong)\b[^>]*>([\s\S]*?)<\/\1>([\s\S]*)$/i,
+  );
+  if (!m) return undefined;
+  const gras = sansBalises(m[2]);
+  const reste = sansBalises(m[3]);
+  const seul = !reste && gras.split(" ").length <= 12 && !/:$/.test(gras);
+  return gras && (seul || /^[—–] /.test(reste)) ? gras : undefined;
+}
+
 const RE_IMG = /src="data:image\/(jpeg|jpg|png|gif|webp)[^,"]*base64,\s*([A-Za-z0-9+/=\s]+)"/i;
 
 /**
@@ -96,6 +112,7 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
     const texte = sansBalises(morceau);
     if (!texte || texte === "–") continue;
     if (intertitre) section = texte;
+    else section = intertitreGras(morceau) ?? section;
     parties.push({ texte, section });
   }
   return { parties, images, avertissements: [] };

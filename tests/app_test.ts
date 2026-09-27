@@ -11,7 +11,7 @@ import {
   reinitialiserMotDePasse,
 } from "../src/app/comptes.ts";
 import { detecterFormat, nomSur } from "../src/app/depot.ts";
-import { relireLegende, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
+import { reextraire, relireLegende, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import {
   faitAuHasard,
   genererSuggestions,
@@ -139,6 +139,22 @@ async function sourceTraitee(
   await traiter(db, job, fauxModeles({ legende }).modeles);
   return db.prepare("SELECT id FROM sources").get()!.id as string;
 }
+
+Deno.test("réextraire met à jour les sections, jamais le texte des citations", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db);
+  assertEquals(await reextraire(db, id), "identique");
+  const blocs = join(config.donnees, "content", id, "blocs.jsonl");
+  const avant = await Deno.readTextFile(blocs);
+  await Deno.writeTextFile(blocs, avant.replaceAll('"section":"', '"section":"ancienne '));
+  assertEquals(await reextraire(db, id), "mise_a_jour");
+  assertEquals(await Deno.readTextFile(blocs), avant);
+  const doc = join(config.donnees, "content", id, "document.txt");
+  await Deno.writeTextFile(doc, (await Deno.readTextFile(doc)) + " modifié");
+  await Deno.writeTextFile(blocs, "");
+  assertEquals(await reextraire(db, id), "texte_change", "des offsets bougeraient");
+  assertEquals(await Deno.readTextFile(blocs), "", "la source reste telle quelle");
+});
 
 Deno.test("un travail interrompu reprend après expiration du verrou, sans image en double", async () => {
   const { db } = await environnement();
@@ -405,6 +421,15 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
   });
   const repare = await demander(db, fauxModeles({ sorties: [fausse, bonne] }).modeles, q, p, 0.023);
   assertEquals(repare.resultat.etat, "answered", "une réparation est permise");
+  const malformee = '{"affirmations": [{"texte": 3, "citation": null}, null]}';
+  const forme = await demander(
+    db,
+    fauxModeles({ sorties: [malformee, bonne] }).modeles,
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(forme.resultat.etat, "answered", "une sortie mal formée se répare aussi");
   const melange = JSON.stringify({
     affirmations: [
       JSON.parse(bonne).affirmations[0],
@@ -437,6 +462,54 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
     assertEquals(refuse.resultat.code, "CITATION_UNVERIFIED");
     assertStringIncludes(String(reponse("test", refuse.resultat)), "vérifier les citations");
   }
+
+  // Une citation réelle qui ne prouve pas sa phrase: le juge la refuse, le générateur la répare.
+  const excessive = JSON.stringify({
+    affirmations: [{
+      texte: "Gaudí refuse la ligne droite dans toutes ses œuvres.",
+      extrait: 1,
+      citation: "Gaudí refuse la ligne droite dans toute la façade",
+    }],
+  });
+  const juge = (texte: string) => texte.includes("toutes ses œuvres") ? 0.1 : 0.9;
+  const corrige = fauxModeles({ sorties: [excessive, bonne], soutien: juge });
+  const juge1 = await demander(db, corrige.modeles, q, p, 0.023);
+  assertEquals(juge1.resultat.etat, "answered", "le juge renvoie en réparation");
+  assertStringIncludes(corrige.vus[1].at(-1)!.content, "dit plus que sa citation");
+  const avecExces = JSON.stringify({
+    affirmations: [
+      JSON.parse(bonne).affirmations[0],
+      JSON.parse(excessive).affirmations[0],
+    ],
+  });
+  const juge2 = await demander(
+    db,
+    fauxModeles({ sorties: [avecExces, avecExces], soutien: juge }).modeles,
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(juge2.resultat.etat, "answered");
+  if (juge2.resultat.etat === "answered") {
+    assertEquals(juge2.resultat.affirmations.map((a) => a.texte), [
+      "Gaudí refuse la ligne droite.",
+    ]);
+    assertEquals(juge2.resultat.partielle, true, "l'affirmation refusée deux fois disparaît");
+  }
+  const juge3 = await demander(
+    db,
+    fauxModeles({ sorties: [excessive, excessive], soutien: juge }).modeles,
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(juge3.resultat.etat, "failed");
+  if (juge3.resultat.etat === "failed") assertEquals(juge3.resultat.code, "CITATION_UNVERIFIED");
+  const sansJuge = fauxModeles({ sorties: [bonne] });
+  sansJuge.modeles.soutenir = () => Promise.reject(new PanneModele("juge injoignable"));
+  const juge4 = await demander(db, sansJuge.modeles, q, p, 0.023);
+  assertEquals(juge4.resultat.etat, "answered", "un juge en panne ne bloque pas la réponse");
+  assertEquals(juge4.journal.juge_indisponible, "juge injoignable");
 
   const vide = fauxModeles();
   vide.modeles.generer = () => {
@@ -491,6 +564,8 @@ Deno.test("une question proposée n'est gardée que si Thot y répond avec une c
       citation: "Gaudí refuse la ligne droite dans toute la façade",
     }],
   });
+  const malformee = fauxModeles({ sorties: ['{"questions": "Pourquoi ?"}'] });
+  assertEquals(await genererSuggestions(db, malformee.modeles, id), 0);
   const f = fauxModeles({
     sorties: [
       JSON.stringify({

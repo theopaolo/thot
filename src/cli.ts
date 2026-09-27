@@ -8,7 +8,15 @@ import { creerCompte, reinitialiserMotDePasse, type Role } from "./app/comptes.t
 import { config, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
-import { indexer, revendiquer, statuer, traiter } from "./app/ingestion.ts";
+import {
+  indexer,
+  lireDocument,
+  reextraire,
+  revendiquer,
+  statuer,
+  traiter,
+} from "./app/ingestion.ts";
+import { contexte } from "./core/texte.ts";
 import { genererSuggestions } from "./app/suggestions.ts";
 
 const AIDE = `thot <commande>
@@ -26,14 +34,17 @@ const AIDE = `thot <commande>
                                             certifie des sources, trace le nom donné
   suggestions <source_id...> | --tout       questions vérifiées proposées aux élèves
   rebuild                                   reconstruit l'index des sources certifiées
+  reextraire                                rejoue l'extraction des sources, garde les offsets
   ask "<question>" [--json]                 pose une question sur le corpus certifié
   eval recherche --img-order=<img_order.json> [--docs=<docs.json>] [--sans-reclasseur]
                                             rejoue les 59 requêtes annotées
-  eval generation                           rejoue les 20 questions d'élève et les 15 pièges`;
+  eval generation [--paires=<paires.json>]  rejoue les 20 questions d'élève et les 15 pièges,
+                                            écrit les paires affirmation-citation à annoter
+  eval soutien --paires=<paires.json>       juge chaque paire annotée, mesure l'accord`;
 
 const args = parseArgs(Deno.args, {
   boolean: ["json", "tout", "sans-reclasseur", "help"],
-  string: ["matiere", "classe", "type", "img-order", "docs", "enseignant", "par"],
+  string: ["matiere", "classe", "type", "img-order", "docs", "enseignant", "par", "paires"],
 });
 const [commande, ...reste] = args._.map(String);
 const db = connexion();
@@ -248,6 +259,7 @@ async function evalGeneration() {
       ) => [s.id, plier(`${s.sequence} ${s.fichier}`)]),
   );
   const p = { schoolId: config.schoolId };
+  const paires: Paire[] = [];
   const lignes: {
     qid: string;
     registre: string;
@@ -257,6 +269,9 @@ async function evalGeneration() {
     bonne_source?: boolean;
     score: unknown;
     ms: number;
+    /** 2 quand la première sortie a échoué à `verifier()` ou au juge */
+    essais: number;
+    partielle: boolean;
     reponse?: string[];
   }[] = [];
   for (
@@ -270,6 +285,19 @@ async function evalGeneration() {
     const citees = resultat.etat === "answered"
       ? resultat.affirmations.map((a) => sources.get(a.source_id) ?? "")
       : [];
+    if (resultat.etat === "answered") {
+      resultat.affirmations.forEach((a, i) =>
+        paires.push({
+          id: `${q.qid}-${i + 1}`,
+          famille: "sortie",
+          texte: a.texte,
+          titre: a.titre,
+          paragraphe: paragraphe(a),
+          citation: a.citation,
+          soutient: null,
+        })
+      );
+    }
     lignes.push({
       qid: q.qid,
       registre: q.registre,
@@ -285,6 +313,8 @@ async function evalGeneration() {
         : undefined,
       score: journal.score,
       ms: Date.now() - t,
+      essais: (journal.tentatives as unknown[] | undefined)?.length ?? 0,
+      partielle: resultat.etat === "answered" && !!resultat.partielle,
       reponse: resultat.etat === "answered"
         ? resultat.affirmations.map((a) => `${a.texte} [${a.titre}]`)
         : undefined,
@@ -305,6 +335,8 @@ async function evalGeneration() {
       bonne_source: taux(dedans, (l) => !!l.bonne_source),
       faux_refus: taux(dedans, (l) => l.etat === "out_of_corpus"),
       panne: taux(dedans, (l) => l.etat === "failed"),
+      reparee: taux(dedans, (l) => l.essais > 1),
+      partielle: taux(dedans, (l) => l.partielle),
     },
     hors_corpus: Object.fromEntries(
       [...new Set(jeu.sans_reponse.map((x) => x.registre))].map((r) => [r, {
@@ -319,6 +351,86 @@ async function evalGeneration() {
   };
   await Deno.mkdir(join(RACINE, "evaluation/resultats"), { recursive: true });
   const sortie = join(RACINE, "evaluation/resultats/generation.json");
+  await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
+  console.log(JSON.stringify(rapport, null, 1));
+  console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
+  if (args.paires) {
+    // Une ligne par paire pour annoter à la main. `createNew` protège un fichier déjà annoté.
+    await Deno.writeTextFile(
+      args.paires,
+      `[\n${paires.map((x) => JSON.stringify(x)).join(",\n")}\n]\n`,
+      { createNew: true },
+    );
+    console.log(`${paires.length} paires à annoter dans ${args.paires}`);
+  }
+}
+
+/** Une phrase de réponse et la citation qui doit la prouver. `soutient` est l'annotation. */
+type Paire = {
+  id: string;
+  famille: string;
+  texte: string;
+  titre?: string;
+  /** le paragraphe que le panneau source montre autour de la citation, pour l'annotation */
+  paragraphe?: string;
+  citation: string;
+  soutient: boolean | null;
+};
+
+function paragraphe(a: { source_id: string; citation: string; debut?: number; fin?: number }) {
+  if (a.debut === undefined || a.fin === undefined) return a.citation;
+  const x = contexte(lireDocument(a.source_id).texte, a.debut, a.fin);
+  return x.avant + x.milieu + x.apres;
+}
+
+async function evalSoutien() {
+  if (!args.paires) throw new Error("--paires=<chemin vers paires.json> est requis.");
+  const toutes = JSON.parse(await Deno.readTextFile(args.paires)) as Paire[];
+  const annotees = toutes.filter((x) => typeof x.soutient === "boolean");
+  if (!annotees.some((x) => x.soutient) || !annotees.some((x) => !x.soutient)) {
+    throw new Error("Il faut des paires annotées `soutient: true` et `soutient: false`.");
+  }
+  const lignes: { id: string; famille: string; soutient: boolean; p: number; ms: number }[] = [];
+  for (const x of annotees) {
+    const t = Date.now();
+    const { probabilite } = await modeles.soutenir(x.texte, x.citation, x.titre ?? "");
+    lignes.push({
+      id: x.id,
+      famille: x.famille,
+      soutient: !!x.soutient,
+      p: probabilite,
+      ms: Date.now() - t,
+    });
+    console.log(`${x.id.padEnd(10)} ${String(x.soutient).padEnd(5)} ${probabilite.toFixed(3)}`);
+  }
+  const vrais = lignes.filter((l) => l.soutient);
+  const faux = lignes.filter((l) => !l.soutient);
+  // AUC de Mann-Whitney: probabilité qu'une paire soutenue passe devant une paire qui ne l'est pas.
+  let gagnees = 0;
+  for (const v of vrais) for (const f of faux) gagnees += v.p > f.p ? 1 : v.p === f.p ? 0.5 : 0;
+  const taux = (ls: typeof lignes, f: (l: (typeof lignes)[0]) => boolean) =>
+    +(ls.filter(f).length / ls.length).toFixed(2);
+  const rapport = {
+    date: new Date().toISOString(),
+    modele: config.modeles.soutien,
+    n: lignes.length,
+    non_annotees: toutes.length - annotees.length,
+    auc: +(gagnees / (vrais.length * faux.length)).toFixed(3),
+    // Au seuil 0,5: part des bonnes affirmations rejetées, part des mauvaises qui passent.
+    faux_rejets: taux(vrais, (l) => l.p < 0.5),
+    faux_passages: taux(faux, (l) => l.p >= 0.5),
+    par_famille: Object.fromEntries(
+      [...new Set(lignes.map((l) => l.famille))].map((f) => {
+        const ls = lignes.filter((l) => l.famille === f);
+        return [f, { n: ls.length, erreurs_a_0_5: taux(ls, (l) => (l.p >= 0.5) !== l.soutient) }];
+      }),
+    ),
+    latence_mediane_ms:
+      lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
+  };
+  // Les citations restent hors du dépôt: le rapport ne garde que les identifiants.
+  await Deno.mkdir(join(RACINE, "evaluation/resultats"), { recursive: true });
+  const sortie = join(RACINE, "evaluation/resultats/soutien.json");
   await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
   console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
@@ -393,6 +505,18 @@ switch (commande) {
     console.log(`${n} question(s) vérifiée(s) pour ${ids.length} source(s).`);
     break;
   }
+  case "reextraire": {
+    const bilan: Record<string, string[]> = {};
+    for (const { id, fichier } of db.prepare("SELECT id, fichier FROM sources").all()) {
+      const r = await reextraire(db, id as string);
+      (bilan[r] ??= []).push(fichier as string);
+    }
+    for (const [etat, fichiers] of Object.entries(bilan)) {
+      console.log(`${etat}: ${fichiers.length}`);
+      if (etat === "texte_change") fichiers.forEach((f) => console.log(`  ${f}`));
+    }
+    break;
+  }
   case "rebuild": {
     const ids = db.prepare("SELECT id FROM sources").all().map((l) => l.id as string);
     for (const id of ids) indexer(db, id);
@@ -416,7 +540,8 @@ switch (commande) {
   case "eval":
     if (reste[0] === "recherche") await evalRecherche();
     else if (reste[0] === "generation") await evalGeneration();
-    else throw new Error("usage: thot eval recherche|generation");
+    else if (reste[0] === "soutien") await evalSoutien();
+    else throw new Error("usage: thot eval recherche|generation|soutien");
     break;
   default:
     console.log(AIDE);

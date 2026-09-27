@@ -14,8 +14,14 @@ export async function environnement() {
   return { db, dir };
 }
 
-/** Faux modèles: le reclasseur rend le score demandé, le générateur rejoue ses sorties. */
-export function fauxModeles(o: { score?: number; sorties?: string[]; legende?: string } = {}) {
+/**
+ * Faux modèles: le reclasseur rend le score demandé, le générateur rejoue ses sorties, le juge
+ * soutient tout sauf ce que `soutien` note plus bas.
+ */
+export function fauxModeles(
+  o: { score?: number; sorties?: string[]; legende?: string; soutien?: (texte: string) => number } =
+    {},
+) {
   const vus: Message[][] = [];
   const sorties = [...(o.sorties ?? [])];
   const modeles: Modeles = {
@@ -29,6 +35,8 @@ export function fauxModeles(o: { score?: number; sorties?: string[]; legende?: s
       return Promise.resolve({ texte, modele: "faux-llm" });
     },
     reformuler: (_precedente, question) => Promise.resolve(question),
+    soutenir: (texte) =>
+      Promise.resolve({ probabilite: o.soutien?.(texte) ?? 1, modele: "faux-juge" }),
   };
   return { modeles, vus };
 }

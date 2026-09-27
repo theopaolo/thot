@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import { assertAlmostEquals, assertEquals } from "@std/assert";
+import { lireVerdict, probabiliteOui } from "../src/core/modeles.ts";
 import { assembler, decouper } from "../src/core/document.ts";
 import { racines } from "../src/core/recherche.ts";
 import { contexte, longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
@@ -79,4 +80,46 @@ Deno.test("le contexte d'une citation reste dans son paragraphe et coupe sur un 
   const d = long.indexOf("gamma");
   const r = contexte(long, d, d + 5, 8);
   assertEquals([r.avant, r.apres, r.coupeAvant, r.coupeApres], ["beta ", " delta", true, true]);
+});
+
+Deno.test("le juge de soutien lit P(oui) parmi oui et non, casse et espaces confondus", () => {
+  const lp = Math.log;
+  assertAlmostEquals(
+    probabiliteOui([{ token: " Oui", logprob: lp(0.6) }, { token: "non", logprob: lp(0.2) }])!,
+    0.75,
+  );
+  assertEquals(probabiliteOui([{ token: "Non", logprob: 0 }, { token: "**", logprob: -9 }]), 0);
+  assertEquals(probabiliteOui([{ token: "La", logprob: 0 }]), undefined);
+});
+
+Deno.test("le verdict du juge se lit après le raisonnement, ou à défaut dans le texte", () => {
+  const lp = Math.log;
+  // Mistral: le contenu mêle raisonnement et texte, les logprobs couvrent les deux.
+  const mistral = {
+    message: {
+      content: [{ type: "thinking" }, { type: "text", text: "non" }],
+    },
+    logprobs: {
+      content: [
+        { token: "La", logprob: 0, top_logprobs: [{ token: "La", logprob: 0 }] },
+        { token: "</think>", logprob: 0 },
+        { token: "\n", logprob: 0 },
+        {
+          token: "non",
+          logprob: lp(0.8),
+          top_logprobs: [{ token: "non", logprob: lp(0.8) }, { token: "oui", logprob: lp(0.2) }],
+        },
+      ],
+    },
+  };
+  assertAlmostEquals(lireVerdict(mistral)!, 0.2);
+  const openrouter = {
+    message: { content: "oui" },
+    logprobs: {
+      content: [{ token: "oui", logprob: 0, top_logprobs: [{ token: "oui", logprob: 0 }] }],
+    },
+  };
+  assertEquals(lireVerdict(openrouter), 1);
+  assertEquals(lireVerdict({ message: { content: "Non." }, logprobs: null }), 0);
+  assertEquals(lireVerdict({ message: { content: "Je ne sais pas" } }), undefined);
 });

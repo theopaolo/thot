@@ -1,62 +1,64 @@
 {
- "date": "2026-09-22T21:52:07.363Z",
+ "date": "2026-09-27T10:51:43.076Z",
  "moteur": "fts5 + qwen/qwen3-reranker-8b",
  "tous": {
   "n": 59,
-  "succes_5": 0.93,
-  "mrr": 0.85
+  "succes_5": 0.9,
+  "mrr": 0.86
  },
  "familles": {
   "A": {
    "n": 10,
    "succes_5": 1,
-   "mrr": 0.95
+   "mrr": 1
   },
   "B": {
    "n": 8,
-   "succes_5": 1,
-   "mrr": 0.92
+   "succes_5": 0.88,
+   "mrr": 0.88
   },
   "C": {
    "n": 6,
    "succes_5": 1,
-   "mrr": 0.92
+   "mrr": 1
   },
   "D": {
    "n": 7,
    "succes_5": 0.86,
-   "mrr": 0.79
+   "mrr": 0.71
   },
   "E": {
    "n": 14,
    "succes_5": 0.93,
-   "mrr": 0.85
+   "mrr": 0.89
   },
   "F": {
    "n": 14,
-   "succes_5": 0.86,
-   "mrr": 0.74
+   "succes_5": 0.79,
+   "mrr": 0.75
   }
  },
  "sans_cible": [],
  "echecs": [
+  "B03",
   "D07",
   "E13",
   "F06",
+  "F11",
   "F13"
  ],
  "lignes": [
   {
    "qid": "A01",
    "type": "A",
-   "rang": 2,
+   "rang": 1,
    "cibles": 1,
    "trouves": [
-    "022 - Suprématisme - Carré noir sur fond blanc, Kazimir Malevitch, 1915",
     "025 - Suprématisme - Carré blanc sur fond blanc, Kazimir Malevitch, 1918",
+    "022 - Suprématisme - Carré noir sur fond blanc, Kazimir Malevitch, 1915",
     "ATC Fiche Suprematisme : Comment ?",
     "ATC Fiche Suprematisme : Où et Quand ?",
-    "ATC Fiche Suprematisme : Sujet (genres)"
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Le Suprématisme"
    ]
   },
   {
@@ -65,7 +67,7 @@
    "rang": 1,
    "cibles": 1,
    "trouves": [
-    "009 Cubisme - Les Demoiselles d&#39;Avignon, Pablo Picasso, 1907 : 009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
     "ATC Fiche Cubisme : Qui ?",
     "ATC Fiche Cubisme : Influences formelles",
     "ATC Fiche Cubisme : Où et Quand ?",
@@ -117,11 +119,11 @@
    "rang": 1,
    "cibles": 2,
    "trouves": [
-    "William Morris, Tapisserie &quot;The Strawberry Thief&quot; (1883) : William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
-    "William Morris, Tapisserie &quot;The Strawberry Thief&quot; (1883) : William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
+    "William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
+    "William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
     "Red House (1859) : Philip Webb, William Morris, Photographie",
-    "Red House - William Morris - Décoration plafond (1855-1860)",
-    "William Morris (1834-1896)"
+    "Edward Burne-Jones & William Morris - Vitrail de la Chapelle de Jesus College (1875)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie"
    ]
   },
   {
@@ -132,7 +134,7 @@
    "trouves": [
     "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
     "037 Constructivisme - Contre-reliefs, Vladimir Tatline, 1914-1915",
-    "Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile",
+    "Synthèse séance 3 - L'art qui veut être utile : L'artiste devient ingénieur",
     "Alexandre Rodtchenko et le graphisme pour l’industrie",
     "ATC Fiche Neoplasticisme : Retombées"
    ]
@@ -147,7 +149,7 @@
     "Charles Rennie Mackintosh, Hill House (1903) intereur",
     "Charles Rennie Mackintosh – Chaise à dossier haut de la Hill House (1903)",
     "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901)",
-    "Charles Rennie Mackintosh, Scotland Street School (1906)"
+    "Charles Rennie Mackintosh, Glasgow School of Art (1897-1909)"
    ]
   },
   {
@@ -156,11 +158,11 @@
    "rang": 1,
    "cibles": 1,
    "trouves": [
-    "Futurisme - États d&#39;âme I, Les adieux, Umberto Boccioni, 1911 : Futurisme - États d'âme I, Les adieux, Umberto Boccioni, 1911",
-    "Futurisme - États d&#39;âme III, Ceux qui restent, Umberto Boccioni, 1911 : Futurisme - États d'âme III, Ceux qui restent, Umberto Boccioni, 1911",
-    "Futurisme - États d&#39;âme II, Les marcheurs, Umberto Boccioni, 1911 : Futurisme - États d'âme II, Les marcheurs, Umberto Boccioni, 1911",
+    "Futurisme - États d'âme I, Les adieux, Umberto Boccioni, 1911",
+    "Futurisme - États d'âme III, Ceux qui restent, Umberto Boccioni, 1911",
+    "Futurisme - États d'âme II, Les marcheurs, Umberto Boccioni, 1911",
     "ATC Fiche Futurisme : Qui ?",
-    "La ville se lève, Umberto Boccioni, 1910"
+    "La Charge des lanciers, Umberto Boccioni, 1915"
    ]
   },
   {
@@ -172,8 +174,8 @@
     "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
     "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
     "Sagrada Familia, Antoni Gaudi, (1882-2032)",
-    "Antoni Gaudi (panorama) vidéo 21mn",
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE"
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Antoni Gaudi, Casa Batllo (1906) patio"
    ]
   },
   {
@@ -183,9 +185,9 @@
    "cibles": 1,
    "trouves": [
     "022 - Suprématisme - Carré noir sur fond blanc, Kazimir Malevitch, 1915",
+    "023 - Suprématisme - Exposition, Kazimir Malevitch",
     "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930",
     "033 - Néoplasticisme - Contra-Compositie V, Theo Van Doesburg, 1924",
-    "023 - Suprématisme - Exposition, Kazimir Malevitch",
     "024 - Suprématisme - Composition suprématiste, Kazimir Malevitch, 1916"
    ]
   },
@@ -205,14 +207,14 @@
   {
    "qid": "B03",
    "type": "B",
-   "rang": 3,
+   "rang": 0,
    "cibles": 3,
    "trouves": [
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
-    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
-    "Antoni Gaudi (panorama) vidéo 21mn",
-    "Joseph Maria Olbrich, Palais de la Secession (1897) 2"
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "ATC Art Nouveau : Où et Quand ?",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Le Castel béranger (1898) interieur"
    ]
   },
   {
@@ -222,9 +224,9 @@
    "cibles": 2,
    "trouves": [
     "Fauvisme - La Danse, Henri Matisse, 1910",
-    "Fauvisme : André Derain, La Danse (1906)",
-    "006 Expressionnisme - Composition VII, Vassily Kandinsky, 1913",
-    "009 Cubisme - Les Demoiselles d&#39;Avignon, Pablo Picasso, 1907 : 009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "ATC Fiche Fauvisme : Qui ?",
+    "Peter Behrens, Salon de musique (1901)",
     "005 Expressionnisme - Scène de rue à Berlin, Ernst Ludwig Kirchner, 1913"
    ]
   },
@@ -235,10 +237,10 @@
    "cibles": 1,
    "trouves": [
     "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
-    "Victor Horta, Hotel Tassel (1892) Interieur",
-    "Sagrada Familia, Antoni Gaudi, (1882-2032)",
     "007 Expressionnisme - Tour Einstein à Potsdam, Erich Mendelsohn, 1921",
-    "Otto Wagner, Maison aux majoliques (1898-1899)"
+    "La Città Nuova, Dessin d'architecture futuriste, Antonio Sant'Elia, 1914.",
+    "René Binet, Porte Monumentale de l'Exposition universelle, 1900",
+    "Charles Rennie Mackintosh, Chambre de l'artiste (1900)"
    ]
   },
   {
@@ -249,9 +251,9 @@
    "trouves": [
     "Fauvisme : Henri Matisse, Portrait de Madame Matisse (La Raie verte) (1905)",
     "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
-    "009 Cubisme - Les Demoiselles d&#39;Avignon, Pablo Picasso, 1907 : 009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
-    "ATC Fiche Fauvisme : Comment ?",
-    "Fauvisme : Henri Matisse, Les Poissons rouges (1911)"
+    "Gustav Klimt, Ce baiser au monde entier (1902)",
+    "Gustav Klimt, Le Baiser (1908-1909)",
+    "Affiche de théâtre, Gismonda, Alfons Mucha, 1894"
    ]
   },
   {
@@ -261,10 +263,10 @@
    "cibles": 1,
    "trouves": [
     "008 Expressionnisme, Affiche du film, Le Cabinet du Dr Caligari (1920)",
-    "ATC Fiche Exressionnisme : Retombées",
     "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
+    "ATC Fiche Exressionnisme : Retombées",
     "Ditha Moser, MCMXI (1910)",
-    "Futurisme - Affiche Campari, Fortunato Depero, 1928"
+    "Affiche, Joseph Maria Olbrich, 1907"
    ]
   },
   {
@@ -276,20 +278,20 @@
     "Ernst Haeckel, Formes artistique de la nature (1904)",
     "Illustration Clade des Cyrtoidea, Formes artistiques de la nature, Ernst Haeckel, 1904",
     "Illustration Anémones de mer, Formes artistiques de la nature, Ernst Haeckel, 1904",
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
-    "Red House (1859) : Philip Webb, William Morris, Internet Source : Une maison vivante"
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Eugène Viollet-le-Duc, Illustration"
    ]
   },
   {
    "qid": "C01",
    "type": "C",
-   "rang": 2,
+   "rang": 1,
    "cibles": 5,
    "trouves": [
+    "Victor Horta, Hotel Tassel (1892)",
     "ATC Art Nouveau : Conclusion",
     "Victor Horta, Maison Horta (1898)",
-    "Victor Horta, Hotel Tassel (1892)",
-    "ATC Art Nouveau : Comment ?",
+    "Victor Horta, Hotel Tassel (1892) Interieur",
     "Maison Horta et son atelier | Admirable Facades - Admirables Facades"
    ]
   },
@@ -299,10 +301,10 @@
    "rang": 1,
    "cibles": 5,
    "trouves": [
-    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
-    "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
     "051 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport unisex, Varvara Stepanova, 1923",
     "048 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile, Varvara Stepanova, 1923",
+    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
+    "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
     "047 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile 2, Varvara Stepanova"
    ]
   },
@@ -316,7 +318,7 @@
     "Red House (1859) : Philip Webb, William Morris, Photographie",
     "Red House - Morris and Co (1859-1866)",
     "Red House (1859) : Philip Webb, William Morris, Internet Source : Une maison vivante",
-    "Red House, Philip Webb, Commode (1860-1865)"
+    "Red House (1859) : Philip Webb, William Morris, Photographie"
    ]
   },
   {
@@ -325,11 +327,11 @@
    "rang": 1,
    "cibles": 7,
    "trouves": [
-    "Synthèse séance 2 - Jusqu&#39;où peut-on aller ? : Synthèse séance 2 - Jusqu'où peut-on aller ?",
-    "Synthèse séance 2 - Jusqu&#39;où peut-on aller ? : Synthèse séance 2 - Jusqu'où peut-on aller ?",
-    "ATC Fiche Neoplasticisme : Sujet (Thèmes)",
-    "ATC Fiche Néoplasticisme",
-    "ATC Fiche Futurisme"
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Futurisme · Suprématisme · Néoplasticisme",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Le Néoplasticisme",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Le Suprématisme",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Les Futuristes",
+    "ATC Fiche Neoplasticisme : Sujet (Thèmes)"
    ]
   },
   {
@@ -339,10 +341,10 @@
    "cibles": 14,
    "trouves": [
     "Charles Rennie Mackintosh, Glasgow School of Art (1897-1909)",
-    "École d&#39;art de Glasgow, Charles Rennie Mackintosh, 1909, vidéo 27mn : École d'art de Glasgow, Charles Rennie Mackintosh, 1909, vidéo 27mn",
-    "Charles Rennie Mackintosh, Scotland Street School (1906) details",
+    "École d'art de Glasgow, Charles Rennie Mackintosh, 1909, vidéo 27mn",
+    "Affiche, Royal Glasgow Institute of the Fine Arts, James Herbert MacNair, Margaret et Frances MacDonald, 1895",
     "Charles Rennie Mackintosh, Scotland Street School (1906)",
-    "Affiche, Royal Glasgow Institute of the Fine Arts, James Herbert MacNair, Margaret et Frances MacDonald, 1895"
+    "Charles Rennie Mackintosh, Scotland Street School (1906) details"
    ]
   },
   {
@@ -355,20 +357,20 @@
     "Joseph Maria Olbrich, Palais de la Secession (1897)",
     "ATC Art Nouveau : Conclusion",
     "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
-    "bildleiste blog"
+    "Gustav Klimt, Ce baiser au monde entier (1902)"
    ]
   },
   {
    "qid": "D01",
    "type": "D",
-   "rang": 1,
+   "rang": 2,
    "cibles": 2,
    "trouves": [
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Le Cubisme",
     "ATC Fiche Cubisme : Comment ?",
-    "Synthèse séance 1 - Quand la peinture arrête de faire semblant",
-    "Synthèse séance 1 - Quand la peinture arrête de faire semblant",
     "ATC Fiche Cubisme : Quoi ?",
-    "ATC Fiche Cubisme : Qui ?"
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Fauvisme · Expressionnisme · Cubisme",
+    "ATC Fiche Cubisme : Influences formelles"
    ]
   },
   {
@@ -381,7 +383,7 @@
     "ATC Fiche Exressionnisme : Influences formelles",
     "ATC Fiche Fauvisme : Influences formelles",
     "ATC Fiche Cubisme : Sources",
-    "youtube"
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907"
    ]
   },
   {
@@ -390,9 +392,9 @@
    "rang": 1,
    "cibles": 4,
    "trouves": [
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Les Fauves",
     "ATC Fiche Fauvisme : Quoi ?",
     "ATC Fiche Fauvisme : Retombées",
-    "Synthèse séance 1 - Quand la peinture arrête de faire semblant",
     "ATC Fiche Fauvisme : Comment ?",
     "ATC Fiche Fauvisme : Sujet (Thèmes)"
    ]
@@ -405,9 +407,9 @@
    "trouves": [
     "ATC Fiche Cubisme : Où et Quand ?",
     "ATC Fiche Cubisme : Influences formelles",
-    "ATC Fiche Exressionnisme : Influences formelles",
     "ATC Fiche Exressionnisme : Conclusion",
-    "ATC Fiche Futurisme : Pourquoi ?"
+    "ATC Fiche Exressionnisme : Influences formelles",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Les Futuristes"
    ]
   },
   {
@@ -433,7 +435,7 @@
     "ATC Fiche Suprematisme : Retombées",
     "ATC Fiche Suprematisme : Comment ?",
     "ATC Fiche Neoplasticisme : Comment ?",
-    "027 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (2)"
+    "026 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (1)"
    ]
   },
   {
@@ -442,9 +444,9 @@
    "rang": 0,
    "cibles": 3,
    "trouves": [
+    "Synthèse séance 3 - L'art qui veut être utile : Le moment où tout se noue",
     "ATC Fiche Neoplasticisme : Conclusion",
     "ATC Fiche Futurisme : Retombées",
-    "Synthèse séance 3 - L&#39;art qui veut être utile : Synthèse séance 3 - L'art qui veut être utile",
     "ATC Fiche Cubisme : Qui ?",
     "ATC Fiche Cubisme : Qui ?"
    ]
@@ -456,10 +458,10 @@
    "cibles": 2,
    "trouves": [
     "Otto Wagner, Maison aux majoliques (1898-1899)",
-    "Otto Wagner, Maison aux majoliques (1898-1899)",
     "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
-    "Parc Güell, Antoni Gaudi, 1914",
-    "Hector Guimard, Le Castel béranger (1898)"
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur"
    ]
   },
   {
@@ -468,9 +470,9 @@
    "rang": 1,
    "cibles": 2,
    "trouves": [
-    "Antoni Gaudi, Casa Batllo (1906)",
     "Antoni Gaudi (panorama) vidéo 21mn",
-    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "Antoni Gaudi, Casa Batllo (1906)",
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
     "Hector Guimard, Le Castel béranger (1898)",
     "Victor Horta, Maison Horta (1898)"
    ]
@@ -478,14 +480,14 @@
   {
    "qid": "E03",
    "type": "E",
-   "rang": 2,
+   "rang": 1,
    "cibles": 1,
    "trouves": [
-    "Charles Rennie Mackintosh – Chaises et table",
     "Charles Rennie Mackintosh – Chaise à dossier haut de la Hill House (1903)",
     "Charles Rennie Mackintosh – Chaise (1904)",
+    "Charles Rennie Mackintosh – Chaises et table",
     "Quennell_Voysey, Chaise haute (1857-1941)",
-    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901) salle à manger"
+    "Mackmurdo et Arthur Heygate, Chaise (1883)"
    ]
   },
   {
@@ -496,9 +498,9 @@
    "trouves": [
     "Parc Güell, Antoni Gaudi, 1914",
     "Nature morte à la nappe à carreaux, Juan Gris, 1915",
-    "La Ville, Robert Delaunay, 1910",
-    "011 Cubisme - Le Petit Déjeuner, Juan Gris, 1914",
-    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)"
+    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "011 Cubisme - Le Petit Déjeuner, Juan Gris, 1914"
    ]
   },
   {
@@ -509,9 +511,9 @@
    "trouves": [
     "Victoria cruziana",
     "Darwin - Tu mourras moins bête - ARTE",
-    "Charles Rennie Mackintosh, Hill House (1903)",
-    "youtube",
-    "Charles Darwin (1809-1882)"
+    "Fauvisme : Henri Matisse, Luxe, calme et volupté (1904)",
+    "William Morris (1834-1896)",
+    "William Morris (1834-1896)"
    ]
   },
   {
@@ -521,23 +523,23 @@
    "cibles": 1,
    "trouves": [
     "041 Constructivisme - Publicité pour la maison d’édition Knigi, à partir du portrait de Lili Brik, Alexandre Rodtchenko, 1924",
+    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
     "Affiche, Royal Glasgow Institute of the Fine Arts, James Herbert MacNair, Margaret et Frances MacDonald, 1895",
     "Affiche de théâtre, Gismonda, Alfons Mucha, 1894",
-    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
     "008 Expressionnisme, Affiche du film, Le Cabinet du Dr Caligari (1920)"
    ]
   },
   {
    "qid": "E07",
    "type": "E",
-   "rang": 3,
+   "rang": 1,
    "cibles": 1,
    "trouves": [
+    "Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
     "ATC Fiche Futurisme : Sujet (Thèmes)",
     "ATC Fiche Futurisme : Influences formelles",
-    "Futurisme - Dynamisme d&#39;un chien en laisse, Giacomo Balla, 1912 : Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
-    "Fauvisme : Henri Matisse, La Joie de vivre (1905-1906)",
-    "ATC Fiche Futurisme : Qui ?"
+    "ATC Fiche Futurisme : Qui ?",
+    "Fauvisme : Henri Matisse, La Joie de vivre (1905-1906)"
    ]
   },
   {
@@ -546,24 +548,24 @@
    "rang": 1,
    "cibles": 3,
    "trouves": [
-    "028 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (3)",
-    "La Città Nuova, Dessin d&#39;architecture futuriste, Antonio Sant&#39;Elia, 1914. : La Città Nuova, Dessin d'architecture futuriste, Antonio Sant'Elia, 1914.",
-    "ATC Fiche Suprematisme : Comment ?",
     "027 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (2)",
-    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919"
+    "ATC Fiche Suprematisme : Comment ?",
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "La Ville, Robert Delaunay, 1910"
    ]
   },
   {
    "qid": "E09",
    "type": "E",
-   "rang": 1,
+   "rang": 2,
    "cibles": 1,
    "trouves": [
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
     "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
     "Parc Güell, Antoni Gaudi, 1914",
-    "Néoclassicisme exemple : Robert Adam, Apsley House (1778)",
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
-    "Joseph Maria Olbrich, Palais de la Secession (1897)"
+    "Antoni Gaudi, Casa Batllo (1906) Salon premier étage",
+    "Otto Wagner, La Caisse d'Épargne de Vienne, 1912, vidéo 26mn"
    ]
   },
   {
@@ -572,11 +574,11 @@
    "rang": 1,
    "cibles": 2,
    "trouves": [
-    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
     "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
+    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
     "051 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport unisex, Varvara Stepanova, 1923",
     "046 Constructivisme - Vêtement de travail pour acteur n°7, Lioubov Popova, 1921",
-    "John Ruskin (1819-1900)"
+    "044 Constructivisme - Vêtement de travail pour acteur n°1, Lioubov Popova, 1921"
    ]
   },
   {
@@ -586,10 +588,10 @@
    "cibles": 1,
    "trouves": [
     "Victor Horta, Hotel Tassel (1892) Interieur",
-    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
-    "Antoni Gaudi, Casa Batllo (1906) patio",
     "Victor Horta, Maison Horta (1898) Interieur",
-    "Victor Horta (panorama) vidéo 17mn"
+    "Antoni Gaudi, Casa Batllo (1906) patio",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Otto Wagner, Maison aux majoliques (1898-1899)"
    ]
   },
   {
@@ -599,10 +601,10 @@
    "cibles": 1,
    "trouves": [
     "Joseph Maria Olbrich, Palais de la Secession (1897)",
-    "Louis Majorelle, Lampe pour table (1902-1904)",
-    "Affiche, Joseph Maria Olbrich, 1907",
-    "Charles Rennie Mackintosh, Chambre de l&#39;artiste (1900) : Charles Rennie Mackintosh, Chambre de l'artiste (1900)",
-    "Edward Burne-Jones &amp; William Morris - Vitrail de la Chapelle de Jesus College (1875) : Edward Burne-Jones & William Morris - Vitrail de la Chapelle de Jesus College (1875)"
+    "026 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (1)",
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "Nature morte au plat de fruits et à la mandoline, Juan Gris, 1919",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927"
    ]
   },
   {
@@ -611,11 +613,11 @@
    "rang": 0,
    "cibles": 2,
    "trouves": [
-    "Antoni Gaudi (panorama) vidéo 21mn",
+    "Victor Horta, Hotel Tassel (1892)",
     "Red House (1859) : Philip Webb, William Morris, Internet Source : Analyse du plan",
-    "Antoni Gaudi, Casa Batllo (1906)",
-    "Parc Güell, Antoni Gaudi, 1914",
-    "Néoclassicisme exemple : Robert Adam, Apsley House (1778) plan"
+    "Antoni Gaudi (panorama) vidéo 21mn",
+    "Charles Rennie Mackintosh, Scotland Street School (1906) details",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927"
    ]
   },
   {
@@ -625,7 +627,7 @@
    "cibles": 1,
    "trouves": [
     "Fauvisme : Henri Matisse, Portrait de Madame Matisse (La Raie verte) (1905)",
-    "009 Cubisme - Les Demoiselles d&#39;Avignon, Pablo Picasso, 1907 : 009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
     "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
     "ATC Fiche Fauvisme : Pour résumer :",
     "ATC Fiche Fauvisme : Comment ?"
@@ -639,22 +641,22 @@
    "trouves": [
     "Otto Wagner, Maison aux majoliques (1898-1899)",
     "Joseph Maria Olbrich, Palais de la Secession (1897) 2",
-    "Hector Guimard, Le Castel béranger (1898)",
-    "Victor Horta (panorama) vidéo 17mn",
-    "Red House (1859) : Philip Webb, William Morris, Photographie"
+    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Le Castel béranger (1898) interieur"
    ]
   },
   {
    "qid": "F02",
    "type": "F",
-   "rang": 2,
+   "rang": 1,
    "cibles": 2,
    "trouves": [
+    "Antoni Gaudi (panorama) vidéo 21mn",
     "Victor Horta, Maison Horta (1898)",
+    "Hector Guimard, Le Castel béranger (1898)",
     "Antoni Gaudi, Casa Batllo (1906)",
-    "031 - Néoplasticisme - Maison Schröder à Utrecht, Gerrit Rietveld, 1924",
-    "Victor Horta, Hotel Tassel (1892)",
-    "Otto Wagner, Maison aux majoliques (1898-1899)"
+    "Victor Horta, Hotel Tassel (1892)"
    ]
   },
   {
@@ -667,7 +669,7 @@
     "Charles Rennie Mackintosh – Chaise (1904)",
     "Quennell_Voysey, Chaise haute (1857-1941)",
     "Mackmurdo et Arthur Heygate, Chaise (1883)",
-    "Parc Güell, Antoni Gaudi, 1914"
+    "030 - Néoplasticisme - Chaise rouge bleu, Gerrit Rietveld, 1917-1923"
    ]
   },
   {
@@ -677,10 +679,10 @@
    "cibles": 2,
    "trouves": [
     "Parc Güell, Antoni Gaudi, 1914",
-    "030 - Néoplasticisme - Chaise rouge bleu, Gerrit Rietveld, 1917-1923",
-    "Parc Güell, Antoni Gaudi, 1914",
-    "Video Gaudí, le génie visionnaire de Barcelone | Educ&#39;ARTE : Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
-    "Fauvisme : Henri Matisse, La Femme au chapeau (1905)"
+    "Néoclassicisme exemple : Robert Adam, Apsley House (1778)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Nature morte à la nappe à carreaux, Juan Gris, 1915",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
    ]
   },
   {
@@ -690,10 +692,10 @@
    "cibles": 1,
    "trouves": [
     "Victoria cruziana",
-    "Ditha Moser, MCMXI (1910)",
-    "Louis Majorelle, Lampe pour table (1902-1904)",
-    "Margaret Macdonald, Motifs de textile géométriques (1900-1905) 003",
-    "Charles Darwin (1809-1882)"
+    "Fauvisme : Henri Matisse, Luxe, calme et volupté (1904)",
+    "Illustration Anémones de mer, Formes artistiques de la nature, Ernst Haeckel, 1904",
+    "Fauvisme : Henri Matisse, La Joie de vivre (1905-1906)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
    ]
   },
   {
@@ -702,11 +704,11 @@
    "rang": 0,
    "cibles": 1,
    "trouves": [
+    "Alexandre Rodtchenko et le graphisme pour l’industrie",
     "043 Constructivisme - Affiche, Alexandre Rodtchenko",
+    "034 Futurisme Russe - Cycliste, Natalia Gontcharova, 1913",
     "Alexandre Rodtchenko et le graphisme pour l’industrie",
-    "Alexandre Rodtchenko et le graphisme pour l’industrie",
-    "Affiche de théâtre, Gismonda, Alfons Mucha, 1894",
-    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)"
+    "Alexandre Rodtchenko et le graphisme pour l’industrie"
    ]
   },
   {
@@ -716,10 +718,10 @@
    "cibles": 1,
    "trouves": [
     "ATC Fiche Futurisme : Sujet (Thèmes)",
-    "Futurisme - Dynamisme d&#39;un chien en laisse, Giacomo Balla, 1912 : Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
+    "Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
     "ATC Fiche Futurisme : Influences formelles",
     "ATC Fiche Futurisme : Qui ?",
-    "Futurisme - États d&#39;âme II, Les marcheurs, Umberto Boccioni, 1911 : Futurisme - États d'âme II, Les marcheurs, Umberto Boccioni, 1911"
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Le Cubisme"
    ]
   },
   {
@@ -728,11 +730,11 @@
    "rang": 1,
    "cibles": 3,
    "trouves": [
-    "028 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (3)",
     "027 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (2)",
     "026 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (1)",
-    "La Ville, Robert Delaunay, 1910",
-    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927"
+    "028 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (3)",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927",
+    "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930"
    ]
   },
   {
@@ -742,10 +744,10 @@
    "cibles": 1,
    "trouves": [
     "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
-    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
-    "Victor Horta, Maison Horta (1898) Interieur",
-    "Néoclassicisme exemple : Robert Adam, Apsley House (1778)",
-    "Sagrada Familia, Antoni Gaudi, (1882-2032)"
+    "Victor Horta, Hotel Tassel (1892) Interieur",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
+    "Eugène Viollet-le-Duc, Illustration",
+    "Antoni Gaudi (panorama) vidéo 21mn"
    ]
   },
   {
@@ -756,22 +758,22 @@
    "trouves": [
     "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
     "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
-    "Margaret Macdonald, Motifs de textile géométriques (1900-1905) 002",
     "Illustration Clade des Cyrtoidea, Formes artistiques de la nature, Ernst Haeckel, 1904",
-    "038 Constructivisme - Proun Room, El Lissitzky, 1923, reconstitution"
+    "048 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile, Varvara Stepanova, 1923",
+    "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930"
    ]
   },
   {
    "qid": "F11",
    "type": "F",
-   "rang": 3,
+   "rang": 0,
    "cibles": 1,
    "trouves": [
-    "Charles Rennie Mackintosh, Glasgow School of Art (1897-1909)",
-    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
-    "Victor Horta, Hotel Tassel (1892) Interieur",
     "Victor Horta, Maison Horta (1898) Interieur",
-    "Antoni Gaudi, Casa Batllo (1906) patio"
+    "Antoni Gaudi, Casa Batllo (1906) patio",
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
    ]
   },
   {
@@ -781,10 +783,10 @@
    "cibles": 1,
    "trouves": [
     "Joseph Maria Olbrich, Palais de la Secession (1897)",
-    "Victor Horta (panorama) vidéo 17mn",
     "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901)",
-    "Antoni Gaudi (panorama) vidéo 21mn",
-    "Otto Wagner, Entrée de la station de métro Karlsplatz (aujourd&#39;hui café), (1898) Vienne : Otto Wagner, Entrée de la station de métro Karlsplatz (aujourd'hui café), (1898) Vienne"
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "007 Expressionnisme - Tour Einstein à Potsdam, Erich Mendelsohn, 1921"
    ]
   },
   {
@@ -793,10 +795,10 @@
    "rang": 0,
    "cibles": 2,
    "trouves": [
-    "Red House (1859) : Philip Webb, William Morris, axonometrie + plan",
     "Red House, Philip Webb, Commode (1860-1865)",
     "Red House - Philip Webb, Commode (1860-1865)",
-    "Charles Rennie Mackintosh, Scotland Street School (1906)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901) salle à manger",
     "Red House (1859) : Philip Webb, dessins"
    ]
   },
@@ -810,7 +812,7 @@
     "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
     "041 Constructivisme - Publicité pour la maison d’édition Knigi, à partir du portrait de Lili Brik, Alexandre Rodtchenko, 1924",
     "ATC Fiche Exressionnisme : Sujet (Genres)",
-    "Darwin - Tu mourras moins bête - ARTE"
+    "Margaret Macdonald, Motifs de textile géométriques (1900-1905) 003"
    ]
   }
  ]

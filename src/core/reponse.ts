@@ -38,15 +38,22 @@ Regles, sans exception :
    - "citation" : un passage de 5 a 40 mots recopie EXACTEMENT, mot pour mot, de cet
      extrait, et qui prouve la phrase. Un seul passage continu, sans points de
      suspension, sans guillemets ajoutes, sans corriger l'orthographe du cours.
-4. Cinq affirmations au maximum, 120 mots de reponse au total.`;
+4. Une affirmation porte un seul fait, pris dans un seul extrait, et ne dit rien de plus que
+   sa citation : aucune cause, date, nom, exemple ou precision venus d'un autre extrait ou de
+   tes connaissances. Si la reponse a besoin de deux extraits, ecris deux affirmations.
+5. Nomme le sujet de chaque affirmation (mouvement, artiste, oeuvre) comme l'extrait le nomme.
+   Choisis une citation qui contient le fait affirme et, quand c'est possible, le nom de ce
+   sujet : une citation qui commence par « il » ou « ils » ne dit pas de qui elle parle.
+6. Cinq affirmations au maximum, 120 mots de reponse au total.`;
 
 const bloc = (retenus: Candidat[]) =>
   retenus.map((c, i) => `[${i + 1}] ${c.titre}\n${c.preuve}`).join("\n\n");
 
-type Brute = {
-  refus?: boolean;
-  affirmations?: { texte?: string; extrait?: number; citation?: string }[];
-};
+// Le modèle peut rendre n'importe quelle forme: chaque champ est vérifié avant usage.
+type Brute = { refus?: unknown; affirmations?: unknown };
+type BruteAffirmation = { texte?: unknown; extrait?: unknown; citation?: unknown } | null;
+
+const chaine = (x: unknown) => typeof x === "string" ? x.trim() : "";
 
 function lire(sortie: string): Brute | null {
   const debut = sortie.indexOf("{");
@@ -65,17 +72,18 @@ export function verifier(brute: Brute | null, retenus: Candidat[]) {
   const affirmations: Affirmation[] = [];
   if (!brute) return { erreurs: ["La sortie n'est pas un objet JSON."], affirmations };
   if (brute.refus) return { erreurs, affirmations, refus: true };
-  const liste = brute.affirmations ?? [];
+  const liste: BruteAffirmation[] = Array.isArray(brute.affirmations) ? brute.affirmations : [];
   if (!liste.length) erreurs.push("Aucune affirmation.");
   liste.forEach((a, i) => {
-    const c = retenus[(a.extrait ?? 0) - 1];
-    const citation = (a.citation ?? "").trim();
-    if (!a.texte?.trim()) return erreurs.push(`Affirmation ${i + 1}: texte vide.`);
-    if (!c) return erreurs.push(`Affirmation ${i + 1}: l'extrait ${a.extrait} n'existe pas.`);
+    const c = retenus[Number(a?.extrait) - 1];
+    const texte = chaine(a?.texte);
+    const citation = chaine(a?.citation);
+    if (!texte) return erreurs.push(`Affirmation ${i + 1}: texte vide.`);
+    if (!c) return erreurs.push(`Affirmation ${i + 1}: l'extrait ${a?.extrait} n'existe pas.`);
     if (citation.split(/\s+/).length < 3) {
       return erreurs.push(`Affirmation ${i + 1}: citation trop courte.`);
     }
-    const base = { texte: a.texte.trim(), citation, source_id: c.source_id, chunk_id: c.id };
+    const base = { texte, citation, source_id: c.source_id, chunk_id: c.id };
     const dansTexte = trouverFragments(c.texte, citation);
     if (dansTexte) {
       affirmations.push({
@@ -90,11 +98,52 @@ export function verifier(brute: Brute | null, retenus: Candidat[]) {
       erreurs.push(
         `Affirmation ${
           i + 1
-        }: la citation n'apparaît pas mot pour mot dans l'extrait ${a.extrait}.`,
+        }: la citation n'apparaît pas mot pour mot dans l'extrait ${a?.extrait}.`,
       );
     }
   });
   return { erreurs, affirmations, refus: false };
+}
+
+/** Probabilité de soutien sous laquelle une affirmation est refusée (`evaluation/resultats/soutien.json`). */
+export const SEUIL_SOUTIEN = 0.5;
+/** Un appel du juge dure 1 s en médiane, mais la queue monte à 10 s: au-delà, il ne bloque pas. */
+const DELAI_JUGE_MS = 4000;
+
+/**
+ * Le juge vérifie que chaque citation, lue sous le titre de son extrait, prouve sa phrase.
+ * Un juge injoignable ou trop lent laisse passer l'affirmation: les citations restent vérifiées
+ * mot pour mot, et la panne est notée au journal.
+ */
+async function juger(modeles: Modeles, affirmations: Affirmation[], journal: Journal) {
+  const verdicts = await Promise.allSettled(
+    affirmations.map((a) => {
+      let minuteur: ReturnType<typeof setTimeout> | undefined;
+      return Promise.race([
+        modeles.soutenir(a.texte, a.citation, a.titre),
+        new Promise<never>((_, non) => {
+          minuteur = setTimeout(() => non(new Error("juge au-delà du délai")), DELAI_JUGE_MS);
+        }),
+      ]).finally(() => clearTimeout(minuteur));
+    }),
+  );
+  const soutenues: Affirmation[] = [];
+  const erreurs: string[] = [];
+  const probabilites: (number | null)[] = [];
+  verdicts.forEach((v, i) => {
+    const a = affirmations[i];
+    if (v.status === "rejected") {
+      journal.juge_indisponible = (v.reason as Error).message;
+      probabilites.push(null);
+      return soutenues.push(a);
+    }
+    probabilites.push(v.value.probabilite);
+    if (v.value.probabilite >= SEUIL_SOUTIEN) return soutenues.push(a);
+    erreurs.push(
+      `L'affirmation « ${a.texte} » dit plus que sa citation. Reformule-la au plus près de la citation, sans rien ajouter, ou retire-la.`,
+    );
+  });
+  return { soutenues, erreurs, probabilites };
 }
 
 /** Recherche, génération, vérification. Aucune exception ne sort: une panne devient `failed`. */
@@ -165,19 +214,22 @@ export async function demander(
       journal.modele = modele;
       etape("Vérification des citations");
       const v = verifier(lire(texte), r.retenus);
-      tentatives.push({ sortie: texte, erreurs: v.erreurs });
       if (v.refus) {
+        tentatives.push({ sortie: texte, erreurs: v.erreurs });
         return gardees.length
           ? repondre(gardees, true)
           : { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       }
-      if (v.affirmations.length > gardees.length) gardees = v.affirmations;
-      if (!v.erreurs.length) return repondre(v.affirmations);
+      const j = await juger(modeles, v.affirmations, journal);
+      const erreurs = [...v.erreurs, ...j.erreurs];
+      tentatives.push({ sortie: texte, erreurs, soutien: j.probabilites });
+      if (j.soutenues.length > gardees.length) gardees = j.soutenues;
+      if (!erreurs.length) return repondre(j.soutenues);
       messages.push(
         { role: "assistant", content: texte },
         {
           role: "user",
-          content: `Ta reponse ne passe pas la verification :\n- ${v.erreurs.join("\n- ")}\n` +
+          content: `Ta reponse ne passe pas la verification :\n- ${erreurs.join("\n- ")}\n` +
             `Rends le JSON complet corrige. Chaque citation doit etre recopiee mot pour mot de l'extrait indique.`,
         },
       );
@@ -187,7 +239,8 @@ export async function demander(
       resultat: {
         etat: "failed",
         code: "CITATION_UNVERIFIED",
-        message: "La réponse proposée cite des passages introuvables dans le cours.",
+        message:
+          "La réponse proposée cite des passages introuvables dans le cours, ou qui ne prouvent pas ses phrases.",
       },
       journal,
     };

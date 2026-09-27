@@ -7,7 +7,10 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
 ## Règles du produit
 
 1. Une affirmation montrée à un élève cite un passage retrouvé mot pour mot dans une source
-   certifiée et ouverte aux élèves. `verifier()` dans `src/core/reponse.ts` le contrôle.
+   certifiée et ouverte aux élèves. `verifier()` dans `src/core/reponse.ts` le contrôle. Un
+   juge (`juger()`, même fichier) contrôle ensuite que ce passage, lu sous le titre de son
+   extrait, prouve toute la phrase. Un juge injoignable ou plus lent que 4 s laisse passer
+   l'affirmation et le note au journal.
 2. Une légende d'image générée et non relue sert à la recherche. Elle ne sert pas de preuve et
    ne s'affiche pas à l'élève. Chaque chunk porte donc deux textes : `rappel` pour la recherche,
    `preuve` pour la citation.
@@ -83,8 +86,8 @@ flowchart TD
   F --> RR[Reclasseur]
   RR -- score sous le seuil --> HC
   RR --> G[Génération sur 5 extraits<br/>JSON d'affirmations citées]
-  G --> V{verifier}
-  V -- tout vérifié --> OK[answered]
+  G --> V{verifier<br/>puis juge}
+  V -- tout vérifié et soutenu --> OK[answered]
   V -- erreurs, 1er essai --> G
   V -- erreurs au 2e essai, refus ou panne --> P{affirmations<br/>déjà vérifiées ?}
   P -- oui --> PART[answered partielle]

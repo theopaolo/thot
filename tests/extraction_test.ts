@@ -93,3 +93,27 @@ Deno.test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le préc�
   assertEquals(s.get("Synthese sequence.html"), "");
   assertEquals(s.get("ATC Fiche Fauvisme.html"), "Séance 1 : Fauvisme");
 });
+
+Deno.test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une étiquette non", () => {
+  const ext = extraireHtml(
+    `<h1>Synthèse séance 1</h1>
+     <p><b>Fauvisme · Expressionnisme · Cubisme</b></p>
+     <p>Trois mouvements rompent le contrat.</p>
+     <p><b>Les Fauves</b> — libérer la couleur : ils s'attaquent à la couleur.</p>
+     <p>Un ciel orange, un visage vert.</p>
+     <p><b>Dimensions</b> : 81 cm × 60 cm</p>
+     <p><b>Thèse :</b></p>
+     <p><b>Décoration peinte</b>, composée de rangées.</p>`,
+    "repli",
+  );
+  assertEquals(ext.parties.map((p) => p.section), [
+    "Synthèse séance 1",
+    "Fauvisme · Expressionnisme · Cubisme",
+    "Fauvisme · Expressionnisme · Cubisme",
+    "Les Fauves",
+    "Les Fauves",
+    "Les Fauves",
+    "Les Fauves",
+    "Les Fauves",
+  ]);
+});

@@ -13,6 +13,12 @@ export interface Modeles {
   reclasser(question: string, documents: string[]): Promise<{ index: number; score: number }[]>;
   generer(messages: Message[]): Promise<{ texte: string; modele: string }>;
   reformuler(questionPrecedente: string, question: string): Promise<string>;
+  /** probabilité que `citation`, lue sous le titre de son extrait, suffise à établir `texte` */
+  soutenir(
+    texte: string,
+    citation: string,
+    titre: string,
+  ): Promise<{ probabilite: number; modele: string }>;
 }
 
 export type Cache = { lire(cle: string): string | undefined; ecrire(cle: string, v: string): void };
@@ -23,7 +29,11 @@ export type ConfigModeles = {
   legende: string;
   reclasseur: string;
   generation: string;
-  /** effort de réflexion du générateur (`low`, `medium`, `high`). Absent: celui du fournisseur. */
+  soutien: string;
+  /** clé de l'API Mistral: le juge y passe d'abord quand elle est là */
+  cleMistral?: string;
+  soutienMistral: string;
+  /** effort de réflexion du générateur (`none`, `low`, `medium`, `high`). Absent: celui du fournisseur. */
   effort?: string;
 };
 
@@ -42,6 +52,60 @@ quelqu'un qui ne connait pas le vocabulaire de la discipline.
 N'invente jamais de nom d'auteur, de date ni de lieu que tu ne lis pas dans
 l'image. Si un texte est ecrit dans l'image, recopie-le entre guillemets.
 Ne reprends aucune formulation de cette consigne.`;
+
+// Le juge ne voit pas le paragraphe autour de la citation: avec lui, il acceptait des faits
+// présents seulement dans le paragraphe (ADR 0006).
+const CONSIGNE_SOUTIEN = `Tu controles une reponse faite a un eleve. On te donne une phrase
+de la reponse, le titre de l'extrait du cours et le passage cite pour la prouver.
+
+Le titre peut donner le sujet de la phrase : le mouvement, l'artiste ou l'oeuvre dont
+parle l'extrait. Tout le reste doit venir du passage.
+
+Reponds "oui" si le titre et le passage suffisent a etablir tout ce que dit la phrase.
+Reponds "non" si la phrase ajoute, generalise, inverse ou attribue a quelqu'un d'autre
+ce que dit le passage.
+
+Reponds par un seul mot : oui ou non.`;
+
+/** P(oui) parmi les jetons les plus probables du premier token de sortie. */
+export function probabiliteOui(tops: { token: string; logprob: number }[]) {
+  const masse = (mot: string) =>
+    tops.filter((t) => t.token.trim().toLowerCase() === mot)
+      .reduce((s, t) => s + Math.exp(t.logprob), 0);
+  const oui = masse("oui");
+  const non = masse("non");
+  return oui + non ? oui / (oui + non) : undefined;
+}
+
+type Jeton = {
+  token: string;
+  logprob: number;
+  top_logprobs?: { token: string; logprob: number }[];
+};
+type Choix = {
+  message?: { content?: string | { type: string; text?: string }[] | null };
+  logprobs?: { content?: Jeton[] | null } | null;
+};
+
+/**
+ * Verdict du juge dans une réponse de chat: P(oui) sur le premier jeton de la réponse, sinon le
+ * verdict écrit, qui vaut 1 ou 0. Certains hébergeurs annoncent les logprobs et n'en rendent pas.
+ * Chez Mistral, le contenu mêle raisonnement et texte, et les logprobs couvrent le raisonnement:
+ * la réponse commence après `</think>`.
+ */
+export function lireVerdict(choix: Choix | undefined) {
+  const contenu = choix?.message?.content;
+  const ecrit =
+    (Array.isArray(contenu)
+      ? contenu.filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
+      : String(contenu ?? "")).trim().toLowerCase();
+  const jetons = choix?.logprobs?.content ?? [];
+  let i = jetons.findLastIndex((j) => j.token.includes("</think>")) + 1;
+  while (i < jetons.length && !jetons[i].token.trim()) i++;
+  const tops = jetons[i]?.top_logprobs;
+  return (tops && probabiliteOui(tops)) ??
+    (/^\W*oui/.test(ecrit) ? 1 : /^\W*non/.test(ecrit) ? 0 : undefined);
+}
 
 async function empreinte(s: string) {
   const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -159,7 +223,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     },
 
     async generer(messages) {
-      // gpt-oss raisonne sur le même budget de sortie. Une réponse vide à 2 400 tokens est
+      // Un générateur qui raisonne le fait sur le même budget de sortie. Une réponse vide à 2 400 tokens est
       // retentée à 6 000 avant d'être déclarée vide, comme dans le banc d'essai.
       for (const budget of [2400, 6000]) {
         const { texte, coupe } = await chat(
@@ -190,11 +254,81 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
             content: `Question précédente : ${questionPrecedente}\nNouvelle question : ${question}`,
           },
         ],
-        // gpt-oss refuse `reasoning: {enabled: false}` (400). Le raisonnement compte dans le budget.
+        // Le raisonnement compte dans le budget. Sans effort réglé, `low` borne la latence.
         600,
-        "low",
+        config.effort ?? "low",
       );
       return texte.trim();
+    },
+
+    async soutenir(texte, citation, titre) {
+      const messages = [
+        { role: "system", content: CONSIGNE_SOUTIEN },
+        {
+          role: "user",
+          content: `Titre : ${titre}\nPassage : « ${citation} »\nPhrase : « ${texte} »`,
+        },
+      ];
+      // Voie directe: GLM 5.3 chez Mistral, en UE. Une erreur, un 429 ou plus de 2,5 s passent
+      // la main à OpenRouter.
+      if (config.cleMistral) {
+        try {
+          const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${config.cleMistral}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              model: config.soutienMistral,
+              messages,
+              temperature: 0,
+              top_p: 1,
+              max_tokens: 3000,
+              reasoning_effort: "low",
+              logprobs: true,
+              top_logprobs: 10,
+            }),
+            signal: AbortSignal.timeout(2500),
+          });
+          if (r.ok) {
+            const probabilite = lireVerdict((await r.json()).choices?.[0]);
+            if (probabilite !== undefined) {
+              return { probabilite, modele: `mistral/${config.soutienMistral}` };
+            }
+          } else await r.body?.cancel();
+        } catch { /* relève par OpenRouter */ }
+      }
+      const json = await post("/chat/completions", {
+        model: config.soutien,
+        messages,
+        temperature: 0,
+        // Le juge raisonne brièvement, puis ses logprobs portent sur le premier jeton de la
+        // réponse. Le budget couvre le raisonnement.
+        max_tokens: 3000,
+        reasoning: { effort: "low" },
+        logprobs: true,
+        top_logprobs: 10,
+        // Sans `require_parameters`, un hébergeur sans logprobs répond quand même, sans elles.
+        // Mistral sert GLM 5.3 en UE: 316 ms de médiane contre 1 s chez Modal, que `throughput`
+        // choisissait. `order` garde la relève des autres hébergeurs.
+        provider: {
+          require_parameters: true,
+          zdr: true,
+          data_collection: "deny",
+          order: ["Mistral"],
+        },
+      }, true);
+      const probabilite = lireVerdict(json.choices?.[0]);
+      if (probabilite === undefined) {
+        throw new PanneModele(
+          `Ni « oui » ni « non » en tête de sortie: ${
+            JSON.stringify(json.choices?.[0]?.message?.content ?? null).slice(0, 200)
+          }`,
+          "MODEL_EMPTY_RESPONSE",
+        );
+      }
+      return { probabilite, modele: config.soutien };
     },
   };
 }

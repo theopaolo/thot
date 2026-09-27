@@ -144,6 +144,24 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
   }
 }
 
+/**
+ * Rejoue l'extraction d'une source déjà déposée, après une amélioration de l'extracteur. Seules
+ * les sections changent: si le texte de `document.txt` différait, les offsets des citations déjà
+ * données bougeraient, et la source reste telle quelle.
+ */
+export async function reextraire(db: Db, sourceId: string) {
+  const s = lireSource(db, sourceId);
+  if (s.format !== "html" && s.format !== "pdf") return "ignoree";
+  const doc = assembler((await extraire(s)).parties);
+  const dossier = contenu(s.id);
+  if (doc.texte !== await Deno.readTextFile(`${dossier}/document.txt`)) return "texte_change";
+  const blocs = doc.blocs.map((b) => JSON.stringify(b)).join("\n");
+  if (blocs === await Deno.readTextFile(`${dossier}/blocs.jsonl`)) return "identique";
+  await ecrireAtomique(`${dossier}/blocs.jsonl`, blocs);
+  indexer(db, s.id);
+  return "mise_a_jour";
+}
+
 export type Meta = { sequence?: string; seance?: string };
 
 export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] } {

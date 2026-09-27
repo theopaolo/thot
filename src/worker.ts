@@ -12,9 +12,10 @@ const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 let arret = false;
 let prochainePurge = 0;
-Deno.addSignalListener("SIGTERM", () => arret = true);
+Deno.addSignalListener("SIGTERM", () => (arret = true));
 
 console.log("worker: en attente de travaux");
+
 while (!arret) {
   if (Date.now() >= prochainePurge) {
     purgerMessages(db, config.retentionJours);
