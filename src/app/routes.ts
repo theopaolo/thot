@@ -304,6 +304,15 @@ export function creerApp(db: Db, modeles: Modeles) {
     const d = detail(c.req.param("id"));
     return d ? c.html(rendre(c, d.source.titre, Prof.detailSource(d))) : c.notFound();
   });
+  // Seul un PDF s'ouvre: un original HTML lancerait ses scripts sur l'origine de Thot.
+  app.get("/prof/sources/:id/original", async (c) => {
+    const d = detail(c.req.param("id"));
+    if (d?.source.format !== "pdf") return c.notFound();
+    return c.body(await Deno.readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
+      "content-type": "application/pdf",
+      "content-disposition": "inline",
+    });
+  });
   app.post("/prof/sources/:id/modifier", async (c) => {
     const d = detail(c.req.param("id"));
     if (!d) return c.notFound();

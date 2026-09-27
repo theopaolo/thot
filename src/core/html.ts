@@ -118,6 +118,17 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
   return { parties, images, avertissements: [] };
 }
 
+/**
+ * Page Pearltrees sans contenu propre: un titre, un lien, une vignette hébergée chez Pearltrees.
+ * `fichier` nomme le fichier du même dossier qu'elle présente (« ./Fiche Cubisme.pdf »).
+ */
+export function pageVide(html: string): { fichier?: string } | undefined {
+  const e = extraireHtml(html, "");
+  if (e.parties.length > 1 || e.images.length) return undefined;
+  const href = html.match(/href="\.\/([^"]+)"/i)?.[1];
+  return { fichier: href && decoder(href) };
+}
+
 /** Rubrique de chaque fichier d'un sommaire Pearltrees, par son `href`. */
 export function rubriquesSommaire(html: string): Map<string, string> {
   const out = new Map<string, string>();

@@ -534,6 +534,11 @@ export const detailSource = (d: Detail) =>
     <p class="discret">${d.meta.sequence ?? ""} ${d.meta.seance ? `· ${d.meta.seance}` : ""} · ${d
       .source.format} · ${d.source.fichier}</p>
     <p class="discret">Déposé par ${d.source.enseignant} le ${jour(d.source.cree_le)}</p>
+    ${d.source.format === "pdf"
+      ? html`
+        <p><a href="/prof/sources/${d.source.id}/original" target="_blank">Ouvrir le PDF</a></p>
+      `
+      : ""}
     <form method="post" action="/prof/sources/${d.source
       .id}/modifier" class="etroit edition-source">
       <h2>Modifier les informations</h2>

@@ -1,11 +1,11 @@
 import { parseArgs } from "@std/cli/parse-args";
 import { basename, dirname, extname, join, relative } from "@std/path";
-import { decoder, rubriquesSommaire } from "./core/html.ts";
+import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
-import { chercher, chercherFts } from "./core/recherche.ts";
+import { chercher, chercherFts, retirerSource, transaction } from "./core/recherche.ts";
 import { creerCompte, reinitialiserMotDePasse, type Role } from "./app/comptes.ts";
-import { config, RACINE } from "./app/config.ts";
+import { config, contenu, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
 import {
@@ -33,6 +33,7 @@ const AIDE = `thot <commande>
   certifier <source_id...> | --tout [--par=nom]
                                             certifie des sources, trace le nom donné
   suggestions <source_id...> | --tout       questions vérifiées proposées aux élèves
+  nettoyer                                  retire les pages Pearltrees réduites à leur titre
   rebuild                                   reconstruit l'index des sources certifiées
   reextraire                                rejoue l'extraction des sources, garde les offsets
   ask "<question>" [--json]                 pose une question sur le corpus certifié
@@ -84,6 +85,13 @@ async function ingest(chemin: string) {
       refus.push(`${relative(racine, f)}: ${controle.erreur}`);
       continue;
     }
+    const vide = controle.format === "html" && pageVide(new TextDecoder().decode(octets));
+    if (vide) {
+      refus.push(
+        `${relative(racine, f)}: titre seul${vide.fichier ? `, voir ${vide.fichier}` : ""}`,
+      );
+      continue;
+    }
     if (
       db.prepare("SELECT 1 FROM sources WHERE checksum = ? AND school_id = ?").get(
         await sha256(octets),
@@ -96,7 +104,15 @@ async function ingest(chemin: string) {
     const dossier = dirname(f);
     if (!sommaires.has(dossier)) {
       const s = await Deno.readTextFile(join(dossier, "Sommaire.html")).catch(() => "");
-      sommaires.set(dossier, rubriquesSommaire(s));
+      const rubriques = rubriquesSommaire(s);
+      // Le sommaire range la page qui présente une fiche PDF, pas la fiche: elle hérite de sa
+      // rubrique.
+      for (const [href, rubrique] of [...rubriques]) {
+        const page = await Deno.readTextFile(join(dossier, href)).catch(() => "");
+        const lie = page && pageVide(page)?.fichier;
+        if (lie) rubriques.set(lie, rubrique);
+      }
+      sommaires.set(dossier, rubriques);
     }
     const sequence = basename(dossier);
     const titre = controle.format === "html"
@@ -128,6 +144,44 @@ async function ingest(chemin: string) {
   }
   console.log(`${deposes} fichier(s) déposé(s).`);
   if (refus.length) console.log(`${refus.length} refusé(s):\n  ${refus.join("\n  ")}`);
+}
+
+/**
+ * Pages vides déjà importées, avant que `ingest` les écarte. La fiche PDF qu'une page présente
+ * reprend sa rubrique, puis la page sort de la base et du disque.
+ */
+async function nettoyer() {
+  const pages = db.prepare(
+    "SELECT id, fichier, metadonnees FROM sources WHERE format = 'html' AND school_id = ?",
+  ).all(config.schoolId) as { id: string; fichier: string; metadonnees: string }[];
+  let n = 0;
+  for (const p of pages) {
+    const vide = pageVide(await Deno.readTextFile(contenu(p.id, "original", p.fichier)));
+    if (!vide) continue;
+    const { sequence, seance } = JSON.parse(p.metadonnees);
+    const fiche = vide.fichier && db.prepare(
+      `SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?
+         AND school_id = ?`,
+    ).get(nomSur(vide.fichier), sequence, config.schoolId)?.id as string | undefined;
+    transaction(db, () => {
+      if (fiche && seance) {
+        db.prepare(
+          `UPDATE sources SET metadonnees = json_set(metadonnees, '$.seance', ?)
+           WHERE id = ? AND json_extract(metadonnees, '$.seance') = ''`,
+        ).run(seance, fiche);
+      }
+      retirerSource(db, p.id);
+      for (const table of ["images", "suggestions", "ingestion_jobs", "sources"]) {
+        db.prepare(`DELETE FROM ${table} WHERE ${table === "sources" ? "id" : "source_id"} = ?`)
+          .run(p.id);
+      }
+    });
+    if (fiche) indexer(db, fiche);
+    await Deno.remove(contenu(p.id), { recursive: true });
+    console.log(`  ${p.fichier}${fiche ? ` → ${vide.fichier}` : ""}`);
+    n++;
+  }
+  console.log(`${n} page(s) vide(s) retirée(s).`);
 }
 
 async function traiterFile() {
@@ -505,6 +559,9 @@ switch (commande) {
     console.log(`${n} question(s) vérifiée(s) pour ${ids.length} source(s).`);
     break;
   }
+  case "nettoyer":
+    await nettoyer();
+    break;
   case "reextraire": {
     const bilan: Record<string, string[]> = {};
     for (const { id, fichier } of db.prepare("SELECT id, fichier FROM sources").all()) {

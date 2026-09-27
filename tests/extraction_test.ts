@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { assembler } from "../src/core/document.ts";
-import { extraireHtml, rubriquesSommaire } from "../src/core/html.ts";
+import { extraireHtml, pageVide, rubriquesSommaire } from "../src/core/html.ts";
 import { decouperPdf, extrairePdf } from "../src/core/pdf.ts";
 import { tranche } from "../src/core/texte.ts";
 
@@ -84,6 +84,17 @@ Deno.test("HTML Pearltrees: titre, texte décodé, intertitre, première image s
   assertEquals(ext.images.length, 1);
   assertEquals(ext.images[0].mime, "image/jpeg");
   assertEquals(Array.from(ext.images[0].octets.slice(0, 3)), [0xff, 0xd8, 0xff]);
+});
+
+Deno.test("HTML Pearltrees: une page réduite à son titre est vide, sa fiche liée nommée", () => {
+  const carte = (lien: string) =>
+    `<h1 class="pearl-title">ATC Art Nouveau</h1>
+<div class="medals"><div class="author-medal"><a href="x">Sdetienne</a></div><div> – </div>
+<div class="see-medal"><a href="y">Voir dans Pearltrees</a></div></div>
+<div><a href="${lien}" target="_blank"><img src="https://cdn-thumbshot-ie.pearltrees.com/a.jpg"</a></div>`;
+  assertEquals(pageVide(carte("./ATC Art Nouveau.pdf")), { fichier: "ATC Art Nouveau.pdf" });
+  assertEquals(pageVide(carte("https://www.admirable-facades.brussels/")), { fichier: undefined });
+  assertEquals(pageVide(PAGE), undefined);
 });
 
 Deno.test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le précède", () => {
