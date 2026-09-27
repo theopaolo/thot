@@ -1,8 +1,8 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
-import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
+import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { serveStatic } from "hono/deno";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
@@ -65,11 +65,19 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
 
   const rendre = (
-    c: { get(k: "compte"): Compte; req: { path: string } },
+    c: Context<Env>,
     titre: string,
     corps: unknown,
     classe = "",
-  ) => page(titre, c.get("compte") ?? null, corps, classe, c.req.path);
+  ) =>
+    page(
+      titre,
+      c.get("compte") ?? null,
+      corps,
+      classe,
+      c.req.path,
+      getCookie(c, "rail") === "replie",
+    );
 
   // ------------------------------------------------------------ connexion
   app.get("/connexion", (c) => c.html(page("Connexion", null, formulaireConnexion())));
@@ -140,7 +148,8 @@ export function creerApp(db: Db, modeles: Modeles) {
     db.prepare(
       `SELECT s.id, s.titre, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
          j.etat, j.erreur,
-         (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire
+         (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
+         (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
@@ -148,6 +157,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
     statut: c.req.query("statut") ?? "",
     sequence: c.req.query("sequence") ?? "",
+    vue: c.req.query("vue") === "grille" ? "grille" : "",
   });
 
   app.get("/prof", (c) => {
@@ -221,7 +231,11 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
     return c.html(
-      Prof.lignesSources(lignes(f.statut, f.sequence), new URLSearchParams(f).toString()),
+      Prof.lignesSources(
+        lignes(f.statut, f.sequence),
+        new URLSearchParams(f).toString(),
+        f.vue === "grille",
+      ),
     );
   });
   app.post("/prof/sources/statut", async (c) => {

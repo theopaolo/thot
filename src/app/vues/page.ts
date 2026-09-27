@@ -9,6 +9,7 @@ export const page = (
   corps: unknown,
   classe = "",
   chemin = "",
+  railReplie = false,
 ) => {
   const prof = chemin.startsWith("/prof");
   return html`
@@ -26,10 +27,10 @@ export const page = (
         <script type="module" src="/static/dist/app.js"></script>
       </head>
       <body
-        class="${prof ? "prof" : "eleve"}"
+        class="${prof ? `prof${railReplie ? " rail-replie" : ""}` : "eleve"}"
       >
         <a class="evitement" href="#contenu">Aller au contenu</a>
-        ${compte && prof ? rail(compte, chemin) : html`
+        ${compte && prof ? rail(compte, chemin, railReplie) : html`
           <header class="site">
             <a class="marque" href="/">Thot</a>
             ${compte ? navEleve(compte, chemin) : ""}
@@ -90,10 +91,17 @@ const navEleve = (c: Compte, chemin: string) =>
     </nav>
   `;
 
-const rail = (c: Compte, chemin: string) =>
+/** Le rail se replie en icônes; le cookie `rail` garde ce choix d'une page à l'autre. */
+const rail = (c: Compte, chemin: string, replie: boolean) =>
   html`
     <header class="rail">
-      <a class="marque" href="/prof">Thot</a>
+      <div class="rail-tete">
+        <a class="marque" href="/prof">Thot</a>
+        <button type="button" class="rail-bascule" data-replier-rail aria-expanded="${String(
+          !replie,
+        )}"
+          aria-label="Menu" title="Replier ou déplier le menu">${icone("sidebar-simple")}</button>
+      </div>
       <p class="discret">Espace enseignant</p>
       <nav aria-label="Navigation enseignant" hx-boost="true">
         ${lienNav(
@@ -111,7 +119,7 @@ const rail = (c: Compte, chemin: string) =>
         ${lienNav("/eleve", "Vue élève", "books", false, false)}
         <strong>${c.nom}</strong>
         <form method="post" action="/deconnexion">
-          <button class="lien">${icone("sign-out")}Se déconnecter</button>
+          <button class="lien">${icone("sign-out")}<span>Se déconnecter</span></button>
         </form>
       </div>
     </header>

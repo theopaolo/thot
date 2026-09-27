@@ -32,37 +32,98 @@ export type LigneSource = {
   etat: string;
   erreur: string | null;
   images_a_relire: number;
+  image_id: string | null;
 };
 
 export const JOBS_ACTIFS = ["received", "extracting", "enriching"];
 
-export const lignesSources = (lignes: LigneSource[], requete: string) => {
-  const actifs = lignes.some((l) => JOBS_ACTIFS.includes(l.etat));
+const statutLigne = (l: LigneSource) =>
+  l.etat === "failed"
+    ? html`<span class="statut failed">échec du traitement</span>`
+    : JOBS_ACTIFS.includes(l.etat)
+    ? html`<span class="statut en-cours">${ETATS_JOB[l.etat]}…</span>`
+    : html`<span class="statut ${l.statut}">${STATUTS[l.statut] ?? l.statut}</span>`;
+
+const nonRelues = (n: number) => n ? `${n} non relue${n > 1 ? "s" : ""}` : "";
+
+const apercu = (l: LigneSource) =>
+  html`<span class="passe-partout">${
+    l.image_id
+      ? html`<img src="/media/${l.image_id}" alt="" loading="lazy">`
+      : html`<span class="sans-image">${icone("file-text")}</span>`
+  }</span>`;
+
+const caseSource = (l: LigneSource, classe = "") =>
+  html`
+    <input class="${classe}" type="checkbox" name="ids" value="${l.id}"
+      aria-label="Sélectionner ${l
+        .titre}">
+  `;
+
+/** Une carte ne signale que l'écart: « certifiée » sur chaque œuvre ne dirait rien. */
+const carte = (l: LigneSource) => {
+  const ecart = l.etat === "failed" || JOBS_ACTIFS.includes(l.etat) || l.statut !== "certifiee";
   return html`
-    <tbody id="lignes" ${actifs
-      ? html`
-        hx-get="/prof/lignes?${requete}" hx-trigger="every 3s" hx-swap="outerHTML"
-      `
-      : ""}>
+    <li class="carte ${l.statut === "rejetee" ? "rejetee" : ""}">
+      ${caseSource(l, "carte-case")}
+      <a class="tuile" href="/prof/sources/${l.id}">
+        ${apercu(l)}
+        <span class="tuile-titre">${l.titre}</span>
+      </a>
+      ${ecart || l.images_a_relire
+        ? html`<p class="carte-etat">${ecart ? statutLigne(l) : ""}${
+          l.images_a_relire
+            ? html`<span class="statut unreviewed">${l.images_a_relire} légende${
+              l.images_a_relire > 1 ? "s" : ""
+            } non relue${l.images_a_relire > 1 ? "s" : ""}</span>`
+            : ""
+        }</p>`
+        : ""}
+    </li>
+  `;
+};
+
+export const lignesSources = (lignes: LigneSource[], requete: string, grille = false) => {
+  const actifs = lignes.some((l) => JOBS_ACTIFS.includes(l.etat));
+  const rafraichir = actifs
+    ? html`
+      hx-get="/prof/lignes?${requete}" hx-trigger="every 3s" hx-swap="outerHTML"
+    `
+    : "";
+  if (grille) {
+    const groupes = Map.groupBy(lignes, (l) => l.sequence ?? "");
+    return html`
+      <div id="lignes" ${rafraichir}>
+        ${[...groupes].map(([sequence, liste]) =>
+          groupes.size > 1
+            ? html`
+              <section class="seance">
+                <h2>${sequence || "Sans séquence"} <span class="discret">${liste.length}</span></h2>
+                <ul class="tuiles grille-sources">${liste.map(carte)}</ul>
+              </section>
+            `
+            : html`<ul class="tuiles grille-sources">${liste.map(carte)}</ul>`
+        )}
+      </div>
+    `;
+  }
+  return html`
+    <tbody id="lignes" ${rafraichir}>
       ${lignes.map((l) =>
         html`
           <tr>
+            <td>${caseSource(l)}</td>
             <td>
-              <input type="checkbox" name="ids" value="${l.id}" aria-label="Sélectionner ${l
-                .titre}">
+              <div class="ligne-doc">
+                ${apercu(l)}
+                <div>
+                  <a href="/prof/sources/${l.id}">${l.titre}</a>
+                  <small>${l.sequence} · ${l.format}</small>
+                </div>
+              </div>
             </td>
-            <td>
-              <a href="/prof/sources/${l.id}">${l.titre}</a><br><small>${l.sequence} · ${l
-                .format}</small>
-            </td>
-            <td>${l.etat === "failed"
-              ? html`<span class="statut failed">échec du traitement</span>`
-              : JOBS_ACTIFS.includes(l.etat)
-              ? html`<span class="statut en-cours">${ETATS_JOB[l.etat]}…</span>`
-              : html`<span class="statut ${l.statut}">${STATUTS[l.statut] ?? l.statut}</span>`}</td>
-            <td class="statut unreviewed">${l.images_a_relire
-              ? `${l.images_a_relire} non relue${l.images_a_relire > 1 ? "s" : ""}`
-              : ""}</td>
+            <td>${statutLigne(l)}</td>
+            <td class="statut unreviewed">${nonRelues(l.images_a_relire)}</td>
           </tr>
         `
       )}
@@ -70,89 +131,93 @@ export const lignesSources = (lignes: LigneSource[], requete: string) => {
   `;
 };
 
-type Filtres = { statut: string; sequence: string };
+type Filtres = { statut: string; sequence: string; vue: string };
 
-/** Une ligne de liens-filtres. Le compte de chaque lien tient compte de l'autre filtre. */
-const filtre = (
-  nom: string,
-  cle: keyof Filtres,
-  choix: [string, string][],
-  f: Filtres,
-  compte: (v: string) => number,
-) =>
-  html`
-    <nav class="filtre" aria-label="${nom}">
-      <span class="discret">${nom}</span>
-      ${choix.map(([v, l]) => {
-        const lien = `/prof?${new URLSearchParams({ ...f, [cle]: v })}`;
-        return html`
-          <a href="${lien}"
-            aria-current="${String(v === f[cle])}">${l} <span class="discret">${compte(
-              v,
-            )}</span></a>
-        `;
-      })}
-    </nav>
-  `;
+const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
+  `/prof?${new URLSearchParams({ ...f, ...change })}`;
 
 export const sources = (
   lignes: LigneSource[],
   f: Filtres,
   repartition: { sequence: string; statut: string; n: number }[],
 ) => {
+  // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
     repartition.filter(garde).reduce((t, r) => t + r.n, 0);
+  const parSequence = (v: string) =>
+    somme((r) => (!v || r.sequence === v) && (!f.statut || r.statut === f.statut));
+  const parStatut = (v: string) =>
+    somme((r) => (!v || r.statut === v) && (!f.sequence || r.sequence === f.sequence));
   const sequences = [...new Set(repartition.map((r) => r.sequence))].filter(Boolean).sort();
   const requete = new URLSearchParams(f).toString();
+  const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
-    ${filtre(
-      "Statut",
-      "statut",
-      [["", "Toutes"], ["a_relire", "À relire"], ["certifiee", "Certifiées"], [
-        "rejetee",
-        "Rejetées",
-      ]],
-      f,
-      (v) => somme((r) => (!v || r.statut === v) && (!f.sequence || r.sequence === f.sequence)),
-    )} ${filtre(
-      "Séquence",
-      "sequence",
-      [["", "Toutes"], ...sequences.map((s): [string, string] => [s, s])],
-      f,
-      (v) => somme((r) => (!v || r.sequence === v) && (!f.statut || r.statut === f.statut)),
-    )}
+    <nav class="onglets" aria-label="Séquence">
+      ${[["", "Toutes les séquences"], ...sequences.map((s) => [s, s])].map(([v, l]) =>
+        html`
+          <a href="${lienFiltres(f, { sequence: v })}"
+            aria-current="${String(
+              v === f.sequence,
+            )}">${l} <span class="nombre">${parSequence(v)}</span></a>
+        `
+      )}
+    </nav>
+    <div class="biblio-outils">
+      <nav class="segments" aria-label="Statut">
+        ${[["", "Toutes"], ["a_relire", "À relire"], ["certifiee", "Certifiées"], [
+          "rejetee",
+          "Rejetées",
+        ]].map(([v, l]) => {
+          const n = parStatut(v);
+          return html`
+            <a href="${lienFiltres(f, { statut: v })}" class="${n ? "" : "vide"}"
+              aria-current="${String(v === f.statut)}">${l} <span class="nombre">${n}</span></a>
+          `;
+        })}
+      </nav>
+      <nav class="segments" aria-label="Affichage">
+        ${([["", "Liste", "list"], ["grille", "Grille", "squares-four"]] as const).map((
+          [v, l, i],
+        ) =>
+          html`
+            <a href="${lienFiltres(f, { vue: v })}" title="${l}"
+              aria-current="${String(
+                v === f.vue,
+              )}">${icone(i)}<span class="visuellement-cache">${l}</span></a>
+          `
+        )}
+      </nav>
+    </div>
     ${lignes.length
       ? html`
         <form method="post" action="/prof/sources/statut?${requete}">
-          <div class="barre actions-selection">
-            <button name="statut" value="certifiee">Certifier la sélection</button>
-            <button
-              class="espace"
-              name="statut"
-              value="rejetee"
-              data-rejeter-selection
-            >
-              Rejeter la sélection
+          ${grille ? lignesSources(lignes, requete, true) : html`
+            <table class="biblio">
+              <thead>
+                <tr>
+                  <th>
+                    <input type="checkbox" aria-label="Tout sélectionner" data-tout-selectionner>
+                  </th>
+                  <th>Document</th>
+                  <th>Statut</th>
+                  <th>Légendes</th>
+                </tr>
+              </thead>
+              ${lignesSources(lignes, requete)}
+            </table>
+          `}
+          <div class="selection" role="region" aria-label="Sélection">
+            <output data-compte-selection aria-live="polite"></output>
+            <button type="button" class="lien" data-selection="tout">Tout sélectionner</button>
+            <button type="button" class="lien" data-selection="aucun">Annuler</button>
+            <button class="principal espace" name="statut" value="certifiee">
+              ${icone("check")} Certifier
+            </button>
+            <button name="statut" value="rejetee" data-rejeter-selection>
+              ${icone("x")} Rejeter
             </button>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label="Tout sélectionner"
-                    data-tout-selectionner
-                  >
-                </th>
-                <th>Document</th>
-                <th>Statut</th>
-                <th>Légendes</th>
-              </tr>
-            </thead>
-            ${lignesSources(lignes, requete)}
-          </table>
         </form>
       `
       : repartition.length
@@ -636,40 +701,46 @@ export const legende = (i: ALegender | undefined, file: { id: string; titre: str
     ? html`
       <div id="legende" class="relecture">
         <nav class="file" aria-label="Légendes à relire">
-          <p><strong>${i.restantes}</strong> légende${i.restantes > 1 ? "s" : ""} à relire</p>
+          <p><strong>${i.restantes}</strong> à relire</p>
           <ol>${file.map((f) =>
             html`
-              <li><a href="/prof/legendes?image=${f.id}" aria-current="${String(
+              <li><a href="/prof/legendes?image=${f.id}" title="${f.titre}" aria-current="${String(
                 f.id === i.id,
-              )}">${f.titre}</a></li>
+              )}"><img src="/media/${f.id}" alt="${f.titre}" loading="lazy"></a></li>
             `
           )}</ol>
         </nav>
-        <figure class="relecture-image">
-          <img src="/media/${i.id}" alt="Image à légender de ${i.titre}">
-        </figure>
-        <form
-          class="relecture-proposition"
-          hx-target="#legende"
-          hx-swap="outerHTML"
-          hx-disabled-elt="find button"
-        >
-          <p><a href="/prof/sources/${i.source_id}">${i.titre}</a></p>
-          <p class="discret">
-            Légende proposée automatiquement. Seule une légende validée peut être citée à un élève.
-          </p>
-          <label for="texte">Légende</label>
-          <textarea id="texte" name="texte" rows="7">${i.legende ?? ""}</textarea>
-          <input type="hidden" name="image" value="${i.id}">
-          <div class="barre">
-            <button class="principal" hx-post="/prof/legendes/certified"
-              data-raccourci="v">${icone("check")}Valider (V)</button>
-            <button class="espace" hx-post="/prof/legendes/rejected"
-              data-raccourci="r">${icone(
-                "x",
-              )}Rejeter (R)</button>
-          </div>
-        </form>
+        <div class="relecture-plan">
+          <figure class="relecture-image">
+            <img src="/media/${i.id}" alt="Image à légender de ${i.titre}">
+          </figure>
+          <form
+            class="relecture-proposition"
+            hx-target="#legende"
+            hx-swap="outerHTML"
+            hx-disabled-elt="find button"
+          >
+            <p class="discret">Source</p>
+            <h2><a href="/prof/sources/${i.source_id}">${i.titre}</a></h2>
+            <label for="texte">Légende proposée</label>
+            <p class="aide">Seule une légende validée peut être citée à un élève.</p>
+            <textarea id="texte" name="texte" rows="7">${i.legende ?? ""}</textarea>
+            <input type="hidden" name="image" value="${i.id}">
+            <div class="barre">
+              <button class="principal" hx-post="/prof/legendes/certified" data-raccourci="v"
+                aria-keyshortcuts="v">
+                ${icone("check")}Valider <kbd aria-hidden="true">V</kbd>
+              </button>
+              <button hx-post="/prof/legendes/rejected" data-raccourci="r" aria-keyshortcuts="r">
+                ${icone("x")}Rejeter <kbd aria-hidden="true">R</kbd>
+              </button>
+            </div>
+            <p class="raccourcis discret">
+              <span><kbd>E</kbd> modifier la légende</span>
+              <span><kbd>←</kbd> <kbd>→</kbd> changer d'image</span>
+            </p>
+          </form>
+        </div>
       </div>
     `
     : html`
@@ -679,9 +750,5 @@ export const legende = (i: ALegender | undefined, file: { id: string; titre: str
 export const pageLegendes = (i: ALegender | undefined, file: { id: string; titre: string }[]) =>
   html`
     <h1>Relire les légendes</h1>
-    <p class="raccourcis discret">
-      <kbd>V</kbd> valider, <kbd>E</kbd> éditer, <kbd>R</kbd> rejeter,
-      <kbd>↑</kbd> <kbd>↓</kbd> image précédente ou suivante
-    </p>
     ${legende(i, file)}
   `;
