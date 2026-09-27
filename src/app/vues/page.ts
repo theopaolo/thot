@@ -33,6 +33,7 @@ export const page = (
         ${compte && prof ? rail(compte, chemin, railReplie) : html`
           <header class="site">
             <a class="marque" href="/">Thot</a>
+            ${compte && chemin !== "/eleve/recherche" ? rechercheEntete : ""}
             ${compte ? navEleve(compte, chemin) : ""}
           </header>
         `}
@@ -66,6 +67,14 @@ const compteMenu = (c: Compte) =>
       </form>
     </details>
   `;
+
+const rechercheEntete = html`
+  <form method="get" action="/eleve/recherche" role="search" class="recherche-entete">
+    <input type="search" name="q" required maxlength="300" aria-label="Chercher dans le cours"
+      placeholder="Chercher une œuvre, un document">
+    <button aria-label="Chercher">${icone("magnifying-glass")}</button>
+  </form>
+`;
 
 const navEleve = (c: Compte, chemin: string) =>
   html`

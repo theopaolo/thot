@@ -268,10 +268,30 @@ header.site nav > a[aria-current="page"] {
   background: var(--yellow);
   border-color: var(--yellow);
 }
+.recherche-entete {
+  display: flex;
+  flex: 0 1 22rem;
+}
+.recherche-entete input {
+  min-width: 0;
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.recherche-entete button {
+  flex: none;
+  width: 44px;
+  padding: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
 .libelle-court {
   display: none;
 }
 @media (max-width: 640px) {
+  .recherche-entete {
+    order: 3;
+    flex-basis: 100%;
+    margin-bottom: var(--s1);
+  }
   header.site {
     gap: 0 var(--s2);
     min-height: 3.5rem;

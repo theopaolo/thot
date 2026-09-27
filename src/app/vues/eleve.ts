@@ -70,7 +70,6 @@ export const accueilEleve = (
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
         <h2 id="tes-chapitres">Tes séquences</h2>
-        ${formRecherche("")}
         ${chapitres.length
           ? html`
             <ul class="chapitres">${chapitres.map((c) =>
