@@ -11,24 +11,26 @@ import { type Candidat, chercher, chercherFts } from "../core/recherche.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
+  choisirMotDePasse,
   type Compte,
+  consommerProvisoire,
   importerEleves,
   lireCompte,
   reinitialiserMotDePasse,
   secretSession,
 } from "./comptes.ts";
+import { lireInstance } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { controlerFichier, deposer, valider } from "./depot.ts";
 import { indexer, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsParChapitre } from "./suggestions.ts";
-import { connexion as formulaireConnexion, page } from "./vues/page.ts";
+import { administration, connexion as formulaireConnexion, motDePasse, page } from "./vues/page.ts";
 import * as Prof from "./vues/prof.ts";
 import * as Eleve from "./vues/eleve.ts";
 
 type Env = { Variables: { compte: Compte } };
 
-const SESSION = "thot_session";
 const PERIMETRE_MS = 3 * 60_000;
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
 const QUIZ = `trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
@@ -37,20 +39,34 @@ const QUIZ = `trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|'
 export function creerApp(db: Db, modeles: Modeles) {
   const app = new Hono<Env>();
   const secret = secretSession();
+  const instance = lireInstance(db);
+  const SESSION = `${
+    config.origine.startsWith("https:") ? "__Host-" : ""
+  }thot_session_${instance.id}`;
+
+  app.use("*", async (c, next) => {
+    if (config.origine && new URL(c.req.url).host !== new URL(config.origine).host) {
+      return c.text("Origine incorrecte.", 421);
+    }
+    await next();
+  });
 
   app.use("/static/dist/*", async (c, next) => {
     c.header("Cache-Control", "no-cache");
     await next();
   });
   app.use("/static/*", serveStatic({ root: "./" }));
-  app.use("*", csrf());
+  app.use("*", csrf(config.origine ? { origin: config.origine } : undefined));
 
   // Session: un cookie signé qui porte l'identifiant du compte, relu en base à chaque requête.
   app.use("*", async (c, next) => {
     const id = await getSignedCookie(c, secret, SESSION);
-    const [compteId, version] = typeof id === "string" ? id.split(":") : [];
+    const [compteId, version, instanceId] = typeof id === "string" ? id.split(":") : [];
     const trouve = compteId ? lireCompte(db, compteId) : undefined;
-    const compte = trouve && String(trouve.session_version) === version ? trouve : undefined;
+    const compte =
+      trouve && String(trouve.session_version) === version && instanceId === instance.id
+        ? trouve
+        : undefined;
     if (compte) c.set("compte", compte);
     const p = c.req.path;
     if (!p.startsWith("/static/") && !p.startsWith("/media/")) {
@@ -58,6 +74,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     }
     if (p === "/connexion" || p.startsWith("/static/")) return next();
     if (!compte) return c.redirect("/connexion");
+    if (compte.renouveler_mdp && p !== "/mot-de-passe" && p !== "/deconnexion") {
+      return c.redirect("/mot-de-passe");
+    }
+    if (p.startsWith("/administration") && !compte.administrateur) {
+      return c.text("Accès réservé à l'administrateur.", 403);
+    }
     if (p.startsWith("/prof") && compte.role !== "enseignant") {
       return c.text("Accès réservé aux enseignants.", 403);
     }
@@ -77,10 +99,11 @@ export function creerApp(db: Db, modeles: Modeles) {
       classe,
       c.req.path,
       getCookie(c, "rail") === "replie",
+      lireInstance(db),
     );
 
   // ------------------------------------------------------------ connexion
-  app.get("/connexion", (c) => c.html(page("Connexion", null, formulaireConnexion())));
+  app.get("/connexion", (c) => c.html(rendre(c, "Connexion", formulaireConnexion())));
   app.post("/connexion", async (c) => {
     const b = await c.req.parseBody();
     const compte = await authentifier(
@@ -88,11 +111,11 @@ export function creerApp(db: Db, modeles: Modeles) {
       String(b.identifiant ?? ""),
       String(b.mot_de_passe ?? ""),
     );
-    if (!compte) {
+    if (!compte || (compte.renouveler_mdp && !consommerProvisoire(db, compte))) {
       return c.html(
-        page(
+        rendre(
+          c,
           "Connexion",
-          null,
           formulaireConnexion(
             "Identifiant ou mot de passe incorrect.",
             String(b.identifiant ?? ""),
@@ -101,25 +124,50 @@ export function creerApp(db: Db, modeles: Modeles) {
         401,
       );
     }
-    await setSignedCookie(c, SESSION, `${compte.id}:${compte.session_version}`, secret, {
-      httpOnly: true,
-      sameSite: "Lax",
-      path: "/",
-      maxAge: 12 * 3600,
-      // Derrière un proxy (Coolify, Traefik), le TLS s'arrête avant l'application.
-      secure: new URL(c.req.url).protocol === "https:" ||
-        c.req.header("x-forwarded-proto") === "https",
-    });
-    return c.redirect("/");
+    await setSignedCookie(
+      c,
+      SESSION,
+      `${compte.id}:${compte.session_version}:${instance.id}`,
+      secret,
+      {
+        httpOnly: true,
+        sameSite: "Lax",
+        path: "/",
+        maxAge: 12 * 3600,
+        // Derrière un proxy (Coolify, Traefik), le TLS s'arrête avant l'application.
+        secure: config.origine.startsWith("https:") || new URL(c.req.url).protocol === "https:" ||
+          c.req.header("x-forwarded-proto") === "https",
+      },
+    );
+    return c.redirect(compte.renouveler_mdp ? "/mot-de-passe" : "/");
   });
   app.post("/deconnexion", (c) => {
     // Invalide aussi les cookies copiés ou restés sur un autre appareil.
     db.prepare("UPDATE comptes SET session_version = session_version + 1 WHERE id = ?")
       .run(c.get("compte").id);
-    deleteCookie(c, SESSION, { path: "/" });
+    deleteCookie(c, SESSION, { path: "/", secure: config.origine.startsWith("https:") });
     return c.redirect("/connexion");
   });
-  app.get("/", (c) => c.redirect(c.get("compte").role === "enseignant" ? "/prof" : "/eleve"));
+  app.get("/", (c) =>
+    c.redirect(
+      lireInstance(db).mode === "personal" || c.get("compte").role === "eleve" ? "/eleve" : "/prof",
+    ));
+  app.get("/mot-de-passe", (c) => c.html(rendre(c, "Choisir un mot de passe", motDePasse())));
+  app.post("/mot-de-passe", async (c) => {
+    const b = await c.req.parseBody();
+    try {
+      if (b.mot_de_passe !== b.confirmation) throw new Error("Les mots de passe diffèrent.");
+      await choisirMotDePasse(db, c.get("compte"), String(b.mot_de_passe ?? ""));
+    } catch (e) {
+      return c.html(rendre(c, "Choisir un mot de passe", motDePasse((e as Error).message)), 400);
+    }
+    deleteCookie(c, SESSION, { path: "/", secure: config.origine.startsWith("https:") });
+    return c.redirect("/connexion");
+  });
+  app.get(
+    "/administration",
+    (c) => c.html(rendre(c, "Administration", administration(lireInstance(db)))),
+  );
 
   // ------------------------------------------------------------ images
   app.get("/media/:id", async (c) => {
@@ -127,7 +175,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT i.fichier, i.mime, i.source_id, s.statut,
          EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves') AS visible
        FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ? AND s.school_id = ?`,
-    ).get(c.req.param("id"), config.schoolId) as
+    ).get(c.req.param("id"), instance.school_id) as
       | { fichier: string; mime: string; source_id: string; statut: string; visible: number }
       | undefined;
     if (
@@ -153,7 +201,13 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
-    ).all(config.schoolId, statut, statut, sequence, sequence) as unknown as Prof.LigneSource[];
+    ).all(
+      instance.school_id,
+      statut,
+      statut,
+      sequence,
+      sequence,
+    ) as unknown as Prof.LigneSource[];
   const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
     statut: c.req.query("statut") ?? "",
     sequence: c.req.query("sequence") ?? "",
@@ -165,7 +219,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const repartition = db.prepare(
       `SELECT coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence, statut, count(*) AS n
        FROM sources WHERE school_id = ? GROUP BY 1, 2`,
-    ).all(config.schoolId) as { sequence: string; statut: string; n: number }[];
+    ).all(instance.school_id) as { sequence: string; statut: string; n: number }[];
     return c.html(
       rendre(c, "Bibliothèque", Prof.sources(lignes(f.statut, f.sequence), f, repartition)),
     );
@@ -246,7 +300,11 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
   });
 
-  app.get("/prof/depot", (c) => c.html(rendre(c, "Déposer", Prof.depot({}))));
+  app.get(
+    "/prof/depot",
+    (c) =>
+      c.html(rendre(c, "Déposer", Prof.depot({ personnel: lireInstance(db).mode === "personal" }))),
+  );
   app.post("/prof/depot", async (c) => {
     const b = await c.req.parseBody({ all: true });
     const champs = Object.fromEntries(
@@ -256,9 +314,16 @@ export function creerApp(db: Db, modeles: Modeles) {
     ) as Record<string, string>;
     const publics = [b.publics ?? []].flat().map(String);
     const refus = (erreurs: Record<string, string>) =>
-      c.html(rendre(c, "Déposer", Prof.depot({ champs, publics, erreurs })), 400);
+      c.html(
+        rendre(
+          c,
+          "Déposer",
+          Prof.depot({ champs, publics, erreurs, personnel: lireInstance(db).mode === "personal" }),
+        ),
+        400,
+      );
 
-    const v = valider(champs, publics);
+    const v = valider(champs, publics, lireInstance(db).mode === "personal");
     const fichier = b.fichier;
     const octets = fichier instanceof File
       ? new Uint8Array(await fichier.arrayBuffer())
@@ -275,7 +340,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       nomFichier: (fichier as File).name,
       octets,
       format: controle.format,
-      schoolId: config.schoolId,
+      schoolId: instance.school_id,
       enseignant: c.get("compte").nom,
     });
     return c.html(
@@ -283,6 +348,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         c,
         "Déposer",
         Prof.depot({
+          personnel: lireInstance(db).mode === "personal",
           ok:
             `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
         }),
@@ -293,7 +359,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const detail = (id: string): Prof.Detail | undefined => {
     const source = db.prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?").get(
       id,
-      config.schoolId,
+      instance.school_id,
     ) as
       | Prof.Detail["source"] & { metadonnees: string }
       | undefined;
@@ -353,7 +419,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     db.prepare(
       "UPDATE sources SET titre = ?, metadonnees = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
     )
-      .run(titre, JSON.stringify(meta), d.source.id, config.schoolId);
+      .run(titre, JSON.stringify(meta), d.source.id, instance.school_id);
     if (d.source.statut === "certifiee") indexer(db, d.source.id);
     return c.redirect(`/prof/sources/${d.source.id}`, 303);
   });
@@ -368,12 +434,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     const restantes = db.prepare(
       `SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id
        WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?`,
-    ).get(config.schoolId)!.n as number;
+    ).get(instance.school_id)!.n as number;
     const i = db.prepare(
       `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id
        WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
        ORDER BY (i.id = ?) DESC, json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 1`,
-    ).get(config.schoolId, imageId ?? "") as Prof.ALegender | undefined;
+    ).get(instance.school_id, imageId ?? "") as Prof.ALegender | undefined;
     return i && { ...i, restantes };
   };
   // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
@@ -382,7 +448,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id
        WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
        ORDER BY json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 12`,
-    ).all(config.schoolId) as { id: string; titre: string }[];
+    ).all(instance.school_id) as { id: string; titre: string }[];
   app.get("/prof/legendes", (c) =>
     c.html(rendre(
       c,
@@ -409,7 +475,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, config.schoolId) as Eleve.SourceLue | undefined;
+    ).get(id, instance.school_id) as Eleve.SourceLue | undefined;
 
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
@@ -421,7 +487,7 @@ export function creerApp(db: Db, modeles: Modeles) {
        FROM sources s WHERE statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        ORDER BY sequence, seance, titre`,
-    ).all(config.schoolId) as Eleve.SourceChapitre[];
+    ).all(instance.school_id) as Eleve.SourceChapitre[];
     const chapitres: Eleve.ChapitreVue[] = [];
     for (const r of rangs) {
       const nom = r.sequence ?? "";
@@ -445,7 +511,13 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Accueil",
-        Eleve.accueilEleve(prenom, chapitres, oeuvre ? undefined : fait, oeuvre),
+        Eleve.accueilEleve(
+          prenom,
+          chapitres,
+          oeuvre ? undefined : fait,
+          oeuvre,
+          lireInstance(db).mode === "personal",
+        ),
         "accueil",
       ),
     );
@@ -462,7 +534,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?
        ORDER BY seance = '', seance, s.titre`,
-    ).all(config.schoolId, nom) as Eleve.SourceChapitre[];
+    ).all(instance.school_id, nom) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
     const doc = sources.find((s) => s.id === c.req.query("doc")) ??
@@ -483,7 +555,10 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, config.schoolId) as Omit<Eleve.Apercu, "image_id" | "legende" | "images" | "extrait">;
+    ).get(id, instance.school_id) as Omit<
+      Eleve.Apercu,
+      "image_id" | "legende" | "images" | "extrait"
+    >;
     if (!s) return undefined;
     const images = db.prepare(
       `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
@@ -543,7 +618,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/eleve/recherche", async (c) => {
     const q = (c.req.query("q") ?? "").trim().slice(0, 300);
     if (!q) return c.html(rendre(c, "Chercher", Eleve.recherche("")));
-    const p = { schoolId: config.schoolId, bibliotheque: true };
+    const p = { schoolId: instance.school_id, bibliotheque: true };
     let proches: Candidat[];
     try {
       const r = await chercher(db, modeles, q, p, config.seuil);
@@ -600,11 +675,11 @@ export function creerApp(db: Db, modeles: Modeles) {
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
        ORDER BY random() LIMIT 3`,
-    ).all(...ids, config.schoolId, question).map((x) => x.question as string);
+    ).all(...ids, instance.school_id, question).map((x) => x.question as string);
     if (memesSources.length) return memesSources;
     const chapitre = db.prepare(
       "SELECT json_extract(metadonnees, '$.sequence') AS nom FROM sources WHERE id = ? AND school_id = ?",
-    ).get(ids[0], config.schoolId)?.nom as string | undefined;
+    ).get(ids[0], instance.school_id)?.nom as string | undefined;
     return chapitre
       ? (suggestionsParChapitre(db).get(chapitre) ?? []).filter((q) => q !== question)
       : [];
@@ -618,7 +693,14 @@ export function creerApp(db: Db, modeles: Modeles) {
       const idees = dernier
         ? ideesPour(JSON.parse(dernier.resultat!), dernier.question, dernier.id)
         : [];
-      return c.html(rendre(c, "Question", Eleve.chat(messages, idees), "page-chat"));
+      return c.html(
+        rendre(
+          c,
+          "Question",
+          Eleve.chat(messages, idees, lireInstance(db).mode === "personal"),
+          "page-chat",
+        ),
+      );
     },
   );
 
@@ -633,7 +715,7 @@ export function creerApp(db: Db, modeles: Modeles) {
            AND json_extract(metadonnees, '$.sequence') = ?
            AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
          LIMIT 1`,
-      ).get(config.schoolId, chapitre)
+      ).get(instance.school_id, chapitre)
     ) return c.text("Séquence indisponible.", 400);
     const id = crypto.randomUUID();
     const t = maintenant();
@@ -681,7 +763,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           db,
           modeles,
           m.question,
-          { schoolId: config.schoolId, chapitre: m.chapitre || undefined },
+          { schoolId: instance.school_id, chapitre: m.chapitre || undefined },
           config.seuil,
           (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
           precedente,

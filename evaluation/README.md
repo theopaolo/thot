@@ -38,5 +38,6 @@ ligne, lui donner un nouvel `id`, réécrire `texte` et nommer la `famille` (`in
 `généralisation`, `attribution`, `ajout`). Le rapport donne l'AUC, les erreurs au seuil 0,5 par
 famille, et ne garde que les identifiants. Le modèle jugé se change par `THOT_MODELE_SOUTIEN`.
 
-Les résultats vont dans `resultats/`, datés dans le fichier. Le corpus ATC et `img_order.json`
-restent dans le dépôt de recherche.
+Les rapports produits par `thot eval` restent dans le répertoire de données de l’instance,
+sous `evaluation/resultats/`. Les résultats de référence suivis dans ce dépôt restent dans
+`resultats/`. Le corpus ATC et `img_order.json` restent dans le dépôt de recherche.

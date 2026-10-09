@@ -4,8 +4,14 @@ import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
 import { chercher, chercherFts, retirerSource, transaction } from "./core/recherche.ts";
-import { creerCompte, reinitialiserMotDePasse, type Role } from "./app/comptes.ts";
-import { config, contenu, RACINE } from "./app/config.ts";
+import {
+  creerAdministrateur,
+  creerCompte,
+  reinitialiserMotDePasse,
+  type Role,
+} from "./app/comptes.ts";
+import { configurerInstance, lireInstance, traitements } from "./app/instance.ts";
+import { config, contenu, preparerDonnees, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
 import {
@@ -22,6 +28,9 @@ import { genererSuggestions } from "./app/suggestions.ts";
 const AIDE = `thot <commande>
 
   migrer                                    applique les migrations
+  instance [--nom="Nom affiché"] [--mode=shared|personal]
+                                            configure l'instance et affiche les services autorisés
+  administrateur <identifiant> <nom>        provisionne l'administrateur, code à usage unique
   compte <identifiant> <nom> <enseignant|eleve>
                                             crée un compte et affiche son mot de passe
   reinitialiser <identifiant>               renouvelle le mot de passe enseignant
@@ -45,9 +54,21 @@ const AIDE = `thot <commande>
 
 const args = parseArgs(Deno.args, {
   boolean: ["json", "tout", "sans-reclasseur", "help"],
-  string: ["matiere", "classe", "type", "img-order", "docs", "enseignant", "par", "paires"],
+  string: [
+    "matiere",
+    "classe",
+    "type",
+    "img-order",
+    "docs",
+    "enseignant",
+    "par",
+    "paires",
+    "nom",
+    "mode",
+  ],
 });
 const [commande, ...reste] = args._.map(String);
+preparerDonnees();
 const db = connexion();
 migrer(db);
 const modeles = openrouter(config.modeles, cacheModeles(db));
@@ -95,7 +116,7 @@ async function ingest(chemin: string) {
     if (
       db.prepare("SELECT 1 FROM sources WHERE checksum = ? AND school_id = ?").get(
         await sha256(octets),
-        config.schoolId,
+        lireInstance(db).school_id,
       )
     ) {
       refus.push(`${relative(racine, f)}: déjà déposé`);
@@ -125,7 +146,7 @@ async function ingest(chemin: string) {
         titre: titre.replace(/\s+/g, " ").slice(0, 200),
         type_document: args.type ?? "cours",
         matiere: args.matiere ?? "arts-appliques",
-        classe: args.classe ?? "terminale",
+        classe: args.classe ?? (lireInstance(db).mode === "personal" ? "" : "terminale"),
         sous_matiere: "",
         sequence,
         seance: sommaires.get(dossier)!.get(nom) ?? "",
@@ -137,7 +158,7 @@ async function ingest(chemin: string) {
       nomFichier: nom,
       octets,
       format: controle.format,
-      schoolId: config.schoolId,
+      schoolId: lireInstance(db).school_id,
       enseignant: args.enseignant ?? "import en ligne de commande",
     });
     deposes++;
@@ -153,7 +174,7 @@ async function ingest(chemin: string) {
 async function nettoyer() {
   const pages = db.prepare(
     "SELECT id, fichier, metadonnees FROM sources WHERE format = 'html' AND school_id = ?",
-  ).all(config.schoolId) as { id: string; fichier: string; metadonnees: string }[];
+  ).all(lireInstance(db).school_id) as { id: string; fichier: string; metadonnees: string }[];
   let n = 0;
   for (const p of pages) {
     const vide = pageVide(await Deno.readTextFile(contenu(p.id, "original", p.fichier)));
@@ -162,7 +183,7 @@ async function nettoyer() {
     const fiche = vide.fichier && db.prepare(
       `SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?
          AND school_id = ?`,
-    ).get(nomSur(vide.fichier), sequence, config.schoolId)?.id as string | undefined;
+    ).get(nomSur(vide.fichier), sequence, lireInstance(db).school_id)?.id as string | undefined;
     transaction(db, () => {
       if (fiche && seance) {
         db.prepare(
@@ -258,8 +279,9 @@ async function evalRecherche() {
   for (const r of requetes) {
     const attendus = r.gold.flatMap(cibles);
     const trouves = args["sans-reclasseur"]
-      ? chercherFts(db, r.q, { schoolId: config.schoolId }).slice(0, 5)
-      : (await chercher(db, modeles, r.q, { schoolId: config.schoolId }, config.seuil)).retenus;
+      ? chercherFts(db, r.q, { schoolId: lireInstance(db).school_id }).slice(0, 5)
+      : (await chercher(db, modeles, r.q, { schoolId: lireInstance(db).school_id }, config.seuil))
+        .retenus;
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({
       qid: r.qid,
@@ -287,9 +309,9 @@ async function evalRecherche() {
     sans_cible: lignes.filter((l) => !l.cibles).map((l) => l.qid),
     echecs: lignes.filter((l) => !l.rang).map((l) => l.qid),
   };
-  await Deno.mkdir(join(RACINE, "evaluation/resultats"), { recursive: true });
+  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(
-    RACINE,
+    config.donnees,
     `evaluation/resultats/recherche-${args["sans-reclasseur"] ? "fts5" : "reclasseur"}.json`,
   );
   await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
@@ -312,7 +334,7 @@ async function evalGeneration() {
         s,
       ) => [s.id, plier(`${s.sequence} ${s.fichier}`)]),
   );
-  const p = { schoolId: config.schoolId };
+  const p = { schoolId: lireInstance(db).school_id };
   const paires: Paire[] = [];
   const lignes: {
     qid: string;
@@ -403,8 +425,8 @@ async function evalGeneration() {
     latence_mediane_ms:
       lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
   };
-  await Deno.mkdir(join(RACINE, "evaluation/resultats"), { recursive: true });
-  const sortie = join(RACINE, "evaluation/resultats/generation.json");
+  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
+  const sortie = join(config.donnees, "evaluation/resultats/generation.json");
   await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
   console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
@@ -483,14 +505,34 @@ async function evalSoutien() {
       lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
   };
   // Les citations restent hors du dépôt: le rapport ne garde que les identifiants.
-  await Deno.mkdir(join(RACINE, "evaluation/resultats"), { recursive: true });
-  const sortie = join(RACINE, "evaluation/resultats/soutien.json");
+  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
+  const sortie = join(config.donnees, "evaluation/resultats/soutien.json");
   await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
   console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
 }
 
 switch (commande) {
+  case "instance":
+    console.log(JSON.stringify(
+      {
+        ...configurerInstance(db, args.nom, args.mode),
+        traitements: traitements(),
+      },
+      null,
+      2,
+    ));
+    break;
+  case "administrateur": {
+    if (reste.length !== 2) throw new Error("usage: thot administrateur <identifiant> <nom>");
+    console.log(
+      `Code provisoire de ${reste[0]}: ${await creerAdministrateur(db, reste[0], reste[1])}`,
+    );
+    console.log(
+      "À utiliser une seule fois pour choisir un mot de passe. Récupération : thot reinitialiser.",
+    );
+    break;
+  }
   case "migrer":
     break;
   case "compte": {
@@ -539,7 +581,7 @@ switch (commande) {
   case "certifier": {
     const ids = args.tout
       ? db.prepare("SELECT id FROM sources WHERE statut = 'a_relire' AND school_id = ?").all(
-        config.schoolId,
+        lireInstance(db).school_id,
       ).map((l) => l.id as string)
       : reste;
     for (const id of ids) statuer(db, id, "certifiee", args.par ?? "cli");
@@ -549,7 +591,7 @@ switch (commande) {
   case "suggestions": {
     const ids = args.tout
       ? db.prepare("SELECT id FROM sources WHERE statut = 'certifiee' AND school_id = ?")
-        .all(config.schoolId).map((l) => l.id as string)
+        .all(lireInstance(db).school_id).map((l) => l.id as string)
       : reste;
     let n = 0;
     for (const [i, id] of ids.entries()) {
@@ -583,7 +625,7 @@ switch (commande) {
   }
   case "ask": {
     const { resultat, journal } = await demander(db, modeles, reste.join(" "), {
-      schoolId: config.schoolId,
+      schoolId: lireInstance(db).school_id,
     }, config.seuil);
     if (args.json) console.log(JSON.stringify({ resultat, journal }, null, 1));
     else if (resultat.etat === "answered") {

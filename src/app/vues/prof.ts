@@ -446,6 +446,7 @@ export const depot = (
     publics?: string[];
     erreurs?: Record<string, string>;
     ok?: string;
+    personnel?: boolean;
   },
 ) => {
   const c = s.champs ?? {};
@@ -488,7 +489,7 @@ export const depot = (
         })} ${champ({
           nom: "classe",
           label: "Classe",
-          requis: true,
+          requis: !s.personnel,
           options: CLASSES,
           valeur: c.classe,
           erreur: e.classe,

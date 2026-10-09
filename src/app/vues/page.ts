@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
+import { type Instance, traitements } from "../instance.ts";
 import { type Icone, icone } from "../icones.ts";
 
 export const page = (
@@ -10,6 +11,7 @@ export const page = (
   classe = "",
   chemin = "",
   railReplie = false,
+  instance: Pick<Instance, "nom" | "mode"> = { nom: "Thot", mode: "shared" },
 ) => {
   const prof = chemin.startsWith("/prof");
   return html`
@@ -19,7 +21,7 @@ export const page = (
         <meta charset="utf-8">
         <meta name="htmx-config" content='{"globalViewTransitions":true}'>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>${titre} · Thot</title>
+        <title>${titre} · ${instance.nom}</title>
         <link rel="stylesheet" href="/static/style.css">
         <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
         <script src="/static/vendor/htmx.min.js" defer></script>
@@ -30,11 +32,17 @@ export const page = (
         class="${prof ? `prof${railReplie ? " rail-replie" : ""}` : "eleve"}"
       >
         <a class="evitement" href="#contenu">Aller au contenu</a>
-        ${compte && prof ? rail(compte, chemin, railReplie) : html`
+        ${compte && prof ? rail(compte, chemin, railReplie, instance) : html`
           <header class="site">
-            <a class="marque" href="/">Thot</a>
-            ${compte && chemin !== "/eleve/recherche" ? rechercheEntete : ""}
-            ${compte ? navEleve(compte, chemin) : ""}
+            <a class="marque" href="/">${instance.nom}</a>
+            ${compte && !compte.renouveler_mdp && chemin !== "/eleve/recherche"
+              ? rechercheEntete
+              : ""}
+            ${compte
+              ? compte.renouveler_mdp
+                ? compteMenu(compte)
+                : navEleve(compte, chemin, instance.mode === "personal")
+              : ""}
           </header>
         `}
         <main id="contenu" tabindex="-1" class="${classe}">
@@ -76,12 +84,12 @@ const rechercheEntete = html`
   </form>
 `;
 
-const navEleve = (c: Compte, chemin: string) =>
+const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
   html`
     <nav aria-label="Navigation principale" hx-boost="true">
       ${lienNav(
         "/eleve",
-        "Séquences",
+        personnel ? "Mes documents" : "Séquences",
         "books",
         chemin === "/eleve" || chemin === "/eleve/sans-sequence" ||
           chemin.startsWith("/eleve/sequences") ||
@@ -94,24 +102,44 @@ const navEleve = (c: Compte, chemin: string) =>
         chemin.startsWith("/eleve/chat"),
       )}
       ${c.role === "enseignant"
-        ? lienNav("/prof", "Espace enseignant", "arrow-left", false, false)
+        ? lienNav(
+          "/prof",
+          personnel ? "Gérer mes documents" : "Espace enseignant",
+          "arrow-left",
+          false,
+          false,
+        )
+        : ""}
+      ${c.administrateur
+        ? lienNav(
+          "/administration",
+          "Administration",
+          "sidebar-simple",
+          chemin === "/administration",
+          false,
+        )
         : ""}
       ${compteMenu(c)}
     </nav>
   `;
 
 /** Le rail se replie en icônes; le cookie `rail` garde ce choix d'une page à l'autre. */
-const rail = (c: Compte, chemin: string, replie: boolean) =>
+const rail = (
+  c: Compte,
+  chemin: string,
+  replie: boolean,
+  instance: Pick<Instance, "nom" | "mode">,
+) =>
   html`
     <header class="rail">
       <div class="rail-tete">
-        <a class="marque" href="/prof">Thot</a>
+        <a class="marque" href="/" title="${instance.nom}">${instance.nom}</a>
         <button type="button" class="rail-bascule" data-replier-rail aria-expanded="${String(
           !replie,
         )}"
           aria-label="Menu" title="Replier ou déplier le menu">${icone("sidebar-simple")}</button>
       </div>
-      <p class="discret">Espace enseignant</p>
+      <p class="discret">${instance.mode === "personal" ? "Mes documents" : "Espace enseignant"}</p>
       <nav aria-label="Navigation enseignant" hx-boost="true">
         ${lienNav(
           "/prof",
@@ -121,11 +149,29 @@ const rail = (c: Compte, chemin: string, replie: boolean) =>
         )}
         ${lienNav("/prof/depot", "Déposer", "upload-simple", chemin.startsWith("/prof/depot"))}
         ${lienNav("/prof/legendes", "Légendes", "image", chemin.startsWith("/prof/legendes"))}
-        ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
-        ${lienNav("/prof/questions", "Questions", "question", chemin.startsWith("/prof/questions"))}
+        ${instance.mode === "shared"
+          ? html`
+            ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
+            ${lienNav(
+              "/prof/questions",
+              "Questions",
+              "question",
+              chemin.startsWith("/prof/questions"),
+            )}
+          `
+          : ""}
+        ${c.administrateur
+          ? lienNav("/administration", "Administration", "sidebar-simple", false, false)
+          : ""}
       </nav>
       <div class="rail-pied">
-        ${lienNav("/eleve", "Vue élève", "books", false, false)}
+        ${lienNav(
+          "/eleve",
+          instance.mode === "personal" ? "Étudier" : "Vue élève",
+          "books",
+          false,
+          false,
+        )}
         <strong>${c.nom}</strong>
         <form method="post" action="/deconnexion">
           <button class="lien">${icone("sign-out")}<span>Se déconnecter</span></button>
@@ -162,9 +208,53 @@ export const connexion = (erreur?: string, identifiant = "") =>
           id="mot_de_passe"
           name="mot_de_passe"
           autocomplete="current-password"
-          ${config.dev ? html`placeholder="Ignoré en dev"` : html`required`}
+          ${config.dev ? html`placeholder="Facultatif sauf administrateur"` : html`required`}
         >
       </div>
       <button class="principal">Se connecter</button>
     </form>
+  `;
+
+export const motDePasse = (erreur?: string) =>
+  html`
+    <form method="post" action="/mot-de-passe" class="etroit">
+      <h1>Choisir un mot de passe</h1>
+      <p>Le code provisoire a été utilisé. Choisissez votre mot de passe, puis reconnectez-vous.</p>
+      ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+      <div class="champ">
+        <label for="mot_de_passe">Nouveau mot de passe (12 caractères minimum)</label>
+        <input id="mot_de_passe" name="mot_de_passe" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
+      </div>
+      <div class="champ">
+        <label for="confirmation">Confirmer le mot de passe</label>
+        <input id="confirmation" name="confirmation" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
+      </div>
+      <button class="principal">Enregistrer et se reconnecter</button>
+    </form>
+  `;
+
+export const administration = (instance: Instance) =>
+  html`
+    <section class="etroit">
+      <h1>Administration</h1>
+      <p><strong>${instance.nom}</strong> · ${instance.mode === "personal"
+        ? "Usage personnel"
+        : "Usage partagé"}</p>
+      <p>Identité de l'instance : <code>${instance.id}</code></p>
+      <p>Le nom et les services autorisés sont configurés par l'opérateur. Renommer l'instance conserve ses documents et ses comptes.</p>
+      <h2>Traitement des documents et des questions</h2>
+      <p>Localisations déclarées par l'opérateur. Elles ne sont pas vérifiées par l'application.</p>
+      <dl>${traitements().map((f) =>
+        html`
+          <dt>${f.nom}</dt>
+          <dd>${!f.autorise
+            ? "Désactivé"
+            : f.disponible
+            ? "Configuré"
+            : "Clé absente"}. Localisation : ${f.localisation}.</dd>
+        `
+      )}</dl>
+      <p>Aucun traitement par un modèle local n'est proposé.</p>
+      <a class="bouton" href="/prof">Gérer les documents</a>
+    </section>
   `;

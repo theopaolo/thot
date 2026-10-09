@@ -1,5 +1,5 @@
 import { openrouter } from "./core/modeles.ts";
-import { config } from "./app/config.ts";
+import { config, preparerDonnees } from "./app/config.ts";
 import { cacheModeles, connexion, purgerMessages } from "./app/db.ts";
 import {
   proposerInformations,
@@ -13,6 +13,7 @@ import {
   sourceSansSuggestions,
 } from "./app/suggestions.ts";
 
+preparerDonnees();
 const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 let arret = false;

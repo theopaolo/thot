@@ -1,7 +1,8 @@
-import { config, RACINE } from "./app/config.ts";
+import { config, preparerDonnees, RACINE } from "./app/config.ts";
 import { connexion, migrer } from "./app/db.ts";
 
 // Les migrations tournent une fois, avant les deux processus.
+preparerDonnees();
 const db = connexion();
 const faites = migrer(db);
 db.close();
@@ -14,7 +15,7 @@ const lancer = (fichier: string, droits: string[]) =>
   new Deno.Command(Deno.execPath(), {
     args: ["run", ...droits, ...envFile, ...surveiller, fichier],
     cwd: RACINE,
-    env: dev ? { THOT_DEV: "1" } : {},
+    env: { THOT_DATA_DIR: config.donnees, ...(dev ? { THOT_DEV: "1" } : {}) },
     stdin: "null",
   }).spawn();
 

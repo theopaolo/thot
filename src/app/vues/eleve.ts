@@ -56,6 +56,7 @@ export const accueilEleve = (
   chapitres: ChapitreVue[],
   fait?: FaitVue,
   oeuvre?: SourceChapitre,
+  personnel = false,
 ) =>
   html`
     <h1>Bonjour ${prenom}</h1>
@@ -69,7 +70,7 @@ export const accueilEleve = (
     </form>
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
-        <h2 id="tes-chapitres">Tes séquences</h2>
+        <h2 id="tes-chapitres">${personnel ? "Mes documents" : "Tes séquences"}</h2>
         ${chapitres.length
           ? html`
             <ul class="chapitres">${chapitres.map((c) =>
@@ -106,7 +107,12 @@ export const accueilEleve = (
             )}</ul>
           `
           : html`
-            <p>Aucun document n'est encore publié par tes enseignants.</p>
+            <p>${personnel
+              ? html`
+                Aucun document n'est encore prêt pour l'étude. <a
+                  href="/prof/depot">Déposer un document</a>, puis le relire dans la bibliothèque.
+              `
+              : "Aucun document n'est encore publié par tes enseignants."}</p>
           `}
       </section>
       ${oeuvre
@@ -621,6 +627,7 @@ export type MessageVue = {
 export const chat = (
   messages: MessageVue[],
   idees: string[] = [],
+  personnel = false,
 ) => {
   const derniere = messages.findLastIndex((m) => m.etat === "answered");
   return html`
@@ -665,7 +672,9 @@ export const chat = (
             ></textarea>
             <button class="principal">${icone("arrow-up")}Envoyer</button>
           </div>
-          <small>Thot répond seulement avec les documents publiés par tes enseignants.</small>
+          <small>${personnel
+            ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
+            : "Thot répond seulement avec les documents publiés par tes enseignants."}</small>
         </form>
       </section>
       <div class="colonne-source">${panneauSource()}</div>

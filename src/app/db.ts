@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { join } from "@std/path";
 import type { Cache } from "../core/modeles.ts";
 import { config, RACINE } from "./config.ts";
+import { initialiserInstance } from "./instance.ts";
 
 export type Db = DatabaseSync;
 
@@ -17,7 +18,7 @@ export function purgerMessages(db: Db, jours: number, date = Date.now()) {
 
 /** Une connexion par processus. WAL laisse lire pendant une écriture du worker. */
 export function connexion(chemin = join(config.donnees, "state.sqlite3")): Db {
-  Deno.mkdirSync(config.donnees, { recursive: true });
+  Deno.mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(chemin);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   return db;
@@ -50,6 +51,7 @@ export function migrer(db: Db): string[] {
     }
     appliquees.push(nom);
   }
+  initialiserInstance(db);
   return appliquees;
 }
 

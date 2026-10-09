@@ -237,6 +237,7 @@ header.site {
   background: var(--bg);
 }
 .marque {
+  overflow-wrap: anywhere;
   margin-right: auto;
   font-size: 1.375rem;
   font-weight: 700;
@@ -423,9 +424,14 @@ button.rail-bascule:hover {
   }
   .rail-replie .rail-tete {
     flex-direction: column;
+    width: 100%;
   }
   .rail-replie .rail .marque {
     font-size: 1.125rem;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
   .rail-replie .rail > .discret,
   .rail-replie .rail-pied strong {

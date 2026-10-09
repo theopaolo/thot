@@ -1,6 +1,7 @@
 import type { Modeles } from "../core/modeles.ts";
 import { questionsVerifiees } from "../core/suggestions.ts";
 import { trouver } from "../core/texte.ts";
+import { lireInstance } from "./instance.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 
@@ -23,7 +24,13 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
   const questions = [];
   for (const p of passages) {
     questions.push(
-      ...await questionsVerifiees(db, modeles, p, { schoolId: config.schoolId }, config.seuil),
+      ...await questionsVerifiees(
+        db,
+        modeles,
+        p,
+        { schoolId: lireInstance(db).school_id },
+        config.seuil,
+      ),
     );
   }
   db.exec("BEGIN IMMEDIATE");
@@ -65,7 +72,7 @@ export function suggestionsParChapitre(db: Db, parChapitre = 3): Map<string, str
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
      ORDER BY random()`,
-  ).all(config.schoolId) as Suggestion[];
+  ).all(lireInstance(db).school_id) as Suggestion[];
   const out = new Map<string, string[]>();
   for (const l of lignes) {
     const liste = out.get(l.chapitre) ?? [];
@@ -106,7 +113,12 @@ export function faitAuHasard(db: Db): Fait | undefined {
      WHERE s.statut = 'certifiee' AND c.school_id = ? AND length(c.texte) >= 300
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
      ORDER BY random() LIMIT 10`,
-  ).all(config.schoolId) as { source_id: string; titre: string; texte: string; debut: number }[];
+  ).all(lireInstance(db).school_id) as {
+    source_id: string;
+    titre: string;
+    texte: string;
+    debut: number;
+  }[];
   for (const p of passages) {
     const phrases = p.texte.split(/(?<=[.!])\s+|\n+/).map((x) => x.trim()).filter(autonome);
     if (!phrases.length) continue;

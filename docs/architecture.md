@@ -39,6 +39,24 @@ une table SQLite avec un verrou expirable : un worker tué reprend le travail au
 (`deno task frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
 
+## Instances
+
+Une installation possède son identité persistante, ses comptes et son répertoire de données.
+Deux installations partagent le code, jamais un volume applicatif. Renommer une installation ne
+change ni son identité ni ses sources. L'ancien identifiant d'établissement est repris des sources
+existantes, ou de l'environnement pour une base vide. Une base qui contient plusieurs
+établissements exige une séparation explicite avant son initialisation.
+
+Le nom et le mode d'usage sont enregistrés en base. Chemins, origine, clés, fournisseurs autorisés
+et localisations déclarées restent des réglages d'opérateur. La localisation affichée ne prouve
+pas le lieu d'exécution du fournisseur. Désactiver un fournisseur interdit aussi son emploi en
+repli, même si sa clé est présente.
+
+Le mode personnel conserve les contrôles de relecture et de publication du pilote. Son propriétaire
+peut gérer les documents et les étudier avec le même compte, sans classe obligatoire. Le mode est
+choisi avant la création des comptes.
+L'autorité d'administration est accordée explicitement par l'opérateur, jamais à tous les enseignants.
+
 ## États
 
 ```mermaid
@@ -105,6 +123,6 @@ flowchart TD
 
 ## Hors périmètre du pilote
 
-Une instance sert un seul établissement. Restent hors périmètre : index vectoriel approximatif,
-contexte complet envoyé au modèle, base ou file distribuée, consensus entre modèles à
+Une instance sert un établissement, un département ou un usage personnel. Restent hors périmètre :
+index vectoriel approximatif, contexte complet envoyé au modèle, base ou file distribuée, consensus entre modèles à
 l'extraction, recherche web, mode hors ligne, DOCX et PPTX tant que personne n'en dépose.

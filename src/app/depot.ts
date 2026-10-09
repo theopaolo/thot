@@ -60,11 +60,12 @@ const LIBRES = ["sous_matiere", "sequence", "seance", "resume", "objectifs", "ev
 export function valider(
   champs: Record<string, string>,
   publics: string[],
+  personnel = false,
 ): { meta: Metadonnees } | { erreurs: Record<string, string> } {
   const erreurs: Record<string, string> = {};
   const lu = (nom: string) => (champs[nom] ?? "").trim();
   for (const nom of REQUIS) {
-    if (!lu(nom)) erreurs[nom] = "Champ obligatoire.";
+    if (!lu(nom) && !(personnel && nom === "classe")) erreurs[nom] = "Champ obligatoire.";
     else if (lu(nom).length > 200) erreurs[nom] = "Texte trop long.";
   }
   for (const nom of LIBRES) if (lu(nom).length > 4000) erreurs[nom] = "Texte trop long.";

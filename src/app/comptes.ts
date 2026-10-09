@@ -9,6 +9,8 @@ export type Compte = {
   nom: string;
   role: Role;
   session_version: number;
+  administrateur: number;
+  renouveler_mdp: number;
 };
 
 const ITERATIONS = 210_000;
@@ -38,6 +40,9 @@ async function deriver(motDePasse: string, sel: string) {
 
 /** Crée un compte avec un mot de passe tiré au hasard. Le mot de passe n'est rendu qu'ici. */
 export async function creerCompte(db: Db, identifiant: string, nom: string, role: Role) {
+  if (!identifiant.trim() || !nom.trim() || identifiant.length > 100 || nom.length > 100) {
+    throw new Error("Identifiant et nom requis, 100 caractères au maximum.");
+  }
   const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   db.prepare(
@@ -158,10 +163,67 @@ export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "
   const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   db.prepare(
-    "UPDATE comptes SET sel = ?, empreinte = ?, session_version = session_version + 1 WHERE id = ?",
+    `UPDATE comptes SET sel = ?, empreinte = ?, session_version = session_version + 1,
+      renouveler_mdp = administrateur WHERE id = ?`,
   )
     .run(sel, await deriver(motDePasse, sel), id);
   return motDePasse;
+}
+
+export async function creerAdministrateur(db: Db, identifiant: string, nom: string) {
+  if (db.prepare("SELECT id FROM comptes WHERE administrateur = 1").get()) {
+    throw new Error(
+      "Administrateur déjà provisionné. Utiliser reinitialiser pour la récupération.",
+    );
+  }
+  identifiant = identifiant.trim().toLowerCase();
+  const existant = db.prepare("SELECT id, role FROM comptes WHERE identifiant = ?").get(
+    identifiant,
+  );
+  if (existant && existant.role !== "enseignant") {
+    throw new Error(
+      "Ce compte est un élève. Choisir un compte enseignant ou un nouvel identifiant.",
+    );
+  }
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    // Le verrou couvre aussi deux commandes de provisionnement lancées ensemble.
+    if (db.prepare("SELECT id FROM comptes WHERE administrateur = 1").get()) {
+      throw new Error("Administrateur déjà provisionné.");
+    }
+    const motDePasse = existant
+      ? await reinitialiserMotDePasse(db, existant.id as string, "enseignant")
+      : await creerCompte(db, identifiant, nom, "enseignant");
+    db.prepare("UPDATE comptes SET administrateur = 1, renouveler_mdp = 1 WHERE identifiant = ?")
+      .run(identifiant);
+    db.exec("COMMIT");
+    return motDePasse!;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+export function consommerProvisoire(db: Db, compte: Compte) {
+  const { changes } = db.prepare(
+    `UPDATE comptes SET empreinte = '', session_version = session_version + 1
+     WHERE id = ? AND session_version = ? AND renouveler_mdp = 1`,
+  ).run(compte.id, compte.session_version);
+  if (changes) compte.session_version++;
+  return !!changes;
+}
+
+export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: string) {
+  if (motDePasse.length < 12 || motDePasse.length > 200) {
+    throw new Error("Choisir un mot de passe de 12 à 200 caractères.");
+  }
+  const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const { changes } = db.prepare(
+    `UPDATE comptes SET sel = ?, empreinte = ?, renouveler_mdp = 0,
+       session_version = session_version + 1
+     WHERE id = ? AND session_version = ? AND renouveler_mdp = 1`,
+  ).run(sel, await deriver(motDePasse, sel), compte.id, compte.session_version);
+  if (!changes) throw new Error("Session expirée. Demander une récupération à l'opérateur.");
 }
 
 export async function authentifier(db: Db, identifiant: string, motDePasse: string) {
@@ -176,20 +238,24 @@ export async function authentifier(db: Db, identifiant: string, motDePasse: stri
   for (let i = 0; i < empreinte.length; i++) {
     diff |= empreinte.charCodeAt(i) ^ l.empreinte.charCodeAt(i);
   }
-  // `deno task dev` accepte n'importe quel mot de passe.
-  return diff === 0 || config.dev
+  // Le contournement en développement exclut les administrateurs.
+  return diff === 0 || (config.dev && !l.administrateur)
     ? {
       id: l.id,
       identifiant: l.identifiant,
       nom: l.nom,
       role: l.role,
       session_version: l.session_version,
+      administrateur: l.administrateur,
+      renouveler_mdp: l.renouveler_mdp,
     }
     : null;
 }
 
 export const lireCompte = (db: Db, id: string) =>
-  db.prepare("SELECT id, identifiant, nom, role, session_version FROM comptes WHERE id = ?").get(
+  db.prepare(
+    "SELECT id, identifiant, nom, role, session_version, administrateur, renouveler_mdp FROM comptes WHERE id = ?",
+  ).get(
     id,
   ) as
     | Compte
@@ -201,11 +267,19 @@ export function secretSession(): string {
   if (fromEnv) return fromEnv;
   const chemin = join(config.donnees, "secret");
   try {
-    return Deno.readTextFileSync(chemin).trim();
-  } catch {
-    Deno.mkdirSync(config.donnees, { recursive: true });
+    const secret = Deno.readTextFileSync(chemin).trim();
+    if (!secret) throw new Error("Secret de session vide. Restaurer le secret de l'instance.");
+    return secret;
+  } catch (e) {
+    if (!(e instanceof Deno.errors.NotFound)) throw e;
+    Deno.mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
     const s = hex(crypto.getRandomValues(new Uint8Array(32)));
-    Deno.writeTextFileSync(chemin, s, { mode: 0o600 });
+    try {
+      Deno.writeTextFileSync(chemin, s, { mode: 0o600, createNew: true });
+    } catch (e) {
+      if (!(e instanceof Deno.errors.AlreadyExists)) throw e;
+      return secretSession();
+    }
     return s;
   }
 }

@@ -12,14 +12,22 @@ Il faut Deno et `pdftotext` (Poppler).
 
 ```bash
 cp .env.example .env                                  # renseigner OPENROUTER_API_KEY
-deno task thot compte prof "M. Detienne" enseignant   # affiche le mot de passe
+deno task thot instance --nom="Mon Thot" --mode=shared
+deno task thot administrateur prof "M. Detienne"       # code de connexion à usage unique
 deno task dev                                         # serveur et worker, http://127.0.0.1:8000
 ```
 
-- `deno task dev` accepte n'importe quel mot de passe : seul l'identifiant compte
+- `deno task dev` accepte n'importe quel mot de passe pour les comptes ordinaires. Un
+  administrateur garde une authentification complète.
 - `deno task check` : format, lint, types serveur et navigateur, frontière `core/`/`app/`, tests
 - `deno task thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
 - `deno task board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878
+
+Pour un usage personnel, choisir `--mode=personal` avant de créer le compte. Aucun établissement
+ni aucune classe ne sont nécessaires. Le propriétaire ouvre ses documents et ses questions,
+puis accède à leur gestion et à l’administration depuis la navigation.
+
+En production, suivre le [provisionnement par instance](docs/exploitation.md).
 
 ## Documentation
 
