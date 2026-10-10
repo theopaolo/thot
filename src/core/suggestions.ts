@@ -7,13 +7,13 @@ import { demander } from "./reponse.ts";
 const RENVOI =
   /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage|le motif|cette (œuvre|oeuvre|image)|l['’]image)\b/i;
 
-const CONSIGNE = `Voici un extrait d'un cours de lycee.
+const CONSIGNE = `Voici un extrait d'une ressource pour apprendre.
 
-Ecris deux questions qu'un eleve de Terminale pourrait poser, dont la reponse se trouve
+Ecris deux questions qu'une personne qui apprend pourrait poser, dont la reponse se trouve
 dans cet extrait et seulement dans cet extrait. Questions courtes, 6 a 15 mots, en
 francais simple, comme un eleve les poserait. Une question porte sur une idee, une cause
-ou une oeuvre, jamais sur un detail de mise en page. L'eleve ne voit pas l'extrait :
-une question nomme l'œuvre ou l'artiste si elle porte sur une image ou un motif. Elle ne
+ou un objet, jamais sur un detail de mise en page. L'eleve ne voit pas l'extrait :
+une question nomme son sujet si elle porte sur une image ou un motif. Elle ne
 mentionne jamais « l'extrait », « le texte », « le document » ou « le passage ».
 
 Rends uniquement un objet JSON : {"questions": ["...", "..."]}`;

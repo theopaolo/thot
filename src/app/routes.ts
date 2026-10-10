@@ -24,17 +24,22 @@ import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { controlerFichier, deposer, valider } from "./depot.ts";
 import { indexer, lireDocument, relireLegende, statuer } from "./ingestion.ts";
-import { faitAuHasard, suggestionsParChapitre } from "./suggestions.ts";
+import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import { administration, connexion as formulaireConnexion, motDePasse, page } from "./vues/page.ts";
 import * as Prof from "./vues/prof.ts";
 import * as Eleve from "./vues/eleve.ts";
+import * as Domaines from "./domaines.ts";
+import * as DomaineVue from "./vues/domaines.ts";
+import { validerInformations } from "../core/profils.ts";
+import { transaction } from "../core/recherche.ts";
 
 type Env = { Variables: { compte: Compte } };
 
 const PERIMETRE_MS = 3 * 60_000;
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
-const QUIZ = `trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
-  coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') AS quiz_reponse`;
+const QUIZ =
+  `CASE WHEN s.profil = 'arts-appliques' THEN trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
+  coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') ELSE '' END AS quiz_reponse`;
 
 export function creerApp(db: Db, modeles: Modeles) {
   const app = new Hono<Env>();
@@ -169,6 +174,64 @@ export function creerApp(db: Db, modeles: Modeles) {
     (c) => c.html(rendre(c, "Administration", administration(lireInstance(db)))),
   );
 
+  const scope = (c: Context<Env>) => Domaines.lireScope(c.req.query());
+  const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
+  const optionsDepot = (champs: Record<string, string> = {}, b: Record<string, unknown> = {}) => {
+    const cat = Domaines.catalogue(db);
+    const m = cat.matieres.find((m) =>
+      champs.matiere_id ? m.id === champs.matiere_id : m.nom === champs.matiere
+    );
+    return {
+      personnel: lireInstance(db).mode === "personal",
+      champs,
+      catalogue: cat,
+      profil: m?.profil ??
+        (champs.matiere === "arts-appliques" ? "arts-appliques" as const : "general" as const),
+      liens: Domaines.liensFormulaire(b),
+    };
+  };
+  app.get(
+    "/administration/domaines",
+    (c) => c.html(rendre(c, "Matières et cours", DomaineVue.gestion(Domaines.catalogue(db)))),
+  );
+  app.post("/administration/domaines/:action", async (c) => {
+    const b = await c.req.parseBody();
+    try {
+      switch (c.req.param("action")) {
+        case "matiere":
+          Domaines.matiere(db, String(b.nom ?? ""), String(b.profil ?? "general"));
+          break;
+        case "cours":
+          Domaines.cours(
+            db,
+            String(b.matiere_id ?? ""),
+            String(b.nom ?? ""),
+            String(b.public ?? ""),
+            String(b.objectif ?? ""),
+          );
+          break;
+        case "theme":
+          Domaines.theme(db, String(b.cours_id ?? ""), String(b.nom ?? ""));
+          break;
+        case "profil":
+          Domaines.profilMatiere(db, String(b.matiere_id ?? ""), String(b.profil ?? ""));
+          break;
+        default:
+          return c.notFound();
+      }
+    } catch (e) {
+      return c.html(
+        rendre(
+          c,
+          "Matières et cours",
+          DomaineVue.gestion(Domaines.catalogue(db), (e as Error).message),
+        ),
+        400,
+      );
+    }
+    return c.redirect("/administration/domaines", 303);
+  });
+
   // ------------------------------------------------------------ images
   app.get("/media/:id", async (c) => {
     const i = db.prepare(
@@ -194,7 +257,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   // ------------------------------------------------------------ enseignant
   const lignes = (statut: string, sequence: string) =>
     db.prepare(
-      `SELECT s.id, s.titre, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
+      `SELECT s.id, s.titre, s.profil, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
@@ -208,20 +271,40 @@ export function creerApp(db: Db, modeles: Modeles) {
       sequence,
       sequence,
     ) as unknown as Prof.LigneSource[];
-  const filtres = (c: { req: { query(k: string): string | undefined } }) => ({
+  const filtres = (c: Context<Env>) => ({
     statut: c.req.query("statut") ?? "",
     sequence: c.req.query("sequence") ?? "",
     vue: c.req.query("vue") === "grille" ? "grille" : "",
+    ...Domaines.lireScope(c.req.query()),
   });
 
   app.get("/prof", (c) => {
     const f = filtres(c);
-    const repartition = db.prepare(
-      `SELECT coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence, statut, count(*) AS n
-       FROM sources WHERE school_id = ? GROUP BY 1, 2`,
-    ).all(instance.school_id) as { sequence: string; statut: string; n: number }[];
+    const selection = idsScope(c);
+    const ressources = lignes("", "").filter((s) => selection.has(s.id));
+    const repartition = [
+      ...Map.groupBy(ressources, (s) => `${s.sequence ?? ""}\0${s.statut}`).values(),
+    ]
+      .map((liste) => ({
+        sequence: liste[0].sequence ?? "",
+        statut: liste[0].statut,
+        n: liste.length,
+      }));
     return c.html(
-      rendre(c, "Bibliothèque", Prof.sources(lignes(f.statut, f.sequence), f, repartition)),
+      rendre(
+        c,
+        "Bibliothèque",
+        html`${DomaineVue.filtre(Domaines.catalogue(db), scope(c), "/prof")}${
+          Prof.sources(
+            ressources.filter((s) =>
+              (!f.statut || s.statut === f.statut) && (!f.sequence || s.sequence === f.sequence)
+            ),
+            f,
+            repartition,
+            ressources.some((s) => s.profil === "general"),
+          )
+        }`,
+      ),
     );
   });
   app.get("/prof/eleves", (c) => {
@@ -284,9 +367,10 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
+    const selection = idsScope(c);
     return c.html(
       Prof.lignesSources(
-        lignes(f.statut, f.sequence),
+        lignes(f.statut, f.sequence).filter((s) => selection.has(s.id)),
         new URLSearchParams(f).toString(),
         f.vue === "grille",
       ),
@@ -302,8 +386,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.get(
     "/prof/depot",
-    (c) =>
-      c.html(rendre(c, "Déposer", Prof.depot({ personnel: lireInstance(db).mode === "personal" }))),
+    (c) => c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c.req.query())))),
   );
   app.post("/prof/depot", async (c) => {
     const b = await c.req.parseBody({ all: true });
@@ -318,12 +401,12 @@ export function creerApp(db: Db, modeles: Modeles) {
         rendre(
           c,
           "Déposer",
-          Prof.depot({ champs, publics, erreurs, personnel: lireInstance(db).mode === "personal" }),
+          Prof.depot({ ...optionsDepot(champs, b), publics, erreurs }),
         ),
         400,
       );
 
-    const v = valider(champs, publics, lireInstance(db).mode === "personal");
+    const v = valider(champs, publics);
     const fichier = b.fichier;
     const octets = fichier instanceof File
       ? new Uint8Array(await fichier.arrayBuffer())
@@ -335,20 +418,25 @@ export function creerApp(db: Db, modeles: Modeles) {
     };
     if ("erreurs" in v || "erreur" in controle) return refus(erreurs);
 
-    await deposer(db, {
-      meta: v.meta,
-      nomFichier: (fichier as File).name,
-      octets,
-      format: controle.format,
-      schoolId: instance.school_id,
-      enseignant: c.get("compte").nom,
-    });
+    try {
+      await deposer(db, {
+        meta: v.meta,
+        nomFichier: (fichier as File).name,
+        octets,
+        format: controle.format,
+        schoolId: instance.school_id,
+        enseignant: c.get("compte").nom,
+        liens: b.cours !== undefined || b.matiere_id ? Domaines.liensFormulaire(b) : undefined,
+      });
+    } catch (e) {
+      return refus({ domaine: (e as Error).message });
+    }
     return c.html(
       rendre(
         c,
         "Déposer",
         Prof.depot({
-          personnel: lireInstance(db).mode === "personal",
+          ...optionsDepot(champs),
           ok:
             `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
         }),
@@ -375,6 +463,9 @@ export function creerApp(db: Db, modeles: Modeles) {
     } catch { /* pas encore extrait */ }
     return {
       source,
+      catalogue: Domaines.catalogue(db),
+      affiliations: db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
+        .all(id) as Domaines.Affiliation[],
       meta: JSON.parse(source.metadonnees),
       job: job && { ...job, avertissements: JSON.parse(job.avertissements) },
       images: db.prepare("SELECT * FROM images WHERE source_id = ? ORDER BY position").all(
@@ -400,7 +491,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.post("/prof/sources/:id/modifier", async (c) => {
     const d = detail(c.req.param("id"));
     if (!d) return c.notFound();
-    const b = await c.req.parseBody();
+    const b = await c.req.parseBody({ all: true });
     const titre = String(b.titre ?? "").trim();
     const sequence = String(b.sequence ?? "").trim();
     const date = String(b.date ?? "").trim();
@@ -413,13 +504,41 @@ export function creerApp(db: Db, modeles: Modeles) {
       return c.text("Titre ou séquence invalide.", 400);
     }
     // Enregistrer valide ce que Thot proposait: la proposition n'a plus d'objet.
-    const meta: Record<string, unknown> = { ...d.meta, titre, sequence, date, artiste, mouvement };
+    let informations: Record<string, string>;
+    let langue: string;
+    try {
+      langue = Domaines.langueSource(String(b.langue ?? d.source.langue ?? "fr"));
+      informations = validerInformations(
+        Object.fromEntries(Object.entries({ ...d.meta, ...b }).map(([k, v]) => [k, String(v)])),
+        d.source.profil ?? "general",
+      );
+    } catch (e) {
+      return c.text((e as Error).message, 400);
+    }
+    const meta: Record<string, unknown> = { ...d.meta, ...informations, titre, sequence, langue };
     delete meta.propositions;
     delete meta.quiz_reponse;
-    db.prepare(
-      "UPDATE sources SET titre = ?, metadonnees = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
-    )
-      .run(titre, JSON.stringify(meta), d.source.id, instance.school_id);
+    try {
+      transaction(db, () => {
+        if (b.affiliations_presentes) {
+          Domaines.affiliations(db, d.source.id, Domaines.liensFormulaire(b));
+        } else if (sequence !== d.meta.sequence) {
+          Domaines.rangerLegacy(
+            db,
+            d.source.id,
+            db.prepare("SELECT matiere_id FROM sources WHERE id = ?").get(d.source.id)!
+              .matiere_id as string | null,
+            sequence,
+          );
+        }
+        db.prepare(
+          "UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
+        )
+          .run(titre, JSON.stringify(meta), langue, d.source.id, instance.school_id);
+      });
+    } catch (e) {
+      return c.text((e as Error).message, 400);
+    }
     if (d.source.statut === "certifiee") indexer(db, d.source.id);
     return c.redirect(`/prof/sources/${d.source.id}`, 303);
   });
@@ -470,7 +589,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   // ------------------------------------------------------------ élève
   const sourceCertifiee = (id: string) =>
     db.prepare(
-      `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
+      `SELECT id, titre, enseignant, profil, langue, metadonnees, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
@@ -479,7 +598,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
-      `SELECT id, titre, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
+      `SELECT id, titre, profil, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          ${QUIZ},
@@ -488,19 +607,77 @@ export function creerApp(db: Db, modeles: Modeles) {
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        ORDER BY sequence, seance, titre`,
     ).all(instance.school_id) as Eleve.SourceChapitre[];
+    const selection = idsScope(c);
+    const visibles = rangs.filter((r) => selection.has(r.id));
     const chapitres: Eleve.ChapitreVue[] = [];
-    for (const r of rangs) {
-      const nom = r.sequence ?? "";
-      if (chapitres.at(-1)?.nom !== nom) chapitres.push({ nom, sources: [], questions: [] });
-      chapitres.at(-1)!.sources.push(r);
+    const rattachements = db.prepare(
+      `SELECT sc.*, c.nom AS cours, t.nom AS theme FROM source_cours sc
+      JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id`,
+    ).all();
+    for (const r of visibles) {
+      const liens = rattachements.filter((l) => l.source_id === r.id);
+      for (const lien of liens.length ? liens : [undefined]) {
+        const themeId = lien?.theme_id as string | undefined;
+        const coursId = lien?.cours_id as string | undefined;
+        const nom = (lien?.theme ?? r.sequence ?? "") as string;
+        let ch = chapitres.find((ch) =>
+          ch.themeId === themeId && ch.coursId === coursId && ch.nom === nom
+        );
+        if (!ch) {
+          ch = {
+            nom,
+            themeId,
+            coursId,
+            sources: [],
+            questions: [],
+            cours: lien?.cours as string | undefined,
+          };
+          chapitres.push(ch);
+        }
+        ch.sources.push(r);
+      }
     }
-    const questions = suggestionsParChapitre(db);
     for (const ch of chapitres) {
-      ch.questions = questions.get(ch.nom) ?? [];
+      const ids = Domaines.sourcesPerimetre(db, {
+        matiere_id: "",
+        cours_id: ch.coursId ?? "",
+        theme_id: ch.themeId ?? "",
+      });
+      ch.questions = ch.coursId
+        ? suggestionsDuPerimetre(db, ids)
+        : suggestionsParChapitre(db).get(ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
+    const cat = Domaines.catalogueVisible(db);
+    const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", "", c.req.query("vue"));
+    const generique = visibles.some((r) => r.profil === "general") ||
+      Object.values(scope(c)).some(Boolean);
+    if (generique) {
+      return c.html(rendre(
+        c,
+        "Ressources",
+        html`<h1>Ressources</h1>${filtresDomaines}
+          <form method="post" action="/eleve/questions" class="question-rapide">
+            ${DomaineVue.champsScope(scope(c))}
+            <label for="texte">Une question dans ce périmètre ?</label>
+            <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
+          </form>
+          <ul class="${c.req.query("vue") === "grille" ? "tuiles" : ""}">${
+          visibles.map((r) =>
+            html`<li><a class="${
+              c.req.query("vue") === "grille" ? "tuile" : ""
+            }" href="/eleve/sources/${r.id}">${
+              c.req.query("vue") === "grille" && r.image_id
+                ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
+                : ""
+            }${r.titre}</a></li>`
+          )
+        }</ul>
+          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}`,
+      ));
+    }
     // Une vignette de vidéo n'est pas une œuvre: elle reste dans son chapitre, pas dans « Le saviez-vous ».
-    const oeuvres = rangs.filter((s) =>
+    const oeuvres = visibles.filter((s) =>
       s.image_id && !/vid[ée]o|\d+ ?mn\b/i.test(`${s.titre} ${s.seance}`)
     );
     const fait = faitAuHasard(db);
@@ -511,30 +688,45 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Accueil",
-        Eleve.accueilEleve(
-          prenom,
-          chapitres,
-          oeuvre ? undefined : fait,
-          oeuvre,
-          lireInstance(db).mode === "personal",
-        ),
+        html`${filtresDomaines}${
+          Eleve.accueilEleve(
+            prenom,
+            chapitres,
+            oeuvre ? undefined : fait,
+            oeuvre,
+            lireInstance(db).mode === "personal",
+          )
+        }`,
         "accueil",
       ),
     );
   });
 
-  app.on("GET", ["/eleve/sans-sequence", "/eleve/sequences/:nom"], (c) => {
-    const nom = c.req.param("nom") ?? "";
+  app.on("GET", ["/eleve/sans-sequence", "/eleve/sequences/:nom", "/eleve/themes/:theme"], (c) => {
+    const themeId = c.req.param("theme");
+    const cat = Domaines.catalogueVisible(db);
+    const theme = themeId ? cat.themes.find((t) => t.id === themeId) : undefined;
+    if (themeId && !theme) return c.notFound();
+    const nom = theme?.nom ?? c.req.param("nom") ?? "";
+    const cours = cat.cours.find((c) => c.id === theme?.cours_id);
+    const matiere = cat.matieres.find((m) => m.id === cours?.matiere_id);
     const sources = db.prepare(
-      `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
+      `SELECT s.id, s.titre, s.profil, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
          AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
-         AND coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?
+         AND (? OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
+         AND (? = '' OR EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = s.id AND sc.theme_id = ?))
        ORDER BY seance = '', seance, s.titre`,
-    ).all(instance.school_id, nom) as Eleve.SourceChapitre[];
+    ).all(
+      instance.school_id,
+      themeId ? 1 : 0,
+      nom,
+      themeId ?? "",
+      themeId ?? "",
+    ) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
     const doc = sources.find((s) => s.id === c.req.query("doc")) ??
@@ -543,7 +735,19 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         nom || "Sans séquence",
-        Eleve.pageChapitre(nom, sources, suggestionsParChapitre(db).get(nom) ?? [], apercu(doc.id)),
+        Eleve.pageChapitre(
+          nom,
+          sources,
+          themeId
+            ? suggestionsDuPerimetre(
+              db,
+              Domaines.sourcesPerimetre(db, { matiere_id: "", cours_id: "", theme_id: themeId }),
+            )
+            : suggestionsParChapitre(db).get(nom) ?? [],
+          apercu(doc.id),
+          themeId,
+          theme ? `${matiere?.nom} / ${cours?.nom} / ${nom}` : "",
+        ),
       ),
     );
   });
@@ -617,8 +821,24 @@ export function creerApp(db: Db, modeles: Modeles) {
   // Une légende non relue aide à trouver l'image mais n'est pas montrée.
   app.get("/eleve/recherche", async (c) => {
     const q = (c.req.query("q") ?? "").trim().slice(0, 300);
-    if (!q) return c.html(rendre(c, "Chercher", Eleve.recherche("")));
-    const p = { schoolId: instance.school_id, bibliotheque: true };
+    if (!q) {
+      return c.html(
+        rendre(
+          c,
+          "Chercher",
+          html`${DomaineVue.filtre(Domaines.catalogueVisible(db), scope(c), "/eleve/recherche")}${
+            Eleve.recherche("", [], scope(c))
+          }`,
+        ),
+      );
+    }
+    const p = {
+      schoolId: instance.school_id,
+      bibliotheque: true,
+      matiereId: scope(c).matiere_id,
+      coursId: scope(c).cours_id,
+      themeId: scope(c).theme_id,
+    };
     let proches: Candidat[];
     try {
       const r = await chercher(db, modeles, q, p, config.seuil);
@@ -631,7 +851,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const ids = [...new Set(proches.map((x) => x.source_id))].slice(0, 12);
     const sources = new Map(
       db.prepare(
-        `SELECT s.id, s.titre, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS sequence,
+        `SELECT s.id, s.titre, s.profil, (SELECT theme_id FROM source_cours WHERE source_id = s.id AND theme_id IS NOT NULL LIMIT 1) AS theme_id, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS sequence,
            coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
            (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
          FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})`,
@@ -646,7 +866,15 @@ export function creerApp(db: Db, modeles: Modeles) {
         extrait: reste.length > 180 ? reste.slice(0, 180).replace(/\s+\S*$/, "") + " …" : reste,
       };
     });
-    return c.html(rendre(c, "Chercher", Eleve.recherche(q, trouves)));
+    return c.html(
+      rendre(
+        c,
+        "Chercher",
+        html`${DomaineVue.filtre(Domaines.catalogueVisible(db), scope(c), "/eleve/recherche", q)}${
+          Eleve.recherche(q, trouves, scope(c))
+        }`,
+      ),
+    );
   });
 
   const messagesDe = (compteId: string) =>
@@ -656,6 +884,18 @@ export function creerApp(db: Db, modeles: Modeles) {
       .all(compteId) as Eleve.MessageVue[];
 
   const ideesPour = (r: Resultat, question = "", messageId = "") => {
+    const m = messageId
+      ? db.prepare("SELECT matiere_id, cours_id, theme_id FROM messages WHERE id = ?").get(
+        messageId,
+      )
+      : undefined;
+    if (m && Object.values(m).some(Boolean)) {
+      return suggestionsDuPerimetre(
+        db,
+        Domaines.sourcesPerimetre(db, Domaines.lireScope(m)),
+        question,
+      );
+    }
     // Hors cours: les questions que couvre le chapitre du passage le plus proche, ou du chapitre posé.
     if (r.etat === "out_of_corpus") {
       const m = db.prepare(
@@ -709,6 +949,14 @@ export function creerApp(db: Db, modeles: Modeles) {
     const texte = String(b.texte ?? "").trim().slice(0, 1000);
     if (!texte) return c.text("Question vide.", 400);
     const chapitre = String(b.chapitre ?? "");
+    const p = Domaines.lireScope(b);
+    if (Object.values(p).some(Boolean)) {
+      const disponibles = Domaines.sourcesPerimetre(db, p);
+      const visible = db.prepare(
+        `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
+      ).all(instance.school_id).some((s) => disponibles.has(s.id as string));
+      if (!visible) return c.text("Périmètre indisponible.", 400);
+    }
     if (
       chapitre && !db.prepare(
         `SELECT id FROM sources s WHERE school_id = ? AND statut = 'certifiee'
@@ -720,9 +968,8 @@ export function creerApp(db: Db, modeles: Modeles) {
     const id = crypto.randomUUID();
     const t = maintenant();
     db.prepare(
-      "INSERT INTO messages (id, compte_id, question, chapitre, etat, cree_le, maj_le) VALUES (?, ?, ?, ?, 'en_attente', ?, ?)",
-    )
-      .run(id, c.get("compte").id, texte, chapitre, t, t);
+      "INSERT INTO messages (id, compte_id, question, chapitre, matiere_id, cours_id, theme_id, etat, cree_le, maj_le) VALUES (?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)",
+    ).run(id, c.get("compte").id, texte, chapitre, p.matiere_id, p.cours_id, p.theme_id, t, t);
     // Hors HTMX (accueil, idée proposée), la conversation s'ouvre et le flux démarre là-bas.
     if (!c.req.header("HX-Request")) return c.redirect("/eleve/chat", 303);
     return c.html(html`
@@ -751,19 +998,32 @@ export function creerApp(db: Db, modeles: Modeles) {
          WHERE id = ? AND compte_id = ? AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le < ?))`,
       ).run(maintenant(), id, compte.id, perime).changes;
       if (pris) {
-        const m = db.prepare("SELECT question, chapitre FROM messages WHERE id = ?").get(id) as {
+        const m = db.prepare(
+          "SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages WHERE id = ?",
+        ).get(id) as {
           question: string;
           chapitre: string;
+          matiere_id: string;
+          cours_id: string;
+          theme_id: string;
         };
         const precedente = db.prepare(
           `SELECT question FROM messages WHERE compte_id = ? AND rowid < (SELECT rowid FROM messages WHERE id = ?)
-           AND chapitre = ? ORDER BY rowid DESC LIMIT 1`,
-        ).get(compte.id, id, m.chapitre)?.question as string | undefined;
+           AND chapitre = ? AND matiere_id = ? AND cours_id = ? AND theme_id = ? ORDER BY rowid DESC LIMIT 1`,
+        ).get(compte.id, id, m.chapitre, m.matiere_id, m.cours_id, m.theme_id)?.question as
+          | string
+          | undefined;
         const { resultat, journal } = await demander(
           db,
           modeles,
           m.question,
-          { schoolId: instance.school_id, chapitre: m.chapitre || undefined },
+          {
+            schoolId: instance.school_id,
+            chapitre: m.chapitre || undefined,
+            matiereId: m.matiere_id,
+            coursId: m.cours_id,
+            themeId: m.theme_id,
+          },
           config.seuil,
           (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
           precedente,

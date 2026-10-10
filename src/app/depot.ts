@@ -1,5 +1,7 @@
 import { contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
+import { type Affiliation, affiliations, domaineSource, rangerLegacy } from "./domaines.ts";
+import { CHAMPS, validerInformations } from "../core/profils.ts";
 
 export const MAX_OCTETS = 25 * 1024 * 1024;
 
@@ -51,22 +53,24 @@ export type Metadonnees = {
   objectifs: string;
   evaluation: string;
   publics: string[];
+  matiere_id?: string;
+  langue?: string;
 };
 
-const REQUIS = ["titre", "type_document", "matiere", "classe"] as const;
+const REQUIS = ["titre", "type_document", "matiere", "classe", "matiere_id", "langue"] as const;
 const LIBRES = ["sous_matiere", "sequence", "seance", "resume", "objectifs", "evaluation"] as const;
 
 /** Valide la saisie. Rend les métadonnées ou un message par champ. */
 export function valider(
   champs: Record<string, string>,
   publics: string[],
-  personnel = false,
 ): { meta: Metadonnees } | { erreurs: Record<string, string> } {
   const erreurs: Record<string, string> = {};
   const lu = (nom: string) => (champs[nom] ?? "").trim();
   for (const nom of REQUIS) {
-    if (!lu(nom) && !(personnel && nom === "classe")) erreurs[nom] = "Champ obligatoire.";
-    else if (lu(nom).length > 200) erreurs[nom] = "Texte trop long.";
+    if (!lu(nom) && (nom === "titre" || nom === "type_document")) {
+      erreurs[nom] = "Champ obligatoire.";
+    } else if (lu(nom).length > 200) erreurs[nom] = "Texte trop long.";
   }
   for (const nom of LIBRES) if (lu(nom).length > 4000) erreurs[nom] = "Texte trop long.";
   const type = lu("type_document");
@@ -75,7 +79,10 @@ export function valider(
   }
   if (Object.keys(erreurs).length) return { erreurs };
   const meta = Object.fromEntries([...REQUIS, ...LIBRES].map((n) => [n, lu(n)]));
-  return { meta: { ...meta, publics } as Metadonnees };
+  const informations = Object.fromEntries(
+    Object.keys(CHAMPS).filter((n) => champs[n]?.trim()).map((n) => [n, champs[n].trim()]),
+  );
+  return { meta: { ...meta, ...informations, publics } as Metadonnees };
 }
 
 const SIGNATURES: [Format, number[]][] = [
@@ -123,6 +130,7 @@ export async function deposer(
     format: Format;
     schoolId: string;
     enseignant: string;
+    liens?: Affiliation[];
   },
 ): Promise<{ source_id: string; job_id: string }> {
   const source_id = crypto.randomUUID();
@@ -137,6 +145,14 @@ export async function deposer(
   const t = maintenant();
   db.exec("BEGIN IMMEDIATE");
   try {
+    const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
+    const informations = validerInformations(
+      d.meta as unknown as Record<string, string>,
+      domaine.profil,
+    );
+    if (domaine.profil === "arts-appliques") {
+      for (const nom of Object.keys(informations)) if (!informations[nom]) delete informations[nom];
+    }
     db.prepare(
       `INSERT INTO sources (id, school_id, titre, metadonnees, fichier, format, checksum, octets,
        enseignant, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -144,7 +160,7 @@ export async function deposer(
       source_id,
       d.schoolId,
       d.meta.titre,
-      JSON.stringify(d.meta),
+      JSON.stringify({ ...d.meta, ...informations }),
       nom,
       d.format,
       checksum,
@@ -152,12 +168,21 @@ export async function deposer(
       d.enseignant,
       t,
     );
+    db.prepare("UPDATE sources SET matiere_id = ?, profil = ?, langue = ? WHERE id = ?").run(
+      domaine.matiere_id,
+      domaine.profil,
+      domaine.langue,
+      source_id,
+    );
+    if (d.liens !== undefined) affiliations(db, source_id, d.liens);
+    else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence);
     db.prepare(
       "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
     ).run(job_id, source_id, t, t);
     db.exec("COMMIT");
   } catch (e) {
     db.exec("ROLLBACK");
+    await Deno.remove(contenu(source_id), { recursive: true });
     throw e;
   }
   return { source_id, job_id };

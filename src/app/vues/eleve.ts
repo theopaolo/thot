@@ -2,10 +2,16 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { Affirmation, Resultat } from "../../core/reponse.ts";
 import { type Icone, icone } from "../icones.ts";
+import { CHAMPS, type Profil, PROFILS } from "../../core/profils.ts";
+import type { Scope } from "../domaines.ts";
+import { champsScope } from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 
 export type ChapitreVue = {
   nom: string;
+  themeId?: string;
+  coursId?: string;
+  cours?: string;
   sources: SourceChapitre[];
   questions: string[];
 };
@@ -17,6 +23,7 @@ export type SourceChapitre = {
   seance: string;
   date: string;
   quiz_reponse: string;
+  profil?: Profil;
   image_id: string | null;
 };
 
@@ -29,21 +36,21 @@ export type FaitVue = {
 };
 
 /** Une question proposée: un bouton qui l'envoie telle quelle, sans passer par la saisie. */
-const idee = (q: string, htmx: boolean, libelle = q, chapitre = "") =>
+const idee = (q: string, htmx: boolean, libelle = q, chapitre = "", themeId = "") =>
   htmx
     ? html`
       <button
         type="button"
         class="idee"
         hx-post="/eleve/questions"
-        hx-vals="${JSON.stringify({ texte: q, chapitre })}"
+        hx-vals="${JSON.stringify({ texte: q, chapitre, theme_id: themeId })}"
         hx-target="#conversation"
         hx-swap="beforeend"
       >${icone("arrow-right")}${libelle}</button>
     `
     : html`
       <form method="post" action="/eleve/questions" class="idee-form">
-        <input type="hidden" name="texte" value="${q}"><input type="hidden" name="chapitre" value="${chapitre}"><button class="idee">${icone(
+        <input type="hidden" name="theme_id" value="${themeId}"><input type="hidden" name="texte" value="${q}"><input type="hidden" name="chapitre" value="${chapitre}"><button class="idee">${icone(
           "arrow-right",
         )}${libelle}</button>
       </form>
@@ -64,7 +71,7 @@ export const accueilEleve = (
       <label for="texte">Qu'aimerais-tu comprendre aujourd'hui ?</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
-          placeholder="Pourquoi trois couleurs chez Mondrian ?">
+          placeholder="Pose ta question sur les ressources">
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
     </form>
@@ -77,10 +84,18 @@ export const accueilEleve = (
               html`
                 <li class="chapitre">
                   <div class="chapitre-tete">
-                    <h3><a href="${lienChapitre(c.nom)}">${nomChapitre(
-                      c.nom || "Sans séquence",
-                    )}</a></h3>
-                    <span class="discret">${c.sources.length} documents</span>
+                    <h3><a href="${c.themeId
+                      ? `/eleve/themes/${c.themeId}`
+                      : c.coursId && c.nom
+                      ? `/eleve?cours_id=${c.coursId}`
+                      : lienChapitre(c.nom)}">${nomChapitre(
+                        c.nom || "Sans séquence",
+                      )}</a></h3>
+                    <span class="discret">${c.sources.length} documents${chapitres.some((autre) =>
+                        autre.nom === c.nom && autre.coursId !== c.coursId
+                      )
+                      ? ` / ${c.cours}`
+                      : ""}</span>
                   </div>
                   <div class="apercu-oeuvres">${c.sources.filter((s) => s.image_id).slice(0, 4).map(
                     (
@@ -88,20 +103,26 @@ export const accueilEleve = (
                     ) =>
                       html`
                         <a class="passe-partout"
-                          href="${lienChapitre(c.nom, s.id)}"><img src="/media/${s
+                          href="${c.themeId
+                            ? `/eleve/themes/${c.themeId}?doc=${s.id}`
+                            : lienChapitre(s.sequence ?? c.nom, s.id)}"><img src="/media/${s
                             .image_id}" alt="${s.titre}" loading="lazy"></a>
                       `,
                   )}</div>
                   ${c.questions.length
                     ? html`
                       <div class="idees">${c.questions.slice(0, 2).map((q) =>
-                        idee(q, false, q, c.nom)
+                        idee(q, false, q, c.themeId ? "" : c.nom, c.themeId)
                       )}</div>
                     `
                     : ""}
-                  <a class="bouton" href="${lienChapitre(c.nom)}">${icone(
-                    "arrow-right",
-                  )}Ouvrir la séquence</a>
+                  <a class="bouton" href="${c.themeId
+                    ? `/eleve/themes/${c.themeId}`
+                    : c.coursId && c.nom
+                    ? `/eleve?cours_id=${c.coursId}`
+                    : lienChapitre(c.nom)}">${icone(
+                      "arrow-right",
+                    )}Ouvrir la séquence</a>
                 </li>
               `
             )}</ul>
@@ -145,13 +166,14 @@ export const accueilEleve = (
     </div>
   `;
 
-const formRecherche = (q: string) =>
+const formRecherche = (q: string, p?: Scope) =>
   html`
     <form method="get" action="/eleve/recherche" class="question-rapide" role="search">
-      <label for="q">Chercher une œuvre ou un document</label>
+      ${p ? champsScope(p) : ""}
+      <label for="q">Chercher une ressource</label>
       <div class="saisie">
         <input type="search" id="q" name="q" value="${q}" required maxlength="300"
-          placeholder="Un toit coloré en vagues au-dessus d'un hall">
+          placeholder="Un sujet ou une description">
         <button>${icone("magnifying-glass")}Chercher</button>
       </div>
     </form>
@@ -163,16 +185,18 @@ export type Trouve = {
   sequence: string;
   date: string;
   image_id: string | null;
+  profil?: Profil;
+  theme_id?: string;
   /** début du passage trouvé, sans le titre */
   extrait: string;
 };
 
 /** Les documents les plus proches de la recherche, du plus proche au moins proche. */
-export const recherche = (q: string, trouves: Trouve[] = []) =>
+export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
   html`
-    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
-    <h1>Chercher dans le cours</h1>
-    ${formRecherche(q)}
+    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>
+    <h1>Chercher une ressource</h1>
+    ${formRecherche(q, p)}
     ${!q ? "" : trouves.length
       ? html`
         <p class="sous-titre">${trouves.length === 1
@@ -180,12 +204,19 @@ export const recherche = (q: string, trouves: Trouve[] = []) =>
           : `${trouves.length} documents proches`} de ta recherche, du plus proche au moins proche.</p>
         <div class="tuiles resultats">${trouves.map((s) =>
           html`
-            <a class="tuile" href="${lienChapitre(s.sequence, s.id)}">
+            <a class="tuile" href="${s.profil === "general"
+              ? `/eleve/sources/${s.id}`
+              : s.theme_id
+              ? `/eleve/themes/${s.theme_id}?doc=${s.id}`
+              : lienChapitre(s.sequence, s.id)}">
               <span class="passe-partout">${s.image_id
                 ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
                 : html`<span class="sans-image">${icone("file-text")}</span>`}</span>
               <span class="tuile-titre">${s.titre}</span>
-              <span class="discret">${[nomChapitre(s.sequence), s.date].filter(Boolean).join(
+              <span class="discret">${[
+                s.profil === "general" ? s.sequence : nomChapitre(s.sequence),
+                s.date,
+              ].filter(Boolean).join(
                 ", ",
               )}</span>
               ${s.extrait ? html`<span class="tuile-extrait">${s.extrait}</span>` : ""}
@@ -212,13 +243,18 @@ export type SourceLue = {
   id: string;
   titre: string;
   enseignant: string;
+  profil?: Profil;
+  langue?: string;
+  metadonnees?: string;
   sequence: string;
   seance: string;
   date: string;
 };
 
 /** Cartel de musée: seulement les champs connus, rien d'inventé. */
-const cartel = (d: { seance: string; chapitre: string; date: string; enseignant: string }) =>
+const cartel = (
+  d: { seance: string; chapitre: string; date: string; enseignant: string; profil?: Profil },
+) =>
   html`
     <dl class="cartel">
       ${d.date
@@ -235,8 +271,8 @@ const cartel = (d: { seance: string; chapitre: string; date: string; enseignant:
         : ""}
       ${d.chapitre
         ? html`
-          <dt>Séquence</dt>
-          <dd>${nomChapitre(d.chapitre)}</dd>
+          <dt>${d.profil === "general" ? "Thème" : "Séquence"}</dt>
+          <dd>${d.profil === "general" ? d.chapitre : nomChapitre(d.chapitre)}</dd>
         `
         : ""}
       <dt>Publié par</dt><dd>${d.enseignant}</dd>
@@ -295,17 +331,17 @@ export const lecteur = (d?: Apercu) =>
       </aside>
     `;
 
-const tuile = (s: SourceChapitre, nom: string, choisi: boolean) =>
+const tuile = (s: SourceChapitre, nom: string, choisi: boolean, themeId?: string) =>
   html`
     <a
       class="tuile"
-      href="${lienChapitre(nom, s.id)}"
+      href="${themeId ? `/eleve/themes/${themeId}?doc=${s.id}` : lienChapitre(nom, s.id)}"
       aria-current="${String(choisi)}"
       hx-get="/eleve/documents/${s.id}/apercu"
       hx-target="#lecteur"
       hx-swap="outerHTML"
       hx-sync="closest .mur-lecteur:replace"
-      hx-push-url="${lienChapitre(nom, s.id)}"
+      hx-push-url="${themeId ? `/eleve/themes/${themeId}?doc=${s.id}` : lienChapitre(nom, s.id)}"
       data-ouvrir-feuille
     >
       <span class="passe-partout">${s.image_id
@@ -321,14 +357,32 @@ export const pageChapitre = (
   sources: SourceChapitre[],
   questions: string[],
   choisi?: Apercu,
+  themeId?: string,
+  perimetre = "",
 ) => {
+  if (sources.some((s) => s.profil === "general")) {
+    return html`
+      <p><a href="/eleve">Ressources</a></p><h1>${nom ||
+        "Ressources non classées"}</h1><p class="discret">${perimetre}</p>
+          <form method="post" action="/eleve/questions"
+        class="question-rapide"><label for="texte">Une question sur ce thème ?</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${themeId ??
+          ""}"><input type="hidden" name="chapitre" value="${themeId
+          ? ""
+          : nom}"><button>Demander</button></div></form>
+          <ul>${sources.map((s) =>
+            html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`
+          )}</ul>${questions.length
+            ? html`<div class="idees">${questions.map((q) => idee(q, false, q, "", themeId))}</div>`
+            : ""}
+    `;
+  }
   const oeuvre = sources.find((s) => s.image_id && s.quiz_reponse);
   const seances = Map.groupBy(sources, (s) => s.seance || "Autres documents");
   return html`
     <div class="mur-lecteur" data-feuille>
       <div class="mur">
     <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
-    <h1>${nomChapitre(nom || "Sans séquence")}</h1>
+    <h1>${themeId ? nom : nomChapitre(nom || "Sans séquence")}</h1>
     <p class="sous-titre">${sources
       .length} documents publiés par tes enseignants, rangés par séance.</p>
     <form method="post" action="/eleve/questions" class="question-rapide">
@@ -336,19 +390,25 @@ export const pageChapitre = (
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
           placeholder="Pose ta question">
-        <input type="hidden" name="chapitre" value="${nom}">
+        ${themeId
+          ? html`<input type="hidden" name="theme_id" value="${themeId}">`
+          : html`<input type="hidden" name="chapitre" value="${nom}">`}
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
     </form>
     ${questions.length
-      ? html`<div class="idees">${questions.slice(0, 3).map((q) => idee(q, false, q, nom))}</div>`
+      ? html`<div class="idees">${
+        questions.slice(0, 3).map((q) => idee(q, false, q, themeId ? "" : nom, themeId))
+      }</div>`
       : ""}
         ${[...seances].map(([seance, docs]) =>
           html`
             <section class="seance" aria-labelledby="seance-${docs[0].id}">
               <h2 id="seance-${docs[0].id}">${seance} <span class="discret">${docs
                 .length}</span></h2>
-              <div class="tuiles">${docs.map((s) => tuile(s, nom, s.id === choisi?.id))}</div>
+              <div class="tuiles">${docs.map((s) =>
+                tuile(s, nom, s.id === choisi?.id, themeId)
+              )}</div>
             </section>
           `
         )}
@@ -382,11 +442,29 @@ export const lectureSource = (
   marque?: [number, number],
 ) =>
   html`
-    <a class="bouton retour" href="${lienChapitre(s.sequence, s.id)}">${icone(
-      "arrow-left",
-    )}${nomChapitre(s.sequence || "Sans séquence")}</a>
+    <a class="bouton retour" href="${s.profil === "general"
+      ? "/eleve"
+      : lienChapitre(s.sequence, s.id)}">${icone(
+        "arrow-left",
+      )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Sans séquence")}</a>
     <article class="document">
       <h1>${s.titre}</h1>
+      ${s.langue && s.langue !== "fr"
+        ? html`<p class="note">Langue non prise en charge pour la recherche : ${s.langue}</p>`
+        : ""}
+      ${s.metadonnees
+        ? html`<dl class="cartel">${
+          PROFILS[s.profil ?? "general"].informations.map((n) => {
+            const valeur = JSON.parse(s.metadonnees!)[n];
+            return valeur
+              ? html`
+                <dt>${CHAMPS[n].label}</dt>
+                <dd>${String(valeur)}</dd>
+              `
+              : "";
+          })
+        }</dl>`
+        : ""}
       <div class="document-tete">
         ${cartel({ ...s, chapitre: s.sequence })}
         <form method="post" action="/eleve/questions">

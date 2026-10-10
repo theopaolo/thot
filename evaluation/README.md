@@ -41,3 +41,13 @@ famille, et ne garde que les identifiants. Le modèle jugé se change par `THOT_
 Les rapports produits par `thot eval` restent dans le répertoire de données de l’instance,
 sous `evaluation/resultats/`. Les résultats de référence suivis dans ce dépôt restent dans
 `resultats/`. Le corpus ATC et `img_order.json` restent dans le dépôt de recherche.
+
+## Langues et profils
+
+`tests/domaines_test.ts` contient une sonde lexicale synthétique français/anglais et les contrôles
+sans fournisseur des prompts génériques, du profil arts et des périmètres de recherche. La sonde
+trouve trois cibles sur quatre en français et une sur quatre en anglais avec la racinisation
+actuelle. Le pluriel irrégulier français et les formes anglaises montrent les limites du moteur.
+Ce petit jeu ne mesure ni la recherche bilingue entre documents et questions ni la qualité des
+modèles. L'anglais reste non pris en charge dans l'interface. Aucun changement de tokenisation ni
+reindexage automatique n'est introduit.

@@ -79,7 +79,7 @@ const compteMenu = (c: Compte) =>
 const rechercheEntete = html`
   <form method="get" action="/eleve/recherche" role="search" class="recherche-entete">
     <input type="search" name="q" required maxlength="300" aria-label="Chercher dans le cours"
-      placeholder="Chercher une œuvre, un document">
+      placeholder="Chercher une ressource">
     <button aria-label="Chercher">${icone("magnifying-glass")}</button>
   </form>
 `;
@@ -89,10 +89,10 @@ const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
     <nav aria-label="Navigation principale" hx-boost="true">
       ${lienNav(
         "/eleve",
-        personnel ? "Mes documents" : "Séquences",
+        personnel ? "Mes documents" : "Ressources",
         "books",
         chemin === "/eleve" || chemin === "/eleve/sans-sequence" ||
-          chemin.startsWith("/eleve/sequences") ||
+          chemin.startsWith("/eleve/sequences") || chemin.startsWith("/eleve/themes") ||
           chemin.startsWith("/eleve/sources"),
       )}
       ${lienNav(
@@ -242,6 +242,7 @@ export const administration = (instance: Instance) =>
         : "Usage partagé"}</p>
       <p>Identité de l'instance : <code>${instance.id}</code></p>
       <p>Le nom et les services autorisés sont configurés par l'opérateur. Renommer l'instance conserve ses documents et ses comptes.</p>
+      <p><a href="/administration/domaines">Configurer les matières et les cours</a></p>
       <h2>Traitement des documents et des questions</h2>
       <p>Localisations déclarées par l'opérateur. Elles ne sont pas vérifiées par l'application.</p>
       <dl>${traitements().map((f) =>

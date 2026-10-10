@@ -1,40 +1,22 @@
 import type { Extraction, Partie } from "./document.ts";
 import { sansAccents } from "./texte.ts";
-
-// ponytail: rubriques des fiches ATC en dur. Une matière qui écrit d'autres rubriques verra
-// ses PDF découpés par paragraphe seulement. Passer la liste en configuration par matière.
-const RUBRIQUES = new Set(
-  [
-    "Ou et Quand ?",
-    "Quoi ?",
-    "Qui ?",
-    "Pourquoi ?",
-    "Comment ?",
-    "Sujet (Themes)",
-    "Sujet (genres)",
-    "Retombees",
-    "Conclusion",
-    "Sources",
-    "Influences formelles",
-    "Pour resumer :",
-  ].map((r) => sansAccents(r).toLowerCase()),
-);
+import { type Profil, PROFILS } from "./profils.ts";
 
 const SEUIL_PAGE_MUETTE = 200;
-
-const estRubrique = (ligne: string) => RUBRIQUES.has(sansAccents(ligne).toLowerCase());
 
 /** Numéro de page, puce isolée, ligne d'un caractère. */
 const bruit = (l: string) => l.length < 2 || /^\d+\s*(sur|\/)\s*[\d!]+$/i.test(l);
 
-export async function extrairePdf(chemin: string): Promise<Extraction> {
+export async function extrairePdf(chemin: string, profil: Profil = "general"): Promise<Extraction> {
   const sortie = await new Deno.Command("pdftotext", { args: [chemin, "-"], stdout: "piped" })
     .output();
   if (!sortie.success) throw new Error(`pdftotext a échoué (code ${sortie.code})`);
-  return decouperPdf(new TextDecoder().decode(sortie.stdout));
+  return decouperPdf(new TextDecoder().decode(sortie.stdout), profil);
 }
 
-export function decouperPdf(brut: string): Extraction {
+export function decouperPdf(brut: string, profil: Profil = "general"): Extraction {
+  const rubriques = new Set(PROFILS[profil].rubriques.map((r) => sansAccents(r).toLowerCase()));
+  const estRubrique = (ligne: string) => rubriques.has(sansAccents(ligne).toLowerCase());
   const pages = brut.split("\f").map((p) => p.split("\n").map((l) => l.trim()));
   if (pages.length > 1 && pages.at(-1)!.every((l) => !l)) pages.pop();
 

@@ -28,7 +28,7 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
         db,
         modeles,
         p,
-        { schoolId: lireInstance(db).school_id },
+        { schoolId: lireInstance(db).school_id, sourceId },
         config.seuil,
       ),
     );
@@ -134,4 +134,16 @@ export function faitAuHasard(db: Db): Fait | undefined {
     };
   }
   return undefined;
+}
+
+export function suggestionsDuPerimetre(db: Db, ids: Set<string>, question = "") {
+  return db.prepare(
+    `SELECT sg.question, sg.source_id FROM suggestions sg JOIN sources s ON s.id = sg.source_id
+    WHERE s.statut = 'certifiee' AND sg.question != ?
+      AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+      AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+    ORDER BY random()`,
+  ).all(question).filter((s) => ids.has(s.source_id as string)).slice(0, 3).map((s) =>
+    s.question as string
+  );
 }

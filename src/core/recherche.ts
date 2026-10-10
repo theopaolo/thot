@@ -29,8 +29,22 @@ export type Candidat = ChunkIndexe & { rang_fts: number; score?: number };
 export type Perimetre = {
   schoolId: string;
   chapitre?: string;
+  matiereId?: string;
+  coursId?: string;
+  themeId?: string;
+  sourceId?: string;
   /** recherche de la bibliothèque: toute source lue par les élèves, même sans le public Thot */
   bibliotheque?: boolean;
+};
+
+export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')
+  OR (? != '' AND ? = '' AND ? = '' AND s.matiere_id = ?)
+  OR EXISTS (SELECT 1 FROM source_cours sc JOIN cours co ON co.id = sc.cours_id
+    WHERE sc.source_id = s.id AND (? = '' OR co.matiere_id = ?)
+      AND (? = '' OR sc.cours_id = ?) AND (? = '' OR sc.theme_id = ?)))`;
+export const parametresDomaine = (p: Perimetre) => {
+  const m = p.matiereId ?? "", c = p.coursId ?? "", t = p.themeId ?? "";
+  return [m, c, t, m, c, t, m, m, m, c, c, t, t];
 };
 
 export type Recherche = {
@@ -83,6 +97,8 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
+       AND (? = '' OR s.id = ?)
+       AND ${FILTRE_DOMAINE}
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
   ).all(
     termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
@@ -90,6 +106,9 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
     p.bibliotheque ? 1 : 0,
     p.chapitre ?? "",
     p.chapitre ?? "",
+    p.sourceId ?? "",
+    p.sourceId ?? "",
+    ...parametresDomaine(p),
     k,
   );
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));

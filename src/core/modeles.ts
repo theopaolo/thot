@@ -9,7 +9,11 @@ export type Message = { role: "system" | "user" | "assistant"; content: string }
 
 /** Accès aux modèles. Deux implémentations: OpenRouter, et un faux pour les tests. */
 export interface Modeles {
-  legender(image: Uint8Array, mime: string): Promise<{ texte: string; modele: string }>;
+  legender(
+    image: Uint8Array,
+    mime: string,
+    profil?: import("./profils.ts").Profil,
+  ): Promise<{ texte: string; modele: string }>;
   reclasser(question: string, documents: string[]): Promise<{ index: number; score: number }[]>;
   generer(messages: Message[]): Promise<{ texte: string; modele: string }>;
   reformuler(questionPrecedente: string, question: string): Promise<string>;
@@ -37,8 +41,8 @@ export type ConfigModeles = {
   effort?: string;
 };
 
-export const CONSIGNE_LEGENDE = `Tu decris une image d'un corpus pedagogique d'arts appliques
-(lycee, Terminale) pour qu'un eleve puisse la RETROUVER en la cherchant avec
+export const CONSIGNE_LEGENDE = `Tu decris une image d'une ressource pedagogique
+pour qu'une personne puisse la RETROUVER en la cherchant avec
 ses propres mots.
 
 Ecris en francais, 40 a 70 mots, un seul paragraphe, sans titre ni puces.
@@ -58,7 +62,7 @@ Ne reprends aucune formulation de cette consigne.`;
 const CONSIGNE_SOUTIEN = `Tu controles une reponse faite a un eleve. On te donne une phrase
 de la reponse, le titre de l'extrait du cours et le passage cite pour la prouver.
 
-Le titre peut donner le sujet de la phrase : le mouvement, l'artiste ou l'oeuvre dont
+Le titre peut donner le sujet de la phrase : la personne, la notion ou l’objet dont
 parle l'extrait. Tout le reste doit venir du passage.
 
 Reponds "oui" si le titre et le passage suffisent a etablir tout ce que dit la phrase.
@@ -190,13 +194,19 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
   }
 
   return {
-    async legender(image, mime) {
+    async legender(image, mime, profil = "general") {
       const url = `data:${mime};base64,${base64(image)}`;
       const { texte } = await chat(
         config.legende,
         [{
           role: "user",
-          content: [{ type: "text", text: CONSIGNE_LEGENDE }, {
+          content: [{
+            type: "text",
+            text: CONSIGNE_LEGENDE +
+              (profil === "arts-appliques"
+                ? "\nContexte : arts appliques, decris les formes et les materiaux visibles."
+                : ""),
+          }, {
             type: "image_url",
             image_url: { url },
           }],

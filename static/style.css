@@ -558,6 +558,12 @@ body.prof main {
   }
 }
 
+@media (max-width: 640px) {
+  .rail nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ------------------------------------------------------------ page */
 
 main {
@@ -662,6 +668,7 @@ label {
 input[type="text"],
 input[type="password"],
 input[type="search"],
+input[type="date"],
 select,
 textarea {
   width: 100%;

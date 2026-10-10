@@ -24,6 +24,8 @@ import {
 } from "./app/ingestion.ts";
 import { contexte } from "./core/texte.ts";
 import { genererSuggestions } from "./app/suggestions.ts";
+import * as Domaines from "./app/domaines.ts";
+import { valider } from "./app/depot.ts";
 
 const AIDE = `thot <commande>
 
@@ -34,7 +36,18 @@ const AIDE = `thot <commande>
   compte <identifiant> <nom> <enseignant|eleve>
                                             crée un compte et affiche son mot de passe
   reinitialiser <identifiant>               renouvelle le mot de passe enseignant
-  ingest <dossier|fichier> [--matiere=arts-appliques] [--classe=terminale] [--type=cours]
+  domaines                                 affiche les identifiants du catalogue
+  matiere <nom> [--profil=general|arts-appliques]
+  profil <matiere_id> <general|arts-appliques>
+                                            change les futurs imports uniquement
+  cours <matiere_id> <nom> [--niveau=...] [--objectif=...]
+  theme <cours_id> <nom>                    crée un thème dans un cours
+  rattacher <source_id> <cours_id> [--theme-id=...]
+                                            ajoute un rattachement sans changer les publics
+  ingest <dossier|fichier> [--matiere-id=...] [--cours-id=...] [--theme-id=...]
+         [--matiere=arts-appliques] [--classe=...] [--type=cours] [--langue=fr]
+         [--auteur=...] [--version=...] [--juridiction=...]
+         [--date-publication=...] [--date-evenement=...] [--valide-du=...] [--valide-au=...]
          [--enseignant="M. Detienne"]
                                             dépose chaque fichier, chapitre tiré du dossier
   traiter                                   vide la file de travaux sans lancer le worker
@@ -65,6 +78,20 @@ const args = parseArgs(Deno.args, {
     "paires",
     "nom",
     "mode",
+    "profil",
+    "matiere-id",
+    "cours-id",
+    "theme-id",
+    "langue",
+    "auteur",
+    "version",
+    "juridiction",
+    "date-publication",
+    "date-evenement",
+    "valide-du",
+    "valide-au",
+    "niveau",
+    "objectif",
   ],
 });
 const [commande, ...reste] = args._.map(String);
@@ -141,25 +168,39 @@ async function ingest(chemin: string) {
         new TextDecoder().decode(octets).match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? nom,
       )
       : nom.replace(/\.[^.]+$/, "");
+    const champs = {
+      titre: titre.replace(/\s+/g, " ").slice(0, 200),
+      type_document: args.type ?? "cours",
+      matiere: args.matiere ?? "",
+      matiere_id: args["matiere-id"] ?? "",
+      langue: args.langue ?? "fr",
+      auteur: args.auteur ?? "",
+      version: args.version ?? "",
+      juridiction: args.juridiction ?? "",
+      date_publication: args["date-publication"] ?? "",
+      date_evenement: args["date-evenement"] ?? "",
+      valide_du: args["valide-du"] ?? "",
+      valide_au: args["valide-au"] ?? "",
+      classe: args.classe ?? "",
+      sous_matiere: "",
+      sequence,
+      seance: sommaires.get(dossier)!.get(nom) ?? "",
+      resume: "",
+      objectifs: "",
+      evaluation: "",
+    };
+    const validation = valider(champs, PUBLICS_PAR_DEFAUT);
+    if ("erreurs" in validation) throw new Error(JSON.stringify(validation.erreurs));
     await deposer(db, {
-      meta: {
-        titre: titre.replace(/\s+/g, " ").slice(0, 200),
-        type_document: args.type ?? "cours",
-        matiere: args.matiere ?? "arts-appliques",
-        classe: args.classe ?? (lireInstance(db).mode === "personal" ? "" : "terminale"),
-        sous_matiere: "",
-        sequence,
-        seance: sommaires.get(dossier)!.get(nom) ?? "",
-        resume: "",
-        objectifs: "",
-        evaluation: "",
-        publics: PUBLICS_PAR_DEFAUT,
-      },
+      meta: validation.meta,
       nomFichier: nom,
       octets,
       format: controle.format,
       schoolId: lireInstance(db).school_id,
       enseignant: args.enseignant ?? "import en ligne de commande",
+      liens: args["cours-id"]
+        ? [{ cours_id: args["cours-id"], theme_id: args["theme-id"] ?? null }]
+        : undefined,
     });
     deposes++;
   }
@@ -513,6 +554,37 @@ async function evalSoutien() {
 }
 
 switch (commande) {
+  case "domaines":
+    console.log(JSON.stringify(Domaines.catalogue(db), null, 2));
+    break;
+  case "matiere":
+    console.log(Domaines.matiere(db, reste.join(" "), args.profil));
+    break;
+  case "cours":
+    console.log(Domaines.cours(db, reste[0], reste.slice(1).join(" "), args.niveau, args.objectif));
+    break;
+  case "theme":
+    console.log(Domaines.theme(db, reste[0], reste.slice(1).join(" ")));
+    break;
+  case "profil":
+    Domaines.profilMatiere(db, reste[0], reste[1]);
+    console.log(
+      "Profil des futurs imports modifié. Ressources existantes inchangées, aucun reindexage requis.",
+    );
+    break;
+  case "rattacher": {
+    const [sourceId, coursId] = reste;
+    transaction(db, () => {
+      const liens = db.prepare(
+        "SELECT cours_id, theme_id FROM source_cours WHERE source_id = ? AND cours_id != ?",
+      ).all(sourceId, coursId) as Domaines.Affiliation[];
+      Domaines.affiliations(db, sourceId, [...liens, {
+        cours_id: coursId,
+        theme_id: args["theme-id"] ?? null,
+      }]);
+    });
+    break;
+  }
   case "instance":
     console.log(JSON.stringify(
       {
@@ -626,6 +698,9 @@ switch (commande) {
   case "ask": {
     const { resultat, journal } = await demander(db, modeles, reste.join(" "), {
       schoolId: lireInstance(db).school_id,
+      matiereId: args["matiere-id"],
+      coursId: args["cours-id"],
+      themeId: args["theme-id"],
     }, config.seuil);
     if (args.json) console.log(JSON.stringify({ resultat, journal }, null, 1));
     else if (resultat.etat === "answered") {

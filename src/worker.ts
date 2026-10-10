@@ -32,7 +32,7 @@ while (!arret) {
     await traiter(db, job, modeles);
     continue;
   }
-  // File vide: date, artiste et mouvement proposés, puis questions suggérées, une source à la fois.
+  // File vide : propositions du profil arts, puis questions suggérées, une source à la fois.
   const aDecrire = sourceSansInformations(db);
   if (aDecrire) {
     await proposerInformations(db, modeles, aDecrire);

@@ -94,7 +94,22 @@ Dispositif destiné aux élèves reconnus en situation de handicap par la MDPH (
 Ensemble des documents produits et validés par les enseignants d'un établissement, indexés dans la bibliothèque de Thot. Le système ne répond qu'à partir de ce corpus : aucune réponse hors corpus n'est possible. La certification désigne le fait que chaque document a été déposé et qualifié par un enseignant responsable.
 
 **Bibliothèque pédagogique**
-Espace de stockage et d'organisation des ressources de l'établissement dans Thot. Structurée par séquences, elle constitue la mémoire collective de l'équipe pédagogique. Chaque enseignant gère sa propre bibliothèque et en reste responsable.
+Espace de stockage et d'organisation des ressources de l'établissement dans Thot. Structurée par matières, cours et thèmes, elle constitue la mémoire collective de l'équipe pédagogique. Chaque enseignant gère sa propre bibliothèque et en reste responsable.
+
+**Matière**
+Discipline ou sujet d'étude dans l'instance. Son profil détermine les champs et traitements des
+futurs dépôts, sans modifier les ressources déjà relues.
+
+**Cours**
+Collection de ressources, avec un public et un objectif facultatifs. Une ressource peut appartenir
+à plusieurs cours. Ce rattachement ne change pas son droit de publication.
+
+**Thème**
+Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents
+restent distincts. Le profil arts emploie aussi le terme « séquence ».
+
+**Ressource non classée**
+Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 
 **Formulaire de dépôt**
 Interface proposée à l'enseignant lors du dépôt d'un document dans la bibliothèque. Il pose une série de questions structurées (discipline, niveau, type, notion centrale, séquence de rattachement) et c'est ce formulaire, une fois rempli, qui indique à Thot comment indexer et ranger le document. La qualité du référencement dépend directement du soin apporté à ce formulaire.

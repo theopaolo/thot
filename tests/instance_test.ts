@@ -41,7 +41,7 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
     cacheModeles(db).ecrire("commun", "pilote");
     db.exec(`INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le)
       SELECT 'historique', id, 'Question du pilote', 'out_of_corpus', 'fixture', 'fixture' FROM comptes`);
-    assertEquals(migrer(db), ["0006_instance.sql"]);
+    assertEquals(migrer(db), ["0006_instance.sql", "0007_domaines.sql"]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
     assertEquals(instance.mode, "shared");

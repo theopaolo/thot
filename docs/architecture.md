@@ -57,6 +57,28 @@ peut gérer les documents et les étudier avec le même compte, sans classe obli
 choisi avant la création des comptes.
 L'autorité d'administration est accordée explicitement par l'opérateur, jamais à tous les enseignants.
 
+## Matières, cours et profils
+
+Une matière choisit un profil d'import. Un cours regroupe des ressources avec un public et un
+objectif facultatifs. Un thème appartient à un cours. Les identifiants, jamais les libellés,
+séparent les thèmes homonymes. Les anciennes matières et séquences gardent leurs métadonnées,
+leurs sources et leurs citations. Une matière absente reste non classée.
+
+Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
+Son déposant, sa certification et ses publics restent ceux de la source. Un rattachement ne
+publie rien. Les contrôles de lecture et d'éligibilité aux réponses du pilote restent applicables
+avant la recherche et sur les lecteurs.
+
+Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
+neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
+et le quiz d'identification. La source capture son profil au dépôt. Changer celui d'une matière
+n'affecte que les futurs dépôts, sans régénération ni réindexation des ressources existantes.
+Une réextraction conserve ce profil et refuse de déplacer les citations si le texte change.
+
+La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
+française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de
+`tests/domaines_test.ts` ne qualifie ni le reclasseur ni les modèles pour l'anglais.
+
 ## États
 
 ```mermaid

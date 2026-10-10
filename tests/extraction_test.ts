@@ -11,7 +11,7 @@ Deno.test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, pag
     "ATC : Fiche\n\nCubisme\n\nPourquoi ?\nLa perspective impose un\nmensonge.",
     "ATC : Fiche\n\nCubisme\n",
   ].join("\f");
-  const { parties, avertissements } = decouperPdf(brut);
+  const { parties, avertissements } = decouperPdf(brut, "arts-appliques");
   const textes = parties.map((p) => p.texte);
   assert(!textes.includes("ATC : Fiche"));
   assert(textes.includes("La théorie de la relativité d'Einstein circule."));
@@ -19,7 +19,8 @@ Deno.test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, pag
   assertEquals(parties.find((p) => p.texte.startsWith("La perspective"))?.section, "Pourquoi ?");
   assertEquals(avertissements.length, 3, "chaque page est sous 200 caractères");
   const sousTitre =
-    decouperPdf("Quoi ?\nRéaction\nLe Fauvisme est une réaction au\nnaturalisme.").parties;
+    decouperPdf("Quoi ?\nRéaction\nLe Fauvisme est une réaction au\nnaturalisme.", "arts-appliques")
+      .parties;
   assertEquals(sousTitre.map((p) => p.texte), [
     "Quoi ?",
     "Réaction",
@@ -55,7 +56,7 @@ Deno.test({
   ignore: !fiches.length,
   async fn() {
     for (const f of fiches) {
-      const doc = assembler((await extrairePdf(f)).parties);
+      const doc = assembler((await extrairePdf(f, "arts-appliques")).parties);
       assert(doc.blocs.length > 5, f);
       for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);
     }

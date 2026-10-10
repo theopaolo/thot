@@ -110,7 +110,7 @@ Deno.test("champs manquants et format refusé: erreurs par champ, saisie conserv
   assertEquals(r.status, 400);
   const page = await r.text();
   assertStringIncludes(page, 'id="titre-erreur">Champ obligatoire.');
-  assertStringIncludes(page, 'id="matiere-erreur">Champ obligatoire.');
+  assert(!page.includes('id="matiere-erreur"'));
   assertStringIncludes(page, "Format non reconnu");
   assertStringIncludes(page, 'value="S1"');
   assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
@@ -303,7 +303,9 @@ Deno.test("les documents sans séquence ont leur propre route, distincte d'une s
     const accueil = await (await eleve.requete("/eleve")).text();
     const chemins = ["/eleve/sans-sequence", "/eleve/sequences/Sans%20s%C3%A9quence"];
     for (const [i, chemin] of chemins.entries()) {
-      assertStringIncludes(accueil, `href="${chemin}"`);
+      const theme = db.prepare("SELECT theme_id FROM source_cours WHERE source_id = ?").get(ids[i])
+        ?.theme_id;
+      assertStringIncludes(accueil, `href="${theme ? `/eleve/themes/${theme}` : chemin}"`);
       const r = await eleve.requete(`${chemin}?doc=${ids[i]}`);
       assertEquals(r.status, 200);
       const page = await r.text();

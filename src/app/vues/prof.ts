@@ -2,6 +2,9 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import { CLASSES, MATIERES, PUBLICS, PUBLICS_PAR_DEFAUT, TYPES_DOCUMENT } from "../depot.ts";
 import { icone } from "../icones.ts";
+import { type Affiliation, type Catalogue } from "../domaines.ts";
+import { type Profil } from "../../core/profils.ts";
+import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 
 type Option = { value: string; label: string };
@@ -26,6 +29,7 @@ const STATUTS: Record<string, string> = {
 export type LigneSource = {
   id: string;
   titre: string;
+  profil?: Profil;
   sequence: string;
   format: string;
   statut: string;
@@ -98,7 +102,9 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
           groupes.size > 1
             ? html`
               <section class="seance">
-                <h2>${sequence || "Sans séquence"} <span class="discret">${liste.length}</span></h2>
+                <h2>${sequence || (lignes.some((l) => l.profil === "general")
+                  ? "Sans thème"
+                  : "Sans séquence")} <span class="discret">${liste.length}</span></h2>
                 <ul class="tuiles grille-sources">${liste.map(carte)}</ul>
               </section>
             `
@@ -131,7 +137,14 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
   `;
 };
 
-type Filtres = { statut: string; sequence: string; vue: string };
+type Filtres = {
+  statut: string;
+  sequence: string;
+  vue: string;
+  matiere_id?: string;
+  cours_id?: string;
+  theme_id?: string;
+};
 
 const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
   `/prof?${new URLSearchParams({ ...f, ...change })}`;
@@ -140,6 +153,7 @@ export const sources = (
   lignes: LigneSource[],
   f: Filtres,
   repartition: { sequence: string; statut: string; n: number }[],
+  general = false,
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
@@ -153,16 +167,18 @@ export const sources = (
   const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
-    <nav class="onglets" aria-label="Séquence">
-      ${[["", "Toutes les séquences"], ...sequences.map((s) => [s, s])].map(([v, l]) =>
+    ${general ? "" : html`<nav class="onglets" aria-label="Séquence">
+      ${
+      [["", "Toutes les séquences"], ...sequences.map((s) => [s, s])].map(([v, l]) =>
         html`
           <a href="${lienFiltres(f, { sequence: v })}"
             aria-current="${String(
               v === f.sequence,
             )}">${l} <span class="nombre">${parSequence(v)}</span></a>
         `
-      )}
-    </nav>
+      )
+    }
+    </nav>`}
     <div class="biblio-outils">
       <nav class="segments" aria-label="Statut">
         ${[["", "Toutes"], ["a_relire", "À relire"], ["certifiee", "Certifiées"], [
@@ -199,7 +215,7 @@ export const sources = (
                   <th>
                     <input type="checkbox" aria-label="Tout sélectionner" data-tout-selectionner>
                   </th>
-                  <th>Document</th>
+                  <th>${general ? "Ressource" : "Document"}</th>
                   <th>Statut</th>
                   <th>Légendes</th>
                 </tr>
@@ -447,13 +463,18 @@ export const depot = (
     erreurs?: Record<string, string>;
     ok?: string;
     personnel?: boolean;
+    catalogue?: Catalogue;
+    profil?: Profil;
+    liens?: Affiliation[];
   },
 ) => {
   const c = s.champs ?? {};
   const e = s.erreurs ?? {};
   const publics = s.publics ?? PUBLICS_PAR_DEFAUT;
+  const arts = s.profil === "arts-appliques" || !s.catalogue;
   return html`
-    <h1>Déposer un document</h1>
+    <h1>Déposer une ressource</h1>
+    ${s.catalogue ? Domaines.choixMatiere(s.catalogue, c.matiere_id) : ""}
     ${s.ok
       ? html`
         <p role="status">${s.ok}</p>
@@ -478,6 +499,7 @@ export const depot = (
           `
           : ""}
       </div>
+      ${e.domaine ? html`<p role="alert">${e.domaine}</p>` : ""}
       <div class="deux">
         ${champ({
           nom: "type_document",
@@ -488,29 +510,32 @@ export const depot = (
           erreur: e.type_document,
         })} ${champ({
           nom: "classe",
-          label: "Classe",
-          requis: !s.personnel,
-          options: CLASSES,
+          label: arts ? "Classe (facultative)" : "Niveau (facultatif)",
+          options: arts ? CLASSES : undefined,
           valeur: c.classe,
           erreur: e.classe,
-        })} ${champ({
-          nom: "matiere",
-          label: "Matière",
-          requis: true,
-          options: MATIERES,
-          valeur: c.matiere,
-          erreur: e.matiere,
-        })} ${champ({
-          nom: "sous_matiere",
-          label: "Sous-matière",
-          valeur: c.sous_matiere,
-        })} ${champ({
-          nom: "sequence",
-          label: "Séquence",
-          valeur: c.sequence,
-          aide: "Les élèves trouvent le document sous cette séquence.",
-        })} ${champ({ nom: "seance", label: "Séance", valeur: c.seance })}
+        })} ${s.catalogue
+          ? html`<input type="hidden" name="matiere_id" value="${c.matiere_id ?? ""}">`
+          : champ({
+            nom: "matiere",
+            label: "Matière (facultative)",
+            options: MATIERES,
+            valeur: c.matiere,
+            erreur: e.matiere,
+          })} ${champ({
+            nom: "sous_matiere",
+            label: arts ? "Sous-matière" : "Sous-thème",
+            valeur: c.sous_matiere,
+          })} ${champ({
+            nom: "sequence",
+            label: arts ? "Séquence" : "Thème (facultatif)",
+            valeur: c.sequence,
+            aide: "Choisir le rattachement au cours ci-dessous.",
+          })} ${champ({ nom: "seance", label: arts ? "Séance" : "Section", valeur: c.seance })}
       </div>
+      ${s.catalogue ? Domaines.liens(s.catalogue, s.liens) : ""}
+      ${Domaines.langue(c.langue)}
+      <div class="deux">${Domaines.informations(s.profil ?? "general", c)}</div>
       ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })} ${champ({
         nom: "objectifs",
         label: "Objectifs pédagogiques",
@@ -542,11 +567,15 @@ export type Detail = {
     statut_le: string | null;
     enseignant: string;
     cree_le: string;
+    profil?: Profil;
+    langue?: string;
   };
   meta: Record<string, unknown>;
   job: { etat: string; erreur: string | null; avertissements: string[] } | undefined;
   images: ImageVue[];
   blocs: Bloc[];
+  catalogue?: Catalogue;
+  affiliations?: Affiliation[];
 };
 
 export type ImageVue = {
@@ -628,11 +657,22 @@ export const detailSource = (d: Detail) => {
         : ""}
       <div class="deux">
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
-        ${champ({ nom: "sequence", label: "Séquence", valeur: String(d.meta.sequence ?? "") })}
-        ${information("date", "Date de l'œuvre")} ${information("artiste", "Artiste")}
-        ${information("mouvement", "Mouvement")}
+        ${champ({
+          nom: "sequence",
+          label: d.source.profil === "general" ? "Thème" : "Séquence",
+          valeur: String(d.meta.sequence ?? ""),
+        })}
+        ${d.source.profil === "general"
+          ? Domaines.informations("general", d.meta)
+          : html`${information("date", "Date de l'œuvre")} ${information("artiste", "Artiste")} ${
+            information("mouvement", "Mouvement")
+          }`}
       </div>
-      <p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>
+      ${d.source.profil !== "general"
+        ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
+        : ""}
+      ${d.catalogue ? Domaines.liens(d.catalogue, d.affiliations) : ""}
+      ${Domaines.langue(d.source.langue)}
       <button>Enregistrer</button>
     </form>
     ${statutSource(d.source)}

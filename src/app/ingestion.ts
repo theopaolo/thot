@@ -6,6 +6,7 @@ import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../
 import { contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { sha256 } from "./depot.ts";
+import type { Profil } from "../core/profils.ts";
 
 const VERROU_MS = 5 * 60_000;
 const MAX_TENTATIVES = 3;
@@ -22,6 +23,8 @@ type Source = {
   fichier: string;
   format: string;
   statut: string;
+  profil: Profil;
+  langue: string;
 };
 
 /**
@@ -58,7 +61,7 @@ const lireSource = (db: Db, id: string) =>
 
 async function extraire(s: Source): Promise<Extraction> {
   const chemin = contenu(s.id, "original", s.fichier);
-  if (s.format === "pdf") return await extrairePdf(chemin);
+  if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
   if (s.format === "html") return extraireHtml(await Deno.readTextFile(chemin), s.titre);
   const extension = s.format;
   return {
@@ -95,6 +98,9 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     const ext = await extraire(s);
     const doc = assembler(ext.parties);
     const avertissements = [...ext.avertissements];
+    if (s.langue !== "fr") {
+      avertissements.push("Langue non prise en charge pour la recherche : " + s.langue);
+    }
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");
 
     const dossier = contenu(s.id);
@@ -124,6 +130,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
         const { texte, modele } = await modeles.legender(
           await Deno.readFile(`${dossier}/assets/${img.fichier}`),
           img.mime,
+          s.profil,
         );
         db.prepare(
           `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
@@ -176,7 +183,10 @@ export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] }
 export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
   const s = lireSource(db, sourceId);
   const meta = JSON.parse(s.metadonnees) as Meta;
-  const contexte = [meta.sequence?.replace(/^ATC /, ""), meta.seance].filter(Boolean).join(" / ");
+  const contexte = [
+    s.profil === "arts-appliques" ? meta.sequence?.replace(/^ATC /, "") : meta.sequence,
+    meta.seance,
+  ].filter(Boolean).join(" / ");
   const images = db.prepare(
     `SELECT legende, legende_statut FROM images
      WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
@@ -247,7 +257,7 @@ export function lireInformations(sortie: string, fiche: string): Record<string, 
 export const sourceSansInformations = (db: Db) =>
   db.prepare(
     `SELECT s.id FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
-     WHERE j.etat = 'awaiting_review' AND s.statut != 'rejetee'
+     WHERE j.etat = 'awaiting_review' AND s.statut != 'rejetee' AND s.profil = 'arts-appliques'
        AND json_type(s.metadonnees, '$.propositions') IS NULL
        AND json_type(s.metadonnees, '$.artiste') IS NULL
      LIMIT 1`,
@@ -260,6 +270,7 @@ export const sourceSansInformations = (db: Db) =>
  */
 export async function proposerInformations(db: Db, modeles: Modeles, sourceId: string) {
   const s = lireSource(db, sourceId);
+  if (s.profil !== "arts-appliques") return;
   const meta = JSON.parse(s.metadonnees) as Meta;
   const fiche = [
     `Titre : ${s.titre}`,
