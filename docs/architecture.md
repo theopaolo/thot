@@ -62,7 +62,8 @@ L'autorité d'administration est accordée explicitement par l'opérateur, jamai
 
 ## Matières, cours et profils
 
-Une matière choisit un profil d'import. Un cours regroupe des ressources avec un public et un
+Une instance a un seul profil d'import, partagé par ses matières et ses ressources. Un
+établissement qui a besoin des deux profils fait tourner deux instances. Un cours regroupe des ressources avec un public et un
 objectif facultatifs. Un thème appartient à un cours. Les identifiants, jamais les libellés,
 séparent les thèmes homonymes. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
@@ -75,12 +76,10 @@ avant la recherche et sur les lecteurs.
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
 neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
 et le quiz d'identification. Il garde aussi les consignes de réponse, de juge, de suggestion et
-de légende mesurées sur le pilote. Une réponse les emploie quand toutes ses sources citables sont
-en arts. Une page élève garde la présentation arts dès qu'une de ses ressources est en arts.
-La source capture son profil au dépôt. Sans matière choisie, une source rattachée à un cours
-d'arts en prend le profil. Changer celui d'une matière
-n'affecte que les futurs dépôts, sans régénération ni réindexation des ressources existantes.
-Une réextraction conserve ce profil et refuse de déplacer les citations si le texte change.
+de légende mesurées sur le pilote. La première matière fixe le profil de l'instance. Il se change
+tant qu'aucune ressource n'est déposée. Ensuite, l'administration et la CLI refusent une matière
+d'un autre profil. La source capture le profil au dépôt, y compris sans matière. Une réextraction
+conserve ce profil et refuse de déplacer les citations si le texte change.
 
 La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
 française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de

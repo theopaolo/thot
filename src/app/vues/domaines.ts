@@ -15,9 +15,8 @@ export const selectionProfil = (valeur = "general") =>
 export const gestion = (cat: Catalogue, erreur = "") =>
   html`
     <h1>Matières et cours</h1>${erreur ? html`<p role="alert">${erreur}</p>` : ""}
-    <p>Un profil modifié s'applique aux futurs dépôts. Les ressources gardent leur profil d'import,
-    leurs informations relues et leur index. Une nouvelle extraction nécessite une action explicite.
-    La réextraction refuse un texte qui changerait les citations. La recherche est prise en charge en français uniquement.</p>
+    <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
+    qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     <h2>Matières</h2>
     ${cat.matieres.map((m) =>
       html`
@@ -27,7 +26,9 @@ export const gestion = (cat: Catalogue, erreur = "") =>
       `
     )}
     <form method="post" action="/administration/domaines/matiere"
-      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${selectionProfil()}<button>Créer la matière</button></form>
+      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${selectionProfil(
+        cat.matieres[0]?.profil,
+      )}<button>Créer la matière</button></form>
     <h2>Cours</h2><ul>${cat.cours.map((c) =>
       html`<li>${c.nom} (${cat.matieres.find((m) => m.id === c.matiere_id)?.nom})${
         c.public ? `, ${c.public}` : ""

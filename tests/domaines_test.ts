@@ -116,17 +116,15 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
   }
 });
 
-Deno.test("général : champs facultatifs, attribution, profils futurs et rattachements sans copie ni publication", async () => {
+Deno.test("général : champs facultatifs, attribution, profil unique et rattachements sans copie ni publication", async () => {
   const { db, dir } = await environnement();
   try {
-    const arts = matiere(db, "Arts", "arts-appliques");
     const physique = matiere(db, "Physique");
     const reaper = matiere(db, "REAPER");
     const socio = matiere(db, "Sociologie");
     const c1 = cours(db, physique, "Optique", "", "Comprendre la lumière"),
       c2 = cours(db, reaper, "Manuel");
     cours(db, socio, "Auteurs");
-    cours(db, arts, "Images");
     const t1 = theme(db, c1, "Introduction"), t2 = theme(db, c2, "Introduction");
     const id = await ressource(db, {
       matiere_id: physique,
@@ -208,15 +206,11 @@ Deno.test("général : champs facultatifs, attribution, profils futurs et rattac
       "Isaac Newton",
     );
     assert(!detail.includes("Le quiz élève"));
-    profilMatiere(db, physique, "arts-appliques");
+    assertThrows(() => profilMatiere(db, physique, "arts-appliques"), Error, "un seul profil");
+    assertThrows(() => matiere(db, "Arts", "arts-appliques"), Error, "un seul profil");
     indexer(db, id);
     await reextraire(db, id);
     assertEquals(db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)!.profil, "general");
-    const id2 = await ressource(db, { matiere_id: physique }, [{ cours_id: c1, theme_id: t1 }]);
-    assertEquals(
-      db.prepare("SELECT profil FROM sources WHERE id = ?").get(id2)!.profil,
-      "arts-appliques",
-    );
     db.prepare(
       "UPDATE sources SET metadonnees = json_set(metadonnees, '$.publics', json('[\"enseignants\"]')) WHERE id = ?",
     ).run(id);
@@ -391,7 +385,7 @@ Deno.test("prompts neutres, preuves conservées, rubriques ATC et légendes rés
   }
 });
 
-Deno.test("arts appliqués : consignes mesurées, matière proposée, accueil gardé malgré une ressource générale", async () => {
+Deno.test("arts appliqués : consignes mesurées, matière proposée, profil de l’instance pour les ressources", async () => {
   const { db, dir } = await environnement();
   const empreinte = async (t: string) =>
     [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))]
@@ -486,7 +480,13 @@ Deno.test("arts appliqués : consignes mesurées, matière proposée, accueil ga
       db.prepare("SELECT profil FROM sources WHERE id = ?").get(rattachee)!.profil,
       "arts-appliques",
     );
-    await ressource(db, {});
+    const nonClassee = await ressource(db, {});
+    assertEquals(
+      db.prepare("SELECT profil FROM sources WHERE id = ?").get(nonClassee)!.profil,
+      "arts-appliques",
+    );
+    assertThrows(() => matiere(db, "Physique", "general"), Error, "un seul profil");
+    assertEquals(catalogue(db).matieres.length, 1);
     const eleve = await session(db, faux.modeles, "eleve");
     assertStringIncludes(await (await eleve.requete("/eleve")).text(), "Tes séquences");
   } finally {
@@ -550,11 +550,11 @@ Deno.test("sonde lexicale français / anglais : français conservé, anglais non
   }
 });
 
-Deno.test("CLI : configurer quatre collections, importer, rattacher et changer le profil sans altérer la source", async () => {
+Deno.test("CLI : configurer quatre collections, importer, rattacher, refuser un second profil", async () => {
   const dir = await Deno.makeTempDir();
   try {
-    const cli = async (...args: string[]) => {
-      const r = await new Deno.Command(Deno.execPath(), {
+    const lancer = (...args: string[]) =>
+      new Deno.Command(Deno.execPath(), {
         args: ["run", "-RWNE", "--allow-run=pdftotext", "src/cli.ts", ...args],
         cwd: RACINE,
         env: {
@@ -566,10 +566,12 @@ Deno.test("CLI : configurer quatre collections, importer, rattacher et changer l
         stdout: "piped",
         stderr: "piped",
       }).output();
+    const cli = async (...args: string[]) => {
+      const r = await lancer(...args);
       assert(r.success, new TextDecoder().decode(r.stderr));
       return new TextDecoder().decode(r.stdout).trim();
     };
-    const arts = await cli("matiere", "Arts", "--profil=arts-appliques");
+    const arts = await cli("matiere", "Arts");
     const physique = await cli("matiere", "Physique");
     await cli("matiere", "REAPER");
     await cli("matiere", "Sociologie");
@@ -598,7 +600,8 @@ Deno.test("CLI : configurer quatre collections, importer, rattacher et changer l
       const c2 = await cli("cours", arts, "Images");
       await cli("rattacher", s.id as string, c2);
       assertEquals(db.prepare("SELECT count(*) n FROM source_cours").get()!.n, 2);
-      await cli("profil", physique, "arts-appliques");
+      assert(!(await lancer("profil", physique, "arts-appliques")).success);
+      assert(!(await lancer("matiere", "Design", "--profil=arts-appliques")).success);
       await cli("reextraire");
       await cli("rebuild");
       assertEquals(db.prepare("SELECT profil FROM sources").get()!.profil, "general");

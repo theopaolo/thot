@@ -211,7 +211,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     try {
       switch (c.req.param("action")) {
         case "matiere":
-          Domaines.matiere(db, String(b.nom ?? ""), String(b.profil ?? "general"));
+          Domaines.matiere(db, String(b.nom ?? ""), b.profil ? String(b.profil) : undefined);
           break;
         case "cours":
           Domaines.cours(

@@ -97,8 +97,8 @@ Ensemble des documents produits et validés par les enseignants d'un établissem
 Espace de stockage et d'organisation des ressources de l'établissement dans Thot. Structurée par matières, cours et thèmes, elle constitue la mémoire collective de l'équipe pédagogique. Chaque enseignant gère sa propre bibliothèque et en reste responsable.
 
 **Matière**
-Discipline ou sujet d'étude dans l'instance. Son profil détermine les champs et traitements des
-futurs dépôts, sans modifier les ressources déjà relues.
+Discipline ou sujet d'étude dans l'instance. Toutes les matières d'une instance partagent son
+profil, qui détermine les champs et traitements des dépôts.
 
 **Cours**
 Collection de ressources, avec un public et un objectif facultatifs. Une ressource peut appartenir

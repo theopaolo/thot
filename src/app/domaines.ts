@@ -22,9 +22,25 @@ const texte = (s: string, max = 200) => {
   if (!s.trim() || s.trim().length > max) throw new Error(`Texte attendu : 1 à ${max} caractères.`);
   return s.trim();
 };
-export function matiere(db: Db, nom: string, profil: string = "general") {
-  const id = crypto.randomUUID();
+/** Le profil commun des matières et des ressources, absent tant que l'instance est vide. */
+export const profilInstance = (db: Db) =>
+  db.prepare("SELECT profil FROM matieres UNION SELECT profil FROM sources LIMIT 1").get()
+    ?.profil as Profil | undefined;
+
+/** Une instance garde un seul profil. Il se change tant qu'aucune ressource n'est déposée. */
+function garderProfil(db: Db, profil: string, saufMatiere = "") {
   if (!Object.hasOwn(PROFILS, profil)) throw new Error("Profil inconnu.");
+  const autres = db.prepare(
+    "SELECT profil FROM matieres WHERE id != ? UNION SELECT profil FROM sources",
+  ).all(saufMatiere);
+  if (autres.some((l) => l.profil !== profil)) {
+    throw new Error("L'instance garde un seul profil, partagé par ses matières et ses ressources.");
+  }
+}
+
+export function matiere(db: Db, nom: string, profil: string = profilInstance(db) ?? "general") {
+  const id = crypto.randomUUID();
+  garderProfil(db, profil);
   db.prepare("INSERT INTO matieres VALUES (?, ?, ?)").run(id, texte(nom), profil);
   return id;
 }
@@ -48,7 +64,7 @@ export function theme(db: Db, coursId: string, nom: string) {
   return id;
 }
 export function profilMatiere(db: Db, id: string, profil: string) {
-  if (!Object.hasOwn(PROFILS, profil)) throw new Error("Profil inconnu.");
+  garderProfil(db, profil, id);
   if (!db.prepare("UPDATE matieres SET profil = ? WHERE id = ?").run(profil, id).changes) {
     throw new Error("Matière inconnue.");
   }
@@ -63,8 +79,8 @@ export const MATIERES = [
   { value: "eps", label: "Éducation physique et sportive" },
 ];
 
-/** Sans matière choisie, une source rattachée à un cours d'arts appliqués en prend le profil. */
-export function domaineSource(db: Db, champs: Record<string, string>, liens: Affiliation[] = []) {
+/** Une source sans matière prend le profil de l'instance. */
+export function domaineSource(db: Db, champs: Record<string, string>) {
   let m: Matiere | undefined;
   if (champs.matiere_id) {
     m = db.prepare("SELECT * FROM matieres WHERE id = ?").get(champs.matiere_id) as
@@ -76,17 +92,17 @@ export function domaineSource(db: Db, champs: Record<string, string>, liens: Aff
     const nom = MATIERES.find((x) => x.value === cle)?.label ?? cle;
     m = db.prepare("SELECT * FROM matieres WHERE nom = ?").get(nom) as Matiere | undefined;
     if (!m) {
-      const id = matiere(db, nom, cle === "arts-appliques" ? "arts-appliques" : "general");
+      const id = matiere(
+        db,
+        nom,
+        profilInstance(db) ?? (cle === "arts-appliques" ? "arts-appliques" : "general"),
+      );
       m = db.prepare("SELECT * FROM matieres WHERE id = ?").get(id) as Matiere;
     }
   }
-  const arts = liens.some((l) =>
-    db.prepare("SELECT m.profil FROM cours c JOIN matieres m ON m.id = c.matiere_id WHERE c.id = ?")
-      .get(l.cours_id)?.profil === "arts-appliques"
-  );
   return {
     matiere_id: m?.id ?? null,
-    profil: m?.profil ?? (arts ? "arts-appliques" : "general") as Profil,
+    profil: m?.profil ?? profilInstance(db) ?? "general",
     langue: langueSource(champs.langue),
   };
 }

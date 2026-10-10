@@ -138,11 +138,7 @@ export async function deposer(
   const t = maintenant();
   try {
     transaction(db, () => {
-      const domaine = domaineSource(
-        db,
-        d.meta as unknown as Record<string, string>,
-        d.liens,
-      );
+      const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
       const informations = validerInformations(
         d.meta as unknown as Record<string, string>,
         domaine.profil,
