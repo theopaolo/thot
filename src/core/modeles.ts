@@ -1,4 +1,5 @@
 import { setTimeout as attendre } from "node:timers/promises";
+import type { Profil } from "./profils.ts";
 
 /** Une panne de fournisseur. Elle ne doit jamais se lire comme un refus hors corpus. */
 export class PanneModele extends Error {
@@ -14,7 +15,7 @@ export interface Modeles {
   legender(
     image: Uint8Array,
     mime: string,
-    profil?: import("./profils.ts").Profil,
+    profil?: Profil,
   ): Promise<{ texte: string; modele: string }>;
   reclasser(question: string, documents: string[]): Promise<{ index: number; score: number }[]>;
   generer(messages: Message[]): Promise<{ texte: string; modele: string }>;
@@ -25,6 +26,7 @@ export interface Modeles {
     citation: string,
     titre: string,
     signal?: AbortSignal,
+    profil?: Profil,
   ): Promise<{ probabilite: number; modele: string }>;
 }
 
@@ -44,8 +46,11 @@ export type ConfigModeles = {
   effort?: string;
 };
 
-export const CONSIGNE_LEGENDE = `Tu decris une image d'une ressource pedagogique
-pour qu'une personne puisse la RETROUVER en la cherchant avec
+// Les consignes d'arts appliqués sont celles que mesurent `evaluation/resultats/ml4-*` (leur
+// `prompt_sha256`). Les retoucher demande de refaire ces mesures. Les autres profils lisent une
+// version générale, pas encore mesurée.
+export const CONSIGNE_LEGENDE = `Tu decris une image d'un corpus pedagogique d'arts appliques
+(lycee, Terminale) pour qu'un eleve puisse la RETROUVER en la cherchant avec
 ses propres mots.
 
 Ecris en francais, 40 a 70 mots, un seul paragraphe, sans titre ni puces.
@@ -59,13 +64,17 @@ quelqu'un qui ne connait pas le vocabulaire de la discipline.
 N'invente jamais de nom d'auteur, de date ni de lieu que tu ne lis pas dans
 l'image. Si un texte est ecrit dans l'image, recopie-le entre guillemets.
 Ne reprends aucune formulation de cette consigne.`;
+const CONSIGNE_LEGENDE_GENERALE = CONSIGNE_LEGENDE.replace(
+  "d'un corpus pedagogique d'arts appliques\n(lycee, Terminale) pour qu'un eleve",
+  "d'une ressource pedagogique\npour qu'une personne",
+);
 
 // Le juge ne voit pas le paragraphe autour de la citation: avec lui, il acceptait des faits
 // présents seulement dans le paragraphe (ADR 0006).
 const CONSIGNE_SOUTIEN = `Tu controles une reponse faite a un eleve. On te donne une phrase
 de la reponse, le titre de l'extrait du cours et le passage cite pour la prouver.
 
-Le titre peut donner le sujet de la phrase : la personne, la notion ou l’objet dont
+Le titre peut donner le sujet de la phrase : le mouvement, l'artiste ou l'oeuvre dont
 parle l'extrait. Tout le reste doit venir du passage.
 
 Reponds "oui" si le titre et le passage suffisent a etablir tout ce que dit la phrase.
@@ -73,6 +82,10 @@ Reponds "non" si la phrase ajoute, generalise, inverse ou attribue a quelqu'un d
 ce que dit le passage.
 
 Reponds par un seul mot : oui ou non.`;
+const CONSIGNE_SOUTIEN_GENERALE = CONSIGNE_SOUTIEN.replace(
+  "le mouvement, l'artiste ou l'oeuvre",
+  "la personne, la notion ou l'objet",
+);
 
 /** P(oui) parmi les jetons les plus probables du premier token de sortie. */
 export function probabiliteOui(tops: { token: string; logprob: number }[]) {
@@ -218,10 +231,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           role: "user",
           content: [{
             type: "text",
-            text: CONSIGNE_LEGENDE +
-              (profil === "arts-appliques"
-                ? "\nContexte : arts appliques, decris les formes et les materiaux visibles."
-                : ""),
+            text: profil === "arts-appliques" ? CONSIGNE_LEGENDE : CONSIGNE_LEGENDE_GENERALE,
           }, {
             type: "image_url",
             image_url: { url },
@@ -296,10 +306,13 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       return texte.trim();
     },
 
-    async soutenir(texte, citation, titre, signal) {
+    async soutenir(texte, citation, titre, signal, profil = "general") {
       signal?.throwIfAborted();
       const messages = [
-        { role: "system", content: CONSIGNE_SOUTIEN },
+        {
+          role: "system",
+          content: profil === "arts-appliques" ? CONSIGNE_SOUTIEN : CONSIGNE_SOUTIEN_GENERALE,
+        },
         {
           role: "user",
           content: `Titre : ${titre}\nPassage : « ${citation} »\nPhrase : « ${texte} »`,

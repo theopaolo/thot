@@ -360,7 +360,7 @@ export const pageChapitre = (
   themeId?: string,
   perimetre = "",
 ) => {
-  if (sources.some((s) => s.profil === "general")) {
+  if (sources.every((s) => s.profil === "general")) {
     return html`
       <p><a href="/eleve">Ressources</a></p><h1>${nom ||
         "Ressources non classées"}</h1><p class="discret">${perimetre}</p>

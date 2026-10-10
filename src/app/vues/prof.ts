@@ -1,8 +1,8 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
-import { CLASSES, MATIERES, PUBLICS, PUBLICS_PAR_DEFAUT, TYPES_DOCUMENT } from "../depot.ts";
+import { CLASSES, PUBLICS, PUBLICS_PAR_DEFAUT, TYPES_DOCUMENT } from "../depot.ts";
 import { icone } from "../icones.ts";
-import { type Affiliation, type Catalogue } from "../domaines.ts";
+import { type Affiliation, type Catalogue, MATIERES } from "../domaines.ts";
 import { type Profil } from "../../core/profils.ts";
 import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";

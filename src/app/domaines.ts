@@ -53,7 +53,18 @@ export function profilMatiere(db: Db, id: string, profil: string) {
     throw new Error("Matière inconnue.");
   }
 }
-export function domaineSource(db: Db, champs: Record<string, string>) {
+// ponytail: liste en dur. `thot ingest --matiere=` et la migration 0007 la lisent encore.
+export const MATIERES = [
+  { value: "arts-appliques", label: "Arts appliqués" },
+  { value: "histoire-geographie", label: "Histoire-géographie" },
+  { value: "francais", label: "Français" },
+  { value: "physique-chimie", label: "Physique-chimie" },
+  { value: "mathematiques", label: "Mathématiques" },
+  { value: "eps", label: "Éducation physique et sportive" },
+];
+
+/** Sans matière choisie, une source rattachée à un cours d'arts appliqués en prend le profil. */
+export function domaineSource(db: Db, champs: Record<string, string>, liens: Affiliation[] = []) {
   let m: Matiere | undefined;
   if (champs.matiere_id) {
     m = db.prepare("SELECT * FROM matieres WHERE id = ?").get(champs.matiere_id) as
@@ -61,16 +72,21 @@ export function domaineSource(db: Db, champs: Record<string, string>) {
       | undefined;
     if (!m) throw new Error("Matière inconnue.");
   } else if (champs.matiere?.trim()) {
-    const nom = champs.matiere.trim();
+    const cle = champs.matiere.trim();
+    const nom = MATIERES.find((x) => x.value === cle)?.label ?? cle;
     m = db.prepare("SELECT * FROM matieres WHERE nom = ?").get(nom) as Matiere | undefined;
     if (!m) {
-      const id = matiere(db, nom, nom === "arts-appliques" ? "arts-appliques" : "general");
+      const id = matiere(db, nom, cle === "arts-appliques" ? "arts-appliques" : "general");
       m = db.prepare("SELECT * FROM matieres WHERE id = ?").get(id) as Matiere;
     }
   }
+  const arts = liens.some((l) =>
+    db.prepare("SELECT m.profil FROM cours c JOIN matieres m ON m.id = c.matiere_id WHERE c.id = ?")
+      .get(l.cours_id)?.profil === "arts-appliques"
+  );
   return {
     matiere_id: m?.id ?? null,
-    profil: m?.profil ?? "general" as Profil,
+    profil: m?.profil ?? (arts ? "arts-appliques" : "general") as Profil,
     langue: langueSource(champs.langue),
   };
 }

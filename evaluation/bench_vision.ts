@@ -106,7 +106,7 @@ async function legender(modele: string, probe: boolean) {
     mesureActive = mesure;
     try {
       const img = await Deno.readFile(join(RACINE, "data/content", l.sourceId, "assets", l.fichier));
-      const { texte } = await modeles.legender(img, l.mime);
+      const { texte } = await modeles.legender(img, l.mime, "arts-appliques");
       donnees[l.id] = { ...mesure, texte, ms: Math.round(performance.now() - t) };
     } catch (e) {
       donnees[l.id] = { ...mesure, erreur: String(e).slice(0, 400), ms: Math.round(performance.now() - t) };

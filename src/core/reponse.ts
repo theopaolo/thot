@@ -8,6 +8,7 @@ import {
   type Perimetre,
 } from "./recherche.ts";
 import { trouverFragments } from "./texte.ts";
+import type { Profil } from "./profils.ts";
 
 export type Affirmation = {
   texte: string;
@@ -28,8 +29,9 @@ export type Resultat =
 
 export type Journal = Record<string, unknown>;
 
-const SYSTEME = `Tu reponds a une personne qui apprend a partir d'extraits de ressources
-fournies, et de RIEN d'autre.
+// Le texte d'arts appliqués est celui que mesurent `evaluation/resultats/ml4-*`.
+const SYSTEME_ARTS = `Tu reponds a des eleves de Terminale a partir d'extraits d'un corpus de cours
+fourni par leur professeur, et de RIEN d'autre.
 
 Regles, sans exception :
 1. Chaque affirmation de ta reponse doit se trouver dans les extraits fournis.
@@ -47,10 +49,26 @@ Regles, sans exception :
 4. Une affirmation porte un seul fait, pris dans un seul extrait, et ne dit rien de plus que
    sa citation : aucune cause, date, nom, exemple ou precision venus d'un autre extrait ou de
    tes connaissances. Si la reponse a besoin de deux extraits, ecris deux affirmations.
-5. Nomme le sujet de chaque affirmation (personne, notion, objet) comme l'extrait le nomme.
+5. Nomme le sujet de chaque affirmation (mouvement, artiste, oeuvre) comme l'extrait le nomme.
    Choisis une citation qui contient le fait affirme et, quand c'est possible, le nom de ce
    sujet : une citation qui commence par « il » ou « ils » ne dit pas de qui elle parle.
 6. Cinq affirmations au maximum, 120 mots de reponse au total.`;
+const SYSTEME: Record<Profil, string> = {
+  "arts-appliques": SYSTEME_ARTS,
+  general: SYSTEME_ARTS.replace(
+    "des eleves de Terminale a partir d'extraits d'un corpus de cours\nfourni par leur professeur",
+    "une personne qui apprend a partir d'extraits de ressources\nfournies",
+  ).replace("(mouvement, artiste, oeuvre)", "(personne, notion, objet)"),
+};
+
+/** Les consignes d'arts appliqués servent quand toutes les sources citables en viennent. */
+export function profilSources(db: DatabaseSync, ids: string[]): Profil {
+  const arts = ids.length > 0 &&
+    ids.every((id) =>
+      db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)?.profil === "arts-appliques"
+    );
+  return arts ? "arts-appliques" : "general";
+}
 
 const bloc = (retenus: Candidat[]) =>
   retenus.map((c, i) => `[${i + 1}] ${c.titre}\n${c.preuve}`).join("\n\n");
@@ -139,13 +157,18 @@ const DELAI_JUGE_MS = 4000;
  * Un juge injoignable ou trop lent laisse passer l'affirmation: les citations restent vérifiées
  * mot pour mot, et la panne est notée au journal.
  */
-async function juger(modeles: Modeles, affirmations: Affirmation[], journal: Journal) {
+async function juger(
+  modeles: Modeles,
+  affirmations: Affirmation[],
+  journal: Journal,
+  profil: Profil,
+) {
   const verdicts = await Promise.allSettled(
     affirmations.map((a) => {
       const controle = new AbortController();
       let minuteur: ReturnType<typeof setTimeout> | undefined;
       return Promise.race([
-        modeles.soutenir(a.texte, a.citation, a.titre, controle.signal),
+        modeles.soutenir(a.texte, a.citation, a.titre, controle.signal, profil),
         new Promise<never>((_, non) => {
           minuteur = setTimeout(() => {
             const erreur = new Error("juge au-delà du délai");
@@ -231,8 +254,9 @@ export async function demander(
     if (r.horsCorpus) return { resultat: { etat: "out_of_corpus", raison: "seuil" }, journal };
 
     etape("Rédaction à partir des passages trouvés");
+    const profil = profilSources(db, r.retenus.map((c) => c.source_id));
     const messages: Message[] = [
-      { role: "system", content: SYSTEME },
+      { role: "system", content: SYSTEME[profil] },
       {
         role: "user",
         content: `Extraits du corpus :\n\n${bloc(r.retenus)}\n\n${
@@ -253,7 +277,7 @@ export async function demander(
           ? repondre(gardees, true)
           : { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       }
-      const j = await juger(modeles, v.affirmations, journal);
+      const j = await juger(modeles, v.affirmations, journal, profil);
       const erreurs = [...v.erreurs, ...j.erreurs];
       tentatives.push({ sortie: texte, erreurs, soutien: j.probabilites });
       if (j.soutenues.length > gardees.length) gardees = j.soutenues;

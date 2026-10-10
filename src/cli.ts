@@ -510,7 +510,14 @@ async function evalSoutien() {
   const lignes: { id: string; famille: string; soutient: boolean; p: number; ms: number }[] = [];
   for (const x of annotees) {
     const t = Date.now();
-    const { probabilite } = await modeles.soutenir(x.texte, x.citation, x.titre ?? "");
+    // Les paires viennent du corpus pilote, en arts appliqués.
+    const { probabilite } = await modeles.soutenir(
+      x.texte,
+      x.citation,
+      x.titre ?? "",
+      undefined,
+      "arts-appliques",
+    );
     lignes.push({
       id: x.id,
       famille: x.famille,

@@ -100,7 +100,7 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
     assertEquals(sources.map((s) => s.profil), ["arts-appliques", "general", "general"]);
     assertEquals(sources[2].matiere_id, null);
     const cat = catalogue(db);
-    assertEquals(cat.matieres.length, 2);
+    assertEquals(cat.matieres.map((m) => m.nom), ["Arts appliqués", "Physique"]);
     assertEquals(cat.themes.map((t) => t.nom), ["Lumière", "Lumière"]);
     assert(cat.themes[0].id !== cat.themes[1].id);
     assert(cat.themes[0].cours_id !== cat.themes[1].cours_id);
@@ -385,6 +385,110 @@ Deno.test("prompts neutres, preuves conservées, rubriques ATC et légendes rés
     );
     assertThrows(() => validerInformations({ date_publication: "2025-02-30" }, "general"));
     await assertRejects(() => ressource(db, { matiere_id: "inconnue" }));
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("arts appliqués : consignes mesurées, matière proposée, accueil gardé malgré une ressource générale", async () => {
+  const { db, dir } = await environnement();
+  const empreinte = async (t: string) =>
+    [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))]
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    const citation =
+      "La lumière traverse le prisme transparent et se décompose en couleurs visibles.";
+    const arts = await ressource(
+      db,
+      { matiere: "arts-appliques" },
+      undefined,
+      Array(5).fill(citation).join(" "),
+    );
+    const [m] = catalogue(db).matieres;
+    assertEquals([m.nom, m.profil], ["Arts appliqués", "arts-appliques"]);
+    const sortie = JSON.stringify({ affirmations: [{ texte: citation, extrait: 1, citation }] });
+    const faux = fauxModeles({
+      sorties: [
+        sortie,
+        JSON.stringify({ questions: ["Comment le prisme décompose-t-il la lumière ?"] }),
+        sortie,
+      ],
+    });
+    await demander(db, faux.modeles, "lumière", { schoolId: "pilote" }, 0.01);
+    await genererSuggestions(db, faux.modeles, arts);
+    const systeme = faux.vus.flat().filter((m) => m.role === "system").map((m) => m.content);
+    // Consignes de `reponse.ts` et `suggestions.ts` avant DOM-101, celles des mesures ml4.
+    assertEquals(
+      new Set(await Promise.all(systeme.map(empreinte))),
+      new Set([
+        "b2242dea70cea02ca328b17439fc4eac058b3dc9b33e4b0ba984442c75f0f778",
+        "3b5289fcae4965f5f2bca037455d4805e334855023495ca8501097f93b92ada8",
+      ]),
+    );
+    const corps: string[] = [];
+    const avant = globalThis.fetch;
+    globalThis.fetch = (_input, init) => {
+      corps.push(String(init?.body));
+      const content = corps.length === 1 ? "Une image." : "oui";
+      return Promise.resolve(Response.json({ choices: [{ message: { content } }] }));
+    };
+    try {
+      const modeles = openrouter({ ...config.modeles, cle: "factice" }, {
+        lire: () => undefined,
+        ecrire: () => {},
+      });
+      await modeles.legender(new Uint8Array([1]), "image/jpeg", "arts-appliques");
+      await modeles.soutenir("Phrase", "Citation", "Titre", undefined, "arts-appliques");
+    } finally {
+      globalThis.fetch = avant;
+    }
+    // Empreintes enregistrées dans `evaluation/resultats/ml4-vision.json` et `ml4-soutien.json`.
+    assertEquals(
+      await empreinte(JSON.parse(corps[0]).messages[0].content[0].text),
+      "a0f6088160f42e44fb255f8b226f5d3aad812cc51ff68ab97ee89592a4853ad3",
+    );
+    assertEquals(
+      await empreinte(JSON.parse(corps[1]).messages[0].content),
+      "af464e182725d30ff3f0be918319cd9e8381f3b221de0ae7272ea420fe45bd22",
+    );
+
+    const prof = await session(db, faux.modeles, "enseignant");
+    assertStringIncludes(
+      await (await prof.requete("/prof/depot")).text(),
+      `name="matiere_id" value="${m.id}"`,
+    );
+    const form = new FormData();
+    for (
+      const [k, v] of Object.entries({
+        titre: "Prisme",
+        type_document: "cours",
+        matiere_id: m.id,
+        sequence: "Lumière",
+        affiliations_presentes: "1",
+      })
+    ) form.set(k, v);
+    form.set("fichier", new File([`<p>${citation}</p>`], "prisme.html"));
+    assertEquals((await prof.requete("/prof/depot", { method: "POST", body: form })).status, 200);
+    assertEquals(
+      db.prepare(
+        `SELECT t.nom FROM sources s JOIN source_cours sc ON sc.source_id = s.id
+        JOIN themes t ON t.id = sc.theme_id WHERE s.titre = 'Prisme'`,
+      ).get()?.nom,
+      "Lumière",
+    );
+    await traiter(db, revendiquer(db)!, faux.modeles);
+    const rattachee = await ressource(db, {}, [{
+      cours_id: catalogue(db).cours[0].id,
+      theme_id: null,
+    }]);
+    assertEquals(
+      db.prepare("SELECT profil FROM sources WHERE id = ?").get(rattachee)!.profil,
+      "arts-appliques",
+    );
+    await ressource(db, {});
+    const eleve = await session(db, faux.modeles, "eleve");
+    assertStringIncludes(await (await eleve.requete("/eleve")).text(), "Tes séquences");
   } finally {
     db.close();
     await Deno.remove(dir, { recursive: true });

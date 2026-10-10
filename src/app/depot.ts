@@ -17,14 +17,6 @@ export const TYPES_DOCUMENT = [
   { value: "referentiel", label: "Référentiel" },
   { value: "autres", label: "Autres" },
 ];
-export const MATIERES = [
-  { value: "arts-appliques", label: "Arts appliqués" },
-  { value: "histoire-geographie", label: "Histoire-géographie" },
-  { value: "francais", label: "Français" },
-  { value: "physique-chimie", label: "Physique-chimie" },
-  { value: "mathematiques", label: "Mathématiques" },
-  { value: "eps", label: "Éducation physique et sportive" },
-];
 export const CLASSES = [
   { value: "2nde", label: "Seconde" },
   { value: "1ere", label: "Première" },
@@ -146,7 +138,11 @@ export async function deposer(
   const t = maintenant();
   try {
     transaction(db, () => {
-      const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
+      const domaine = domaineSource(
+        db,
+        d.meta as unknown as Record<string, string>,
+        d.liens,
+      );
       const informations = validerInformations(
         d.meta as unknown as Record<string, string>,
         domaine.profil,

@@ -1,22 +1,32 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Modeles } from "./modeles.ts";
 import type { Perimetre } from "./recherche.ts";
-import { demander } from "./reponse.ts";
+import { demander, profilSources } from "./reponse.ts";
+import type { Profil } from "./profils.ts";
 
 /** Une question qui renvoie à un support que l'élève n'a pas sous les yeux. */
 const RENVOI =
   /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage|le motif|cette (œuvre|oeuvre|image)|l['’]image)\b/i;
 
-const CONSIGNE = `Voici un extrait d'une ressource pour apprendre.
+// Le texte d'arts appliqués est celui que mesurent `evaluation/resultats/ml4-*`.
+const CONSIGNE_ARTS = `Voici un extrait d'un cours de lycee.
 
-Ecris deux questions qu'une personne qui apprend pourrait poser, dont la reponse se trouve
+Ecris deux questions qu'un eleve de Terminale pourrait poser, dont la reponse se trouve
 dans cet extrait et seulement dans cet extrait. Questions courtes, 6 a 15 mots, en
 francais simple, comme un eleve les poserait. Une question porte sur une idee, une cause
-ou un objet, jamais sur un detail de mise en page. L'eleve ne voit pas l'extrait :
-une question nomme son sujet si elle porte sur une image ou un motif. Elle ne
+ou une oeuvre, jamais sur un detail de mise en page. L'eleve ne voit pas l'extrait :
+une question nomme l'œuvre ou l'artiste si elle porte sur une image ou un motif. Elle ne
 mentionne jamais « l'extrait », « le texte », « le document » ou « le passage ».
 
 Rends uniquement un objet JSON : {"questions": ["...", "..."]}`;
+const CONSIGNE: Record<Profil, string> = {
+  "arts-appliques": CONSIGNE_ARTS,
+  general: CONSIGNE_ARTS
+    .replace("d'un cours de lycee", "d'une ressource pour apprendre")
+    .replace("qu'un eleve de Terminale", "qu'une personne qui apprend")
+    .replace("ou une oeuvre, jamais", "ou un objet, jamais")
+    .replace("nomme l'œuvre ou l'artiste si", "nomme son sujet si"),
+};
 
 /**
  * Propose des questions sur un passage, puis ne garde que celles auxquelles la chaîne de réponse
@@ -30,7 +40,7 @@ export async function questionsVerifiees(
   seuil: number,
 ): Promise<{ question: string; modele: string }[]> {
   const { texte, modele } = await modeles.generer([
-    { role: "system", content: CONSIGNE },
+    { role: "system", content: CONSIGNE[profilSources(db, [passage.source_id])] },
     { role: "user", content: `${passage.titre}\n\n${passage.texte}` },
   ]);
   let questions: unknown;

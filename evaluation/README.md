@@ -45,7 +45,8 @@ sous `evaluation/resultats/`. Les résultats de référence suivis dans ce dép�
 ## Langues et profils
 
 `tests/domaines_test.ts` contient une sonde lexicale synthétique français/anglais et les contrôles
-sans fournisseur des prompts génériques, du profil arts et des périmètres de recherche. La sonde
+sans fournisseur des prompts génériques, du profil arts et des périmètres de recherche. Il
+vérifie que les consignes du profil arts ont l'empreinte des mesures ml4. La sonde
 trouve trois cibles sur quatre en français et une sur quatre en anglais avec la racinisation
 actuelle. Le pluriel irrégulier français et les formes anglaises montrent les limites du moteur.
 Ce petit jeu ne mesure ni la recherche bilingue entre documents et questions ni la qualité des

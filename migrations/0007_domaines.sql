@@ -29,16 +29,31 @@ CREATE TABLE source_cours (
     PRIMARY KEY (source_id, cours_id),
     FOREIGN KEY (theme_id, cours_id) REFERENCES themes(id, cours_id)
 );
+-- Le dépôt rangeait la matière sous l'identifiant de sa liste. Les élèves voient le libellé.
+CREATE TEMP TABLE noms_matieres (cle TEXT PRIMARY KEY, nom TEXT NOT NULL);
+INSERT INTO noms_matieres
+    SELECT DISTINCT json_extract(metadonnees, '$.matiere'), json_extract(metadonnees, '$.matiere')
+    FROM sources WHERE coalesce(json_extract(metadonnees, '$.matiere'), '') != '';
+UPDATE noms_matieres SET nom = CASE cle
+    WHEN 'arts-appliques' THEN 'Arts appliqués'
+    WHEN 'histoire-geographie' THEN 'Histoire-géographie'
+    WHEN 'francais' THEN 'Français'
+    WHEN 'physique-chimie' THEN 'Physique-chimie'
+    WHEN 'mathematiques' THEN 'Mathématiques'
+    WHEN 'eps' THEN 'Éducation physique et sportive'
+    ELSE nom END;
 INSERT INTO matieres
-    SELECT lower(hex(randomblob(16))), json_extract(metadonnees, '$.matiere'),
-        CASE WHEN json_extract(metadonnees, '$.matiere') = 'arts-appliques'
-            THEN 'arts-appliques' ELSE 'general' END
-    FROM sources WHERE coalesce(json_extract(metadonnees, '$.matiere'), '') != ''
-    GROUP BY json_extract(metadonnees, '$.matiere');
+    SELECT lower(hex(randomblob(16))), nom,
+        CASE WHEN max(cle = 'arts-appliques') THEN 'arts-appliques' ELSE 'general' END
+    FROM noms_matieres GROUP BY nom;
 UPDATE sources SET matiere_id = (
-    SELECT id FROM matieres WHERE nom = json_extract(sources.metadonnees, '$.matiere')
-), profil = CASE WHEN json_extract(metadonnees, '$.matiere') = 'arts-appliques'
-    THEN 'arts-appliques' ELSE 'general' END;
+    SELECT m.id FROM noms_matieres n JOIN matieres m ON m.nom = n.nom
+    WHERE n.cle = json_extract(sources.metadonnees, '$.matiere')
+);
+UPDATE sources SET profil = coalesce(
+    (SELECT profil FROM matieres WHERE id = sources.matiere_id), 'general'
+);
+DROP TABLE noms_matieres;
 INSERT INTO cours (id, matiere_id, nom)
     SELECT lower(hex(randomblob(16))), id, nom FROM matieres;
 INSERT INTO themes

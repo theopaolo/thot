@@ -186,6 +186,10 @@ export function creerApp(db: Db, modeles: Modeles) {
   const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
   const optionsDepot = (champs: Record<string, string> = {}, b: Record<string, unknown> = {}) => {
     const cat = Domaines.catalogue(db);
+    // Une seule matière: le dépôt la prend d'office. « Non classée » reste un choix explicite.
+    if (cat.matieres.length === 1 && champs.matiere_id === undefined && !champs.matiere) {
+      champs = { ...champs, matiere_id: cat.matieres[0].id };
+    }
     const m = cat.matieres.find((m) =>
       champs.matiere_id ? m.id === champs.matiere_id : m.nom === champs.matiere
     );
@@ -446,7 +450,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           format: controle.format,
           schoolId: instance.school_id,
           enseignant: c.get("compte").nom,
-          liens: b.cours !== undefined || b.matiere_id ? Domaines.liensFormulaire(b) : undefined,
+          liens: b.cours !== undefined ? Domaines.liensFormulaire(b) : undefined,
         });
       } catch (e) {
         return refus({ domaine: (e as Error).message });
@@ -674,7 +678,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db);
     const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", "", c.req.query("vue"));
-    const generique = visibles.some((r) => r.profil === "general") ||
+    const generique = visibles.every((r) => r.profil === "general") ||
       Object.values(scope(c)).some(Boolean);
     if (generique) {
       return c.html(rendre(

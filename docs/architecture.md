@@ -74,7 +74,11 @@ avant la recherche et sur les lecteurs.
 
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
 neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
-et le quiz d'identification. La source capture son profil au dépôt. Changer celui d'une matière
+et le quiz d'identification. Il garde aussi les consignes de réponse, de juge, de suggestion et
+de légende mesurées sur le pilote. Une réponse les emploie quand toutes ses sources citables sont
+en arts. Une page élève garde la présentation arts dès qu'une de ses ressources est en arts.
+La source capture son profil au dépôt. Sans matière choisie, une source rattachée à un cours
+d'arts en prend le profil. Changer celui d'une matière
 n'affecte que les futurs dépôts, sans régénération ni réindexation des ressources existantes.
 Une réextraction conserve ce profil et refuse de déplacer les citations si le texte change.
 
