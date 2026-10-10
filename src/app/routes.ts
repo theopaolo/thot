@@ -12,7 +12,10 @@ import {
   type Candidat,
   chercher,
   chercherFts,
+  FILTRE_ACCES,
   indexerSource,
+  type Lecteur,
+  parametresAcces,
   transaction,
 } from "../core/recherche.ts";
 import { contexte } from "../core/texte.ts";
@@ -22,14 +25,17 @@ import {
   type Compte,
   consommerProvisoire,
   importerEleves,
+  lecteur,
   lireCompte,
+  peutLire,
+  peutModifier,
   reinitialiserMotDePasse,
   secretSession,
 } from "./comptes.ts";
 import { lireInstance } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
-import { controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
+import { audience, controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
 import { chunksSource, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import { administration, connexion as formulaireConnexion, motDePasse, page } from "./vues/page.ts";
@@ -114,6 +120,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       getCookie(c, "rail") === "replie",
       lireInstance(db),
     );
+
+  const lu = (c: Context<Env>) => lecteur(c.get("compte"));
+  const MODIFICATION_REFUSEE =
+    "Seuls son propriétaire et les administrateurs modifient cette source.";
 
   // ------------------------------------------------------------ connexion
   app.get("/connexion", (c) => c.html(rendre(c, "Connexion", formulaireConnexion())));
@@ -253,37 +263,41 @@ export function creerApp(db: Db, modeles: Modeles) {
   // ------------------------------------------------------------ images
   app.get("/media/:id", async (c) => {
     const i = db.prepare(
-      `SELECT i.fichier, i.mime, i.source_id, s.statut,
-         EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves') AS visible
-       FROM images i JOIN sources s ON s.id = i.source_id WHERE i.id = ? AND s.school_id = ?`,
-    ).get(c.req.param("id"), instance.school_id) as
-      | { fichier: string; mime: string; source_id: string; statut: string; visible: number }
+      `SELECT i.fichier, i.mime, i.source_id, i.checksum FROM images i JOIN sources s ON s.id = i.source_id
+       WHERE i.id = ? AND s.school_id = ? AND ${FILTRE_ACCES} AND (s.statut = 'certifiee' OR ?)`,
+    ).get(
+      c.req.param("id"),
+      instance.school_id,
+      ...parametresAcces(lu(c)),
+      lu(c).enseignant ? 1 : 0,
+    ) as
+      | { fichier: string; mime: string; source_id: string; checksum: string }
       | undefined;
-    if (
-      !i || (c.get("compte").role !== "enseignant" &&
-        (i.statut !== "certifiee" || !i.visible))
-    ) {
-      return c.notFound();
-    }
+    if (!i) return c.notFound();
+    // Le navigateur revalide à chaque affichage : une source devenue privée cesse aussitôt de servir.
+    const entetes = { "cache-control": "private, no-cache", etag: `"${i.checksum}"` };
+    if (c.req.header("if-none-match") === entetes.etag) return c.body(null, 304, entetes);
     const octets = await Deno.readFile(contenu(i.source_id, "assets", i.fichier));
-    return c.body(octets, 200, {
-      "content-type": i.mime,
-      "cache-control": "private, max-age=3600",
-    });
+    return c.body(octets, 200, { ...entetes, "content-type": i.mime });
   });
 
   // ------------------------------------------------------------ enseignant
-  const lignes = (statut: string, sequence: string) =>
+  const lignes = (c: Context<Env>, statut: string, sequence: string) =>
     db.prepare(
       `SELECT s.id, s.titre, s.profil, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
+         s.audience, coalesce(? OR s.proprietaire_id = ?, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
-       WHERE s.school_id = ? AND (? = '' OR s.statut = ?) AND (? = '' OR sequence = ?)
+       WHERE s.school_id = ? AND ${FILTRE_ACCES} AND (? = '' OR s.statut = ?)
+         AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
     ).all(
+      lu(c).administrateur ? 1 : 0,
+      lu(c).id,
       instance.school_id,
+      ...parametresAcces(lu(c)),
       statut,
       statut,
       sequence,
@@ -299,7 +313,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof", (c) => {
     const f = filtres(c);
     const selection = idsScope(c);
-    const ressources = lignes("", "").filter((s) => selection.has(s.id));
+    const ressources = lignes(c, "", "").filter((s) => selection.has(s.id));
     const repartition = [
       ...Map.groupBy(ressources, (s) => `${s.sequence ?? ""}\0${s.statut}`).values(),
     ]
@@ -377,10 +391,12 @@ export function creerApp(db: Db, modeles: Modeles) {
            json_extract(s2.metadonnees, '$.sequence'), '') AS chapitre
        FROM messages m JOIN comptes c ON c.id = m.compte_id
        LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
+         AND ${FILTRE_ACCES}
        LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
+         AND ${FILTRE_ACCES.replaceAll("s.", "s2.")}
        WHERE c.role = 'eleve'
        ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
-    ).all() as Prof.QuestionProf[];
+    ).all(...parametresAcces(lu(c)), ...parametresAcces(lu(c))) as Prof.QuestionProf[];
     return c.html(rendre(c, "Questions des élèves", Prof.questionsProf(messages)));
   });
   app.get("/prof/lignes", (c) => {
@@ -388,7 +404,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const selection = idsScope(c);
     return c.html(
       Prof.lignesSources(
-        lignes(f.statut, f.sequence).filter((s) => selection.has(s.id)),
+        lignes(c, f.statut, f.sequence).filter((s) => selection.has(s.id)),
         new URLSearchParams(f).toString(),
         f.vue === "grille",
       ),
@@ -396,9 +412,22 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
   app.post("/prof/sources/statut", async (c) => {
     const b = await c.req.parseBody({ all: true });
-    const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
-    const ids = [b.ids ?? []].flat().map(String);
-    for (const id of ids) statuer(db, id, statut, c.get("compte").nom);
+    const ids = [b.ids ?? []].flat().map(String)
+      .filter((id) => peutModifier(db, c.get("compte"), id));
+    if (b.statut === "lecteurs") {
+      let lecteurs;
+      try {
+        lecteurs = audience(b.audience);
+      } catch (e) {
+        return c.text((e as Error).message, 400);
+      }
+      for (const id of ids) {
+        db.prepare("UPDATE sources SET audience = ? WHERE id = ?").run(lecteurs, id);
+      }
+    } else {
+      const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
+      for (const id of ids) statuer(db, id, statut, c.get("compte").nom);
+    }
     return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
   });
 
@@ -415,22 +444,19 @@ export function creerApp(db: Db, modeles: Modeles) {
     async (c) => {
       const b = await c.req.parseBody({ all: true });
       const champs = Object.fromEntries(
-        Object.entries(b).filter(([k, v]) =>
-          k !== "fichier" && k !== "publics" && typeof v === "string"
-        ),
+        Object.entries(b).filter(([k, v]) => k !== "fichier" && typeof v === "string"),
       ) as Record<string, string>;
-      const publics = [b.publics ?? []].flat().map(String);
       const refus = (erreurs: Record<string, string>) =>
         c.html(
           rendre(
             c,
             "Déposer",
-            Prof.depot({ ...optionsDepot(champs, b), publics, erreurs }),
+            Prof.depot({ ...optionsDepot(champs, b), erreurs }),
           ),
           400,
         );
 
-      const v = valider(champs, publics);
+      const v = valider(champs);
       const fichier = b.fichier;
       if (fichier instanceof File && fichier.size > MAX_OCTETS) {
         return refus({
@@ -456,6 +482,10 @@ export function creerApp(db: Db, modeles: Modeles) {
           format: controle.format,
           schoolId: instance.school_id,
           enseignant: c.get("compte").nom,
+          proprietaireId: c.get("compte").id,
+          // Sans le choix des lecteurs, la ressource va aux élèves et sert aux réponses.
+          audience: audience(b.audience ?? "eleves"),
+          reponses: b.audience === undefined || Boolean(b.reponses),
           liens: b.cours !== undefined ? Domaines.liensFormulaire(b) : undefined,
         });
       } catch (e) {
@@ -475,14 +505,14 @@ export function creerApp(db: Db, modeles: Modeles) {
     },
   );
 
-  const detail = (id: string): Prof.Detail | undefined => {
+  const detail = (id: string, compte: Compte): Prof.Detail | undefined => {
     const source = db.prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?").get(
       id,
       instance.school_id,
     ) as
       | Prof.Detail["source"] & { metadonnees: string }
       | undefined;
-    if (!source) return undefined;
+    if (!source || !peutLire(db, compte, id)) return undefined;
     const job = db.prepare(
       "SELECT etat, erreur, avertissements FROM ingestion_jobs WHERE source_id = ?",
     ).get(id) as
@@ -494,6 +524,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     } catch { /* pas encore extrait */ }
     return {
       source,
+      modifiable: peutModifier(db, compte, id),
       catalogue: Domaines.catalogue(db),
       affiliations: db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
         .all(id) as Domaines.Affiliation[],
@@ -507,12 +538,12 @@ export function creerApp(db: Db, modeles: Modeles) {
   };
 
   app.get("/prof/sources/:id", (c) => {
-    const d = detail(c.req.param("id"));
+    const d = detail(c.req.param("id"), c.get("compte"));
     return d ? c.html(rendre(c, d.source.titre, Prof.detailSource(d))) : c.notFound();
   });
   // Seul un PDF s'ouvre: un original HTML lancerait ses scripts sur l'origine de Thot.
   app.get("/prof/sources/:id/original", async (c) => {
-    const d = detail(c.req.param("id"));
+    const d = detail(c.req.param("id"), c.get("compte"));
     if (d?.source.format !== "pdf") return c.notFound();
     return c.body(await Deno.readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
       "content-type": "application/pdf",
@@ -520,8 +551,9 @@ export function creerApp(db: Db, modeles: Modeles) {
     });
   });
   app.post("/prof/sources/:id/modifier", async (c) => {
-    const d = detail(c.req.param("id"));
+    const d = detail(c.req.param("id"), c.get("compte"));
     if (!d) return c.notFound();
+    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     const b = await c.req.parseBody({ all: true });
     const titre = String(b.titre ?? "").trim();
     const sequence = String(b.sequence ?? "").trim();
@@ -537,8 +569,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     // Enregistrer valide ce que Thot proposait: la proposition n'a plus d'objet.
     let informations: Record<string, string>;
     let langue: string;
+    let lecteurs = d.source.audience;
     try {
       langue = Domaines.langueSource(String(b.langue ?? d.source.langue ?? "fr"));
+      if (b.audience !== undefined) lecteurs = audience(b.audience);
       informations = validerInformations(
         Object.fromEntries(Object.entries({ ...d.meta, ...b }).map(([k, v]) => [k, String(v)])),
         d.source.profil ?? "general",
@@ -563,9 +597,18 @@ export function creerApp(db: Db, modeles: Modeles) {
           );
         }
         db.prepare(
-          "UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
+          `UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, audience = ?, reponses = ?,
+           suggestions_le = NULL WHERE id = ? AND school_id = ?`,
         )
-          .run(titre, JSON.stringify(meta), langue, d.source.id, instance.school_id);
+          .run(
+            titre,
+            JSON.stringify(meta),
+            langue,
+            lecteurs,
+            b.audience === undefined ? d.source.reponses : b.reponses ? 1 : 0,
+            d.source.id,
+            instance.school_id,
+          );
         const statut =
           db.prepare("SELECT statut FROM sources WHERE id = ?").get(d.source.id)!.statut;
         indexerSource(db, d.source.id, statut === "certifiee" ? chunksSource(db, d.source.id) : []);
@@ -578,38 +621,46 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
   app.post("/prof/sources/:id/:statut{certifiee|rejetee}", (c) => {
     const id = c.req.param("id");
-    if (!detail(id)) return c.notFound();
+    const d = detail(id, c.get("compte"));
+    if (!d) return c.notFound();
+    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
-    return c.html(Prof.statutSource(detail(id)!.source));
+    return c.html(Prof.statutSource(detail(id, c.get("compte"))!.source));
   });
 
-  const aLegender = (imageId?: string) => {
+  // La file ne propose que les images des sources que le compte peut relire.
+  const FILE = `i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
+    AND (? OR s.proprietaire_id = ?)`;
+  const file = (c: Context<Env>) => [instance.school_id, lu(c).administrateur ? 1 : 0, lu(c).id];
+  const aLegender = (c: Context<Env>, imageId?: string) => {
     const restantes = db.prepare(
-      `SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id
-       WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?`,
-    ).get(instance.school_id)!.n as number;
+      `SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`,
+    ).get(...file(c))!.n as number;
     const i = db.prepare(
-      `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id
-       WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
+      `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
        ORDER BY (i.id = ?) DESC, json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 1`,
-    ).get(instance.school_id, imageId ?? "") as Prof.ALegender | undefined;
+    ).get(...file(c), imageId ?? "") as Prof.ALegender | undefined;
     return i && { ...i, restantes };
   };
   // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
-  const fileLegendes = () =>
+  const fileLegendes = (c: Context<Env>) =>
     db.prepare(
-      `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id
-       WHERE i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
+      `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
        ORDER BY json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 12`,
-    ).all(instance.school_id) as { id: string; titre: string }[];
+    ).all(...file(c)) as { id: string; titre: string }[];
   app.get("/prof/legendes", (c) =>
     c.html(rendre(
       c,
       "Légendes",
-      Prof.pageLegendes(aLegender(c.req.query("image")), fileLegendes()),
+      Prof.pageLegendes(aLegender(c, c.req.query("image")), fileLegendes(c)),
     )));
   app.post("/prof/legendes/:action{certified|rejected}", async (c) => {
     const b = await c.req.parseBody();
+    const source = db.prepare("SELECT source_id FROM images WHERE id = ?").get(String(b.image))
+      ?.source_id as string | undefined;
+    if (!source || !peutModifier(db, c.get("compte"), source)) {
+      return c.text(MODIFICATION_REFUSEE, 403);
+    }
     relireLegende(
       db,
       String(b.image),
@@ -617,18 +668,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       String(b.texte ?? ""),
       c.get("compte").nom,
     );
-    return c.html(Prof.legende(aLegender(), fileLegendes()));
+    return c.html(Prof.legende(aLegender(c), fileLegendes(c)));
   });
 
   // ------------------------------------------------------------ élève
-  const sourceCertifiee = (id: string) =>
+  const sourceCertifiee = (id: string, l: Lecteur) =>
     db.prepare(
       `SELECT id, titre, enseignant, profil, langue, metadonnees, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, instance.school_id) as Eleve.SourceLue | undefined;
+       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
+    ).get(id, instance.school_id, ...parametresAcces(l)) as Eleve.SourceLue | undefined;
 
   app.get("/eleve", (c) => {
     const rangs = db.prepare(
@@ -637,10 +687,9 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-       FROM sources s WHERE statut = 'certifiee' AND school_id = ?
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}
        ORDER BY sequence, seance, titre`,
-    ).all(instance.school_id) as Eleve.SourceChapitre[];
+    ).all(instance.school_id, ...parametresAcces(lu(c))) as Eleve.SourceChapitre[];
     const selection = idsScope(c);
     const visibles = rangs.filter((r) => selection.has(r.id));
     const chapitres: Eleve.ChapitreVue[] = [];
@@ -682,7 +731,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         : suggestionsParChapitre(db).get(ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
-    const cat = Domaines.catalogueVisible(db);
+    const cat = Domaines.catalogueVisible(db, lu(c));
     const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", "", c.req.query("vue"));
     const generique = visibles.every((r) => r.profil === "general") ||
       Object.values(scope(c)).some(Boolean);
@@ -738,7 +787,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.on("GET", ["/eleve/sans-sequence", "/eleve/sequences/:nom", "/eleve/themes/:theme"], (c) => {
     const themeId = c.req.param("theme");
-    const cat = Domaines.catalogueVisible(db);
+    const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = themeId ? cat.themes.find((t) => t.id === themeId) : undefined;
     if (themeId && !theme) return c.notFound();
     const nom = theme?.nom ?? c.req.param("nom") ?? "";
@@ -749,13 +798,13 @@ export function creerApp(db: Db, modeles: Modeles) {
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-       FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee'
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES}
          AND (? OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
          AND (? = '' OR EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = s.id AND sc.theme_id = ?))
        ORDER BY seance = '', seance, s.titre`,
     ).all(
       instance.school_id,
+      ...parametresAcces(lu(c)),
       themeId ? 1 : 0,
       nom,
       themeId ?? "",
@@ -778,7 +827,7 @@ export function creerApp(db: Db, modeles: Modeles) {
               Domaines.sourcesPerimetre(db, { matiere_id: "", cours_id: "", theme_id: themeId }),
             )
             : suggestionsParChapitre(db).get(nom) ?? [],
-          apercu(doc.id),
+          apercu(doc.id, lu(c)),
           themeId,
           theme ? `${matiere?.nom} / ${cours?.nom} / ${nom}` : "",
         ),
@@ -786,14 +835,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
-  const apercu = (id: string): Eleve.Apercu | undefined => {
+  const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
     const s = db.prepare(
       `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ?
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-    ).get(id, instance.school_id) as Omit<
+       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
+    ).get(id, instance.school_id, ...parametresAcces(l)) as Omit<
       Eleve.Apercu,
       "image_id" | "legende" | "images" | "extrait"
     >;
@@ -820,12 +868,12 @@ export function creerApp(db: Db, modeles: Modeles) {
   };
 
   app.get("/eleve/documents/:id/apercu", (c) => {
-    const a = apercu(c.req.param("id"));
+    const a = apercu(c.req.param("id"), lu(c));
     return a ? c.html(Eleve.lecteur(a)) : c.notFound();
   });
 
   app.get("/eleve/sources/:id", (c) => {
-    const s = sourceCertifiee(c.req.param("id"));
+    const s = sourceCertifiee(c.req.param("id"), lu(c));
     if (!s) return c.notFound();
     const images = db.prepare(
       `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
@@ -860,14 +908,15 @@ export function creerApp(db: Db, modeles: Modeles) {
         rendre(
           c,
           "Chercher",
-          html`${DomaineVue.filtre(Domaines.catalogueVisible(db), scope(c), "/eleve/recherche")}${
-            Eleve.recherche("", [], scope(c))
-          }`,
+          html`${
+            DomaineVue.filtre(Domaines.catalogueVisible(db, lu(c)), scope(c), "/eleve/recherche")
+          }${Eleve.recherche("", [], scope(c))}`,
         ),
       );
     }
     const p = {
       schoolId: instance.school_id,
+      lecteur: lu(c),
       bibliotheque: true,
       matiereId: scope(c).matiere_id,
       coursId: scope(c).cours_id,
@@ -889,9 +938,10 @@ export function creerApp(db: Db, modeles: Modeles) {
            coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
            (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
          FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})
-           AND s.statut = 'certifiee' AND s.school_id = ?
-           AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-      ).all(...ids, instance.school_id).map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
+           AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
+      ).all(...ids, instance.school_id, ...parametresAcces(lu(c))).map((
+        s,
+      ) => [s.id as string, s as unknown as Eleve.Trouve]),
     );
     const trouves = ids.filter((id) => sources.has(id)).map((id) => {
       const texte = proches.find((x) => x.source_id === id)!.texte.replace(/\s+/g, " ").trim();
@@ -906,23 +956,24 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Chercher",
-        html`${DomaineVue.filtre(Domaines.catalogueVisible(db), scope(c), "/eleve/recherche", q)}${
-          Eleve.recherche(q, trouves, scope(c))
-        }`,
+        html`${
+          DomaineVue.filtre(Domaines.catalogueVisible(db, lu(c)), scope(c), "/eleve/recherche", q)
+        }${Eleve.recherche(q, trouves, scope(c))}`,
       ),
     );
   });
 
-  const resultatActuel = (texte: string) =>
-    actualiserResultat(db, JSON.parse(texte), { schoolId: instance.school_id });
+  // La relecture d'une réponse revérifie ses preuves avec les droits actuels du lecteur.
+  const resultatActuel = (texte: string, l: Lecteur) =>
+    actualiserResultat(db, JSON.parse(texte), { schoolId: instance.school_id, lecteur: l });
 
-  const messagesDe = (compteId: string) =>
+  const messagesDe = (compte: Compte) =>
     (db.prepare(
       "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
     )
-      .all(compteId) as Eleve.MessageVue[]).map((m) => {
+      .all(compte.id) as Eleve.MessageVue[]).map((m) => {
         if (!m.resultat) return m;
-        const r = resultatActuel(m.resultat);
+        const r = resultatActuel(m.resultat, lecteur(compte));
         return { ...m, etat: r.etat, resultat: JSON.stringify(r) };
       });
 
@@ -954,9 +1005,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const memesSources = db.prepare(
       `SELECT sg.question FROM suggestions sg JOIN sources s ON s.id = sg.source_id
        WHERE sg.source_id IN (${ids.map(() => "?").join(",")}) AND s.statut = 'certifiee'
-         AND s.school_id = ? AND sg.question != ?
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
-         AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot')
+         AND s.school_id = ? AND sg.question != ? AND s.audience = 'eleves' AND s.reponses = 1
        ORDER BY random() LIMIT 3`,
     ).all(...ids, instance.school_id, question).map((x) => x.question as string);
     if (memesSources.length) return memesSources;
@@ -971,7 +1020,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get(
     "/eleve/chat",
     (c) => {
-      const messages = messagesDe(c.get("compte").id);
+      const messages = messagesDe(c.get("compte"));
       const dernier = [...messages].reverse().find((m) => m.resultat);
       const idees = dernier
         ? ideesPour(JSON.parse(dernier.resultat!), dernier.question, dernier.id)
@@ -996,17 +1045,18 @@ export function creerApp(db: Db, modeles: Modeles) {
     if (Object.values(p).some(Boolean)) {
       const disponibles = Domaines.sourcesPerimetre(db, p);
       const visible = db.prepare(
-        `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-      ).all(instance.school_id).some((s) => disponibles.has(s.id as string));
+        `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
+      ).all(instance.school_id, ...parametresAcces(lu(c))).some((s) =>
+        disponibles.has(s.id as string)
+      );
       if (!visible) return c.text("Périmètre indisponible.", 400);
     }
     if (
       chapitre && !db.prepare(
         `SELECT id FROM sources s WHERE school_id = ? AND statut = 'certifiee'
-           AND json_extract(metadonnees, '$.sequence') = ?
-           AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+           AND json_extract(metadonnees, '$.sequence') = ? AND ${FILTRE_ACCES}
          LIMIT 1`,
-      ).get(instance.school_id, chapitre)
+      ).get(instance.school_id, chapitre, ...parametresAcces(lu(c)))
     ) return c.text("Séquence indisponible.", 400);
     const id = crypto.randomUUID();
     const t = maintenant();
@@ -1025,7 +1075,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       .get(c.req.param("id"), c.get("compte").id);
     if (
       !m || (m.etat !== "failed" &&
-        (!m.resultat || resultatActuel(m.resultat as string).etat !== "failed"))
+        (!m.resultat || resultatActuel(m.resultat as string, lu(c)).etat !== "failed"))
     ) return c.notFound();
     const r = db.prepare(
       "UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered')",
@@ -1077,6 +1127,7 @@ export function creerApp(db: Db, modeles: Modeles) {
             | undefined;
           const p = {
             schoolId: instance.school_id,
+            lecteur: lecteur(compte),
             chapitre: m.chapitre || undefined,
             matiereId: m.matiere_id,
             coursId: m.cours_id,
@@ -1119,7 +1170,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           | undefined;
         if (!m) return;
         if (m.resultat) {
-          const r = resultatActuel(m.resultat);
+          const r = resultatActuel(m.resultat, lecteur(compte));
           await flux.writeSSE({
             event: "reponse",
             data: String(await Eleve.reponse(id, r, null, ideesPour(r, m.question, id), true))
@@ -1147,11 +1198,11 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/eleve/messages/:id/citations/:n", (c) => {
     const m = db.prepare("SELECT resultat FROM messages WHERE id = ? AND compte_id = ?")
       .get(c.req.param("id"), c.get("compte").id) as { resultat: string | null } | undefined;
-    const r = m?.resultat ? resultatActuel(m.resultat) : undefined;
+    const r = m?.resultat ? resultatActuel(m.resultat, lu(c)) : undefined;
     const a: Affirmation | undefined = r?.etat === "answered"
       ? r.affirmations[Number(c.req.param("n"))]
       : undefined;
-    const source = a && sourceCertifiee(a.source_id);
+    const source = a && sourceCertifiee(a.source_id, lu(c));
     if (!a || !source) return c.html(Eleve.panneauSource());
     const suite = {
       id: c.req.param("id"),

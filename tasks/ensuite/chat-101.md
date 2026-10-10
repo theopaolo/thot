@@ -8,7 +8,7 @@ type: [feature]
 ## Depends on
 
 - [[dom-101]]
-- [[acc-101]]
+- [[acc-102]]
 - [[ing-006]]
 - [[ux-201]]
 

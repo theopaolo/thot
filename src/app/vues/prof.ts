@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
-import { CLASSES, PUBLICS, PUBLICS_PAR_DEFAUT, TYPES_DOCUMENT } from "../depot.ts";
+import { type Audience, AUDIENCES, CLASSES, TYPES_DOCUMENT } from "../depot.ts";
 import { icone } from "../icones.ts";
 import { type Affiliation, type Catalogue, MATIERES } from "../domaines.ts";
 import { type Profil } from "../../core/profils.ts";
@@ -37,6 +37,9 @@ export type LigneSource = {
   erreur: string | null;
   images_a_relire: number;
   image_id: string | null;
+  audience?: Audience;
+  /** 0 quand le compte lit la source sans pouvoir la modifier */
+  modifiable?: number;
 };
 
 export const JOBS_ACTIFS = ["received", "extracting", "enriching"];
@@ -47,6 +50,11 @@ const statutLigne = (l: LigneSource) =>
     : JOBS_ACTIFS.includes(l.etat)
     ? html`<span class="statut en-cours">${ETATS_JOB[l.etat]}…</span>`
     : html`<span class="statut ${l.statut}">${STATUTS[l.statut] ?? l.statut}</span>`;
+// Seul l'écart à la publication aux élèves est signalé.
+const lecteursLigne = (l: LigneSource) =>
+  l.audience && l.audience !== "eleves"
+    ? html`<small>${AUDIENCES.find((a) => a.value === l.audience)?.label}</small>`
+    : "";
 
 const nonRelues = (n: number) => n ? `${n} non relue${n > 1 ? "s" : ""}` : "";
 
@@ -60,7 +68,7 @@ const apercu = (l: LigneSource) =>
 const caseSource = (l: LigneSource, classe = "") =>
   html`
     <input id="selection-${l.id}" hx-preserve class="${classe}" type="checkbox" name="ids"
-      value="${l.id}"
+      value="${l.id}" ${l.modifiable === 0 ? "disabled" : ""}
       aria-label="Sélectionner ${l
         .titre}">
   `;
@@ -129,7 +137,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
                 </div>
               </div>
             </td>
-            <td>${statutLigne(l)}</td>
+            <td>${statutLigne(l)} ${lecteursLigne(l)}</td>
             <td class="statut unreviewed">${nonRelues(l.images_a_relire)}</td>
           </tr>
         `
@@ -234,6 +242,14 @@ export const sources = (
             <button name="statut" value="rejetee" data-rejeter-selection>
               ${icone("x")} Rejeter
             </button>
+            <select name="audience" aria-label="Lecteurs de la sélection">
+              ${AUDIENCES.map((a) =>
+                html`
+                  <option value="${a.value}">${a.label}</option>
+                `
+              )}
+            </select>
+            <button name="statut" value="lecteurs">Changer les lecteurs</button>
           </div>
         </form>
       `
@@ -457,10 +473,26 @@ const champ = (
     </div>
   `;
 
+const lecteurs = (audience = "eleves", reponses = true) =>
+  html`
+    <fieldset>
+      <legend><strong>Qui peut la lire ?</strong></legend>
+      ${AUDIENCES.map((a) =>
+        html`
+          <label><input type="radio" name="audience" value="${a.value}" ${audience === a.value
+            ? "checked"
+            : ""}> ${a.label}</label>
+        `
+      )}
+      <label><input type="checkbox" name="reponses" value="1" ${reponses ? "checked" : ""}> Thot
+        s'en sert pour répondre</label>
+      <p class="aide">Une réponse ne cite que les ressources certifiées que son lecteur peut lire.</p>
+    </fieldset>
+  `;
+
 export const depot = (
   s: {
     champs?: Record<string, string>;
-    publics?: string[];
     erreurs?: Record<string, string>;
     ok?: string;
     personnel?: boolean;
@@ -471,7 +503,6 @@ export const depot = (
 ) => {
   const c = s.champs ?? {};
   const e = s.erreurs ?? {};
-  const publics = s.publics ?? PUBLICS_PAR_DEFAUT;
   const arts = s.profil === "arts-appliques" || !s.catalogue;
   return html`
     <h1>Déposer une ressource</h1>
@@ -543,15 +574,7 @@ export const depot = (
         zone: true,
         valeur: c.objectifs,
       })} ${champ({ nom: "evaluation", label: "Évaluation", valeur: c.evaluation })}
-      <fieldset>
-        <legend><strong>Confidentialité</strong></legend>
-        ${PUBLICS.map((p) =>
-          html`
-            <label><input type="checkbox" name="publics" value="${p
-              .value}" ${publics.includes(p.value) ? "checked" : ""}> ${p.label}</label>
-          `
-        )}
-      </fieldset>
+      ${lecteurs(c.audience, c.audience === undefined || Boolean(c.reponses))}
       <button class="principal">Déposer</button>
     </form>
   `;
@@ -570,7 +593,11 @@ export type Detail = {
     cree_le: string;
     profil?: Profil;
     langue?: string;
+    audience: Audience;
+    reponses: number;
   };
+  /** le propriétaire ou un administrateur */
+  modifiable?: boolean;
   meta: Record<string, unknown>;
   job: { etat: string; erreur: string | null; avertissements: string[] } | undefined;
   images: ImageVue[];
@@ -587,7 +614,7 @@ export type ImageVue = {
   modele: string | null;
 };
 
-export const statutSource = (s: Detail["source"]) =>
+export const statutSource = (s: Detail["source"], modifiable = true) =>
   html`
     <div id="statut-source" class="barre">
       <span class="statut ${s.statut}">${STATUTS[s.statut]}</span>
@@ -597,7 +624,7 @@ export const statutSource = (s: Detail["source"]) =>
         `
         : ""}
       <span class="espace"></span>
-      ${s.statut !== "certifiee"
+      ${modifiable && s.statut !== "certifiee"
         ? html`
           <button
             class="principal"
@@ -608,7 +635,7 @@ export const statutSource = (s: Detail["source"]) =>
             Certifier la source
           </button>
         `
-        : ""} ${s.statut !== "rejetee"
+        : ""} ${modifiable && s.statut !== "rejetee"
         ? html`
           <button
             hx-post="/prof/sources/${s.id}/rejetee"
@@ -639,53 +666,71 @@ export const detailSource = (d: Detail) => {
     <h1>${d.source.titre}</h1>
     <p class="discret">${d.meta.sequence ?? ""} ${d.meta.seance ? `· ${d.meta.seance}` : ""} · ${d
       .source.format} · ${d.source.fichier}</p>
-    <p class="discret">Déposé par ${d.source.enseignant} le ${jour(d.source.cree_le)}</p>
+    <p class="discret">Déposé par ${d.source.enseignant} le ${jour(
+      d.source.cree_le,
+    )}. Lecteurs : ${AUDIENCES
+      .find((a) => a.value === d.source.audience)?.label.toLowerCase()}${d.source.reponses
+      ? ", cité par Thot"
+      : ""}.</p>
     ${d.source.format === "pdf"
       ? html`
         <p><a href="/prof/sources/${d.source.id}/original" target="_blank">Ouvrir le PDF</a></p>
       `
       : ""}
-    <form method="post" action="/prof/sources/${d.source
-      .id}/modifier" class="etroit edition-source">
+    ${d.modifiable
+      ? html`<form method="post" action="/prof/sources/${d.source.id}/modifier" class="etroit edition-source">
       <h2>Modifier les informations</h2>
-      ${["date", "artiste", "mouvement"].some(propose)
-        ? html`
-          <p class="note">
-            Thot a lu ces informations dans le titre, le nom du fichier ou le texte. Les élèves les
-            voient une fois enregistrées.
-          </p>
-        `
-        : ""}
+      ${
+        ["date", "artiste", "mouvement"].some(propose)
+          ? html`
+            <p class="note">
+              Thot a lu ces informations dans le titre, le nom du fichier ou le texte. Les élèves les
+              voient une fois enregistrées.
+            </p>
+          `
+          : ""
+      }
       <div class="deux">
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
-        ${champ({
+        ${
+        champ({
           nom: "sequence",
           label: d.source.profil === "general" ? "Thème" : "Séquence",
           valeur: String(d.meta.sequence ?? ""),
-        })}
-        ${d.source.profil === "general"
+        })
+      }
+        ${
+        d.source.profil === "general"
           ? Domaines.informations("general", d.meta)
           : html`${information("date", "Date de l'œuvre")} ${information("artiste", "Artiste")} ${
             information("mouvement", "Mouvement")
-          }`}
+          }`
+      }
       </div>
-      ${d.source.profil !== "general"
-        ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
-        : ""}
+      ${
+        d.source.profil !== "general"
+          ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
+          : ""
+      }
       ${d.catalogue ? Domaines.liens(d.catalogue, d.affiliations) : ""}
       ${Domaines.langue(d.source.langue)}
+      ${lecteurs(d.source.audience, d.source.reponses === 1)}
       <button>Enregistrer</button>
-    </form>
+    </form>`
+      : ""}
     <div id="traitement-source" hx-disinherit="hx-select" ${d.job &&
         JOBS_ACTIFS.includes(d.job.etat)
       ? html`hx-get="/prof/sources/${d.source.id}" hx-trigger="every 3s"
           hx-select="#traitement-source" hx-swap="outerHTML"`
       : ""}>
-    ${statutSource(d.source)}
-    <p class="discret">
-      Certifier la source la rend disponible selon les publics choisis au dépôt. Les légendes d'images
-      se relisent à part : une légende non relue n'est jamais citée.
-    </p>
+    ${statutSource(d.source, d.modifiable)} ${d.modifiable
+      ? html`
+        <p class="discret">
+          Certifier la source la rend disponible à ses lecteurs. Les légendes d'images se relisent
+          à part : une légende non relue n'est jamais citée.
+        </p>
+      `
+      : ""}
     ${d.job?.etat === "failed"
       ? html`
         <p role="alert">Le traitement a échoué : ${d.job.erreur}</p>
@@ -712,7 +757,8 @@ export const detailSource = (d: Detail) => {
               <img src="/media/${i.id}" alt="Image de ${d.source.titre}" loading="lazy">
               <figcaption>
                 <span class="statut ${i.legende_statut}">${LEGENDES[i.legende_statut]}</span>
-                ${i.legende ?? "Pas de légende."} ${i.legende_statut === "unreviewed"
+                ${i.legende ??
+                  "Pas de légende."} ${d.modifiable && i.legende_statut === "unreviewed"
                   ? html`
                     <a href="/prof/legendes?image=${i.id}">Relire</a>
                   `

@@ -33,9 +33,22 @@ export type Perimetre = {
   coursId?: string;
   themeId?: string;
   sourceId?: string;
-  /** recherche de la bibliothèque: toute source lue par les élèves, même sans le public Thot */
+  /** recherche de la bibliothèque: toute source lisible, même hors des preuves de réponse */
   bibliotheque?: boolean;
+  /** absent: le périmètre d'un élève */
+  lecteur?: Lecteur;
 };
+
+export type Lecteur = { id: string; enseignant: boolean; administrateur: boolean };
+/** Sources lisibles par le lecteur. Un administrateur lit tout, un enseignant ce que ses
+ * collègues partagent, chacun ses propres sources. */
+export const FILTRE_ACCES = `(s.audience = 'eleves' OR ? OR s.proprietaire_id = ?
+  OR (? AND s.audience = 'collegues'))`;
+export const parametresAcces = (l?: Lecteur) => [
+  l?.administrateur ? 1 : 0,
+  l?.id ?? "",
+  l?.enseignant ? 1 : 0,
+];
 
 export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')
   OR (? != '' AND ? = '' AND ? = '' AND s.matiere_id = ?)
@@ -94,8 +107,7 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
     `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
-       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
-       AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
+       AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
        AND (? = '' OR s.id = ?)
        AND ${FILTRE_DOMAINE}
@@ -103,6 +115,7 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   ).all(
     termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
     p.schoolId,
+    ...parametresAcces(p.lecteur),
     p.bibliotheque ? 1 : 0,
     p.chapitre ?? "",
     p.chapitre ?? "",
@@ -118,14 +131,14 @@ export function lireChunk(db: DatabaseSync, sourceId: string, id: string, p: Per
   return db.prepare(
     `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE c.source_id = ? AND c.id = ? AND s.school_id = ? AND s.statut = 'certifiee'
-       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
-       AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
+       AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
        AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`,
   ).get(
     sourceId,
     id,
     p.schoolId,
+    ...parametresAcces(p.lecteur),
     p.bibliotheque ? 1 : 0,
     p.chapitre ?? "",
     p.chapitre ?? "",

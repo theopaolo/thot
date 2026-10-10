@@ -39,15 +39,18 @@ const CHAMPS = {
   sequence: "ATC Art Nouveau",
 };
 
+type Acces = { audience: "prive" | "collegues" | "eleves"; reponses: boolean };
+
 const formulaire = (
   champs: Record<string, string>,
   fichier: Uint8Array,
   nom = "fiche.pdf",
-  publics = ["enseignants", "eleves", "thot"],
+  acces: Acces = { audience: "eleves", reponses: true },
 ) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(champs)) f.append(k, v);
-  for (const publicCible of publics) f.append("publics", publicCible);
+  f.append("audience", acces.audience);
+  if (acces.reponses) f.append("reponses", "1");
   f.append("fichier", new File([fichier as Uint8Array<ArrayBuffer>], nom));
   return f;
 };
@@ -86,7 +89,11 @@ Deno.test("dépôt complet: original écrit, source et travail créés", async (
   assertStringIncludes(await r.text(), "est déposé");
   const s = db.prepare("SELECT id, metadonnees, format FROM sources").get()!;
   assertEquals(s.format, "pdf");
-  assertEquals(JSON.parse(s.metadonnees as string).publics, ["enseignants", "eleves", "thot"]);
+  assertEquals(JSON.parse(s.metadonnees as string).publics, undefined);
+  const acces = db.prepare("SELECT audience, reponses, proprietaire_id FROM sources").get()!;
+  assertEquals(acces.audience, "eleves");
+  assertEquals(acces.reponses, 1);
+  assertEquals(acces.proprietaire_id, db.prepare("SELECT id FROM comptes").get()!.id);
   const original = await Deno.readTextFile(
     join(dir, "content", s.id as string, "original", "fiche.pdf"),
   );
@@ -137,12 +144,14 @@ Deno.test("une session élève reçoit 403 sur chaque route enseignant", async (
 async function sourceTraitee(
   db: Parameters<typeof traiter>[0],
   legende = "Façade ondulée aux balcons en forme de masques.",
-  publics?: string[],
+  acces?: Acces,
+  // Le compte qui dépose possède la source: lui seul (ou un administrateur) peut ensuite la modifier.
+  prof?: Awaited<ReturnType<typeof session>>,
 ) {
-  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  const { requete } = prof ?? await session(db, fauxModeles().modeles, "enseignant");
   await requete("/prof/depot", {
     method: "POST",
-    body: formulaire(CHAMPS, PAGE, "casa.html", publics),
+    body: formulaire(CHAMPS, PAGE, "casa.html", acces),
   });
   const job = revendiquer(db)!;
   await traiter(db, job, fauxModeles({ legende }).modeles);
@@ -325,7 +334,7 @@ Deno.test("les documents sans séquence ont leur propre route, distincte d'une s
 
 Deno.test("sans public Élèves, une source certifiée reste invisible aux élèves et à Thot", async () => {
   const { db } = await environnement();
-  const id = await sourceTraitee(db, undefined, ["enseignants", "thot"]);
+  const id = await sourceTraitee(db, undefined, { audience: "collegues", reponses: true });
   statuer(db, id, "certifiee", "test");
   const prof = await session(db, fauxModeles().modeles, "enseignant");
   const eleve = await session(db, fauxModeles().modeles, "eleve");
@@ -355,7 +364,7 @@ Deno.test("sans public Élèves, une source certifiée reste invisible aux élè
 
 Deno.test("sans public Thot, une source reste lisible mais ne sert pas aux réponses", async () => {
   const { db } = await environnement();
-  const id = await sourceTraitee(db, undefined, ["enseignants", "eleves"]);
+  const id = await sourceTraitee(db, undefined, { audience: "eleves", reponses: false });
   statuer(db, id, "certifiee", "test");
   const { requete } = await session(db, fauxModeles().modeles, "eleve");
 
@@ -395,10 +404,10 @@ Deno.test("une légende non relue aide la recherche mais n'atteint jamais le gé
 
 Deno.test("la recherche trouve une image par sa légende non relue sans la montrer", async () => {
   const { db } = await environnement();
-  const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.", [
-    "enseignants",
-    "eleves",
-  ]);
+  const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.", {
+    audience: "eleves",
+    reponses: false,
+  });
   statuer(db, id, "certifiee", "test");
   const { requete } = await session(db, fauxModeles().modeles, "eleve");
 
@@ -795,7 +804,8 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
 
 Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", async () => {
   const { db } = await environnement();
-  const id = await sourceTraitee(db);
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const id = await sourceTraitee(db, undefined, undefined, prof);
   statuer(db, id, "certifiee", "test");
   assertEquals(
     lireInformations(
@@ -813,7 +823,6 @@ Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", as
   await proposerInformations(db, fauxModeles({ sorties: [sortie] }).modeles, id);
   assertEquals(sourceSansInformations(db), undefined);
 
-  const prof = await session(db, fauxModeles().modeles, "enseignant");
   const fiche = await (await prof.requete(`/prof/sources/${id}`)).text();
   assertStringIncludes(fiche, 'value="Antoni Gaudí"');
   assertStringIncludes(fiche, "Proposé par Thot");
@@ -842,9 +851,9 @@ Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", as
 
 Deno.test("titre édité réindexé, image certifiée liée à la réponse et messages purgés", async () => {
   const { db } = await environnement();
-  const id = await sourceTraitee(db);
-  statuer(db, id, "certifiee", "test");
   const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const id = await sourceTraitee(db, undefined, undefined, prof);
+  statuer(db, id, "certifiee", "test");
   const r = await prof.requete(`/prof/sources/${id}/modifier`, {
     method: "POST",
     body: new URLSearchParams({
@@ -929,7 +938,8 @@ async function poserQuestion(
 Deno.test("une panne d'indexation annule aussi les éditions de légende et de métadonnées", async () => {
   const { db } = await environnement();
   try {
-    const id = await sourceTraitee(db);
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const id = await sourceTraitee(db, undefined, undefined, prof);
     statuer(db, id, "certifiee", "Prof");
     relireLegende(db, `${id}-0`, "certified", "", "Prof");
     const image = db.prepare("SELECT * FROM images WHERE source_id = ?").get(id);
@@ -943,7 +953,6 @@ Deno.test("une panne d'indexation annule aussi les éditions de légende et de m
       assertEquals(db.prepare("SELECT * FROM images WHERE source_id = ?").get(id), image);
       assertEquals(db.prepare("SELECT * FROM chunks WHERE source_id = ?").all(id), chunks);
     }
-    const prof = await session(db, fauxModeles().modeles, "enseignant");
     const r = await prof.requete(`/prof/sources/${id}/modifier`, {
       method: "POST",
       body: new URLSearchParams({ titre: "Titre corrigé", sequence: "Architecture" }),
@@ -995,7 +1004,8 @@ Deno.test("les réponses conservées et leurs panneaux revérifient la preuve ac
   for (const retrait of ["legende", "source", "public", "titre"] as const) {
     const { db } = await environnement();
     try {
-      const id = await sourceTraitee(db);
+      const prof = await session(db, fauxModeles().modeles, "enseignant");
+      const id = await sourceTraitee(db, undefined, undefined, prof);
       statuer(db, id, "certifiee", "Prof");
       relireLegende(db, `${id}-0`, "certified", "", "Prof");
       const sortie = retrait === "legende"
@@ -1018,11 +1028,10 @@ Deno.test("les réponses conservées et leurs panneaux revérifient la preuve ac
       if (retrait === "source") statuer(db, id, "rejetee", "Prof");
       if (retrait === "public") {
         db.prepare(
-          "UPDATE sources SET metadonnees = json_set(metadonnees, '$.publics', json('[\"eleves\"]')) WHERE id = ?",
+          "UPDATE sources SET reponses = 0 WHERE id = ?",
         ).run(id);
       }
       if (retrait === "titre") {
-        const prof = await session(db, fauxModeles().modeles, "enseignant");
         await prof.requete(`/prof/sources/${id}/modifier`, {
           method: "POST",
           body: new URLSearchParams({ titre: "Autre œuvre" }),

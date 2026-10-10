@@ -140,7 +140,7 @@ export const choixMatiere = (cat: Catalogue, id = "") =>
       )}</select></label><button>Choisir les champs</button></form>
   `;
 export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
-  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Le rattachement ne change pas les publics de la ressource.</p>${
+  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Le rattachement ne change pas les lecteurs de la ressource.</p>${
     cat.cours.map((c) =>
       html`
         <div

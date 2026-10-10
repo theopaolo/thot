@@ -1,4 +1,11 @@
-import { FILTRE_DOMAINE, parametresDomaine, transaction } from "../core/recherche.ts";
+import {
+  FILTRE_ACCES,
+  FILTRE_DOMAINE,
+  type Lecteur,
+  parametresAcces,
+  parametresDomaine,
+  transaction,
+} from "../core/recherche.ts";
 import type { Db } from "./db.ts";
 import { type Profil, PROFILS } from "../core/profils.ts";
 
@@ -229,12 +236,12 @@ export function sourcesPerimetre(db: Db, p: Scope) {
   );
 }
 
-export function catalogueVisible(db: Db): Catalogue {
+export function catalogueVisible(db: Db, l: Lecteur): Catalogue {
   const cat = catalogue(db);
   const liens = db.prepare(
     `SELECT sc.cours_id, sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
-    WHERE s.statut = 'certifiee' AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
-  ).all();
+    WHERE s.statut = 'certifiee' AND ${FILTRE_ACCES}`,
+  ).all(...parametresAcces(l));
   const ids = new Set(liens.map((s) => s.cours_id));
   const themes = new Set(liens.map((s) => s.theme_id));
   cat.cours = cat.cours.filter((c) => ids.has(c.id));

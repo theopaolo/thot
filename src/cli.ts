@@ -13,7 +13,7 @@ import {
 import { configurerInstance, lireInstance, traitements } from "./app/instance.ts";
 import { config, contenu, preparerDonnees, RACINE } from "./app/config.ts";
 import { cacheModeles, connexion, migrer } from "./app/db.ts";
-import { controlerFichier, deposer, nomSur, PUBLICS_PAR_DEFAUT, sha256 } from "./app/depot.ts";
+import { controlerFichier, deposer, nomSur, sha256 } from "./app/depot.ts";
 import {
   indexer,
   lireDocument,
@@ -47,7 +47,7 @@ const AIDE = `thot <commande>
   supprimer <matiere|cours|theme> <id>      refusé si une ressource ou une question l'utilise,
                                             emporte les cours et thèmes d'une matière
   rattacher <source_id> <cours_id> [--theme-id=...]
-                                            ajoute un rattachement sans changer les publics
+                                            ajoute un rattachement sans changer ses lecteurs
   ingest <dossier|fichier> [--matiere-id=...] [--cours-id=...] [--theme-id=...]
          [--matiere=arts-appliques] [--classe=...] [--type=cours] [--langue=fr]
          [--auteur=...] [--version=...] [--juridiction=...]
@@ -193,7 +193,7 @@ async function ingest(chemin: string) {
       objectifs: "",
       evaluation: "",
     };
-    const validation = valider(champs, PUBLICS_PAR_DEFAUT);
+    const validation = valider(champs);
     if ("erreurs" in validation) throw new Error(JSON.stringify(validation.erreurs));
     await deposer(db, {
       meta: validation.meta,
@@ -202,6 +202,8 @@ async function ingest(chemin: string) {
       format: controle.format,
       schoolId: lireInstance(db).school_id,
       enseignant: args.enseignant ?? "import en ligne de commande",
+      audience: "eleves",
+      reponses: true,
       liens: args["cours-id"]
         ? [{ cours_id: args["cours-id"], theme_id: args["theme-id"] ?? null }]
         : undefined,

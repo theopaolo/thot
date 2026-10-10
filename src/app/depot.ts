@@ -24,15 +24,17 @@ export const CLASSES = [
   { value: "bts1", label: "BTS 1re année" },
   { value: "bts2", label: "BTS 2e année" },
 ];
-export const PUBLICS = [
-  { value: "enseignants", label: "Enseignants" },
-  { value: "eleves", label: "Élèves" },
-  { value: "thot", label: "Thot (réponses aux élèves)" },
-  { value: "consultants", label: "Consultants extérieurs" },
-];
-
-/** Cochés d'office au dépôt. Les consultants extérieurs restent un choix explicite. */
-export const PUBLICS_PAR_DEFAUT = ["enseignants", "eleves", "thot"];
+export const AUDIENCES = [
+  { value: "prive", label: "Moi seulement" },
+  { value: "collegues", label: "Les enseignants" },
+  { value: "eleves", label: "Les enseignants et les élèves" },
+] as const;
+export type Audience = typeof AUDIENCES[number]["value"];
+export const audience = (v: unknown): Audience => {
+  const a = AUDIENCES.find((a) => a.value === v);
+  if (!a) throw new Error("Lecteurs inconnus.");
+  return a.value;
+};
 
 export type Metadonnees = {
   titre: string;
@@ -45,7 +47,6 @@ export type Metadonnees = {
   resume: string;
   objectifs: string;
   evaluation: string;
-  publics: string[];
   matiere_id?: string;
   langue?: string;
 };
@@ -56,7 +57,6 @@ const LIBRES = ["sous_matiere", "sequence", "seance", "resume", "objectifs", "ev
 /** Valide la saisie. Rend les métadonnées ou un message par champ. */
 export function valider(
   champs: Record<string, string>,
-  publics: string[],
 ): { meta: Metadonnees } | { erreurs: Record<string, string> } {
   const erreurs: Record<string, string> = {};
   const lu = (nom: string) => (champs[nom] ?? "").trim();
@@ -75,7 +75,7 @@ export function valider(
   const informations = Object.fromEntries(
     Object.keys(CHAMPS).filter((n) => champs[n]?.trim()).map((n) => [n, champs[n].trim()]),
   );
-  return { meta: { ...meta, ...informations, publics } as Metadonnees };
+  return { meta: { ...meta, ...informations } as Metadonnees };
 }
 
 const SIGNATURES: [Format, number[]][] = [
@@ -122,7 +122,11 @@ export async function deposer(
     octets: Uint8Array;
     format: Format;
     schoolId: string;
+    /** nom affiché. Sans `proprietaireId`, il désigne le compte s'il est le seul à le porter. */
     enseignant: string;
+    proprietaireId?: string;
+    audience: Audience;
+    reponses: boolean;
     liens?: Affiliation[];
   },
 ): Promise<{ source_id: string; job_id: string }> {
@@ -163,10 +167,18 @@ export async function deposer(
         d.enseignant,
         t,
       );
-      db.prepare("UPDATE sources SET matiere_id = ?, profil = ?, langue = ? WHERE id = ?").run(
+      db.prepare(
+        `UPDATE sources SET matiere_id = ?, profil = ?, langue = ?, audience = ?, reponses = ?,
+         proprietaire_id = coalesce(?, (SELECT min(id) FROM comptes
+           WHERE role = 'enseignant' AND nom = ? HAVING count(*) = 1)) WHERE id = ?`,
+      ).run(
         domaine.matiere_id,
         domaine.profil,
         domaine.langue,
+        audience(d.audience),
+        d.reponses ? 1 : 0,
+        d.proprietaireId ?? null,
+        d.enseignant,
         source_id,
       );
       if (d.liens !== undefined) affiliations(db, source_id, d.liens);

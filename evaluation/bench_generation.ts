@@ -173,8 +173,8 @@ if (mode === "generation") {
   const passages = db.prepare(`SELECT source_id,titre,texte FROM (
     SELECT c.source_id,c.titre,c.texte,ROW_NUMBER() OVER(PARTITION BY c.source_id ORDER BY length(c.texte) DESC,c.id) rn
     FROM chunks c JOIN sources s ON s.id=c.source_id WHERE s.statut='certifiee' AND length(c.texte)>=250
-    AND EXISTS(SELECT 1 FROM json_each(s.metadonnees,'$.publics') WHERE value='eleves')
-    AND EXISTS(SELECT 1 FROM json_each(s.metadonnees,'$.publics') WHERE value='thot'))
+    AND s.audience = 'eleves'
+    AND s.reponses = 1)
     WHERE rn=1 ORDER BY source_id LIMIT 12`).all() as {
     source_id: string;
     titre: string;

@@ -43,11 +43,7 @@ async function ressource(
   liens?: { cours_id: string; theme_id: string | null }[],
   texte = "La lumière traverse le prisme transparent et se décompose en couleurs visibles.",
 ) {
-  const v = valider({ titre: "ATC Lumière", type_document: "cours", ...champs }, [
-    "enseignants",
-    "eleves",
-    "thot",
-  ]);
+  const v = valider({ titre: "ATC Lumière", type_document: "cours", ...champs });
   assert("meta" in v);
   const { source_id } = await deposer(db, {
     meta: v.meta,
@@ -56,6 +52,8 @@ async function ressource(
     format: "html",
     schoolId: lireInstance(db).school_id,
     enseignant: "Prof original",
+    audience: "eleves",
+    reponses: true,
     octets: new TextEncoder().encode(
       `<html><h1>Lumière</h1><img src="data:image/jpeg;base64,/9j/4AAQ"><p>${texte}</p></html>`,
     ),
@@ -94,11 +92,17 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, 'Prof historique', 'fixture')`,
       ).run(String(i), JSON.stringify(m));
     }
-    assertEquals(migrer(db), ["0007_domaines.sql"]);
+    assertEquals(migrer(db), ["0007_domaines.sql", "0008_acces.sql"]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
     assertEquals(sources.map((s) => s.metadonnees), metas.map((m) => JSON.stringify(m)));
     assertEquals(sources.map((s) => s.profil), ["arts-appliques", "general", "general"]);
+    // Sans `publics`, une source reste lisible des enseignants, sans propriétaire et sans réponses.
+    assertEquals(sources.map((s) => [s.audience, s.reponses, s.proprietaire_id]), [
+      ["collegues", 0, null],
+      ["collegues", 0, null],
+      ["collegues", 0, null],
+    ]);
     assertEquals(sources[2].matiere_id, null);
     const cat = catalogue(db);
     assertEquals(cat.matieres.map((m) => m.nom), ["Arts appliqués", "Physique"]);
@@ -179,6 +183,10 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
     assert(!html.includes("data-verifier-quiz"));
     assertStringIncludes(html, `name="theme_id" value="${t1}"`);
     const prof = await session(db, fauxModeles().modeles, "enseignant");
+    // La ressource est déposée sous le nom « Prof original »: le compte connecté en devient propriétaire.
+    db.prepare(
+      "UPDATE sources SET proprietaire_id = (SELECT id FROM comptes WHERE role = 'enseignant')",
+    ).run();
     const bibliotheque = await (await prof.requete(`/prof?cours_id=${c1}`)).text();
     assert(!bibliotheque.includes("Toutes les séquences"));
     assertStringIncludes(bibliotheque, "Ressource</th>");
@@ -213,11 +221,15 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
     await reextraire(db, id);
     assertEquals(db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)!.profil, "general");
     db.prepare(
-      "UPDATE sources SET metadonnees = json_set(metadonnees, '$.publics', json('[\"enseignants\"]')) WHERE id = ?",
+      "UPDATE sources SET audience = 'collegues' WHERE id = ?",
     ).run(id);
     assertEquals(chercherFts(db, "lumière", { schoolId: "pilote", coursId: c2 }).length, 0);
     assertEquals((await eleve.requete(`/eleve/themes/${t2}`)).status, 404);
-    assert(!catalogueVisible(db).themes.some((t) => t.id === t2));
+    assert(
+      !catalogueVisible(db, { id: "", enseignant: false, administrateur: false }).themes.some((t) =>
+        t.id === t2
+      ),
+    );
     assertEquals(
       db.prepare("SELECT enseignant FROM sources WHERE id = ?").get(id)!.enseignant,
       "Prof original",
@@ -252,7 +264,8 @@ Deno.test("dépôt web et questions : périmètres par identifiants conservés j
         [`theme_${c}`]: t,
       })
     ) form.set(k, v);
-    for (const p of ["enseignants", "eleves", "thot"]) form.append("publics", p);
+    form.append("audience", "eleves");
+    form.append("reponses", "1");
     form.set("fichier", new File([`<p>${citation}</p>`], "social.html"));
     assertEquals((await prof.requete("/prof/depot", { method: "POST", body: form })).status, 200);
     await traiter(db, revendiquer(db)!, faux.modeles);

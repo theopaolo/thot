@@ -1786,6 +1786,11 @@ form:has([name="ids"]:checked) .selection {
 .selection button:not(.lien):hover {
   border-color: var(--surface);
 }
+.selection select {
+  width: auto;
+  min-height: 40px;
+  color: var(--ink);
+}
 .selection button.principal {
   border-color: var(--yellow);
   background: var(--yellow);

@@ -102,11 +102,16 @@ profil, qui détermine les champs et traitements des dépôts.
 
 **Cours**
 Collection de ressources, avec un public et un objectif facultatifs. Une ressource peut appartenir
-à plusieurs cours. Ce rattachement ne change pas son droit de publication.
+à plusieurs cours. Ce rattachement ne change pas ses lecteurs.
 
 **Thème**
 Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents
 restent distincts. Le profil arts emploie aussi le terme « séquence ».
+
+**Lecteurs d'une ressource**
+Les comptes qui peuvent la lire : « Moi seulement », « Les enseignants » ou « Les enseignants et
+les élèves ». Les administrateurs lisent toutes les ressources. La case « Thot s'en sert pour
+répondre » décide à part si les réponses peuvent la citer.
 
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.

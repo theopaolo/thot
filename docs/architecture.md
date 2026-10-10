@@ -6,14 +6,14 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
 
 ## Règles du produit
 
-1. Une affirmation montrée à un élève cite un passage retrouvé mot pour mot dans une source
-   certifiée et ouverte aux élèves. `verifier()` dans `src/core/reponse.ts` le contrôle. Un
+1. Une affirmation cite un passage retrouvé mot pour mot dans une source certifiée, que son
+   lecteur peut lire et que Thot peut citer. `verifier()` dans `src/core/reponse.ts` le contrôle. Un
    juge (`juger()`, même fichier) contrôle ensuite que ce passage, lu sous le titre de son
    extrait, prouve toute la phrase. Un juge injoignable ou plus lent que 4 s laisse passer
    l'affirmation et le note au journal. Le dépassement du délai annule la requête du juge.
    Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau.
-   Si une preuve ou son titre a changé, ou si son accès est retiré, la réponse est signalée
-   comme indisponible et peut être recalculée.
+   Si une preuve ou son titre a changé, ou si le lecteur n'y a plus accès, la réponse est
+   signalée comme indisponible et peut être recalculée.
 2. Une légende d'image générée et non relue sert à la recherche. Elle ne sert pas de preuve et
    ne s'affiche pas à l'élève. Chaque chunk porte donc deux textes : `rappel` pour la recherche,
    `preuve` pour la citation.
@@ -71,9 +71,8 @@ l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
 
 Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
-Son déposant, sa certification et ses publics restent ceux de la source. Un rattachement ne
-publie rien. Les contrôles de lecture et d'éligibilité aux réponses du pilote restent applicables
-avant la recherche et sur les lecteurs.
+Son propriétaire, sa certification et ses lecteurs restent ceux de la source. Un rattachement ne
+publie rien.
 
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
 neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
@@ -87,6 +86,24 @@ conserve ce profil et refuse de déplacer les citations si le texte change.
 La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
 française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de
 `tests/domaines_test.ts` ne qualifie ni le reclasseur ni les modèles pour l'anglais.
+
+## Lecteurs et propriétaire
+
+Une source appartient au compte qui l'a déposée. Ses lecteurs sont son propriétaire seul, les
+enseignants, ou les enseignants et les élèves. Les administrateurs lisent et gèrent toutes les
+sources, y compris celles sans propriétaire. Un élève ne lit que les sources certifiées. Thot cite
+une source dans une réponse seulement si la case « Thot s'en sert pour répondre » est cochée : une
+source peut se lire sans servir de preuve. La recherche de la bibliothèque montre toute source
+certifiée lisible.
+
+`FILTRE_ACCES` dans `src/core/recherche.ts` porte cette règle. La recherche, les pages de lecture,
+les images, les filtres de cours et la relecture des réponses l'appliquent avec le compte qui lit.
+Seuls le propriétaire et les administrateurs modifient une source, la certifient ou relisent ses
+légendes. Les questions suggérées restent celles des sources publiées aux élèves. Une image se
+revalide à chaque affichage : un accès retiré s'applique aussitôt.
+
+Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
+enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.
 
 ## États
 

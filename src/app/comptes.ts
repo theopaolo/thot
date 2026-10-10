@@ -1,5 +1,5 @@
 import { join } from "@std/path";
-import { transaction } from "../core/recherche.ts";
+import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 
@@ -261,6 +261,20 @@ export const lireCompte = (db: Db, id: string) =>
   ) as
     | Compte
     | undefined;
+
+export const lecteur = (c: Compte): Lecteur => ({
+  id: c.id,
+  enseignant: c.role === "enseignant",
+  administrateur: c.administrateur === 1,
+});
+export const peutLire = (db: Db, c: Compte, sourceId: string) =>
+  db.prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
+    .get(sourceId, ...parametresAcces(lecteur(c))) !== undefined;
+/** Seuls le propriétaire et les administrateurs modifient, certifient ou relisent une source. */
+export const peutModifier = (db: Db, c: Compte, sourceId: string) =>
+  c.administrateur === 1 ||
+  db.prepare("SELECT 1 FROM sources WHERE id = ? AND proprietaire_id = ?").get(sourceId, c.id) !==
+    undefined;
 
 /** Secret de signature des cookies. Créé au premier lancement, conservé avec les données. */
 export function secretSession(): string {

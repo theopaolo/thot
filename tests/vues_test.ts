@@ -76,6 +76,8 @@ Deno.test("le rafraîchissement enseignant exclut le formulaire et conserve les 
     statut_le: null,
     enseignant: "Prof",
     cree_le: "2026-01-01T00:00:00Z",
+    audience: "eleves" as const,
+    reponses: 1,
   };
   const d = {
     source,

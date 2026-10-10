@@ -47,7 +47,7 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
     cacheModeles(db).ecrire("commun", "pilote");
     db.exec(`INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le)
       SELECT 'historique', id, 'Question du pilote', 'out_of_corpus', 'fixture', 'fixture' FROM comptes`);
-    assertEquals(migrer(db), ["0006_instance.sql", "0007_domaines.sql"]);
+    assertEquals(migrer(db), ["0006_instance.sql", "0007_domaines.sql", "0008_acces.sql"]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
     assertEquals(instance.mode, "shared");
@@ -195,6 +195,8 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
         format: "html",
         schoolId: lireInstance(db).school_id,
         enseignant: "Prof",
+        audience: "eleves",
+        reponses: true,
         octets: new TextEncoder().encode(
           `<html><p>Texte confidentiel ${nom} avec un contenu pédagogique propre à cette instance.</p></html>`,
         ),
@@ -209,7 +211,6 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
           resume: "",
           objectifs: "",
           evaluation: "",
-          publics: ["eleves", "thot"],
         },
       });
       await traiter(db, revendiquer(db)!, fauxModeles().modeles);
