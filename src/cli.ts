@@ -38,10 +38,14 @@ const AIDE = `thot <commande>
   reinitialiser <identifiant>               renouvelle le mot de passe enseignant
   domaines                                 affiche les identifiants du catalogue
   matiere <nom> [--profil=general|arts-appliques]
-  profil <matiere_id> <general|arts-appliques>
-                                            change les futurs imports uniquement
+  profil <general|arts-appliques>           change le profil de toutes les matières,
+                                            refusé si une ressource a un autre profil
   cours <matiere_id> <nom> [--niveau=...] [--objectif=...]
   theme <cours_id> <nom>                    crée un thème dans un cours
+  renommer <matiere|cours|theme> <id> <nom>
+                                            garde l'identifiant et les rattachements
+  supprimer <matiere|cours|theme> <id>      refusé si une ressource ou une question l'utilise,
+                                            emporte les cours et thèmes d'une matière
   rattacher <source_id> <cours_id> [--theme-id=...]
                                             ajoute un rattachement sans changer les publics
   ingest <dossier|fichier> [--matiere-id=...] [--cours-id=...] [--theme-id=...]
@@ -574,10 +578,14 @@ switch (commande) {
     console.log(Domaines.theme(db, reste[0], reste.slice(1).join(" ")));
     break;
   case "profil":
-    Domaines.profilMatiere(db, reste[0], reste[1]);
-    console.log(
-      "Profil des futurs imports modifié. Ressources existantes inchangées, aucun reindexage requis.",
-    );
+    Domaines.changerProfil(db, reste[0]);
+    console.log(`Profil de l'instance : ${reste[0]}.`);
+    break;
+  case "renommer":
+    Domaines.renommer(db, reste[0], reste[1], reste.slice(2).join(" "));
+    break;
+  case "supprimer":
+    Domaines.supprimer(db, reste[0], reste[1]);
     break;
   case "rattacher": {
     const [sourceId, coursId] = reste;

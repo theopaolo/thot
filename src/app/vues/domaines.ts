@@ -12,38 +12,71 @@ export const selectionProfil = (valeur = "general") =>
       html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`
     )
   }</select></label>`;
-export const gestion = (cat: Catalogue, erreur = "") =>
-  html`
+const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème" };
+const ligne = (genre: keyof typeof LIBELLES, id: string, nom: string, contexte = "") => {
+  const libelle = `Nom (${LIBELLES[genre]})`;
+  return html`
+    <form method="post" action="/administration/domaines/renommer" class="barre">
+      <input type="hidden" name="genre" value="${genre}"><input type="hidden" name="id" value="${id}">
+      <input type="text" name="nom" value="${nom}" required maxlength="200" aria-label="${libelle}">
+      <button>Renommer</button>
+      <button formaction="/administration/domaines/supprimer" formnovalidate>Supprimer</button>
+      ${contexte ? html`<span class="discret">${contexte}</span>` : ""}
+    </form>
+  `;
+};
+export const gestion = (cat: Catalogue, erreur = "", figee = false) => {
+  const profil = cat.matieres[0]?.profil;
+  const controleProfil = !profil
+    ? ""
+    : figee
+    ? html`<p>Profil de l'instance : <strong>${
+      PROFILS[profil].nom
+    }</strong>. Des ressources sont déposées, il ne change plus.</p>`
+    : html`
+      <form method="post" action="/administration/domaines/profil"
+        class="barre">${selectionProfil(
+          profil,
+        )}<button>Changer le profil de l'instance</button></form>
+    `;
+  return html`
     <h1>Matières et cours</h1>${erreur ? html`<p role="alert">${erreur}</p>` : ""}
     <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
+    ${controleProfil}
+    <p>Renommer garde les rattachements. Supprimer est refusé tant qu'une ressource ou une question
+    d'élève utilise l'entrée. Une matière ou un cours emporte ses cours et ses thèmes.</p>
     <h2>Matières</h2>
-    ${cat.matieres.map((m) =>
-      html`
-        <form method="post" action="/administration/domaines/profil"
-          class="barre"><strong>${m.nom}</strong><input type="hidden" name="matiere_id" value="${m
-            .id}">${selectionProfil(m.profil)}<button>Enregistrer le profil</button></form>
-      `
-    )}
+    ${cat.matieres.map((m) => ligne("matiere", m.id, m.nom))}
     <form method="post" action="/administration/domaines/matiere"
-      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${selectionProfil(
-        cat.matieres[0]?.profil,
-      )}<button>Créer la matière</button></form>
-    <h2>Cours</h2><ul>${cat.cours.map((c) =>
-      html`<li>${c.nom} (${cat.matieres.find((m) => m.id === c.matiere_id)?.nom})${
-        c.public ? `, ${c.public}` : ""
-      }${c.objectif ? ` : ${c.objectif}` : ""}</li>`
-    )}</ul>
+      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${profil
+        ? ""
+        : selectionProfil()}<button>Créer la matière</button></form>
+    <h2>Cours</h2>${cat.cours.map((c) =>
+      ligne(
+        "cours",
+        c.id,
+        c.nom,
+        `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${c.public ? `, ${c.public}` : ""}${
+          c.objectif ? ` : ${c.objectif}` : ""
+        }`,
+      )
+    )}
     <form method="post" action="/administration/domaines/cours"
       class="etroit"><label>Matière <select name="matiere_id" required>${options(
         cat.matieres,
       )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>Public ou niveau (facultatif) <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>
-    <h2>Thèmes</h2><ul>${cat.themes.map((t) =>
-      html`<li>${
-        cat.matieres.find((m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id)
-          ?.nom
-      } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom} : ${t.nom}</li>`
-    )}</ul>
+    <h2>Thèmes</h2>${cat.themes.map((t) =>
+      ligne(
+        "theme",
+        t.id,
+        t.nom,
+        `${
+          cat.matieres.find((m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id)
+            ?.nom
+        } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom}`,
+      )
+    )}
     <form method="post" action="/administration/domaines/theme"
       class="etroit"><label>Cours <select name="cours_id" required>${options(
         cat.cours.map((c) => ({
@@ -52,6 +85,7 @@ export const gestion = (cat: Catalogue, erreur = "") =>
         })),
       )}</select></label><label>Nouveau thème <input type="text" name="nom" required maxlength="200"></label><button>Créer le thème</button></form>
   `;
+};
 
 export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "") =>
   html`

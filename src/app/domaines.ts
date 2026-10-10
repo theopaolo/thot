@@ -1,4 +1,4 @@
-import { FILTRE_DOMAINE, parametresDomaine } from "../core/recherche.ts";
+import { FILTRE_DOMAINE, parametresDomaine, transaction } from "../core/recherche.ts";
 import type { Db } from "./db.ts";
 import { type Profil, PROFILS } from "../core/profils.ts";
 
@@ -27,12 +27,10 @@ export const profilInstance = (db: Db) =>
   db.prepare("SELECT profil FROM matieres UNION SELECT profil FROM sources LIMIT 1").get()
     ?.profil as Profil | undefined;
 
-/** Une instance garde un seul profil. Il se change tant qu'aucune ressource n'est déposée. */
-function garderProfil(db: Db, profil: string, saufMatiere = "") {
+/** Une instance garde un seul profil, partagé par ses matières et ses ressources. */
+function garderProfil(db: Db, profil: string) {
   if (!Object.hasOwn(PROFILS, profil)) throw new Error("Profil inconnu.");
-  const autres = db.prepare(
-    "SELECT profil FROM matieres WHERE id != ? UNION SELECT profil FROM sources",
-  ).all(saufMatiere);
+  const autres = db.prepare("SELECT profil FROM matieres UNION SELECT profil FROM sources").all();
   if (autres.some((l) => l.profil !== profil)) {
     throw new Error("L'instance garde un seul profil, partagé par ses matières et ses ressources.");
   }
@@ -63,11 +61,75 @@ export function theme(db: Db, coursId: string, nom: string) {
   db.prepare("INSERT INTO themes VALUES (?, ?, ?)").run(id, coursId, texte(nom));
   return id;
 }
-export function profilMatiere(db: Db, id: string, profil: string) {
-  garderProfil(db, profil, id);
-  if (!db.prepare("UPDATE matieres SET profil = ? WHERE id = ?").run(profil, id).changes) {
-    throw new Error("Matière inconnue.");
+/** Change le profil de toutes les matières d'un coup, tant qu'aucune ressource n'a un autre profil. */
+export function changerProfil(db: Db, profil: string) {
+  if (!Object.hasOwn(PROFILS, profil)) throw new Error("Profil inconnu.");
+  if (db.prepare("SELECT 1 FROM sources WHERE profil != ?").get(profil)) {
+    throw new Error("Des ressources sont déjà déposées : le profil de l'instance ne change plus.");
   }
+  if (!db.prepare("UPDATE matieres SET profil = ?").run(profil).changes) {
+    throw new Error("Aucune matière : le profil se choisit à la création de la première.");
+  }
+}
+
+const TABLES: Record<string, string> = { matiere: "matieres", cours: "cours", theme: "themes" };
+function nomEntree(db: Db, genre: string, id: string) {
+  if (!Object.hasOwn(TABLES, genre)) throw new Error("Type inconnu.");
+  const ligne = db.prepare(`SELECT nom FROM ${TABLES[genre]} WHERE id = ?`).get(id);
+  if (!ligne) throw new Error("Matière, cours ou thème inconnu.");
+  return ligne.nom as string;
+}
+/** L'identifiant reste: les rattachements suivent le nouveau nom. */
+export function renommer(db: Db, genre: string, id: string, nom: string) {
+  nomEntree(db, genre, id);
+  const n = texte(nom);
+  try {
+    db.prepare(`UPDATE ${TABLES[genre]} SET nom = ? WHERE id = ?`).run(n, id);
+  } catch (e) {
+    if (!(e as Error).message.includes("UNIQUE")) throw e;
+    throw new Error(`« ${n} » existe déjà.`);
+  }
+}
+/**
+ * Retire une matière, un cours ou un thème que rien n'utilise. Une matière ou un cours emporte
+ * ses cours et ses thèmes, et reste en place si l'un d'eux sert encore.
+ */
+export function supprimer(db: Db, genre: string, id: string) {
+  const nom = nomEntree(db, genre, id);
+  const liste = (sql: string, ...p: string[]) => db.prepare(sql).all(...p).map((l) => l.id);
+  transaction(db, () => {
+    const cours = genre === "cours"
+      ? [id]
+      : genre === "matiere"
+      ? liste("SELECT id FROM cours WHERE matiere_id = ?", id)
+      : [];
+    const themes = genre === "theme" ? [id] : liste(
+      "SELECT id FROM themes WHERE cours_id IN (SELECT value FROM json_each(?))",
+      JSON.stringify(cours),
+    );
+    const [m, c, t] = [genre === "matiere" ? [id] : [], cours, themes].map((l) =>
+      JSON.stringify(l)
+    );
+    const dans = "IN (SELECT value FROM json_each(?))";
+    const ressources = db.prepare(
+      `SELECT count(*) AS n FROM (SELECT id FROM sources WHERE matiere_id ${dans}
+        UNION SELECT source_id FROM source_cours WHERE cours_id ${dans} OR theme_id ${dans})`,
+    ).get(m, c, t)!.n as number;
+    const questions = db.prepare(
+      `SELECT count(*) AS n FROM messages
+       WHERE matiere_id ${dans} OR cours_id ${dans} OR theme_id ${dans}`,
+    ).get(m, c, t)!.n as number;
+    if (ressources || questions) {
+      const emplois = [
+        ressources && `${ressources} ressource(s)`,
+        questions && `${questions} question(s)`,
+      ];
+      throw new Error(`« ${nom} » est utilisé par ${emplois.filter(Boolean).join(" et ")}.`);
+    }
+    for (const [table, ids] of [["themes", t], ["cours", c], ["matieres", m]]) {
+      db.prepare(`DELETE FROM ${table} WHERE id ${dans}`).run(ids);
+    }
+  });
 }
 // ponytail: liste en dur. `thot ingest --matiere=` et la migration 0007 la lisent encore.
 export const MATIERES = [

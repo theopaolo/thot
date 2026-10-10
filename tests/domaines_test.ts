@@ -13,9 +13,10 @@ import {
   affiliations,
   catalogue,
   catalogueVisible,
+  changerProfil,
   cours,
   matiere,
-  profilMatiere,
+  renommer,
   theme,
 } from "../src/app/domaines.ts";
 import { lireInstance } from "../src/app/instance.ts";
@@ -206,7 +207,7 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
       "Isaac Newton",
     );
     assert(!detail.includes("Le quiz élève"));
-    assertThrows(() => profilMatiere(db, physique, "arts-appliques"), Error, "un seul profil");
+    assertThrows(() => changerProfil(db, "arts-appliques"), Error, "ressources");
     assertThrows(() => matiere(db, "Arts", "arts-appliques"), Error, "un seul profil");
     indexer(db, id);
     await reextraire(db, id);
@@ -495,6 +496,194 @@ Deno.test("arts appliqués : consignes mesurées, matière proposée, profil de 
   }
 });
 
+async function administrateur(db: ReturnType<typeof connexion>) {
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  db.prepare("UPDATE comptes SET administrateur = 1 WHERE role = 'enseignant'").run();
+  return {
+    ...prof,
+    poster: (action: string, champs: Record<string, string>) =>
+      prof.requete(`/administration/domaines/${action}`, {
+        method: "POST",
+        body: new URLSearchParams(champs),
+      }),
+  };
+}
+
+Deno.test("profil de l’instance : deux matières arts passent au général en une action, refus dès qu’une ressource existe", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const arts = matiere(db, "Arts", "arts-appliques");
+    matiere(db, "Design");
+    const admin = await administrateur(db);
+    const profils = () => catalogue(db).matieres.map((m: { profil: string }) => m.profil);
+    assertEquals(profils(), ["arts-appliques", "arts-appliques"]);
+    assertEquals((await admin.poster("profil", { profil: "general" })).status, 303);
+    assertEquals(profils(), ["general", "general"]);
+    // Des matières de profils différents, héritées d’avant la règle, se rejoignent aussi.
+    db.prepare("UPDATE matieres SET profil = 'arts-appliques' WHERE id = ?").run(arts);
+    changerProfil(db, "general");
+    assertEquals(profils(), ["general", "general"]);
+    assertThrows(() => changerProfil(db, "inconnu"), Error, "Profil inconnu");
+    const page = await (await admin.requete("/administration/domaines")).text();
+    assertStringIncludes(page, 'action="/administration/domaines/profil"');
+
+    await ressource(db, { matiere_id: arts });
+    const refus = await admin.poster("profil", { profil: "arts-appliques" });
+    assertEquals(refus.status, 400);
+    assertStringIncludes(await refus.text(), "ressources sont déjà déposées");
+    assertEquals(profils(), ["general", "general"]);
+    const figee = await (await admin.requete("/administration/domaines")).text();
+    assert(!figee.includes('action="/administration/domaines/profil"'));
+    assertStringIncludes(figee, "Des ressources sont déposées");
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("renommer : le cours pilote et un thème gardent leurs rattachements et les pages élèves", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const id = await ressource(db, { matiere: "arts-appliques", sequence: "Art Nouveau" });
+    const [m] = catalogue(db).matieres, [c] = catalogue(db).cours, [t] = catalogue(db).themes;
+    assertEquals([c.nom, t.nom], ["Arts appliqués", "Art Nouveau"]);
+    const liens = () => db.prepare("SELECT * FROM source_cours").all();
+    const avant = liens();
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+
+    renommer(db, "cours", c.id, "Histoire de l’art");
+    renommer(db, "theme", t.id, "Art nouveau et Arts and Crafts");
+    assertEquals(liens(), avant);
+    assertEquals(catalogue(db).cours[0].matiere_id, m.id);
+    assertEquals(catalogue(db).themes[0].cours_id, c.id);
+    for (const chemin of [`/eleve/themes/${t.id}`, "/eleve", `/eleve?cours_id=${c.id}`]) {
+      const reponse = await eleve.requete(chemin);
+      assertEquals(reponse.status, 200, chemin);
+      assertStringIncludes(await reponse.text(), "ATC Lumière");
+    }
+    assertStringIncludes(
+      await (await eleve.requete(`/eleve/themes/${t.id}`)).text(),
+      "<h1>Art nouveau et Arts and Crafts</h1>",
+    );
+    assertStringIncludes(
+      await (await eleve.requete("/eleve")).text(),
+      "Art nouveau et Arts and Crafts",
+    );
+    // Les métadonnées gardent le nom du dossier d’origine: les anciennes adresses répondent.
+    assertEquals((await eleve.requete("/eleve/sequences/Art%20Nouveau")).status, 200);
+    assertStringIncludes(
+      await (await prof.requete("/prof?sequence=Art%20Nouveau")).text(),
+      `/prof/sources/${id}`,
+    );
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const arts = matiere(db, "Arts appliqués", "arts-appliques"), chimie = matiere(db, "Chimie");
+    const c = cours(db, arts, "Images"), c2 = cours(db, arts, "Objets");
+    const t = theme(db, c, "Art Nouveau");
+    theme(db, c, "Bauhaus");
+    theme(db, c2, "Ornement");
+    assertThrows(() => renommer(db, "matiere", chimie, " Arts appliqués "), Error, "existe déjà");
+    assertThrows(() => renommer(db, "theme", t, "Bauhaus"), Error, "« Bauhaus » existe déjà");
+    renommer(db, "theme", t, "Ornement");
+    renommer(db, "cours", c2, "Images");
+    assertThrows(() => renommer(db, "theme", t, " "), Error, "Texte attendu");
+    assertThrows(() => renommer(db, "theme", "absent", "Nom"), Error, "inconnu");
+    assertThrows(() => renommer(db, "table", t, "Nom"), Error, "Type inconnu");
+    const admin = await administrateur(db);
+    const refus = await admin.poster("renommer", {
+      genre: "matiere",
+      id: chimie,
+      nom: "Arts appliqués",
+    });
+    assertEquals(refus.status, 400);
+    const page = await refus.text();
+    assertStringIncludes(page, "« Arts appliqués » existe déjà");
+    assert(!page.includes("constraint"));
+
+    // `--matiere=` et le dossier d’un import cherchent la matière et le thème par leur nom.
+    renommer(db, "theme", t, "Art nouveau 1900");
+    renommer(db, "matiere", arts, "Arts appliqués 2de");
+    await ressource(db, { matiere_id: arts, sequence: "Art Nouveau" });
+    assertEquals(catalogue(db).themes.map((x) => x.nom).sort(), [
+      "Art Nouveau",
+      "Art nouveau 1900",
+      "Bauhaus",
+      "Ornement",
+    ]);
+    await ressource(db, { matiere: "arts-appliques" });
+    assertEquals(
+      catalogue(db).matieres.map((x) => x.nom),
+      ["Arts appliqués", "Arts appliqués 2de", "Chimie"],
+    );
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("supprimer : refusée avec sa raison tant qu’une ressource ou une question utilise l’entrée, sinon retirée des filtres et du dépôt", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const physique = matiere(db, "Physique"), socio = matiere(db, "Sociologie");
+    const optique = cours(db, physique, "Optique"), mecanique = cours(db, physique, "Mécanique");
+    const lumiere = theme(db, optique, "Lumière"), couleurs = theme(db, optique, "Colorimétrie");
+    theme(db, cours(db, socio, "Théories"), "Auteurs");
+    await ressource(db, { matiere_id: physique }, [{ cours_id: optique, theme_id: lumiere }]);
+    const admin = await administrateur(db);
+    const supprimer = (genre: string, id: string) => admin.poster("supprimer", { genre, id });
+    db.prepare(
+      `INSERT INTO messages (id, compte_id, question, theme_id, etat, cree_le, maj_le)
+       VALUES ('q', (SELECT id FROM comptes), 'Question', ?, 'answered', 'x', 'x')`,
+    ).run(couleurs);
+
+    for (
+      const [genre, id, raison] of [
+        ["theme", lumiere, "« Lumière » est utilisé par 1 ressource(s)."],
+        ["theme", couleurs, "« Colorimétrie » est utilisé par 1 question(s)."],
+        ["cours", optique, "« Optique » est utilisé par 1 ressource(s) et 1 question(s)."],
+        ["matiere", physique, "« Physique » est utilisé par 1 ressource(s) et 1 question(s)."],
+      ]
+    ) {
+      const refus = await supprimer(genre, id);
+      assertEquals(refus.status, 400);
+      assertStringIncludes(await refus.text(), raison);
+    }
+    // Un refus ne retire rien, pas même les cours inutilisés de la matière.
+    const avant = catalogue(db);
+    assertEquals([avant.matieres.length, avant.cours.length, avant.themes.length], [2, 3, 3]);
+    assertEquals((await supprimer("table", "x")).status, 400);
+    assertEquals((await supprimer("theme", "absent")).status, 400);
+
+    db.prepare("DELETE FROM messages").run();
+    assertEquals((await supprimer("theme", couleurs)).status, 303);
+    assertEquals((await supprimer("cours", mecanique)).status, 303);
+    // Une matière emporte ses cours et ses thèmes quand rien ne les utilise.
+    assertEquals((await supprimer("matiere", socio)).status, 303);
+    const apres = catalogue(db);
+    assertEquals(apres.matieres.map((x) => x.nom), ["Physique"]);
+    assertEquals(apres.cours.map((x) => x.nom), ["Optique"]);
+    assertEquals(apres.themes.map((x) => x.nom), ["Lumière"]);
+    for (const chemin of ["/prof", "/prof/depot"]) {
+      const page = await (await admin.requete(chemin)).text();
+      assertStringIncludes(page, "Optique");
+      for (const retire of ["Sociologie", "Théories", "Auteurs", "Mécanique", "Colorimétrie"]) {
+        assert(!page.includes(retire), `${chemin} propose encore ${retire}`);
+      }
+    }
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
 Deno.test("sonde lexicale français / anglais : français conservé, anglais non qualifié", async () => {
   const { db, dir } = await environnement();
   try {
@@ -550,7 +739,7 @@ Deno.test("sonde lexicale français / anglais : français conservé, anglais non
   }
 });
 
-Deno.test("CLI : configurer quatre collections, importer, rattacher, refuser un second profil", async () => {
+Deno.test("CLI : configurer des collections, changer le profil, importer, rattacher, renommer, supprimer, refuser un second profil", async () => {
   const dir = await Deno.makeTempDir();
   try {
     const lancer = (...args: string[]) =>
@@ -571,10 +760,15 @@ Deno.test("CLI : configurer quatre collections, importer, rattacher, refuser un 
       assert(r.success, new TextDecoder().decode(r.stderr));
       return new TextDecoder().decode(r.stdout).trim();
     };
-    const arts = await cli("matiere", "Arts");
+    const profils = async () =>
+      JSON.parse(await cli("domaines")).matieres.map((m: { profil: string }) => m.profil);
+    const arts = await cli("matiere", "Arts", "--profil=arts-appliques");
     const physique = await cli("matiere", "Physique");
+    assertEquals(await profils(), ["arts-appliques", "arts-appliques"]);
+    await cli("profil", "general");
+    assertEquals(await profils(), ["general", "general"]);
     await cli("matiere", "REAPER");
-    await cli("matiere", "Sociologie");
+    const socio = await cli("matiere", "Sociologie");
     const c = await cli("cours", physique, "Optique"), t = await cli("theme", c, "Introduction");
     const fichier = join(dir, "physique.html");
     await Deno.writeTextFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
@@ -600,13 +794,20 @@ Deno.test("CLI : configurer quatre collections, importer, rattacher, refuser un 
       const c2 = await cli("cours", arts, "Images");
       await cli("rattacher", s.id as string, c2);
       assertEquals(db.prepare("SELECT count(*) n FROM source_cours").get()!.n, 2);
-      assert(!(await lancer("profil", physique, "arts-appliques")).success);
+      assert(!(await lancer("profil", "arts-appliques")).success);
       assert(!(await lancer("matiere", "Design", "--profil=arts-appliques")).success);
+      assert(!(await lancer("supprimer", "matiere", physique)).success);
+      await cli("renommer", "cours", c, "Optique", "géométrique");
+      await cli("supprimer", "matiere", socio);
+      assertEquals(
+        db.prepare("SELECT nom FROM cours WHERE id = ?").get(c)!.nom,
+        "Optique géométrique",
+      );
       await cli("reextraire");
       await cli("rebuild");
       assertEquals(db.prepare("SELECT profil FROM sources").get()!.profil, "general");
       assertEquals(db.prepare("SELECT enseignant FROM sources").get()!.enseignant, s.enseignant);
-      assertEquals(JSON.parse(await cli("domaines")).matieres.length, 4);
+      assertEquals(JSON.parse(await cli("domaines")).matieres.length, 3);
       assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 1);
     } finally {
       db.close();

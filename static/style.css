@@ -795,6 +795,11 @@ input[type="checkbox"] {
 .barre .espace {
   margin-left: auto;
 }
+.barre input[type="text"] {
+  flex: 1 1 18rem;
+  width: auto;
+  max-width: 24rem;
+}
 
 kbd {
   display: inline-block;

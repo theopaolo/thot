@@ -65,7 +65,9 @@ L'autorité d'administration est accordée explicitement par l'opérateur, jamai
 Une instance a un seul profil d'import, partagé par ses matières et ses ressources. Un
 établissement qui a besoin des deux profils fait tourner deux instances. Un cours regroupe des ressources avec un public et un
 objectif facultatifs. Un thème appartient à un cours. Les identifiants, jamais les libellés,
-séparent les thèmes homonymes. Les anciennes matières et séquences gardent leurs métadonnées,
+séparent les thèmes homonymes. Renommer garde les identifiants, donc les rattachements. Une
+matière, un cours ou un thème ne se supprime que si ni une ressource ni une question d'élève ne
+l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
 
 Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
@@ -76,9 +78,10 @@ avant la recherche et sur les lecteurs.
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
 neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
 et le quiz d'identification. Il garde aussi les consignes de réponse, de juge, de suggestion et
-de légende mesurées sur le pilote. La première matière fixe le profil de l'instance. Il se change
-tant qu'aucune ressource n'est déposée. Ensuite, l'administration et la CLI refusent une matière
-d'un autre profil. La source capture le profil au dépôt, y compris sans matière. Une réextraction
+de légende mesurées sur le pilote. La première matière fixe le profil de l'instance. Une seule
+action le change pour toutes les matières, tant qu'aucune ressource n'a un autre profil. Ensuite,
+l'administration et la CLI refusent une matière d'un autre profil. La source capture le profil au
+dépôt, y compris sans matière. Une réextraction
 conserve ce profil et refuse de déplacer les citations si le texte change.
 
 La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation

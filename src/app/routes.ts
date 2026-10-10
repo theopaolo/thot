@@ -202,10 +202,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       liens: Domaines.liensFormulaire(b),
     };
   };
-  app.get(
-    "/administration/domaines",
-    (c) => c.html(rendre(c, "Matières et cours", DomaineVue.gestion(Domaines.catalogue(db)))),
-  );
+  const pageDomaines = (c: Context<Env>, erreur = "") =>
+    rendre(
+      c,
+      "Matières et cours",
+      DomaineVue.gestion(
+        Domaines.catalogue(db),
+        erreur,
+        !!db.prepare("SELECT 1 FROM sources").get(),
+      ),
+    );
+  app.get("/administration/domaines", (c) => c.html(pageDomaines(c)));
   app.post("/administration/domaines/:action", async (c) => {
     const b = await c.req.parseBody();
     try {
@@ -226,20 +233,19 @@ export function creerApp(db: Db, modeles: Modeles) {
           Domaines.theme(db, String(b.cours_id ?? ""), String(b.nom ?? ""));
           break;
         case "profil":
-          Domaines.profilMatiere(db, String(b.matiere_id ?? ""), String(b.profil ?? ""));
+          Domaines.changerProfil(db, String(b.profil ?? ""));
+          break;
+        case "renommer":
+          Domaines.renommer(db, String(b.genre ?? ""), String(b.id ?? ""), String(b.nom ?? ""));
+          break;
+        case "supprimer":
+          Domaines.supprimer(db, String(b.genre ?? ""), String(b.id ?? ""));
           break;
         default:
           return c.notFound();
       }
     } catch (e) {
-      return c.html(
-        rendre(
-          c,
-          "Matières et cours",
-          DomaineVue.gestion(Domaines.catalogue(db), (e as Error).message),
-        ),
-        400,
-      );
+      return c.html(pageDomaines(c, (e as Error).message), 400);
     }
     return c.redirect("/administration/domaines", 303);
   });
