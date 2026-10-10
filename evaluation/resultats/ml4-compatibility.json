@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-09T11:29:07.721446+00:00",
+  "model": "mistral-large-4",
+  "effort": "low",
+  "http_status": 400,
+  "error": "{\"object\":\"error\",\"message\":\"reasoning_effort low is not supported for this model, supported values: [<ReasoningEffort.high: 'high'>, <ReasoningEffort.none: 'none'>]\",\"type\":\"invalid_request_invalid_args\",\"param\":null,\"code\":\"3051\",\"raw_status_code\":400}",
+  "production_effect": "Direct Mistral route in soutenir hardcodes low; a model-ID-only swap returns HTTP 400 and falls back to OpenRouter. Benchmark none requires changing that setting.",
+  "production_changed": false
+}

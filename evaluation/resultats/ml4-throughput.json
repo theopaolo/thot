@@ -1,0 +1,245 @@
+{
+  "date": "2026-10-09T11:29:26.218108+00:00",
+  "source": "https://openrouter.ai/docs/api/api-reference/generations/get-generation",
+  "definition": {
+    "generation_tps": "native_tokens_completion / (generation_time en secondes), médiane des ratios individuels",
+    "effective_request_tps": "native_tokens_completion / (durée de requête client en secondes), médiane des ratios individuels",
+    "provider_latency": "latency déclarée par OpenRouter, en ms ; le client non streamé ne mesure pas le premier token",
+    "sampling": "au plus 12 appels réussis par variante et modèle, espacés régulièrement dans l'ordre du journal",
+    "tokens": "comptes natifs déclarés par OpenRouter ; le raisonnement est indiqué séparément et peut dépasser le compte de complétion"
+  },
+  "invalid_log_rows": 0,
+  "results": [
+    {
+      "variant": "deepseek-followup-1",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "eligible": 12,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 54.7,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 39.4,
+      "provider_latency_ms_median": 240.0,
+      "client_request_ms_median": 315.2,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.000474,
+      "providers": {
+        "Together": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "deepseek-generation-1",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "eligible": 30,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 332.3,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 308.2,
+      "provider_latency_ms_median": 270.5,
+      "client_request_ms_median": 882.5,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.007482,
+      "providers": {
+        "Together": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "deepseek-generation-2",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "eligible": 30,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 289.8,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 273.8,
+      "provider_latency_ms_median": 232.5,
+      "client_request_ms_median": 890.0,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.004098,
+      "providers": {
+        "Together": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "deepseek-suggestions-1",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "eligible": 49,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 279.4,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 258.5,
+      "provider_latency_ms_median": 275.0,
+      "client_request_ms_median": 806.3,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.005222,
+      "providers": {
+        "Together": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "gemma-generation-1",
+      "model": "google/gemma-4-26b-a4b-it",
+      "effort": "none",
+      "eligible": 30,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 144.3,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 136.1,
+      "provider_latency_ms_median": 187.0,
+      "client_request_ms_median": 916.8,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.001774,
+      "providers": {
+        "Makora": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "gpt-oss-generation-1",
+      "model": "openai/gpt-oss-120b",
+      "effort": "low",
+      "eligible": 35,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 693.4,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 556.5,
+      "provider_latency_ms_median": 186.5,
+      "client_request_ms_median": 353.2,
+      "reasoning_tokens_median": 48.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.008095,
+      "providers": {
+        "Cerebras": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "ml4-followup-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "eligible": 12,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 11.9,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 11.5,
+      "provider_latency_ms_median": 847.5,
+      "client_request_ms_median": 992.9,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.000914,
+      "providers": {
+        "Mistral": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "ml4-generation-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "eligible": 33,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 48.9,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 48.7,
+      "provider_latency_ms_median": 527.5,
+      "client_request_ms_median": 4756.5,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.017303,
+      "providers": {
+        "Mistral": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "ml4-high-generation-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "high",
+      "eligible": 4,
+      "sampled": 4,
+      "metadata_ok": 4,
+      "generation_tps_n": 4,
+      "generation_tps_median": 66.1,
+      "effective_request_tps_n": 4,
+      "effective_request_tps_median": 66.0,
+      "provider_latency_ms_median": 1070.0,
+      "client_request_ms_median": 42545.2,
+      "reasoning_tokens_median": 2580.0,
+      "reasoning_exceeds_completion": 2,
+      "sample_total_cost_usd": 0.024305,
+      "providers": {
+        "Mistral": 4
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "ml4-json-generation-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "eligible": 34,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 68.6,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 68.0,
+      "provider_latency_ms_median": 581.0,
+      "client_request_ms_median": 3844.6,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.016719,
+      "providers": {
+        "Mistral": 12
+      },
+      "metadata_failures": {}
+    },
+    {
+      "variant": "ml4-json-suggestions-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "eligible": 46,
+      "sampled": 12,
+      "metadata_ok": 12,
+      "generation_tps_n": 12,
+      "generation_tps_median": 40.3,
+      "effective_request_tps_n": 12,
+      "effective_request_tps_median": 38.3,
+      "provider_latency_ms_median": 612.5,
+      "client_request_ms_median": 3097.1,
+      "reasoning_tokens_median": 0.0,
+      "reasoning_exceeds_completion": 0,
+      "sample_total_cost_usd": 0.014193,
+      "providers": {
+        "Mistral": 12
+      },
+      "metadata_failures": {}
+    }
+  ]
+}

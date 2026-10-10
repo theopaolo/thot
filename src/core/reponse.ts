@@ -1,6 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 import { type Message, type Modeles, PanneModele } from "./modeles.ts";
-import { type Candidat, chercher, type Perimetre } from "./recherche.ts";
+import {
+  type Candidat,
+  chercher,
+  type ChunkIndexe,
+  lireChunk,
+  type Perimetre,
+} from "./recherche.ts";
 import { trouverFragments } from "./texte.ts";
 
 export type Affirmation = {
@@ -67,7 +73,7 @@ function lire(sortie: string): Brute | null {
 }
 
 /** Contrôles déterministes: chaque citation existe mot pour mot dans l'extrait qu'elle désigne. */
-export function verifier(brute: Brute | null, retenus: Candidat[]) {
+export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
   const erreurs: string[] = [];
   const affirmations: Affirmation[] = [];
   if (!brute) return { erreurs: ["La sortie n'est pas un objet JSON."], affirmations };
@@ -105,6 +111,24 @@ export function verifier(brute: Brute | null, retenus: Candidat[]) {
   return { erreurs, affirmations, refus: false };
 }
 
+/** Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. */
+export function actualiserResultat(db: DatabaseSync, resultat: Resultat, p: Perimetre): Resultat {
+  if (resultat.etat !== "answered") return resultat;
+  for (const a of resultat.affirmations) {
+    const c = lireChunk(db, a.source_id, a.chunk_id, p);
+    const valide = c && verifier({ affirmations: [{ ...a, extrait: 1 }] }, [c]).affirmations[0];
+    if (!valide || valide.titre !== a.titre || valide.debut !== a.debut || valide.fin !== a.fin) {
+      return {
+        etat: "failed",
+        code: "EVIDENCE_WITHDRAWN",
+        message:
+          "Une source de cette réponse a été retirée ou modifiée. Pose à nouveau ta question.",
+      };
+    }
+  }
+  return resultat;
+}
+
 /** Probabilité de soutien sous laquelle une affirmation est refusée (`evaluation/resultats/soutien.json`). */
 export const SEUIL_SOUTIEN = 0.5;
 /** Un appel du juge dure 1 s en médiane, mais la queue monte à 10 s: au-delà, il ne bloque pas. */
@@ -118,11 +142,16 @@ const DELAI_JUGE_MS = 4000;
 async function juger(modeles: Modeles, affirmations: Affirmation[], journal: Journal) {
   const verdicts = await Promise.allSettled(
     affirmations.map((a) => {
+      const controle = new AbortController();
       let minuteur: ReturnType<typeof setTimeout> | undefined;
       return Promise.race([
-        modeles.soutenir(a.texte, a.citation, a.titre),
+        modeles.soutenir(a.texte, a.citation, a.titre, controle.signal),
         new Promise<never>((_, non) => {
-          minuteur = setTimeout(() => non(new Error("juge au-delà du délai")), DELAI_JUGE_MS);
+          minuteur = setTimeout(() => {
+            const erreur = new Error("juge au-delà du délai");
+            controle.abort(erreur);
+            non(erreur);
+          }, DELAI_JUGE_MS);
         }),
       ]).finally(() => clearTimeout(minuteur));
     }),
@@ -172,7 +201,11 @@ export async function demander(
       }
     }
     return {
-      resultat: { etat: "answered" as const, affirmations, ...(partielle && { partielle }) },
+      resultat: actualiserResultat(db, {
+        etat: "answered",
+        affirmations,
+        ...(partielle && { partielle }),
+      }, p),
       journal,
     };
   };

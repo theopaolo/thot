@@ -8,7 +8,8 @@ de modèles et rapports.
 
 ## Lancer
 
-Il faut Deno et `pdftotext` (Poppler).
+Il faut Deno et `pdftotext` (Poppler). Sous Linux, il faut aussi `/usr/bin/prlimit`
+(util-linux) pour borner la mémoire du convertisseur. L'image Docker les installe.
 
 ```bash
 cp .env.example .env                                  # renseigner OPENROUTER_API_KEY

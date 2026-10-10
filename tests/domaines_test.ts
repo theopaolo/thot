@@ -28,7 +28,7 @@ import {
   statuer,
   traiter,
 } from "../src/app/ingestion.ts";
-import { chercherFts, indexerSource } from "../src/core/recherche.ts";
+import { chercherFts, indexerSource, lireChunk } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
 import { decouperPdf } from "../src/core/pdf.ts";
 import { CHAMPS, PROFILS, validerInformations } from "../src/core/profils.ts";
@@ -76,6 +76,7 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
         "0002_mvp.sql",
         "0003_suggestions.sql",
         "0004_pilote.sql",
+        "0005_coherence.sql",
         "0006_instance.sql",
       ]
     ) {
@@ -154,6 +155,13 @@ Deno.test("général : champs facultatifs, attribution, profils futurs et rattac
       chercherFts(db, "lumière", { schoolId: "pilote", coursId: c1, themeId: t2 }).length,
       0,
     );
+    const chunk = chercherFts(db, "lumière", { schoolId: "pilote", coursId: c1, themeId: t1 })[0];
+    assert(lireChunk(db, id, chunk.id, { schoolId: "pilote", coursId: c1, themeId: t1 }));
+    assertEquals(
+      lireChunk(db, id, chunk.id, { schoolId: "pilote", coursId: c1, themeId: t2 }),
+      undefined,
+    );
+    assertEquals(lireChunk(db, id, chunk.id, { schoolId: "pilote", sourceId: "autre" }), undefined);
     assertEquals(
       chercherFts(db, "lumière", { schoolId: "pilote", matiereId: physique, coursId: c2 }).length,
       0,

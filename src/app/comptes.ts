@@ -1,4 +1,5 @@
 import { join } from "@std/path";
+import { transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 
@@ -129,7 +130,12 @@ export async function importerEleves(db: Db, csv: string) {
       throw new Error(`Identifiant déjà utilisé : ${c.identifiant}.`);
     }
   }
-  const resultats = [];
+  const resultats: (typeof comptes[number] & {
+    motDePasse: string;
+    id: string;
+    sel: string;
+    empreinte: string;
+  })[] = [];
   for (const c of comptes) {
     const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));
     const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
@@ -141,19 +147,14 @@ export async function importerEleves(db: Db, csv: string) {
       empreinte: await deriver(motDePasse, sel),
     });
   }
-  db.exec("BEGIN IMMEDIATE");
-  try {
+  transaction(db, () => {
     const insert = db.prepare(
       "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, 'eleve', ?, ?, ?)",
     );
     for (const c of resultats) {
       insert.run(c.id, c.identifiant, c.nom, c.sel, c.empreinte, maintenant());
     }
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
+  });
   return resultats.map(({ identifiant, nom, motDePasse }) => ({ identifiant, nom, motDePasse }));
 }
 

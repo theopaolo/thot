@@ -20,7 +20,7 @@ const lancer = (fichier: string, droits: string[]) =>
   }).spawn();
 
 const serveur = lancer("src/server.ts", ["-RWNE"]);
-const worker = lancer("src/worker.ts", ["-RWNE", "--allow-run=pdftotext"]);
+const worker = lancer("src/worker.ts", ["-RWNE", "--allow-run=pdftotext,/usr/bin/prlimit,/bin/ps"]);
 const processus = [serveur, worker];
 if (dev) {
   processus.push(new Deno.Command(Deno.execPath(), {

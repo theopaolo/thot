@@ -1,0 +1,306 @@
+{
+  "scope": {
+    "questions": [
+      "G05",
+      "G13",
+      "G17",
+      "G18",
+      "G19",
+      "G20",
+      "N10"
+    ],
+    "runs": [
+      "deepseek-generation-1",
+      "gpt-oss-generation-1",
+      "ml4-generation-1",
+      "ml4-json-generation-1"
+    ],
+    "unit": "Final answers to six answerable questions and one trap per run",
+    "method": "Nonblind assistant review of each final assertion against its own citation and title. Surrounding context was checked to identify retrieval gaps but could not supply a missing fact to the chosen citation. Direct means the answer addresses the question. Partial supplies relevant facts without the requested explanation. None means refusal or an answer to another question. This is not human ground truth."
+  },
+  "counts": {
+    "deepseek": {
+      "answerable_answered": 4,
+      "direct": 3,
+      "partial": 1,
+      "none": 2,
+      "answered_with_unsupported_claim": 0,
+      "trap_answered": 0
+    },
+    "gpt-oss": {
+      "answerable_answered": 6,
+      "direct": 2,
+      "partial": 1,
+      "none": 3,
+      "answered_with_unsupported_claim": 1,
+      "trap_answered": 0
+    },
+    "ml4": {
+      "answerable_answered": 4,
+      "direct": 2,
+      "partial": 2,
+      "none": 2,
+      "answered_with_unsupported_claim": 2,
+      "trap_answered": 0
+    },
+    "ml4-json": {
+      "answerable_answered": 6,
+      "direct": 2,
+      "partial": 3,
+      "none": 1,
+      "answered_with_unsupported_claim": 4,
+      "trap_answered": 1
+    }
+  },
+  "cases": [
+    {
+      "id": "G05",
+      "model": "deepseek",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Refuses. Retrieved passages describe Arts and Crafts but do not state what Art Nouveau owes Ruskin and Morris."
+    },
+    {
+      "id": "G05",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "none",
+      "citation_support": "all",
+      "finding": "The cited fact about Ruskin and Morris drawing on medieval and neo-Gothic art is supported. It does not establish an influence on Art Nouveau. The first draft asserted that influence. The judge rejected it, and the final repair left the question unanswered."
+    },
+    {
+      "id": "G05",
+      "model": "ml4",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Refuses on the same missing Art Nouveau link."
+    },
+    {
+      "id": "G05",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "none",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "The short quote about nature does not name Ruskin. The generic excerpt title cannot assign it to him.",
+        "The short quote about pleasure in making useful things does not name Morris. The generic excerpt title cannot assign it to him."
+      ],
+      "finding": "Biographical facts about the two men do not explain their influence on Art Nouveau."
+    },
+    {
+      "id": "G13",
+      "model": "deepseek",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "all",
+      "finding": "The citations establish an artist as engineer, an actor's work garment and a sports uniform. These are examples of use, but the answer never explains the purpose of constructivist clothing as a whole."
+    },
+    {
+      "id": "G13",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "The cited list says that constructivist works should be useful and includes mass-produced textiles. It does not say the clothing was for everyday use or that the clothing itself was mass-produced."
+      ],
+      "finding": "The sentence answers the question in form, but promotes adjacent context and a general statement about textiles into a specific claim about clothing. The judge accepted it."
+    },
+    {
+      "id": "G13",
+      "model": "ml4",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "all",
+      "finding": "Four cited garment titles establish actor's work garments and a sports uniform. The list does not explain a general purpose."
+    },
+    {
+      "id": "G13",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "The short citation about mass-produced textiles does not identify constructivist artists. Its generic title does not supply the subject."
+      ],
+      "finding": "Two garment titles supply use examples, but the response does not explain the larger purpose."
+    },
+    {
+      "id": "G17",
+      "model": "deepseek",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "Identifies the Austrian Secession, two associated artists and Olbrich's building. The phrase 'art movement' is an interpretive reading of the Art Nouveau section and the country list rather than a literal quotation."
+    },
+    {
+      "id": "G17",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "A short, minimally useful identification as an Austrian art movement. 'Art movement' depends on the Art Nouveau section context."
+    },
+    {
+      "id": "G17",
+      "model": "ml4",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "Identifies the Austrian Secession, Wagner and Olbrich, then gives cited details of its building. The movement label relies on the Art Nouveau section context."
+    },
+    {
+      "id": "G17",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "Useful identification and building details. The movement label relies on the Art Nouveau section context."
+    },
+    {
+      "id": "G18",
+      "model": "deepseek",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "Links the chair's primary-color planes to the Neoplasticist palette and its status as a Neoplasticist work. The causal explanation is assembled from three supported claims."
+    },
+    {
+      "id": "G18",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "all",
+      "finding": "Cites the chair's red-blue title and the movement's palette, but the repair removed the explicit explanation connecting them. The reader must supply that connection."
+    },
+    {
+      "id": "G18",
+      "model": "ml4",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "The source calls red, blue, yellow, black, white and gray a minimum palette. It does not say Neoplasticism uses only those colors.",
+        "The quote beginning 'Ce n'est pas une illustration' does not name Rietveld's chair, and the generic section title cannot resolve its subject."
+      ],
+      "finding": "The first cited claim does connect the chair with primary-color planes, so the core answer remains useful."
+    },
+    {
+      "id": "G18",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "The quote beginning 'Ce n'est pas une illustration' does not name Rietveld's chair, and the generic section title cannot resolve its subject."
+      ],
+      "finding": "The other citations support the chair's primary-color planes and the movement's palette."
+    },
+    {
+      "id": "G19",
+      "model": "deepseek",
+      "state": "answered",
+      "relevance": "direct",
+      "citation_support": "all",
+      "finding": "Mackintosh is cited as an example of geometric stylization in the Art Nouveau lesson. The extra building details are supported but add little to the contribution asked about."
+    },
+    {
+      "id": "G19",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "none",
+      "citation_support": "all",
+      "finding": "The cited passage names Mackintosh's decorative elements as an example of geometric stylization. The repair drops 'geometric' and says only that he has decorative elements, which does not identify the Glasgow School's contribution."
+    },
+    {
+      "id": "G19",
+      "model": "ml4",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "A citation naming Mackintosh's decorative work as one example does not establish that the Glasgow School as a whole developed geometric stylization."
+      ],
+      "finding": "The cited architectural details are supported, but do not establish a broader school contribution."
+    },
+    {
+      "id": "G19",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "some_unsupported",
+      "unsupported": [
+        "A citation naming Mackintosh's decorative work as one example does not establish that the Glasgow School as a whole developed geometric stylization."
+      ],
+      "finding": "The cited architectural details are supported, but do not establish a broader school contribution."
+    },
+    {
+      "id": "G20",
+      "model": "deepseek",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Refuses. Retrieved passages do not include Futurism, one of the expected sources for this cross-movement question."
+    },
+    {
+      "id": "G20",
+      "model": "gpt-oss",
+      "state": "answered",
+      "relevance": "none",
+      "citation_support": "all",
+      "finding": "Its one cited statement says what Cubism seeks to represent. It gives no method for depicting movement in a still painting. It omits the other avant-garde movements, and no Futurism passage was retrieved."
+    },
+    {
+      "id": "G20",
+      "model": "ml4",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Refuses after the same retrieval result without Futurism."
+    },
+    {
+      "id": "G20",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "partial",
+      "citation_support": "all",
+      "finding": "The cited Cubism facts contrast a fixed viewpoint with mobile vision, but do not describe a pictorial technique for motion or cover Futurism. No Futurism passage was retrieved."
+    },
+    {
+      "id": "N10",
+      "model": "deepseek",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Correctly refuses the unsupported Bauhaus-to-Swedish-design link."
+    },
+    {
+      "id": "N10",
+      "model": "gpt-oss",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Correctly refuses the unsupported Bauhaus-to-Swedish-design link."
+    },
+    {
+      "id": "N10",
+      "model": "ml4",
+      "state": "out_of_corpus",
+      "relevance": "none",
+      "citation_support": "not_applicable",
+      "finding": "Correctly refuses the unsupported Bauhaus-to-Swedish-design link."
+    },
+    {
+      "id": "N10",
+      "model": "ml4-json",
+      "state": "answered",
+      "relevance": "none",
+      "citation_support": "all",
+      "finding": "The cited sentence concerns Neoplasticist principles and Scandinavian furniture. It says nothing about Bauhaus influence or Sweden, yet the pipeline marks this trap answered."
+    }
+  ],
+  "interpretation": "Within these seven questions, GPT-OSS's six answers to six answerable items include three that do not answer the question and one that claims more than its citation proves. Its extra answer count therefore does not establish better citation fidelity or usefulness. DeepSeek supplies fewer answers but no unsupported final assertion in this focused set. Mistral Large 4 with JSON mode answers more often than plain Large 4, but the extra answers include one answered trap and several citation or relevance gaps. These are small, deliberately selected cases, not an overall model ranking.",
+  "date": "2026-10-09T11:37:40.483097+00:00"
+}

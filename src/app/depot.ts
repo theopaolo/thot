@@ -1,4 +1,5 @@
 import { contenu } from "./config.ts";
+import { transaction } from "../core/recherche.ts";
 import { type Db, maintenant } from "./db.ts";
 import { type Affiliation, affiliations, domaineSource, rangerLegacy } from "./domaines.ts";
 import { CHAMPS, validerInformations } from "../core/profils.ts";
@@ -143,45 +144,46 @@ export async function deposer(
 
   const checksum = await sha256(d.octets);
   const t = maintenant();
-  db.exec("BEGIN IMMEDIATE");
   try {
-    const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
-    const informations = validerInformations(
-      d.meta as unknown as Record<string, string>,
-      domaine.profil,
-    );
-    if (domaine.profil === "arts-appliques") {
-      for (const nom of Object.keys(informations)) if (!informations[nom]) delete informations[nom];
-    }
-    db.prepare(
-      `INSERT INTO sources (id, school_id, titre, metadonnees, fichier, format, checksum, octets,
+    transaction(db, () => {
+      const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
+      const informations = validerInformations(
+        d.meta as unknown as Record<string, string>,
+        domaine.profil,
+      );
+      if (domaine.profil === "arts-appliques") {
+        for (const nom of Object.keys(informations)) {
+          if (!informations[nom]) delete informations[nom];
+        }
+      }
+      db.prepare(
+        `INSERT INTO sources (id, school_id, titre, metadonnees, fichier, format, checksum, octets,
        enseignant, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      source_id,
-      d.schoolId,
-      d.meta.titre,
-      JSON.stringify({ ...d.meta, ...informations }),
-      nom,
-      d.format,
-      checksum,
-      d.octets.length,
-      d.enseignant,
-      t,
-    );
-    db.prepare("UPDATE sources SET matiere_id = ?, profil = ?, langue = ? WHERE id = ?").run(
-      domaine.matiere_id,
-      domaine.profil,
-      domaine.langue,
-      source_id,
-    );
-    if (d.liens !== undefined) affiliations(db, source_id, d.liens);
-    else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence);
-    db.prepare(
-      "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
-    ).run(job_id, source_id, t, t);
-    db.exec("COMMIT");
+      ).run(
+        source_id,
+        d.schoolId,
+        d.meta.titre,
+        JSON.stringify({ ...d.meta, ...informations }),
+        nom,
+        d.format,
+        checksum,
+        d.octets.length,
+        d.enseignant,
+        t,
+      );
+      db.prepare("UPDATE sources SET matiere_id = ?, profil = ?, langue = ? WHERE id = ?").run(
+        domaine.matiere_id,
+        domaine.profil,
+        domaine.langue,
+        source_id,
+      );
+      if (d.liens !== undefined) affiliations(db, source_id, d.liens);
+      else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence);
+      db.prepare(
+        "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
+      ).run(job_id, source_id, t, t);
+    });
   } catch (e) {
-    db.exec("ROLLBACK");
     await Deno.remove(contenu(source_id), { recursive: true });
     throw e;
   }

@@ -1,6 +1,6 @@
 ---
 title: QUIZ-001 Demander « Quelle œuvre est-ce ? »
-status: in_progress
+status: not_started
 context: shallow
 energy: 2
 # pleasure: 1 2 3 5 8 13 21

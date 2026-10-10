@@ -2,7 +2,7 @@ import { assembler, type Bloc, decouper, type Extraction } from "../core/documen
 import { extraireHtml } from "../core/html.ts";
 import type { Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
-import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../core/recherche.ts";
+import { type ChunkIndexe, indexerSource, transaction } from "../core/recherche.ts";
 import { contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { sha256 } from "./depot.ts";
@@ -300,11 +300,9 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
 
 /** Seule une source certifiée entre dans l'index. Toute autre en sort. */
 export function indexer(db: Db, sourceId: string) {
-  const s = lireSource(db, sourceId);
-  const chunks = s.statut === "certifiee" ? chunksSource(db, sourceId) : [];
   transaction(db, () => {
-    if (chunks.length) indexerSource(db, sourceId, chunks);
-    else retirerSource(db, sourceId);
+    const s = lireSource(db, sourceId);
+    indexerSource(db, sourceId, s.statut === "certifiee" ? chunksSource(db, sourceId) : []);
   });
 }
 
@@ -330,16 +328,19 @@ export function relireLegende(
   texte: string,
   par: string,
 ) {
-  const img = db.prepare("SELECT source_id, legende FROM images WHERE id = ?").get(imageId) as
-    | { source_id: string; legende: string }
-    | undefined;
-  if (!img) return;
-  const corrigee = action === "certified" && texte.trim() && texte.trim() !== img.legende;
-  db.prepare(
-    `UPDATE images SET legende_statut = ?, relu_par = ?, relu_le = ?,
+  transaction(db, () => {
+    const img = db.prepare("SELECT source_id, legende FROM images WHERE id = ?").get(imageId) as
+      | { source_id: string; legende: string }
+      | undefined;
+    if (!img) return;
+    const corrigee = action === "certified" && texte.trim() && texte.trim() !== img.legende;
+    db.prepare(
+      `UPDATE images SET legende_statut = ?, relu_par = ?, relu_le = ?,
        legende = CASE WHEN ? THEN ? ELSE legende END,
        legende_origine = CASE WHEN ? THEN 'teacher' ELSE legende_origine END
      WHERE id = ?`,
-  ).run(action, par, maintenant(), corrigee ? 1 : 0, texte.trim(), corrigee ? 1 : 0, imageId);
-  indexer(db, img.source_id);
+    ).run(action, par, maintenant(), corrigee ? 1 : 0, texte.trim(), corrigee ? 1 : 0, imageId);
+    const s = lireSource(db, img.source_id);
+    indexerSource(db, s.id, s.statut === "certifiee" ? chunksSource(db, s.id) : []);
+  });
 }

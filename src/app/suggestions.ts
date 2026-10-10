@@ -1,4 +1,5 @@
 import type { Modeles } from "../core/modeles.ts";
+import { transaction } from "../core/recherche.ts";
 import { questionsVerifiees } from "../core/suggestions.ts";
 import { trouver } from "../core/texte.ts";
 import { lireInstance } from "./instance.ts";
@@ -21,7 +22,7 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
     titre: string;
     texte: string;
   }[];
-  const questions = [];
+  const questions: Awaited<ReturnType<typeof questionsVerifiees>> = [];
   for (const p of passages) {
     questions.push(
       ...await questionsVerifiees(
@@ -33,19 +34,14 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
       ),
     );
   }
-  db.exec("BEGIN IMMEDIATE");
-  try {
+  transaction(db, () => {
     db.prepare("DELETE FROM suggestions WHERE source_id = ?").run(sourceId);
     const ins = db.prepare("INSERT INTO suggestions VALUES (?, ?, ?, ?, ?)");
     for (const q of questions) {
       ins.run(crypto.randomUUID(), sourceId, q.question, q.modele, maintenant());
     }
     db.prepare("UPDATE sources SET suggestions_le = ? WHERE id = ?").run(maintenant(), sourceId);
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
+  });
   return questions.length;
 }
 

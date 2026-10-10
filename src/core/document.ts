@@ -38,7 +38,7 @@ export function assembler(parties: Partie[]): Document {
 const MAX_CHUNK = 1800;
 
 /**
- * Découpe par section. Une section trop longue est coupée entre deux blocs. Un chunk est une
+ * Découpe par section et borne aussi les blocs longs. Un chunk est une
  * tranche continue de `document.txt`, ses offsets servent directement de citation.
  */
 export function decouper(doc: Document): Chunk[] {
@@ -53,13 +53,28 @@ export function decouper(doc: Document): Chunk[] {
     courant = [];
   };
   for (const b of doc.blocs) {
-    const taille = courant.reduce((n, x) => n + x.texte.length, 0);
     if (
-      courant.length && (b.section !== courant[0].section || taille + b.texte.length > MAX_CHUNK)
+      courant.length && (b.section !== courant[0].section || b.fin - courant[0].debut > MAX_CHUNK)
     ) {
       fermer();
     }
-    courant.push(b);
+    const caracteres = Array.from(b.texte);
+    for (let debut = 0; debut < caracteres.length;) {
+      let fin = Math.min(debut + MAX_CHUNK, caracteres.length);
+      if (fin < caracteres.length) {
+        let espace = fin;
+        while (espace > debut && !/\s/.test(caracteres[espace - 1])) espace--;
+        if (espace > debut) fin = espace;
+      }
+      courant.push({
+        ...b,
+        debut: b.debut + debut,
+        fin: b.debut + fin,
+        texte: caracteres.slice(debut, fin).join(""),
+      });
+      debut = fin;
+      if (debut < caracteres.length) fermer();
+    }
   }
   fermer();
   return chunks;

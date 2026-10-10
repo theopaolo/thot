@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-09T10:49:37.423929+00:00",
+  "status": "stopped_latency_probe",
+  "reason": "Completed first question in 29.6 seconds; stopped during the next question after token-budget retries and repair. Not a completed quality benchmark.",
+  "model": "mistralai/mistral-large-4-0",
+  "effort": "high",
+  "completed_questions": [
+    {
+      "qid": "G01",
+      "state": "answered",
+      "ms": 29649.112917
+    }
+  ],
+  "successful_http_calls": [
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "provider": "Mistral",
+      "response_model": "mistralai/mistral-large-4-0",
+      "status": 200,
+      "ms": 26129.656208,
+      "completion_tokens": 2301,
+      "reasoning_tokens": 2136,
+      "finish_reason": "stop"
+    },
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "provider": "Mistral",
+      "response_model": "mistralai/mistral-large-4-0",
+      "status": 200,
+      "ms": 34880.114,
+      "completion_tokens": 2400,
+      "reasoning_tokens": 2637,
+      "finish_reason": "length"
+    },
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "provider": "Mistral",
+      "response_model": "mistralai/mistral-large-4-0",
+      "status": 200,
+      "ms": 50210.277458,
+      "completion_tokens": 3170,
+      "reasoning_tokens": 3062,
+      "finish_reason": "stop"
+    },
+    {
+      "model": "mistralai/mistral-large-4-0",
+      "provider": "Mistral",
+      "response_model": "mistralai/mistral-large-4-0",
+      "status": 200,
+      "ms": 56126.030666000006,
+      "completion_tokens": 2400,
+      "reasoning_tokens": 2523,
+      "finish_reason": "length"
+    }
+  ],
+  "input_sha256": {
+    "data/benchmark-ml4/snapshot.sqlite3": "db35846ceb06e4f0cc2ad30cb7d62ae429ad46c4436b0010c1bc832af5bf51ed",
+    "evaluation/queries_generation.json": "2f6f55e7b8e5d7a59ad08811b39aba4d3d96e17c0780285c1be12692cdbb23b9",
+    "src/core/modeles.ts": "adcf7d1d87c6ea83168cbd5453b0c6b4efd7c313349716657037bb477d3d03b4",
+    "src/core/reponse.ts": "148996a9706b3953900d40bf09773b3c4ed458df446ad738561207594f677ae3",
+    "src/core/suggestions.ts": "13d4cf3a4183ac38e3aa6166b7dcc89a5c7cc4678077fc8c00b95c66b8fe2ba0"
+  },
+  "limitations": [
+    "Unfinished question excluded from quality metrics.",
+    "Request log omits interrupted/aborted HTTP calls, so timings are not total runtime.",
+    "Some provider reasoning token counts exceed reported completion tokens."
+  ]
+}

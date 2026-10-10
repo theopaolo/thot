@@ -29,7 +29,13 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
     for (
-      const nom of ["0001_depot.sql", "0002_mvp.sql", "0003_suggestions.sql", "0004_pilote.sql"]
+      const nom of [
+        "0001_depot.sql",
+        "0002_mvp.sql",
+        "0003_suggestions.sql",
+        "0004_pilote.sql",
+        "0005_coherence.sql",
+      ]
     ) {
       db.exec(await Deno.readTextFile(join(RACINE, "migrations", nom)));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);

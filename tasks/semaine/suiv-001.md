@@ -1,6 +1,6 @@
 ---
 title: SUIV-001 Montrer à l'enseignant les questions des élèves
-status: in_progress
+status: not_started
 context: shallow
 energy: 3
 # pleasure: 1 2 3 5 8 13 21

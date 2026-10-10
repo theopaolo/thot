@@ -8,10 +8,75 @@ const SEUIL_PAGE_MUETTE = 200;
 const bruit = (l: string) => l.length < 2 || /^\d+\s*(sur|\/)\s*[\d!]+$/i.test(l);
 
 export async function extrairePdf(chemin: string, profil: Profil = "general"): Promise<Extraction> {
-  const sortie = await new Deno.Command("pdftotext", { args: [chemin, "-"], stdout: "piped" })
-    .output();
-  if (!sortie.success) throw new Error(`pdftotext a échoué (code ${sortie.code})`);
-  return decouperPdf(new TextDecoder().decode(sortie.stdout), profil);
+  const linux = Deno.build.os === "linux";
+  const processus = new Deno.Command(linux ? "/usr/bin/prlimit" : "pdftotext", {
+    args: [...(linux ? ["--as=536870912", "--cpu=30", "--", "pdftotext"] : []), chemin, "-"],
+    stdin: "null",
+    stdout: "piped",
+    stderr: "null",
+  }).spawn();
+  let termine = false;
+  const statut = processus.status.then((s) => {
+    termine = true;
+    return s;
+  });
+  let erreur: Error | undefined;
+  const arreter = (raison: string) => {
+    erreur ??= new Error(raison);
+    try {
+      processus.kill("SIGKILL");
+    } catch { /* déjà sorti */ }
+  };
+  const minuteur = setTimeout(() => arreter("PDF : extraction au-delà de 30 secondes."), 30_000);
+  let controleEnCours: Promise<void> | undefined;
+  // shortcut: macOS borne le RSS par sondage, utiliser Linux pour une limite mémoire stricte.
+  const memoire = linux ? undefined : setInterval(() => {
+    if (controleEnCours) return;
+    controleEnCours = (async () => {
+      const r = await new Deno.Command("/bin/ps", {
+        args: ["-o", "rss=", "-p", String(processus.pid)],
+        stdout: "piped",
+        stderr: "null",
+        signal: AbortSignal.timeout(1000),
+      }).output();
+      if (!r.success && !termine) throw new Error("ps indisponible");
+      if (Number(new TextDecoder().decode(r.stdout).trim()) > 512 * 1024) {
+        arreter("PDF : extraction au-delà de 512 Mo de mémoire.");
+      }
+    })().catch(() => {
+      if (!termine) arreter("PDF : contrôle de mémoire impossible.");
+    })
+      .finally(() => {
+        controleEnCours = undefined;
+      });
+  }, 100);
+  try {
+    const decoder = new TextDecoder();
+    let texte = "";
+    let octets = 0;
+    for await (const bloc of processus.stdout) {
+      octets += bloc.byteLength;
+      if (octets > 10 * 1024 * 1024) {
+        arreter("PDF : texte extrait au-delà de 10 Mo.");
+        break;
+      }
+      texte += decoder.decode(bloc, { stream: true });
+    }
+    const sortie = await statut;
+    clearInterval(memoire);
+    await controleEnCours;
+    if (erreur) throw erreur;
+    if (!sortie.success) throw new Error(`pdftotext a échoué (code ${sortie.code})`);
+    return decouperPdf(texte + decoder.decode(), profil);
+  } finally {
+    clearTimeout(minuteur);
+    clearInterval(memoire);
+    try {
+      processus.kill("SIGKILL");
+    } catch { /* déjà sorti */ }
+    await statut;
+    await controleEnCours;
+  }
 }
 
 export function decouperPdf(brut: string, profil: Profil = "general"): Extraction {
@@ -20,9 +85,17 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
   const pages = brut.split("\f").map((p) => p.split("\n").map((l) => l.trim()));
   if (pages.length > 1 && pages.at(-1)!.every((l) => !l)) pages.pop();
 
-  // En-têtes et pieds de page: une ligne présente sur au moins la moitié des pages.
+  // Seules les occurrences aux bords de page peuvent être des en-têtes ou pieds de page.
+  const bords = pages.map((p) => {
+    const indices = p.flatMap((l, i) => l ? [i] : []);
+    return new Set([indices[0], indices.at(-1)]);
+  });
   const vues = new Map<string, number>();
-  for (const p of pages) for (const l of new Set(p)) if (l) vues.set(l, (vues.get(l) ?? 0) + 1);
+  pages.forEach((p, i) => {
+    for (const l of new Set(p.filter((_, n) => bords[i].has(n)))) {
+      if (l) vues.set(l, (vues.get(l) ?? 0) + 1);
+    }
+  });
   const repetee = (l: string) => (vues.get(l) ?? 0) >= Math.max(2, pages.length / 2);
 
   const parties: Partie[] = [];
@@ -30,7 +103,8 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
   let section = "Introduction";
   pages.forEach((lignes, i) => {
     const page = i + 1;
-    const utiles = lignes.filter((l) => l && !bruit(l) && !repetee(l));
+    const entete = (l: string, n: number) => bords[i].has(n) && repetee(l);
+    const utiles = lignes.filter((l, n) => l && !bruit(l) && !entete(l, n));
     const n = utiles.join("").length;
     if (n < SEUIL_PAGE_MUETTE) {
       avertissements.push(`Page ${page}: ${n} caractères de texte, contenu probablement en image.`);
@@ -40,12 +114,12 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
       if (paragraphe.length) parties.push({ texte: paragraphe.join("\n"), section, page });
       paragraphe = [];
     };
-    for (const l of lignes) {
+    for (const [n, l] of lignes.entries()) {
       if (!l) {
         fermer();
         continue;
       }
-      if (bruit(l) || repetee(l)) continue;
+      if (bruit(l) || entete(l, n)) continue;
       if (estRubrique(l)) {
         fermer();
         section = l;

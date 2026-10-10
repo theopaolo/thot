@@ -18,6 +18,11 @@ function cocherTout(form: HTMLFormElement | null, coche: boolean) {
 }
 
 export function installerProf() {
+  document.addEventListener("htmx:afterSwap", (event) => {
+    if (event.target instanceof Element && event.target.id === "lignes") {
+      majSelection(event.target.closest("form"));
+    }
+  });
   document.addEventListener("click", (event) => {
     if (!(event.target instanceof Element)) return;
     if (event.target.closest("[data-imprimer]")) globalThis.print();

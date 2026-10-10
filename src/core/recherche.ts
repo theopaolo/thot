@@ -93,7 +93,7 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   const lignes = db.prepare(
     `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
      JOIN sources s ON s.id = c.source_id
-     WHERE chunks_fts MATCH ? AND c.school_id = ?
+     WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
        AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
        AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
@@ -114,6 +114,29 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));
 }
 
+export function lireChunk(db: DatabaseSync, sourceId: string, id: string, p: Perimetre) {
+  return db.prepare(
+    `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
+     WHERE c.source_id = ? AND c.id = ? AND s.school_id = ? AND s.statut = 'certifiee'
+       AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')
+       AND (? OR EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'thot'))
+       AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
+       AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`,
+  ).get(
+    sourceId,
+    id,
+    p.schoolId,
+    p.bibliotheque ? 1 : 0,
+    p.chapitre ?? "",
+    p.chapitre ?? "",
+    p.sourceId ?? "",
+    p.sourceId ?? "",
+    ...parametresDomaine(p),
+  ) as
+    | ChunkIndexe
+    | undefined;
+}
+
 /** FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. */
 export async function chercher(
   db: DatabaseSync,
@@ -126,7 +149,16 @@ export async function chercher(
   if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
   const ordre = await modeles.reclasser(question, candidats.map((c) => c.rappel));
   for (const { index, score } of ordre) candidats[index].score = score;
-  const classes = ordre.map(({ index }) => candidats[index]);
+  const classes = ordre.map(({ index }) => candidats[index]).filter((c) => {
+    const actuel = lireChunk(db, c.source_id, c.id, p);
+    return actuel && actuel.titre === c.titre && actuel.rappel === c.rappel &&
+      actuel.preuve === c.preuve && actuel.debut === c.debut && actuel.fin === c.fin;
+  });
   const score = classes[0]?.score ?? 0;
-  return { candidats, retenus: classes.slice(0, 5), score, horsCorpus: score < seuil };
+  return {
+    candidats: classes,
+    retenus: classes.slice(0, 5),
+    score,
+    horsCorpus: !classes.length || score < seuil,
+  };
 }

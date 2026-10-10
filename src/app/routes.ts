@@ -1,13 +1,20 @@
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { csrf } from "hono/csrf";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { serveStatic } from "hono/deno";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
-import { type Affirmation, demander, type Resultat } from "../core/reponse.ts";
-import { type Candidat, chercher, chercherFts } from "../core/recherche.ts";
+import { actualiserResultat, type Affirmation, demander, type Resultat } from "../core/reponse.ts";
+import {
+  type Candidat,
+  chercher,
+  chercherFts,
+  indexerSource,
+  transaction,
+} from "../core/recherche.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
@@ -22,8 +29,8 @@ import {
 import { lireInstance } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
-import { controlerFichier, deposer, valider } from "./depot.ts";
-import { indexer, lireDocument, relireLegende, statuer } from "./ingestion.ts";
+import { controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
+import { chunksSource, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import { administration, connexion as formulaireConnexion, motDePasse, page } from "./vues/page.ts";
 import * as Prof from "./vues/prof.ts";
@@ -31,10 +38,10 @@ import * as Eleve from "./vues/eleve.ts";
 import * as Domaines from "./domaines.ts";
 import * as DomaineVue from "./vues/domaines.ts";
 import { validerInformations } from "../core/profils.ts";
-import { transaction } from "../core/recherche.ts";
 
 type Env = { Variables: { compte: Compte } };
 
+const SESSION_MS = 12 * 3600_000;
 const PERIMETRE_MS = 3 * 60_000;
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
 const QUIZ =
@@ -66,10 +73,11 @@ export function creerApp(db: Db, modeles: Modeles) {
   // Session: un cookie signé qui porte l'identifiant du compte, relu en base à chaque requête.
   app.use("*", async (c, next) => {
     const id = await getSignedCookie(c, secret, SESSION);
-    const [compteId, version, instanceId] = typeof id === "string" ? id.split(":") : [];
+    const [compteId, version, instanceId, expiration] = typeof id === "string" ? id.split(":") : [];
     const trouve = compteId ? lireCompte(db, compteId) : undefined;
     const compte =
-      trouve && String(trouve.session_version) === version && instanceId === instance.id
+      trouve && String(trouve.session_version) === version && instanceId === instance.id &&
+        Number.isSafeInteger(Number(expiration)) && Number(expiration) > Date.now()
         ? trouve
         : undefined;
     if (compte) c.set("compte", compte);
@@ -132,13 +140,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     await setSignedCookie(
       c,
       SESSION,
-      `${compte.id}:${compte.session_version}:${instance.id}`,
+      `${compte.id}:${compte.session_version}:${instance.id}:${Date.now() + SESSION_MS}`,
       secret,
       {
         httpOnly: true,
         sameSite: "Lax",
         path: "/",
-        maxAge: 12 * 3600,
+        maxAge: SESSION_MS / 1000,
         // Derrière un proxy (Coolify, Traefik), le TLS s'arrête avant l'application.
         secure: config.origine.startsWith("https:") || new URL(c.req.url).protocol === "https:" ||
           c.req.header("x-forwarded-proto") === "https",
@@ -388,61 +396,74 @@ export function creerApp(db: Db, modeles: Modeles) {
     "/prof/depot",
     (c) => c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c.req.query())))),
   );
-  app.post("/prof/depot", async (c) => {
-    const b = await c.req.parseBody({ all: true });
-    const champs = Object.fromEntries(
-      Object.entries(b).filter(([k, v]) =>
-        k !== "fichier" && k !== "publics" && typeof v === "string"
-      ),
-    ) as Record<string, string>;
-    const publics = [b.publics ?? []].flat().map(String);
-    const refus = (erreurs: Record<string, string>) =>
-      c.html(
+  app.post(
+    "/prof/depot",
+    bodyLimit({
+      maxSize: MAX_OCTETS + 128 * 1024,
+      onError: (c) => c.text("Dépôt trop volumineux, 25 Mo au maximum par fichier.", 413),
+    }),
+    async (c) => {
+      const b = await c.req.parseBody({ all: true });
+      const champs = Object.fromEntries(
+        Object.entries(b).filter(([k, v]) =>
+          k !== "fichier" && k !== "publics" && typeof v === "string"
+        ),
+      ) as Record<string, string>;
+      const publics = [b.publics ?? []].flat().map(String);
+      const refus = (erreurs: Record<string, string>) =>
+        c.html(
+          rendre(
+            c,
+            "Déposer",
+            Prof.depot({ ...optionsDepot(champs, b), publics, erreurs }),
+          ),
+          400,
+        );
+
+      const v = valider(champs, publics);
+      const fichier = b.fichier;
+      if (fichier instanceof File && fichier.size > MAX_OCTETS) {
+        return refus({
+          ...("erreurs" in v ? v.erreurs : {}),
+          fichier: "Fichier trop lourd, 25 Mo au maximum.",
+        });
+      }
+      const octets = fichier instanceof File
+        ? new Uint8Array(await fichier.arrayBuffer())
+        : new Uint8Array();
+      const controle = controlerFichier(octets);
+      const erreurs = {
+        ...("erreurs" in v ? v.erreurs : {}),
+        ...("erreur" in controle ? { fichier: controle.erreur } : {}),
+      };
+      if ("erreurs" in v || "erreur" in controle) return refus(erreurs);
+
+      try {
+        await deposer(db, {
+          meta: v.meta,
+          nomFichier: (fichier as File).name,
+          octets,
+          format: controle.format,
+          schoolId: instance.school_id,
+          enseignant: c.get("compte").nom,
+          liens: b.cours !== undefined || b.matiere_id ? Domaines.liensFormulaire(b) : undefined,
+        });
+      } catch (e) {
+        return refus({ domaine: (e as Error).message });
+      }
+      return c.html(
         rendre(
           c,
           "Déposer",
-          Prof.depot({ ...optionsDepot(champs, b), publics, erreurs }),
+          Prof.depot({
+            ...optionsDepot(champs),
+            ok:
+              `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
+          }),
         ),
-        400,
       );
-
-    const v = valider(champs, publics);
-    const fichier = b.fichier;
-    const octets = fichier instanceof File
-      ? new Uint8Array(await fichier.arrayBuffer())
-      : new Uint8Array();
-    const controle = controlerFichier(octets);
-    const erreurs = {
-      ...("erreurs" in v ? v.erreurs : {}),
-      ...("erreur" in controle ? { fichier: controle.erreur } : {}),
-    };
-    if ("erreurs" in v || "erreur" in controle) return refus(erreurs);
-
-    try {
-      await deposer(db, {
-        meta: v.meta,
-        nomFichier: (fichier as File).name,
-        octets,
-        format: controle.format,
-        schoolId: instance.school_id,
-        enseignant: c.get("compte").nom,
-        liens: b.cours !== undefined || b.matiere_id ? Domaines.liensFormulaire(b) : undefined,
-      });
-    } catch (e) {
-      return refus({ domaine: (e as Error).message });
-    }
-    return c.html(
-      rendre(
-        c,
-        "Déposer",
-        Prof.depot({
-          ...optionsDepot(champs),
-          ok:
-            `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
-        }),
-      ),
-    );
-  });
+    },
+  );
 
   const detail = (id: string): Prof.Detail | undefined => {
     const source = db.prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?").get(
@@ -535,11 +556,14 @@ export function creerApp(db: Db, modeles: Modeles) {
           "UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, suggestions_le = NULL WHERE id = ? AND school_id = ?",
         )
           .run(titre, JSON.stringify(meta), langue, d.source.id, instance.school_id);
+        const statut =
+          db.prepare("SELECT statut FROM sources WHERE id = ?").get(d.source.id)!.statut;
+        indexerSource(db, d.source.id, statut === "certifiee" ? chunksSource(db, d.source.id) : []);
       });
     } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
       return c.text((e as Error).message, 400);
     }
-    if (d.source.statut === "certifiee") indexer(db, d.source.id);
     return c.redirect(`/prof/sources/${d.source.id}`, 303);
   });
   app.post("/prof/sources/:id/:statut{certifiee|rejetee}", (c) => {
@@ -854,10 +878,12 @@ export function creerApp(db: Db, modeles: Modeles) {
         `SELECT s.id, s.titre, s.profil, (SELECT theme_id FROM source_cours WHERE source_id = s.id AND theme_id IS NOT NULL LIMIT 1) AS theme_id, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS sequence,
            coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
            (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-         FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})`,
-      ).all(...ids).map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
+         FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})
+           AND s.statut = 'certifiee' AND s.school_id = ?
+           AND EXISTS (SELECT 1 FROM json_each(s.metadonnees, '$.publics') WHERE value = 'eleves')`,
+      ).all(...ids, instance.school_id).map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
     );
-    const trouves = ids.map((id) => {
+    const trouves = ids.filter((id) => sources.has(id)).map((id) => {
       const texte = proches.find((x) => x.source_id === id)!.texte.replace(/\s+/g, " ").trim();
       const s = sources.get(id)!;
       const reste = texte.startsWith(s.titre) ? texte.slice(s.titre.length).trim() : texte;
@@ -877,11 +903,18 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
+  const resultatActuel = (texte: string) =>
+    actualiserResultat(db, JSON.parse(texte), { schoolId: instance.school_id });
+
   const messagesDe = (compteId: string) =>
-    db.prepare(
+    (db.prepare(
       "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
     )
-      .all(compteId) as Eleve.MessageVue[];
+      .all(compteId) as Eleve.MessageVue[]).map((m) => {
+        if (!m.resultat) return m;
+        const r = resultatActuel(m.resultat);
+        return { ...m, etat: r.etat, resultat: JSON.stringify(r) };
+      });
 
   const ideesPour = (r: Resultat, question = "", messageId = "") => {
     const m = messageId
@@ -978,8 +1011,14 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
 
   app.post("/eleve/messages/:id/relancer", (c) => {
+    const m = db.prepare("SELECT etat, resultat FROM messages WHERE id = ? AND compte_id = ?")
+      .get(c.req.param("id"), c.get("compte").id);
+    if (
+      !m || (m.etat !== "failed" &&
+        (!m.resultat || resultatActuel(m.resultat as string).etat !== "failed"))
+    ) return c.notFound();
     const r = db.prepare(
-      "UPDATE messages SET etat = 'en_attente', resultat = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat = 'failed'",
+      "UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered')",
     ).run(maintenant(), c.req.param("id"), c.get("compte").id);
     return r.changes ? c.html(Eleve.attente(c.req.param("id"))) : c.notFound();
   });
@@ -992,48 +1031,74 @@ export function creerApp(db: Db, modeles: Modeles) {
     const id = c.req.param("id");
     const compte = c.get("compte");
     return streamSSE(c, async (flux) => {
+      if (flux.aborted) return;
+      const generationId = crypto.randomUUID();
       const perime = new Date(Date.now() - PERIMETRE_MS).toISOString().slice(0, 19) + "Z";
       const pris = db.prepare(
-        `UPDATE messages SET etat = 'en_cours', maj_le = ?
+        `UPDATE messages SET etat = 'en_cours', maj_le = ?, generation_id = ?
          WHERE id = ? AND compte_id = ? AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le < ?))`,
-      ).run(maintenant(), id, compte.id, perime).changes;
+      ).run(maintenant(), generationId, id, compte.id, perime).changes;
       if (pris) {
-        const m = db.prepare(
-          "SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages WHERE id = ?",
-        ).get(id) as {
-          question: string;
-          chapitre: string;
-          matiere_id: string;
-          cours_id: string;
-          theme_id: string;
-        };
-        const precedente = db.prepare(
-          `SELECT question FROM messages WHERE compte_id = ? AND rowid < (SELECT rowid FROM messages WHERE id = ?)
-           AND chapitre = ? AND matiere_id = ? AND cours_id = ? AND theme_id = ? ORDER BY rowid DESC LIMIT 1`,
-        ).get(compte.id, id, m.chapitre, m.matiere_id, m.cours_id, m.theme_id)?.question as
-          | string
-          | undefined;
-        const { resultat, journal } = await demander(
-          db,
-          modeles,
-          m.question,
-          {
+        const renouveler = setInterval(() => {
+          try {
+            const r = db.prepare(
+              "UPDATE messages SET maj_le = ? WHERE id = ? AND generation_id = ? AND etat = 'en_cours'",
+            ).run(maintenant(), id, generationId);
+            if (!r.changes) clearInterval(renouveler);
+          } catch (e) {
+            console.error("Renouvellement de la génération impossible", e);
+          }
+        }, 30_000);
+        try {
+          const m = db.prepare(
+            "SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages WHERE id = ?",
+          ).get(id) as {
+            question: string;
+            chapitre: string;
+            matiere_id: string;
+            cours_id: string;
+            theme_id: string;
+          };
+          const precedente = db.prepare(
+            `SELECT question FROM messages WHERE compte_id = ? AND rowid < (SELECT rowid FROM messages WHERE id = ?)
+             AND chapitre = ? AND matiere_id = ? AND cours_id = ? AND theme_id = ? ORDER BY rowid DESC LIMIT 1`,
+          ).get(compte.id, id, m.chapitre, m.matiere_id, m.cours_id, m.theme_id)?.question as
+            | string
+            | undefined;
+          const p = {
             schoolId: instance.school_id,
             chapitre: m.chapitre || undefined,
             matiereId: m.matiere_id,
             coursId: m.cours_id,
             themeId: m.theme_id,
-          },
-          config.seuil,
-          (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
-          precedente,
-        );
-        db.prepare(
-          "UPDATE messages SET etat = ?, resultat = ?, journal = ?, maj_le = ? WHERE id = ?",
-        )
-          .run(resultat.etat, JSON.stringify(resultat), JSON.stringify(journal), maintenant(), id);
+          };
+          const { resultat, journal } = await demander(
+            db,
+            modeles,
+            m.question,
+            p,
+            config.seuil,
+            (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
+            precedente,
+          );
+          transaction(db, () => {
+            const actuel = actualiserResultat(db, resultat, p);
+            db.prepare(
+              "UPDATE messages SET etat = ?, resultat = ?, journal = ?, maj_le = ?, generation_id = NULL WHERE id = ? AND generation_id = ? AND etat = 'en_cours'",
+            ).run(
+              actuel.etat,
+              JSON.stringify(actuel),
+              JSON.stringify(journal),
+              maintenant(),
+              id,
+              generationId,
+            );
+          });
+        } finally {
+          clearInterval(renouveler);
+        }
       }
-      for (let i = 0; i < 240; i++) {
+      for (let i = 0; i < 240 && !flux.aborted; i++) {
         const m = db.prepare(
           "SELECT question, resultat FROM messages WHERE id = ? AND compte_id = ?",
         ).get(
@@ -1044,7 +1109,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           | undefined;
         if (!m) return;
         if (m.resultat) {
-          const r = JSON.parse(m.resultat) as Resultat;
+          const r = resultatActuel(m.resultat);
           await flux.writeSSE({
             event: "reponse",
             data: String(await Eleve.reponse(id, r, null, ideesPour(r, m.question, id), true))
@@ -1072,7 +1137,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/eleve/messages/:id/citations/:n", (c) => {
     const m = db.prepare("SELECT resultat FROM messages WHERE id = ? AND compte_id = ?")
       .get(c.req.param("id"), c.get("compte").id) as { resultat: string | null } | undefined;
-    const r = m?.resultat ? JSON.parse(m.resultat) as Resultat : undefined;
+    const r = m?.resultat ? resultatActuel(m.resultat) : undefined;
     const a: Affirmation | undefined = r?.etat === "answered"
       ? r.affirmations[Number(c.req.param("n"))]
       : undefined;

@@ -1,0 +1,545 @@
+{
+  "date": "2026-10-09T11:43:05.423577+00:00",
+  "application_revision": "0309a0b229e272a3957a56702fbbef20eee2a8ce",
+  "production_defaults_changed": false,
+  "coverage": {
+    "complete_generation_runs": 7,
+    "generation_questions": 245,
+    "judge_labeled_cases": 103,
+    "judge_passes": 4,
+    "judge_decisions": 412,
+    "captions": 362,
+    "retrieval_queries": 118,
+    "followup_rewrites": 24,
+    "suggestion_passages": 24,
+    "visual_spotcheck_images": 8,
+    "semantic_audit_responses": 28
+  },
+  "recommendation": {
+    "generation": "Keep DeepSeek V4.1 Flash with reasoning off. GPT-OSS is fastest but its higher answer count includes off-topic answers in the targeted audit. ML4 is slower; JSON mode fixes formatting but answers one trap.",
+    "citation_checker": "ML4 with reasoning none is a credible alternative, with fewer false acceptances and more false rejections in these two passes. Its better AUC does not establish an unconditional replacement at the production threshold. Keep current defaults pending an adoption decision.",
+    "captions": "Keep Gemma 4 26B. ML4 gains one retrieval query out of 59, takes 6.5 times longer per caption at the median, and follows the 40–70 word instruction on only 1/181 images.",
+    "followups_and_suggestions": "Keep DeepSeek: scope-preserving rewrites in the spot-check, and 22/24 suggestions kept versus 19/24 for ML4 JSON on the same passages.",
+    "reranking": "Existing reranker used throughout; no replacement or threshold change tested."
+  },
+  "generation": [
+    {
+      "run": "deepseek-generation-1",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "json_mode": false,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 17,
+        "good_source": 17,
+        "failed": 0,
+        "repaired": 5,
+        "partial": 3,
+        "judge_unavailable": 0,
+        "p50_ms": 2408.2740420000046,
+        "p95_ms": 5872.244166999999
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 762.6125840000022,
+        "p95_ms": 2793.607250000008
+      },
+      "generator_request_p50_ms": 850.4367499999971,
+      "reported_generation_tps": 332.3,
+      "tps_sample_n": 12,
+      "source": "ml4-deepseek-generation-1.json"
+    },
+    {
+      "run": "deepseek-generation-2",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "json_mode": false,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 15,
+        "good_source": 15,
+        "failed": 0,
+        "repaired": 5,
+        "partial": 1,
+        "judge_unavailable": 4,
+        "p50_ms": 2665.9286249999996,
+        "p95_ms": 6404.765833000001
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 508.05679100001,
+        "p95_ms": 950.9661249999917
+      },
+      "generator_request_p50_ms": 867.7718339999992,
+      "reported_generation_tps": 289.8,
+      "tps_sample_n": 12,
+      "source": "ml4-deepseek-generation-2.json"
+    },
+    {
+      "run": "deepseek-ml4judge-generation-1",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "effort": "none",
+      "json_mode": false,
+      "judge": "mistral-large-4",
+      "answerable": {
+        "n": 20,
+        "answered": 17,
+        "good_source": 17,
+        "failed": 0,
+        "repaired": 3,
+        "partial": 2,
+        "judge_unavailable": 0,
+        "p50_ms": 3227.8824160000004,
+        "p95_ms": 6022.194875000001
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 571.3656670000055,
+        "p95_ms": 1311.5751249999885
+      },
+      "generator_request_p50_ms": 1001.1229579999999,
+      "reported_generation_tps": null,
+      "tps_sample_n": 0,
+      "source": "ml4-deepseek-ml4judge-generation-1.json"
+    },
+    {
+      "run": "gemma-generation-1",
+      "model": "google/gemma-4-26b-a4b-it",
+      "effort": "none",
+      "json_mode": false,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 15,
+        "good_source": 14,
+        "failed": 0,
+        "repaired": 5,
+        "partial": 3,
+        "judge_unavailable": 0,
+        "p50_ms": 2505.412334,
+        "p95_ms": 4977.888000000003
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 769.5177499999918,
+        "p95_ms": 2558.506417000004
+      },
+      "generator_request_p50_ms": 786.7124580000018,
+      "reported_generation_tps": 144.3,
+      "tps_sample_n": 12,
+      "source": "ml4-gemma-generation-1.json"
+    },
+    {
+      "run": "gpt-oss-generation-1",
+      "model": "openai/gpt-oss-120b",
+      "effort": "low",
+      "json_mode": false,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 19,
+        "good_source": 18,
+        "failed": 0,
+        "repaired": 10,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 2274.4635000000017,
+        "p95_ms": 4195.098
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 530.0849589999998,
+        "p95_ms": 1944.8605410000018
+      },
+      "generator_request_p50_ms": 375.23241699999994,
+      "reported_generation_tps": 693.4,
+      "tps_sample_n": 12,
+      "source": "ml4-gpt-oss-generation-1.json"
+    },
+    {
+      "run": "ml4-generation-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "json_mode": false,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 16,
+        "good_source": 16,
+        "failed": 1,
+        "repaired": 8,
+        "partial": 3,
+        "judge_unavailable": 0,
+        "p50_ms": 7372.603875000001,
+        "p95_ms": 17906.639708999995
+      },
+      "traps": {
+        "n": 15,
+        "answered": 0,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 1021.1986660000111,
+        "p95_ms": 2504.760709000024
+      },
+      "generator_request_p50_ms": 4486.665709000001,
+      "reported_generation_tps": 48.9,
+      "tps_sample_n": 12,
+      "source": "ml4-ml4-generation-1.json"
+    },
+    {
+      "run": "ml4-json-generation-1",
+      "model": "mistralai/mistral-large-4-0",
+      "effort": "none",
+      "json_mode": true,
+      "judge": "zai-glm-5-3",
+      "answerable": {
+        "n": 20,
+        "answered": 19,
+        "good_source": 19,
+        "failed": 0,
+        "repaired": 9,
+        "partial": 2,
+        "judge_unavailable": 1,
+        "p50_ms": 8800.939125000004,
+        "p95_ms": 12167.083708999999
+      },
+      "traps": {
+        "n": 15,
+        "answered": 1,
+        "good_source": 0,
+        "failed": 0,
+        "repaired": 0,
+        "partial": 0,
+        "judge_unavailable": 0,
+        "p50_ms": 759.5463340000133,
+        "p95_ms": 3301.6296659999934
+      },
+      "generator_request_p50_ms": 3639.5056250000052,
+      "reported_generation_tps": 68.6,
+      "tps_sample_n": 12,
+      "source": "ml4-ml4-json-generation-1.json"
+    }
+  ],
+  "citation_checker": {
+    "ml4-none": {
+      "model": "mistral-large-4",
+      "effort": "none",
+      "passes": [
+        {
+          "n": 103,
+          "valides": 103,
+          "echecs": 0,
+          "faux_rejets": 7,
+          "positifs_valides": 43,
+          "faux_passages": 1,
+          "negatifs_valides": 60,
+          "sortie_erreurs": 8,
+          "sortie_valides": 70,
+          "auc": 0.986,
+          "auc_apres_raisonnement": 0.986,
+          "p50_ms": 670,
+          "p95_ms": 1641,
+          "plus_2500_ms": 1,
+          "plus_4000_ms": 0,
+          "completion_tokens": 206,
+          "methodes": {
+            "logprobs": 103,
+            "binary": 0,
+            "invalid_answer": 0,
+            "api_error": 0,
+            "transport_error": 0
+          },
+          "formes_invalides": 0,
+          "modeles_repondants": [
+            "mistral-large-4"
+          ]
+        },
+        {
+          "n": 103,
+          "valides": 103,
+          "echecs": 0,
+          "faux_rejets": 8,
+          "positifs_valides": 43,
+          "faux_passages": 1,
+          "negatifs_valides": 60,
+          "sortie_erreurs": 9,
+          "sortie_valides": 70,
+          "auc": 0.986,
+          "auc_apres_raisonnement": 0.986,
+          "p50_ms": 678,
+          "p95_ms": 1651,
+          "plus_2500_ms": 1,
+          "plus_4000_ms": 0,
+          "completion_tokens": 206,
+          "methodes": {
+            "logprobs": 103,
+            "binary": 0,
+            "invalid_answer": 0,
+            "api_error": 0,
+            "transport_error": 0
+          },
+          "formes_invalides": 0,
+          "modeles_repondants": [
+            "mistral-large-4"
+          ]
+        }
+      ]
+    },
+    "glm-low": {
+      "model": "zai-glm-5-3",
+      "effort": "low",
+      "passes": [
+        {
+          "n": 103,
+          "valides": 103,
+          "echecs": 0,
+          "faux_rejets": 7,
+          "positifs_valides": 43,
+          "faux_passages": 2,
+          "negatifs_valides": 60,
+          "sortie_erreurs": 9,
+          "sortie_valides": 70,
+          "auc": 0.924,
+          "auc_apres_raisonnement": 0.924,
+          "p50_ms": 461,
+          "p95_ms": 1147,
+          "plus_2500_ms": 0,
+          "plus_4000_ms": 0,
+          "completion_tokens": 1395,
+          "methodes": {
+            "logprobs": 103,
+            "binary": 0,
+            "invalid_answer": 0,
+            "api_error": 0,
+            "transport_error": 0
+          },
+          "formes_invalides": 0,
+          "modeles_repondants": [
+            "zai-glm-5-3"
+          ]
+        },
+        {
+          "n": 103,
+          "valides": 103,
+          "echecs": 0,
+          "faux_rejets": 4,
+          "positifs_valides": 43,
+          "faux_passages": 2,
+          "negatifs_valides": 60,
+          "sortie_erreurs": 6,
+          "sortie_valides": 70,
+          "auc": 0.967,
+          "auc_apres_raisonnement": 0.967,
+          "p50_ms": 502,
+          "p95_ms": 2350,
+          "plus_2500_ms": 5,
+          "plus_4000_ms": 4,
+          "completion_tokens": 1218,
+          "methodes": {
+            "logprobs": 103,
+            "binary": 0,
+            "invalid_answer": 0,
+            "api_error": 0,
+            "transport_error": 0
+          },
+          "formes_invalides": 0,
+          "modeles_repondants": [
+            "zai-glm-5-3"
+          ]
+        }
+      ]
+    }
+  },
+  "vision": [
+    {
+      "modele": "google/gemma-4-26b-a4b-it",
+      "images": 181,
+      "erreurs": 0,
+      "mots_moyens": 62,
+      "mots_40_70_pct": 99.4,
+      "latence_ms": {
+        "p50": 757,
+        "p95": 1474
+      },
+      "completion_tokens": null,
+      "completion_tokens_couverture": "0/181",
+      "effective_completion_tps": null,
+      "fournisseurs": [],
+      "modeles_resolus": [],
+      "recherche": {
+        "tous": {
+          "n": 59,
+          "succes_5": 91.5,
+          "mrr": 0.867
+        },
+        "E": {
+          "n": 14,
+          "succes_5": 100,
+          "mrr": 0.917
+        },
+        "F": {
+          "n": 14,
+          "succes_5": 78.6,
+          "mrr": 0.738
+        },
+        "echecs": [
+          "B05",
+          "D07",
+          "F06",
+          "F12",
+          "F13"
+        ]
+      }
+    },
+    {
+      "modele": "mistralai/mistral-large-4-0",
+      "images": 181,
+      "erreurs": 0,
+      "mots_moyens": 126,
+      "mots_40_70_pct": 0.6,
+      "latence_ms": {
+        "p50": 4913,
+        "p95": 14181
+      },
+      "completion_tokens": 32465,
+      "completion_tokens_couverture": "172/181",
+      "effective_completion_tps": 30.34,
+      "fournisseurs": [
+        "Mistral"
+      ],
+      "modeles_resolus": [
+        "mistralai/mistral-large-4-0"
+      ],
+      "recherche": {
+        "tous": {
+          "n": 59,
+          "succes_5": 93.2,
+          "mrr": 0.893
+        },
+        "E": {
+          "n": 14,
+          "succes_5": 100,
+          "mrr": 0.952
+        },
+        "F": {
+          "n": 14,
+          "succes_5": 78.6,
+          "mrr": 0.738
+        },
+        "echecs": [
+          "D07",
+          "F02",
+          "F06",
+          "F13"
+        ]
+      }
+    }
+  ],
+  "followups": {
+    "deepseek": {
+      "calls": 12,
+      "failed": 0,
+      "p50_ms": 304.844959,
+      "p95_ms": 587.790375,
+      "effective_tps_p50": 38.00800501796887,
+      "effective_tps_definition": "reported completion tokens / total request seconds; not decode speed; reasoning accounting depends on provider",
+      "completion_tokens": 160
+    },
+    "ml4": {
+      "calls": 12,
+      "failed": 0,
+      "p50_ms": 980.3112499999988,
+      "p95_ms": 9074.364125,
+      "effective_tps_p50": 10.704029281634208,
+      "effective_tps_definition": "reported completion tokens / total request seconds; not decode speed; reasoning accounting depends on provider",
+      "completion_tokens": 164
+    }
+  },
+  "suggestions": {
+    "deepseek": {
+      "kept": 22,
+      "maximum": 24,
+      "passages": 12
+    },
+    "ml4-json": {
+      "kept": 19,
+      "maximum": 24,
+      "passages": 12
+    }
+  },
+  "integration": {
+    "date": "2026-10-09T11:29:07.721446+00:00",
+    "model": "mistral-large-4",
+    "effort": "low",
+    "http_status": 400,
+    "error": "{\"object\":\"error\",\"message\":\"reasoning_effort low is not supported for this model, supported values: [<ReasoningEffort.high: 'high'>, <ReasoningEffort.none: 'none'>]\",\"type\":\"invalid_request_invalid_args\",\"param\":null,\"code\":\"3051\",\"raw_status_code\":400}",
+    "production_effect": "Direct Mistral route in soutenir hardcodes low; a model-ID-only swap returns HTTP 400 and falls back to OpenRouter. Benchmark none requires changing that setting.",
+    "production_changed": false
+  },
+  "availability": {
+    "mistral_large_4": "Public-preview API verified. Open weights announced for the end of October, not released at the time of this run.",
+    "source": "https://mistral.ai/news/mistral-large-4/"
+  },
+  "measurement_notes": [
+    "Generation quality columns count pipeline answers and expected-source hits, not independently graded correct answers. All baseline generators share GLM validation; the mixed run changes the checker.",
+    "P50/P95 generation and caption latencies use nearest rank. Judge percentiles use interpolation. Generation latency includes retrieval, verification, repair and provider retries, measured separately for answerable questions and traps.",
+    "Provider-reported generation TPS samples up to 12 calls per variant. Native tokenization and reasoning accounting differ. These nonstreamed calls do not measure client time to first token.",
+    "The mixed-checker run has request token telemetry but was added after provider-metadata sampling; its native generation TPS is not reported.",
+    "Application/response caches disabled. Provider routing and prompt caching were not controlled beyond the existing production routing policy.",
+    "API runs overlap within the same account. Latency outliers and judge deadline bypasses are retained, not removed.",
+    "No new human annotation. Judge labels were previously revised after GLM review. Semantic audit is nonblind and selects difficult questions. Visual spot-check covers eight Art Nouveau images only.",
+    "Caption token coverage is 0/181 Gemma and 172/181 ML4 because instrumentation was added during the campaign; missing caption TPS is not estimated.",
+    "High reasoning generation was stopped during question two after a 29.6-second first answer and long retries. High reasoning checker has a single 6.3-second probe, not a full quality evaluation.",
+    "Four generator families plus GLM as the incumbent checker were tested on this corpus. No self-hosted hardware throughput, long-context redesign, OCR replacement or model-training benchmark."
+  ],
+  "validation": {
+    "deno_task_check": "passed, 42 tests",
+    "benchmark_deno_check_and_lint": "passed",
+    "benchmark_self_tests": "passed",
+    "input_dataset_edits": false
+  },
+  "evidence": {
+    "judge": "ml4-soutien.json",
+    "vision": "ml4-vision.json",
+    "throughput": "ml4-throughput.json",
+    "semantic_audit": "ml4-generation-audit.json",
+    "visual_audit": "ml4-vision-audit.json",
+    "high_reasoning_probe": "ml4-high-probe.json",
+    "compatibility": "ml4-compatibility.json"
+  }
+}

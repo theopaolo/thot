@@ -1,4 +1,4 @@
-import { assertAlmostEquals, assertEquals } from "@std/assert";
+import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { lireVerdict, probabiliteOui } from "../src/core/modeles.ts";
 import { assembler, decouper } from "../src/core/document.ts";
 import { racines } from "../src/core/recherche.ts";
@@ -38,6 +38,33 @@ Deno.test("une citation qui recolle une liste à puces se retrouve", () => {
   const texte = "par un artisan :\n• Possibilité de personnaliser\n• Marge de manoeuvre";
   const [a, b] = trouver(texte, "par un artisan : Possibilité de personnaliser")!;
   assertEquals(tranche(texte, a, b), "par un artisan :\n• Possibilité de personnaliser");
+});
+
+Deno.test("une casse qui s'étend conserve les offsets des citations", () => {
+  const texte = "😀 İSTANBUL porte un décor bleu.";
+  for (const citation of ["İSTANBUL porte", "porte un décor bleu.", texte]) {
+    const position = trouver(texte, citation.toLowerCase())!;
+    assert(position.every(Number.isFinite));
+    assertEquals(tranche(texte, ...position), citation);
+  }
+});
+
+Deno.test("les paragraphes longs restent bornés sans perdre le texte ni ses offsets", () => {
+  for (const texte of ["a".repeat(100_000), "😀 un mot ".repeat(1500)]) {
+    const doc = assembler([{ texte, section: "Texte" }]);
+    const chunks = decouper(doc);
+    assert(chunks.length > 1);
+    assertEquals(chunks.map((c) => c.texte).join(""), doc.texte);
+    for (const c of chunks) {
+      assert(longueur(c.texte) <= 1800);
+      assertEquals(tranche(doc.texte, c.debut, c.fin), c.texte);
+    }
+  }
+  const doc = assembler([
+    { texte: "a".repeat(1799), section: "Texte" },
+    { texte: "b", section: "Texte" },
+  ]);
+  assertEquals(decouper(doc).length, 2, "le séparateur compte dans la limite");
 });
 
 Deno.test("la racinisation retire l'élision et rapproche les formes", () => {
@@ -122,4 +149,9 @@ Deno.test("le verdict du juge se lit après le raisonnement, ou à défaut dans 
   assertEquals(lireVerdict(openrouter), 1);
   assertEquals(lireVerdict({ message: { content: "Non." }, logprobs: null }), 0);
   assertEquals(lireVerdict({ message: { content: "Je ne sais pas" } }), undefined);
+  assertEquals(lireVerdict({ message: { content: "<think>Oui ? Non.</think>non" } }), 0);
+  assertEquals(lireVerdict({ message: { content: "<think>Non ?</think>\n**Oui**." } }), 1);
+  for (const content of ["ouistiti", "nonobstant", "ouié", "oui_non"]) {
+    assertEquals(lireVerdict({ message: { content } }), undefined);
+  }
 });

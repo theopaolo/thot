@@ -1,0 +1,121 @@
+{
+  "date": "2026-10-09T10:50:22.344Z",
+  "variant": {
+    "model": "mistralai/mistral-large-4-0",
+    "effort": "none",
+    "json": true
+  },
+  "pass": "1",
+  "mode": "suggestions",
+  "cache": false,
+  "dataset": "fixed cases in evaluation/bench_generation.ts",
+  "snapshot": "data/benchmark-ml4/snapshot.sqlite3",
+  "answerable": {
+    "n": 0,
+    "answered": 0,
+    "good_source": 0,
+    "failed": 0,
+    "repaired": 0,
+    "partial": 0,
+    "judge_unavailable": 0,
+    "p50_ms": null,
+    "p95_ms": null
+  },
+  "traps": {
+    "n": 0,
+    "answered": 0,
+    "good_source": 0,
+    "failed": 0,
+    "repaired": 0,
+    "partial": 0,
+    "judge_unavailable": 0,
+    "p50_ms": null,
+    "p95_ms": null
+  },
+  "generator": {
+    "calls": 46,
+    "failed": 0,
+    "p50_ms": 2787.6454999999987,
+    "p95_ms": 13433.118749999994,
+    "effective_tps_p50": 49.25560518265607,
+    "effective_tps_definition": "reported completion tokens / total request seconds; not decode speed; reasoning accounting depends on provider",
+    "completion_tokens": 8659
+  },
+  "kept": 19,
+  "rows": [
+    {
+      "id": "0f1f0007-02d5-4776-800d-6afbbbd2ea46",
+      "kept": 2,
+      "ms": 15650.7925
+    },
+    {
+      "id": "0fdc3fa9-32cb-4947-8b2b-2c085230b502",
+      "kept": 2,
+      "ms": 17086.213583
+    },
+    {
+      "id": "1942b624-4147-4d56-a430-03937f7c26d7",
+      "kept": 2,
+      "ms": 11761.652333000005
+    },
+    {
+      "id": "28ff5a5c-042a-4dee-b59b-d8097784a764",
+      "kept": 2,
+      "ms": 12741.676750000006
+    },
+    {
+      "id": "3cda116c-e8d0-42c9-b5ee-692643cc07d7",
+      "kept": 2,
+      "ms": 20205.583583
+    },
+    {
+      "id": "40b6fd9c-bceb-492b-a43e-653899eb41b5",
+      "kept": 2,
+      "ms": 20299.653749999998
+    },
+    {
+      "id": "458e52a5-9b73-4f2e-8daa-4628c3a21698",
+      "kept": 2,
+      "ms": 12906.750042
+    },
+    {
+      "id": "4e85a79f-7845-4bb2-8fd7-6a7e756a8a91",
+      "kept": 0,
+      "ms": 10671.623749999999
+    },
+    {
+      "id": "510ea8d2-7a7a-4eb2-bc15-d452da459593",
+      "kept": 2,
+      "ms": 41755.72074999999
+    },
+    {
+      "id": "69a1a8d3-87c7-4f7e-9886-b5c5702cb75b",
+      "kept": 2,
+      "ms": 29262.263124999998
+    },
+    {
+      "id": "6aff804b-ddd2-4ed5-9145-6e1d73798b59",
+      "kept": 1,
+      "ms": 46381.39045800001
+    },
+    {
+      "id": "714ae4fe-674a-4fc7-8d66-867b7e202cbb",
+      "kept": 0,
+      "ms": 7842.6222919999855
+    }
+  ],
+  "input_sha256": {
+    "data/benchmark-ml4/snapshot.sqlite3": "db35846ceb06e4f0cc2ad30cb7d62ae429ad46c4436b0010c1bc832af5bf51ed",
+    "evaluation/queries_generation.json": "2f6f55e7b8e5d7a59ad08811b39aba4d3d96e17c0780285c1be12692cdbb23b9",
+    "src/core/modeles.ts": "adcf7d1d87c6ea83168cbd5453b0c6b4efd7c313349716657037bb477d3d03b4",
+    "src/core/reponse.ts": "148996a9706b3953900d40bf09773b3c4ed458df446ad738561207594f677ae3",
+    "src/core/suggestions.ts": "13d4cf3a4183ac38e3aa6166b7dcc89a5c7cc4678077fc8c00b95c66b8fe2ba0"
+  },
+  "configured_judge": "zai-glm-5-3",
+  "cost": {
+    "openrouter_pipeline_usd": 0.08545263000000003,
+    "direct_mistral_included": false
+  },
+  "quality_definition": "Pipeline answer/expected-source outcomes; no independent factual grading",
+  "suggestions_scope": "Longest passage of each of 12 sources; production uses up to two"
+}

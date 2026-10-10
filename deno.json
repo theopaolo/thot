@@ -2,8 +2,8 @@
   "tasks": {
     "dev": "deno task build && deno run -RWNE --allow-run --env-file=.env src/main.ts --watch",
     "start": "deno task build && deno run -RWNE --allow-run --env-file=.env src/main.ts",
-    "thot": "deno run -RWNE --allow-run=pdftotext --env-file=.env src/cli.ts",
-    "test": "deno test -RWNE --allow-run=pdftotext,deno tests/",
+    "thot": "deno run -RWNE --allow-run=pdftotext,/usr/bin/prlimit,/bin/ps --env-file=.env src/cli.ts",
+    "test": "deno test -RWNE --allow-run=pdftotext,/usr/bin/prlimit,/bin/ps,deno tests/",
     "check": "deno fmt --check && deno lint && deno check src/main.ts src/server.ts src/worker.ts src/cli.ts tests/ && deno check --config src/app/client/deno.json src/app/client/ && deno task build && deno task frontiere && deno task test",
     "frontiere": "! grep -rnE \"from ['\\\"](\\.\\./)+app/\" src/core/",
     "board": "npx -y github:theopaolo/repoboard",

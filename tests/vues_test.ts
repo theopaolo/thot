@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
-import { depot, pageLegendes } from "../src/app/vues/prof.ts";
+import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource } from "../src/app/vues/eleve.ts";
 import { texteDocument } from "../src/app/vues/document.ts";
 
@@ -63,4 +63,51 @@ Deno.test("les vues partagent le bundle et gardent leurs contrats de fragments e
     7,
   ]);
   assertStringIncludes(String(await blocs[0]), '<mark id="passage">Gaudí</mark>');
+});
+
+Deno.test("le rafraîchissement enseignant exclut le formulaire et conserve les sélections", async () => {
+  const source = {
+    id: "source-1",
+    titre: "Document",
+    statut: "a_relire",
+    format: "pdf",
+    fichier: "document.pdf",
+    statut_par: null,
+    statut_le: null,
+    enseignant: "Prof",
+    cree_le: "2026-01-01T00:00:00Z",
+  };
+  const d = {
+    source,
+    meta: {},
+    job: { etat: "extracting", erreur: null, avertissements: [] },
+    images: [],
+    blocs: [],
+  };
+  const detail = String(await detailSource(d));
+  assert(detail.indexOf("</form>") < detail.indexOf('id="traitement-source"'));
+  assertStringIncludes(detail, 'hx-select="#traitement-source"');
+  assertStringIncludes(detail, 'hx-disinherit="hx-select"');
+  assert(
+    !String(await detailSource({ ...d, job: { ...d.job, etat: "awaiting_review" } }))
+      .includes('hx-trigger="every 3s"'),
+  );
+  for (const grille of [false, true]) {
+    const lignes = String(
+      await lignesSources(
+        [{
+          ...source,
+          sequence: "Arts",
+          etat: "extracting",
+          erreur: null,
+          images_a_relire: 0,
+          image_id: null,
+        }],
+        "",
+        grille,
+      ),
+    );
+    assertStringIncludes(lignes, 'id="selection-source-1" hx-preserve');
+    assertStringIncludes(lignes, 'hx-trigger="every 3s"');
+  }
 });

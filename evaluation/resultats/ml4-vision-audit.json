@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-09T11:37:40.483334+00:00",
+  "methode": "Contrôle visuel ponctuel par assistant, non aveugle, sur 8 images locales déjà légendées par les deux modèles. Comparaison aux pixels visibles seulement ; aucun score humain ni extrapolation au corpus complet.",
+  "selection": "Premières images communes disponibles lors du contrôle ; toutes proviennent de la séquence Art Nouveau. Types choisis : affiches, escalier, carte, portrait, meuble, salle et illustration.",
+  "modeles": {
+    "gemma": "google/gemma-4-26b-a4b-it",
+    "mistral": "mistralai/mistral-large-4-0"
+  },
+  "resume": {
+    "images": 8,
+    "erreurs_visibles_gemma": 1,
+    "erreurs_visibles_mistral": 2,
+    "assertions_non_verifiables_gemma": 0,
+    "assertions_non_verifiables_mistral": 2
+  },
+  "cas": [
+    {
+      "image_id": "8cb12d8d-6d23-4242-bef0-e9bf0e90ebd4-0",
+      "type": "affiche avec texte",
+      "observation": "Les deux modèles repèrent correctement la figure, la palme et les grandes inscriptions. Mistral relève aussi le petit personnage et la ligne d'imprimeur, tous deux visibles.",
+      "erreurs_visibles": []
+    },
+    {
+      "image_id": "753f9ac6-4ffb-4279-8a5b-613caefd139e-0",
+      "type": "affiche avec texte dense",
+      "observation": "Mistral lit davantage de lignes de l'affiche ; Gemma donne une description plus courte mais reconnaissable. L'identité féminine de la figure centrale reste difficile à établir visuellement.",
+      "erreurs_visibles": []
+    },
+    {
+      "image_id": "e326faf4-7540-4327-970f-721c4ff6df92-0",
+      "type": "escalier intérieur",
+      "observation": "Les deux modèles décrivent les carreaux bleus et blancs, les fenêtres et la rampe. Mistral précise des matériaux que la photographie ne permet pas de confirmer.",
+      "erreurs_visibles": [],
+      "assertions_non_verifiables": [
+        "mistral : sol en marbre et balustres en fer forgé"
+      ]
+    },
+    {
+      "image_id": "b41464dd-0704-4838-ad3a-163630168222-0",
+      "type": "carte imprimée",
+      "observation": "Les deux modèles identifient la carte européenne et son millésime. Gemma transcrit un mot du sous-titre autrement que sur l'image.",
+      "erreurs_visibles": [
+        "gemma : « Polities » au lieu de « Politics »"
+      ]
+    },
+    {
+      "image_id": "f49e61c7-da8b-4114-8a68-1150262d734a-0",
+      "type": "portrait",
+      "observation": "Les deux modèles relèvent les traits et les vêtements principaux sans inventer de nom ni de date. Le procédé de mise en couleur ne peut pas être établi à l'image.",
+      "erreurs_visibles": [],
+      "assertions_non_verifiables": [
+        "mistral : photographie colorisée à la main"
+      ]
+    },
+    {
+      "image_id": "36d67727-6c34-4ccf-88e9-49156c968142-0",
+      "type": "siège",
+      "observation": "Les deux modèles voient le grand dossier noir ajouré, le coussin clair et la base fermée. Chaise ou banquette est ambigu sur cette vue isolée.",
+      "erreurs_visibles": []
+    },
+    {
+      "image_id": "cf98fecf-890e-4eb1-b10e-921602759c53-0",
+      "type": "salle de restauration",
+      "observation": "Les deux modèles reconnaissent les tables dressées, les dossiers hauts et le décor vitré. Aucun écart manifeste retenu.",
+      "erreurs_visibles": []
+    },
+    {
+      "image_id": "2a582a8f-053b-40aa-9c9f-09c095561fea-0",
+      "type": "illustration avec texte",
+      "observation": "Les deux modèles repèrent le lecteur, le crabe, la plage et l'inscription principale. Mistral inverse deux détails corporels clairement visibles.",
+      "erreurs_visibles": [
+        "mistral : jambes dites croisées alors qu'elles sont écartées",
+        "mistral : sandales vertes alors que les pieds sont nus"
+      ]
+    }
+  ]
+}

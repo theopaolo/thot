@@ -1,0 +1,443 @@
+{
+  "date": "2026-10-09T10:43:00.673Z",
+  "variant": {
+    "model": "google/gemma-4-26b-a4b-it",
+    "effort": "none"
+  },
+  "pass": "1",
+  "mode": "generation",
+  "cache": false,
+  "dataset": "evaluation/queries_generation.json",
+  "snapshot": "data/benchmark-ml4/snapshot.sqlite3",
+  "answerable": {
+    "n": 20,
+    "answered": 15,
+    "good_source": 14,
+    "failed": 0,
+    "repaired": 5,
+    "partial": 3,
+    "judge_unavailable": 0,
+    "p50_ms": 2505.412334,
+    "p95_ms": 4977.888000000003
+  },
+  "traps": {
+    "n": 15,
+    "answered": 0,
+    "good_source": 0,
+    "failed": 0,
+    "repaired": 0,
+    "partial": 0,
+    "judge_unavailable": 0,
+    "p50_ms": 769.5177499999918,
+    "p95_ms": 2558.506417000004
+  },
+  "generator": {
+    "calls": 30,
+    "failed": 0,
+    "p50_ms": 786.7124580000018,
+    "p95_ms": 1649.3159159999996,
+    "effective_tps_p50": 150.76524658255565,
+    "effective_tps_definition": "reported completion tokens / total request seconds; not decode speed; reasoning accounting depends on provider",
+    "completion_tokens": 4971
+  },
+  "rows": [
+    {
+      "qid": "G01",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 2505.412334,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G02",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 1569.7174999999997,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G03",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 4411.622875,
+      "good_source": true,
+      "attempts": 2,
+      "partial": true,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G04",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 2927.329249999999,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G05",
+      "kind": "answerable",
+      "state": "out_of_corpus",
+      "ms": 740.2819159999999,
+      "good_source": false,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "G06",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 5028.017708000001,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G07",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 2946.240249999999,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G08",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 2409.9392920000028,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G09",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 3421.318583,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G10",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 4977.888000000003,
+      "good_source": true,
+      "attempts": 2,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G11",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 4639.250499999998,
+      "good_source": true,
+      "attempts": 2,
+      "partial": true,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G12",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 3617.944416999999,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G13",
+      "kind": "answerable",
+      "state": "out_of_corpus",
+      "ms": 893.8940829999992,
+      "good_source": false,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "G14",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 3862.5603749999937,
+      "good_source": false,
+      "attempts": 2,
+      "partial": true,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G15",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 4149.615582999999,
+      "good_source": true,
+      "attempts": 2,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G16",
+      "kind": "answerable",
+      "state": "out_of_corpus",
+      "ms": 820.961083000002,
+      "good_source": false,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "G17",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 2318.3608749999985,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G18",
+      "kind": "answerable",
+      "state": "out_of_corpus",
+      "ms": 1251.8867919999975,
+      "good_source": false,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "G19",
+      "kind": "answerable",
+      "state": "answered",
+      "ms": 1886.7554170000003,
+      "good_source": true,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": null
+    },
+    {
+      "qid": "G20",
+      "kind": "answerable",
+      "state": "out_of_corpus",
+      "ms": 787.270457999999,
+      "good_source": false,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "N01",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 282.50345899999957,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N02",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 497.715750000003,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N03",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 588.5061249999999,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N04",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 2558.506417000004,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N05",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 296.73345800000243,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N06",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 1349.351499999997,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N07",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 438.03304200000275,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N08",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 822.2607500000013,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N09",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 525.9597920000015,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N10",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 1529.700125000003,
+      "good_source": null,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "N11",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 785.656167000001,
+      "good_source": null,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "N12",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 769.5177499999918,
+      "good_source": null,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "N13",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 496.5260419999977,
+      "good_source": null,
+      "attempts": 0,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "seuil"
+    },
+    {
+      "qid": "N14",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 841.8112499999988,
+      "good_source": null,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    },
+    {
+      "qid": "N15",
+      "kind": "trap",
+      "state": "out_of_corpus",
+      "ms": 1027.9654169999994,
+      "good_source": null,
+      "attempts": 1,
+      "partial": false,
+      "judge_unavailable": null,
+      "reason": "refus_modele"
+    }
+  ],
+  "input_sha256": {
+    "data/benchmark-ml4/snapshot.sqlite3": "db35846ceb06e4f0cc2ad30cb7d62ae429ad46c4436b0010c1bc832af5bf51ed",
+    "evaluation/queries_generation.json": "2f6f55e7b8e5d7a59ad08811b39aba4d3d96e17c0780285c1be12692cdbb23b9",
+    "src/core/modeles.ts": "adcf7d1d87c6ea83168cbd5453b0c6b4efd7c313349716657037bb477d3d03b4",
+    "src/core/reponse.ts": "148996a9706b3953900d40bf09773b3c4ed458df446ad738561207594f677ae3",
+    "src/core/suggestions.ts": "13d4cf3a4183ac38e3aa6166b7dcc89a5c7cc4678077fc8c00b95c66b8fe2ba0"
+  },
+  "configured_judge": "zai-glm-5-3",
+  "cost": {
+    "openrouter_pipeline_usd": 0.045034728,
+    "direct_mistral_included": false
+  },
+  "quality_definition": "Pipeline answer/expected-source outcomes; no independent factual grading"
+}

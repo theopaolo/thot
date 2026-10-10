@@ -51,3 +51,41 @@ actuelle. Le pluriel irrégulier français et les formes anglaises montrent les 
 Ce petit jeu ne mesure ni la recherche bilingue entre documents et questions ni la qualité des
 modèles. L'anglais reste non pris en charge dans l'interface. Aucun changement de tokenisation ni
 reindexage automatique n'est introduit.
+
+## Comparaison des modèles
+
+[La synthèse des mesures](resultats/ml4-comparaison.json) relie les résultats et leurs limites.
+
+Les bancs `bench_generation.ts`, `bench_soutien.py` et `bench_vision.ts` comparent les modèles
+sur les jeux figés. `bench_generation.ts` crée au premier lancement une sauvegarde SQLite en
+lecture seule pour les essais. Le banc de vision réutilise cette sauvegarde. Les réponses,
+citations, légendes et traces complètes restent dans `data/benchmark-ml4/`, ignoré par Git.
+Les rapports publiés dans `resultats/ml4-*.json` gardent les mesures et les identifiants.
+
+```bash
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts ml4 1
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts ml4-json 1
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek-ml4judge 1
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1 followup
+deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1 suggestions
+python3 evaluation/bench_soutien.py --profiles ml4-none glm-low
+deno run -RWNE --env-file=.env evaluation/bench_vision.ts run
+python3 evaluation/bench_tps.py
+```
+
+Le numéro de passage distingue les essais de génération. Une sortie existante est protégée.
+Les bancs de soutien et de vision reprennent leurs résultats privés sauvegardés, sans refaire
+les appels terminés. Une nouvelle mesure complète exige un nouveau dossier de résultats
+privés. Les scripts Python utilisent le magasin de certificats de `certifi`.
+
+Le débit calculé sur la requête entière inclut l'attente réseau et le traitement du prompt.
+`bench_tps.py` récupère aussi le débit calculé à partir du temps de génération déclaré par
+OpenRouter, avec le fournisseur et la couverture de l'échantillon. Les tokens de raisonnement
+et les différences de tokenisation empêchent d'assimiler ce débit à une vitesse de lecture.
+
+« Répond » et « bonne source » mesurent la chaîne existante, pas une annotation indépendante
+de la justesse des réponses. Les dépassements du délai du juge sont comptés séparément. Les
+suggestions portent sur un seul passage par source pour une comparaison à entrées égales.
+Les reformulations sont testées seules, sans mesurer la recherche qui suit. Les sondes
+interrompues sont signalées comme telles et ne valent pas un passage complet.

@@ -59,7 +59,8 @@ const apercu = (l: LigneSource) =>
 
 const caseSource = (l: LigneSource, classe = "") =>
   html`
-    <input class="${classe}" type="checkbox" name="ids" value="${l.id}"
+    <input id="selection-${l.id}" hx-preserve class="${classe}" type="checkbox" name="ids"
+      value="${l.id}"
       aria-label="Sélectionner ${l
         .titre}">
   `;
@@ -675,6 +676,11 @@ export const detailSource = (d: Detail) => {
       ${Domaines.langue(d.source.langue)}
       <button>Enregistrer</button>
     </form>
+    <div id="traitement-source" hx-disinherit="hx-select" ${d.job &&
+        JOBS_ACTIFS.includes(d.job.etat)
+      ? html`hx-get="/prof/sources/${d.source.id}" hx-trigger="every 3s"
+          hx-select="#traitement-source" hx-swap="outerHTML"`
+      : ""}>
     ${statutSource(d.source)}
     <p class="discret">
       Certifier la source la rend disponible selon les publics choisis au dépôt. Les légendes d'images
@@ -686,14 +692,7 @@ export const detailSource = (d: Detail) => {
       `
       : d.job && JOBS_ACTIFS.includes(d.job.etat)
       ? html`
-        <p
-          class="note"
-          hx-get="/prof/sources/${d.source.id}"
-          hx-trigger="every 3s"
-          hx-select="main"
-          hx-target="main"
-          hx-swap="outerHTML"
-        >
+        <p class="note">
           Traitement en cours : ${ETATS_JOB[d.job.etat]}.
         </p>
       `
@@ -726,6 +725,7 @@ export const detailSource = (d: Detail) => {
       : ""}
     <h2>Texte extrait</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
+    </div>
   `;
 };
 

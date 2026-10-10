@@ -56,10 +56,11 @@ export function trouver(texte: string, citation: string): [number, number] | nul
   const pos: number[] = [];
   let i = 0;
   for (const c of texte) {
-    const p = plier(c);
-    if (!(p === " " && src.at(-1) === " ")) {
-      src.push(p);
-      pos.push(i);
+    for (const p of plier(c)) {
+      if (!(p === " " && src.at(-1) === " ")) {
+        src.push(p);
+        pos.push(i);
+      }
     }
     i++;
   }

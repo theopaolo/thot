@@ -1,6 +1,6 @@
 ---
 title: RGPD-001 Préparer le pilote avec des élèves mineurs
-status: in_progress
+status: not_started
 context: deep
 energy: 3
 # pleasure: 1 2 3 5 8 13 21

@@ -39,6 +39,19 @@ Deno.test("un PDF de deux pages conserve le texte propre à chaque page", () => 
   ]);
 });
 
+Deno.test("les répétitions dans le corps d'un PDF restent dans le cours", () => {
+  const phrase = "Gaudí refuse la ligne droite dans toute la façade.";
+  const brut = [
+    `Fiche ATC\n\nPremier chapitre\n\n${phrase}\n\nAnalyse première.\n\nPied de page`,
+    `Fiche ATC\n\nDeuxième chapitre\n\n${phrase}\n\nAnalyse deuxième.\n\nPied de page`,
+    "Fiche ATC\n\nTroisième chapitre\n\nFiche ATC\n\nAnalyse troisième.\n\nPied de page",
+  ].join("\f");
+  const { parties } = decouperPdf(brut);
+  assertEquals(parties.filter((p) => p.texte === phrase).length, 2);
+  assertEquals(parties.filter((p) => p.texte === "Fiche ATC").length, 1);
+  assert(!parties.some((p) => p.texte === "Pied de page"));
+});
+
 const corpus = fromFileUrl(new URL("../../corpus/", import.meta.url));
 const fiches = (() => {
   try {

@@ -1,0 +1,97 @@
+{
+  "date": "2026-10-09T11:41:19.356Z",
+  "corpus": "181 images et 59 requêtes figées",
+  "reclasseur": "qwen/qwen3-reranker-8b",
+  "sha256": {
+    "snapshot": "db35846ceb06e4f0cc2ad30cb7d62ae429ad46c4436b0010c1bc832af5bf51ed",
+    "requetes": "d0bcf8c62725e3871aad17ae6aa970f2fd599430b94e0331d00e59a79857fbff",
+    "ordre_images": "880ccfa91a1ae82cdc8042510cf62eaf38d2586e38a85b23569617f1b9207297",
+    "images": "99e1f09c52719dea5f8b736b0d2c865bb1bedd4696657636b84588dfa062994e",
+    "consigne": "a0f6088160f42e44fb255f8b226f5d3aad812cc51ff68ab97ee89592a4853ad3"
+  },
+  "modeles": [
+    {
+      "modele": "google/gemma-4-26b-a4b-it",
+      "images": 181,
+      "erreurs": 0,
+      "mots_moyens": 62,
+      "mots_40_70_pct": 99.4,
+      "latence_ms": {
+        "p50": 757,
+        "p95": 1474
+      },
+      "completion_tokens": null,
+      "completion_tokens_couverture": "0/181",
+      "effective_completion_tps": null,
+      "fournisseurs": [],
+      "modeles_resolus": [],
+      "recherche": {
+        "tous": {
+          "n": 59,
+          "succes_5": 91.5,
+          "mrr": 0.867
+        },
+        "E": {
+          "n": 14,
+          "succes_5": 100,
+          "mrr": 0.917
+        },
+        "F": {
+          "n": 14,
+          "succes_5": 78.6,
+          "mrr": 0.738
+        },
+        "echecs": [
+          "B05",
+          "D07",
+          "F06",
+          "F12",
+          "F13"
+        ]
+      }
+    },
+    {
+      "modele": "mistralai/mistral-large-4-0",
+      "images": 181,
+      "erreurs": 0,
+      "mots_moyens": 126,
+      "mots_40_70_pct": 0.6,
+      "latence_ms": {
+        "p50": 4913,
+        "p95": 14181
+      },
+      "completion_tokens": 32465,
+      "completion_tokens_couverture": "172/181",
+      "effective_completion_tps": 30.34,
+      "fournisseurs": [
+        "Mistral"
+      ],
+      "modeles_resolus": [
+        "mistralai/mistral-large-4-0"
+      ],
+      "recherche": {
+        "tous": {
+          "n": 59,
+          "succes_5": 93.2,
+          "mrr": 0.893
+        },
+        "E": {
+          "n": 14,
+          "succes_5": 100,
+          "mrr": 0.952
+        },
+        "F": {
+          "n": 14,
+          "succes_5": 78.6,
+          "mrr": 0.738
+        },
+        "echecs": [
+          "D07",
+          "F02",
+          "F06",
+          "F13"
+        ]
+      }
+    }
+  ]
+}

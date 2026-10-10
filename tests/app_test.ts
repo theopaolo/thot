@@ -1,16 +1,16 @@
 import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import { join } from "@std/path";
-import { PanneModele } from "../src/core/modeles.ts";
+import { openrouter, PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
-import { migrer, purgerMessages } from "../src/app/db.ts";
+import { cacheModeles, maintenant, migrer, purgerMessages } from "../src/app/db.ts";
 import {
   authentifier,
   creerCompte,
   lireListe,
   reinitialiserMotDePasse,
 } from "../src/app/comptes.ts";
-import { detecterFormat, nomSur } from "../src/app/depot.ts";
+import { detecterFormat, MAX_OCTETS, nomSur } from "../src/app/depot.ts";
 import {
   lireInformations,
   proposerInformations,
@@ -781,6 +781,12 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
     await (await prof.requete("/prof/questions")).text(),
     "Citation non vérifiée",
   );
+  db.prepare("UPDATE messages SET resultat = NULL WHERE id = ?").run(id3);
+  assertEquals(
+    (await eleve.requete(`/eleve/messages/${id3}/relancer`, { method: "POST" })).status,
+    200,
+    "une panne sans résultat enregistré reste relançable",
+  );
   assertEquals(
     chercherFts(db, "Gaudí", { schoolId: "pilote", chapitre: "Chapitre absent" }).length,
     0,
@@ -898,4 +904,394 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
     "INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le) VALUES ('ancien', ?, 'question', 'en_attente', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')",
   ).run(compte);
   assertEquals(purgerMessages(db, 90, Date.UTC(2026, 8, 23)), 1);
+});
+
+const REPONSE_CITEE = JSON.stringify({
+  affirmations: [{
+    texte: "Gaudí refuse la ligne droite.",
+    extrait: 1,
+    citation: "Gaudí refuse la ligne droite dans toute la façade",
+  }],
+});
+
+async function poserQuestion(
+  requete: Awaited<ReturnType<typeof session>>["requete"],
+  texte = "ligne droite",
+) {
+  const r = await requete("/eleve/questions", {
+    method: "POST",
+    headers: { "HX-Request": "true" },
+    body: new URLSearchParams({ texte }),
+  });
+  return (await r.text()).match(/messages\/([\w-]+)\/flux/)![1];
+}
+
+Deno.test("une panne d'indexation annule aussi les éditions de légende et de métadonnées", async () => {
+  const { db } = await environnement();
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    relireLegende(db, `${id}-0`, "certified", "", "Prof");
+    const image = db.prepare("SELECT * FROM images WHERE source_id = ?").get(id);
+    const source = db.prepare("SELECT * FROM sources WHERE id = ?").get(id);
+    const chunks = db.prepare("SELECT * FROM chunks WHERE source_id = ?").all(id);
+    db.exec(
+      "CREATE TRIGGER index_indisponible BEFORE INSERT ON chunks BEGIN SELECT RAISE(ABORT, 'Index indisponible'); END",
+    );
+    for (const action of ["rejected", "certified"] as const) {
+      assertThrows(() => relireLegende(db, `${id}-0`, action, "Une légende corrigée.", "Prof"));
+      assertEquals(db.prepare("SELECT * FROM images WHERE source_id = ?").get(id), image);
+      assertEquals(db.prepare("SELECT * FROM chunks WHERE source_id = ?").all(id), chunks);
+    }
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const r = await prof.requete(`/prof/sources/${id}/modifier`, {
+      method: "POST",
+      body: new URLSearchParams({ titre: "Titre corrigé", sequence: "Architecture" }),
+    });
+    assertEquals(r.status, 500);
+    assertEquals(db.prepare("SELECT * FROM sources WHERE id = ?").get(id), source);
+    assertEquals(db.prepare("SELECT * FROM chunks WHERE source_id = ?").all(id), chunks);
+  } finally {
+    db.close();
+  }
+});
+
+Deno.test("un retrait pendant la génération ou le reclassement n'est pas publié", async () => {
+  const { db } = await environnement();
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    const fake = fauxModeles({ sorties: [REPONSE_CITEE] });
+    const generer = fake.modeles.generer;
+    fake.modeles.generer = (messages) => {
+      statuer(db, id, "rejetee", "Prof");
+      return generer(messages);
+    };
+    const eleve = await session(db, fake.modeles, "eleve");
+    const mid = await poserQuestion(eleve.requete);
+    const flux = await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+    assert(!flux.includes("Gaudí refuse la ligne droite."));
+    assertEquals(
+      JSON.parse(
+        db.prepare("SELECT resultat FROM messages WHERE id = ?").get(mid)!.resultat as string,
+      ).code,
+      "EVIDENCE_WITHDRAWN",
+    );
+    statuer(db, id, "certifiee", "Prof");
+    const reclasser = fake.modeles.reclasser;
+    fake.modeles.reclasser = (q, docs) => {
+      statuer(db, id, "rejetee", "Prof");
+      return reclasser(q, docs);
+    };
+    const recherche = await (await eleve.requete("/eleve/recherche?q=ligne")).text();
+    assert(!recherche.includes(CHAMPS.titre));
+    assert(!recherche.includes("Gaudí refuse la ligne droite"));
+  } finally {
+    db.close();
+  }
+});
+
+Deno.test("les réponses conservées et leurs panneaux revérifient la preuve actuelle", async () => {
+  for (const retrait of ["legende", "source", "public", "titre"] as const) {
+    const { db } = await environnement();
+    try {
+      const id = await sourceTraitee(db);
+      statuer(db, id, "certifiee", "Prof");
+      relireLegende(db, `${id}-0`, "certified", "", "Prof");
+      const sortie = retrait === "legende"
+        ? JSON.stringify({
+          affirmations: [{
+            texte: "Les balcons ressemblent à des masques.",
+            extrait: 1,
+            citation: "Façade ondulée aux balcons en forme de masques",
+          }],
+        })
+        : REPONSE_CITEE;
+      const eleve = await session(db, fauxModeles({ sorties: [sortie] }).modeles, "eleve");
+      const mid = await poserQuestion(eleve.requete, "ligne droite balcons masques");
+      await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+      assertStringIncludes(
+        await (await eleve.requete(`/eleve/messages/${mid}/citations/0`)).text(),
+        "<mark>",
+      );
+      if (retrait === "legende") relireLegende(db, `${id}-0`, "rejected", "", "Prof");
+      if (retrait === "source") statuer(db, id, "rejetee", "Prof");
+      if (retrait === "public") {
+        db.prepare(
+          "UPDATE sources SET metadonnees = json_set(metadonnees, '$.publics', json('[\"eleves\"]')) WHERE id = ?",
+        ).run(id);
+      }
+      if (retrait === "titre") {
+        const prof = await session(db, fauxModeles().modeles, "enseignant");
+        await prof.requete(`/prof/sources/${id}/modifier`, {
+          method: "POST",
+          body: new URLSearchParams({ titre: "Autre œuvre" }),
+        });
+      }
+      for (const route of ["/eleve/chat", `/eleve/messages/${mid}/flux`]) {
+        const vue = await (await eleve.requete(route)).text();
+        assertStringIncludes(vue, "Une source de cette réponse a été retirée ou modifiée.");
+        assert(!vue.includes(JSON.parse(sortie).affirmations[0].texte));
+      }
+      assert(
+        !(await (await eleve.requete(`/eleve/messages/${mid}/citations/0`)).text()).includes(
+          "<mark>",
+        ),
+      );
+      assertEquals(
+        (await eleve.requete(`/eleve/messages/${mid}/relancer`, { method: "POST" })).status,
+        200,
+      );
+    } finally {
+      db.close();
+    }
+  }
+});
+
+Deno.test("la durée de session est vérifiée côté serveur même pour un cookie copié", async () => {
+  const { db } = await environnement();
+  const now = Date.now;
+  try {
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    assertEquals((await eleve.requete("/eleve/chat")).status, 200);
+    const futur = now() + 12 * 3600_000;
+    Date.now = () => futur;
+    assertEquals((await eleve.requete("/eleve/chat")).status, 302);
+  } finally {
+    Date.now = now;
+    db.close();
+  }
+});
+
+Deno.test("les dépôts trop grands sont refusés avant lecture du fichier", async () => {
+  const { db } = await environnement();
+  const arrayBuffer = File.prototype.arrayBuffer;
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    let lectures = 0;
+    File.prototype.arrayBuffer = function () {
+      lectures++;
+      return arrayBuffer.call(this);
+    };
+    const proche = await prof.requete("/prof/depot", {
+      method: "POST",
+      body: formulaire(CHAMPS, new Uint8Array(MAX_OCTETS + 1)),
+    });
+    assertEquals(proche.status, 400);
+    assertEquals(lectures, 0);
+    let lus = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        lus++;
+        c.enqueue(new Uint8Array(1024 * 1024));
+      },
+    });
+    const trop = await prof.requete("/prof/depot", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=test" },
+      body,
+    });
+    assertEquals(trop.status, 413);
+    assert(lus <= 28, "le flux est arrêté sans lire tout le corps");
+    assertEquals(lectures, 0);
+    assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
+  } finally {
+    File.prototype.arrayBuffer = arrayBuffer;
+    db.close();
+  }
+});
+
+Deno.test("la migration efface les jugements anciens et ne se rejoue pas", async () => {
+  const { db } = await environnement();
+  try {
+    db.exec("ALTER TABLE messages DROP COLUMN generation_id");
+    db.prepare("DELETE FROM migrations WHERE nom = '0005_coherence.sql'").run();
+    cacheModeles(db).ecrire("ancien", JSON.stringify({ reasoning: "PrivateName" }));
+    assertEquals(migrer(db), ["0005_coherence.sql"]);
+    assertEquals(db.prepare("SELECT count(*) n FROM cache_modeles").get()!.n, 0);
+    cacheModeles(db).ecrire("legende", "image");
+    assertEquals(migrer(db), []);
+    assertEquals(cacheModeles(db).lire("legende"), "image");
+  } finally {
+    db.close();
+  }
+});
+
+Deno.test("une sortie vide du reclasseur reste une panne de fournisseur", async () => {
+  const { db } = await environnement();
+  const fetch = globalThis.fetch;
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    globalThis.fetch = () => Promise.resolve(Response.json({ results: [] }));
+    const modeles = openrouter({ ...config.modeles, cle: "test" });
+    const { resultat } = await demander(db, modeles, "ligne droite", { schoolId: "pilote" }, 0.023);
+    assertEquals(resultat.etat, "failed");
+    if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_INVALID_RESPONSE");
+  } finally {
+    globalThis.fetch = fetch;
+    db.close();
+  }
+});
+
+Deno.test("une génération active renouvelle son bail et partage son résultat", async () => {
+  const { db } = await environnement();
+  const interval = globalThis.setInterval;
+  const termine = Promise.withResolvers<void>();
+  let premier: Promise<string> | undefined;
+  let second: Promise<string> | undefined;
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    let renouveler: (() => void) | undefined;
+    globalThis.setInterval = ((callback: () => void, delai?: number) => {
+      if (delai === 30_000) renouveler = callback;
+      return interval(callback, delai);
+    }) as typeof setInterval;
+    const commence = Promise.withResolvers<void>();
+    let appels = 0;
+    const fake = fauxModeles();
+    fake.modeles.generer = async () => {
+      appels++;
+      commence.resolve();
+      await termine.promise;
+      return { texte: REPONSE_CITEE, modele: "test" };
+    };
+    const eleve = await session(db, fake.modeles, "eleve");
+    const mid = await poserQuestion(eleve.requete);
+    premier = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+    await commence.promise;
+    db.prepare("UPDATE messages SET maj_le = '2000-01-01T00:00:00Z' WHERE id = ?").run(mid);
+    assert(renouveler);
+    renouveler();
+    assertEquals(
+      db.prepare("SELECT maj_le FROM messages WHERE id = ?").get(mid)!.maj_le,
+      maintenant(),
+    );
+    second = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+    assertEquals(appels, 1);
+    termine.resolve();
+    assertStringIncludes(await premier, "Gaudí refuse la ligne droite.");
+    assertStringIncludes(await second, "Gaudí refuse la ligne droite.");
+  } finally {
+    termine.resolve();
+    await Promise.all([premier, second]);
+    globalThis.setInterval = interval;
+    db.close();
+  }
+});
+
+Deno.test("un ancien propriétaire du message ne peut écraser son successeur", async () => {
+  const { db } = await environnement();
+  const termine = Promise.withResolvers<void>();
+  let premier: Promise<string> | undefined;
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    const commence = Promise.withResolvers<void>();
+    let appels = 0;
+    const fake = fauxModeles();
+    fake.modeles.generer = async () => {
+      const n = ++appels;
+      if (n === 1) {
+        commence.resolve();
+        await termine.promise;
+      }
+      return {
+        texte: REPONSE_CITEE.replace("Gaudí refuse la ligne droite.", `Réponse ${n}.`),
+        modele: "test",
+      };
+    };
+    const eleve = await session(db, fake.modeles, "eleve");
+    const mid = await poserQuestion(eleve.requete);
+    premier = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+    await commence.promise;
+    db.prepare("UPDATE messages SET maj_le = '2000-01-01T00:00:00Z' WHERE id = ?").run(mid);
+    assertStringIncludes(
+      await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text(),
+      "Réponse 2.",
+    );
+    termine.resolve();
+    assertStringIncludes(await premier, "Réponse 2.");
+    assertStringIncludes(
+      db.prepare("SELECT resultat FROM messages WHERE id = ?").get(mid)!.resultat as string,
+      "Réponse 2.",
+    );
+    assertEquals(appels, 2);
+  } finally {
+    termine.resolve();
+    await premier;
+    db.close();
+  }
+});
+
+Deno.test("une déconnexion arrête l'attente mais laisse la génération revendiquée se terminer", async () => {
+  const { db } = await environnement();
+  const termine = Promise.withResolvers<void>();
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    const commence = Promise.withResolvers<void>();
+    const fake = fauxModeles();
+    fake.modeles.generer = async () => {
+      commence.resolve();
+      await termine.promise;
+      return { texte: REPONSE_CITEE, modele: "test" };
+    };
+    const eleve = await session(db, fake.modeles, "eleve");
+    const mid = await poserQuestion(eleve.requete);
+    const proprietaire = await eleve.requete(`/eleve/messages/${mid}/flux`);
+    await commence.promise;
+    const prepare = db.prepare.bind(db);
+    let lectures = 0;
+    db.prepare = ((sql: string) => {
+      if (sql.includes("SELECT question, resultat FROM messages")) lectures++;
+      return prepare(sql);
+    }) as typeof db.prepare;
+    const abonne = await eleve.requete(`/eleve/messages/${mid}/flux`);
+    await abonne.body!.cancel();
+    const avant = lectures;
+    await new Promise((r) => setTimeout(r, 550));
+    assertEquals(lectures, avant);
+    await proprietaire.body!.cancel();
+    termine.resolve();
+    for (
+      let i = 0;
+      i < 100 && !prepare("SELECT resultat FROM messages WHERE id = ?").get(mid)!.resultat;
+      i++
+    ) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    assertEquals(prepare("SELECT etat FROM messages WHERE id = ?").get(mid)!.etat, "answered");
+  } finally {
+    termine.resolve();
+    db.close();
+  }
+});
+
+Deno.test("le délai du juge annule son signal avant de laisser passer la citation", async () => {
+  const { db } = await environnement();
+  const timeout = globalThis.setTimeout;
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    globalThis.setTimeout = ((callback: () => void, delai?: number) =>
+      timeout(callback, delai === 4000 ? 10 : delai)) as typeof setTimeout;
+    let annule = false;
+    const fake = fauxModeles({ sorties: [REPONSE_CITEE] });
+    fake.modeles.soutenir = (_texte, _citation, _titre, signal) =>
+      new Promise((_oui, non) => {
+        signal!.addEventListener("abort", () => {
+          annule = true;
+          non(signal!.reason);
+        }, { once: true });
+      });
+    const r = await demander(db, fake.modeles, "ligne droite", { schoolId: "pilote" }, 0.023);
+    assertEquals(r.resultat.etat, "answered");
+    assertEquals(annule, true);
+    assertStringIncludes(String(r.journal.juge_indisponible), "délai");
+  } finally {
+    globalThis.setTimeout = timeout;
+    db.close();
+  }
 });

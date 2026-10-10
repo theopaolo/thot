@@ -1,3 +1,5 @@
+import { setTimeout as attendre } from "node:timers/promises";
+
 /** Une panne de fournisseur. Elle ne doit jamais se lire comme un refus hors corpus. */
 export class PanneModele extends Error {
   constructor(message: string, readonly code = "MODEL_UNAVAILABLE") {
@@ -22,6 +24,7 @@ export interface Modeles {
     texte: string,
     citation: string,
     titre: string,
+    signal?: AbortSignal,
   ): Promise<{ probabilite: number; modele: string }>;
 }
 
@@ -102,13 +105,17 @@ export function lireVerdict(choix: Choix | undefined) {
   const ecrit =
     (Array.isArray(contenu)
       ? contenu.filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
-      : String(contenu ?? "")).trim().toLowerCase();
+      : String(contenu ?? "")).split("</think>").at(-1)!.trim().toLowerCase();
   const jetons = choix?.logprobs?.content ?? [];
   let i = jetons.findLastIndex((j) => j.token.includes("</think>")) + 1;
   while (i < jetons.length && !jetons[i].token.trim()) i++;
   const tops = jetons[i]?.top_logprobs;
   return (tops && probabiliteOui(tops)) ??
-    (/^\W*oui/.test(ecrit) ? 1 : /^\W*non/.test(ecrit) ? 0 : undefined);
+    (/^[^\p{L}\p{N}]*(oui)(?![\p{L}\p{N}_])/u.test(ecrit)
+      ? 1
+      : /^[^\p{L}\p{N}]*(non)(?![\p{L}\p{N}_])/u.test(ecrit)
+      ? 0
+      : undefined);
 }
 
 async function empreinte(s: string) {
@@ -125,7 +132,8 @@ const base64 = (octets: Uint8Array) => {
 };
 
 export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
-  async function post(chemin: string, corps: unknown, cacheable = false) {
+  async function post(chemin: string, corps: unknown, cacheable = false, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     if (!config.cle) {
       throw new PanneModele("OPENROUTER_API_KEY absente: aucun modèle n'est joignable.", "NO_KEY");
     }
@@ -135,7 +143,8 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     // Une seconde tentative après une panne passagère: réseau, 429, 5xx, erreur dans le corps.
     let derniere = "";
     for (const attente of [0, 1500]) {
-      if (attente) await new Promise((r) => setTimeout(r, attente));
+      signal?.throwIfAborted();
+      if (attente) await attendre(attente, undefined, { signal });
       let reponse: Response;
       try {
         reponse = await fetch((config.url ?? "https://openrouter.ai/api/v1") + chemin, {
@@ -146,9 +155,10 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
             "X-OpenRouter-Cache": "false",
           },
           body: JSON.stringify(corps),
-          signal: AbortSignal.timeout(90_000),
+          signal: AbortSignal.any([AbortSignal.timeout(90_000), ...(signal ? [signal] : [])]),
         });
       } catch (e) {
+        signal?.throwIfAborted();
         derniere = `OpenRouter injoignable: ${(e as Error).message}`;
         continue;
       }
@@ -157,7 +167,13 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         if (reponse.status === 429 || reponse.status >= 500) continue;
         throw new PanneModele(derniere);
       }
-      const json = await reponse.json();
+      const json = await reponse.json().catch(() => {
+        signal?.throwIfAborted();
+        throw new PanneModele("Réponse JSON du fournisseur invalide.", "MODEL_INVALID_RESPONSE");
+      });
+      if (!json || typeof json !== "object" || Array.isArray(json)) {
+        throw new PanneModele("Réponse du fournisseur invalide.", "MODEL_INVALID_RESPONSE");
+      }
       if (json.error) {
         derniere = `OpenRouter: ${JSON.stringify(json.error).slice(0, 300)}`;
         continue;
@@ -227,7 +243,16 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         documents: documents.map((d) => d.slice(0, 8000)),
         provider: { zdr: true, data_collection: "deny" },
       });
-      return (json.results as { index: number; relevance_score: number }[])
+      const resultats = json.results;
+      if (
+        !Array.isArray(resultats) || !resultats.length ||
+        resultats.some((r) =>
+          !r || !Number.isInteger(r.index) || r.index < 0 ||
+          r.index >= documents.length || !Number.isFinite(r.relevance_score)
+        ) ||
+        new Set(resultats.map((r) => r.index)).size !== resultats.length
+      ) throw new PanneModele("Résultat du reclasseur invalide.", "MODEL_INVALID_RESPONSE");
+      return (resultats as { index: number; relevance_score: number }[])
         .map((r) => ({ index: r.index, score: r.relevance_score }))
         .sort((a, b) => b.score - a.score);
     },
@@ -271,7 +296,8 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       return texte.trim();
     },
 
-    async soutenir(texte, citation, titre) {
+    async soutenir(texte, citation, titre, signal) {
+      signal?.throwIfAborted();
       const messages = [
         { role: "system", content: CONSIGNE_SOUTIEN },
         {
@@ -299,7 +325,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
               logprobs: true,
               top_logprobs: 10,
             }),
-            signal: AbortSignal.timeout(2500),
+            signal: AbortSignal.any([AbortSignal.timeout(2500), ...(signal ? [signal] : [])]),
           });
           if (r.ok) {
             const probabilite = lireVerdict((await r.json()).choices?.[0]);
@@ -309,26 +335,31 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           } else await r.body?.cancel();
         } catch { /* relève par OpenRouter */ }
       }
-      const json = await post("/chat/completions", {
-        model: config.soutien,
-        messages,
-        temperature: 0,
-        // Le juge raisonne brièvement, puis ses logprobs portent sur le premier jeton de la
-        // réponse. Le budget couvre le raisonnement.
-        max_tokens: 3000,
-        reasoning: { effort: "low" },
-        logprobs: true,
-        top_logprobs: 10,
-        // Sans `require_parameters`, un hébergeur sans logprobs répond quand même, sans elles.
-        // Mistral sert GLM 5.3 en UE: 316 ms de médiane contre 1 s chez Modal, que `throughput`
-        // choisissait. `order` garde la relève des autres hébergeurs.
-        provider: {
-          require_parameters: true,
-          zdr: true,
-          data_collection: "deny",
-          order: ["Mistral"],
+      const json = await post(
+        "/chat/completions",
+        {
+          model: config.soutien,
+          messages,
+          temperature: 0,
+          // Le juge raisonne brièvement, puis ses logprobs portent sur le premier jeton de la
+          // réponse. Le budget couvre le raisonnement.
+          max_tokens: 3000,
+          reasoning: { effort: "low" },
+          logprobs: true,
+          top_logprobs: 10,
+          // Sans `require_parameters`, un hébergeur sans logprobs répond quand même, sans elles.
+          // Mistral sert GLM 5.3 en UE: 316 ms de médiane contre 1 s chez Modal, que `throughput`
+          // choisissait. `order` garde la relève des autres hébergeurs.
+          provider: {
+            require_parameters: true,
+            zdr: true,
+            data_collection: "deny",
+            order: ["Mistral"],
+          },
         },
-      }, true);
+        false,
+        signal,
+      );
       const probabilite = lireVerdict(json.choices?.[0]);
       if (probabilite === undefined) {
         throw new PanneModele(

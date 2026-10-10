@@ -596,10 +596,14 @@ export const reponse = (
   }
   return html`
     <article class="reponse panne" id="reponse-${id}">
-      <p><strong>${r.code === "CITATION_UNVERIFIED"
+      <p><strong>${r.code === "EVIDENCE_WITHDRAWN"
+        ? "Une source de cette réponse a été retirée ou modifiée."
+        : r.code === "CITATION_UNVERIFIED"
         ? "Je n'ai pas pu vérifier les citations de cette réponse."
         : "Thot n'a pas pu répondre, à cause d'une panne technique."}</strong></p>
-      <p>${r.code === "CITATION_UNVERIFIED"
+      <p>${r.code === "EVIDENCE_WITHDRAWN"
+        ? "Réessaie pour obtenir une réponse avec les sources disponibles."
+        : r.code === "CITATION_UNVERIFIED"
         ? "Ta question est conservée. Réessaie ou demande à ton professeur."
         : "Ce n'est pas une limite du cours. Ta question est conservée."}</p>
       <button
