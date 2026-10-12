@@ -8,16 +8,18 @@ de modèles et rapports.
 
 ## Lancer
 
-Il faut pnpm et `pdftotext` (Poppler). pnpm installe Node.js 26 dans le projet. Sous Linux,
-il faut aussi `/usr/bin/prlimit` (util-linux) pour borner la mémoire du convertisseur.
-L'image Docker les installe.
+Il faut [Vite+](https://viteplus.dev/guide/) et `pdftotext` (Poppler). Dans ce dossier, `vp`
+fournit Node.js et pnpm aux versions de `package.json`. Sans Vite+, installer ces versions à la
+main : `pnpm install` refuse une autre version de Node.js. Sous Linux, il faut aussi
+`/usr/bin/prlimit` (util-linux) pour borner la mémoire du convertisseur. L'image Docker les
+installe.
 
 ```bash
 pnpm install
-cp .env.example .env                                  # renseigner OPENROUTER_API_KEY
+cp .env.example .env                         # renseigner OPENROUTER_API_KEY
 pnpm thot instance --nom="Mon Thot" --mode=shared
-pnpm thot administrateur prof "M. Detienne"            # code de connexion à usage unique
-pnpm dev                                              # serveur et worker, http://127.0.0.1:8000
+pnpm thot administrateur prof "M. Detienne"  # code de connexion à usage unique
+pnpm dev                                     # serveur et worker, http://127.0.0.1:8000
 ```
 
 - `pnpm dev` accepte n'importe quel mot de passe pour les comptes ordinaires. Un

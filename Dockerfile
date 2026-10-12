@@ -1,8 +1,10 @@
 FROM node:26.11.1-bookworm-slim AS build
 WORKDIR /app
-RUN npm install -g pnpm@12.4.2
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+# pnpm à la version de packageManager. devEngines.runtime fait échouer l'installation
+# si l'image ne porte pas la version de Node épinglée.
+RUN npm install -g "$(node -p 'require("./package.json").packageManager')" \
+  && pnpm install --frozen-lockfile
 COPY vite.config.ts tsconfig.json ./
 COPY src/ src/
 RUN pnpm exec vp build

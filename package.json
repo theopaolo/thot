@@ -18,14 +18,15 @@
   },
   "devDependencies": {
     "@std/assert": "jsr:^1.0.19",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.5",
     "vite-plus": "1.1.0"
   },
   "devEngines": {
     "runtime": {
       "name": "node",
-      "version": "^26.11.1",
-      "onFail": "download"
+      "version": "26.11.1",
+      "onFail": "error"
     }
-  }
+  },
+  "packageManager": "pnpm@12.11.2"
 }
