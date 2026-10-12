@@ -1,5 +1,5 @@
 import type { Modeles } from "../core/modeles.ts";
-import { transaction } from "../core/recherche.ts";
+import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
 import { questionsVerifiees } from "../core/suggestions.ts";
 import { trouver } from "../core/texte.ts";
 import { lireInstance } from "./instance.ts";
@@ -29,7 +29,7 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
         db,
         modeles,
         p,
-        { schoolId: lireInstance(db).school_id, sourceId },
+        { lecteur: null, schoolId: lireInstance(db).school_id, sourceId },
         config.seuil,
       ),
     );
@@ -60,15 +60,15 @@ export const marquerSuggestions = (db: Db, sourceId: string) =>
 export type Suggestion = { question: string; chapitre: string };
 
 /** Quelques questions par chapitre, tirées au hasard parmi celles des sources certifiées. */
-export function suggestionsParChapitre(db: Db, parChapitre = 3): Map<string, string[]> {
+export function suggestionsParChapitre(db: Db, l: Lecteur, parChapitre = 3): Map<string, string[]> {
   const lignes = db.prepare(
     `SELECT sg.question, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS chapitre
      FROM suggestions sg JOIN sources s ON s.id = sg.source_id
-     WHERE s.statut = 'certifiee' AND s.school_id = ?
+     WHERE s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}
        AND s.audience = 'eleves'
        AND s.reponses = 1
      ORDER BY random()`,
-  ).all(lireInstance(db).school_id) as Suggestion[];
+  ).all(lireInstance(db).school_id, ...parametresAcces(l)) as Suggestion[];
   const out = new Map<string, string[]>();
   for (const l of lignes) {
     const liste = out.get(l.chapitre) ?? [];
@@ -103,13 +103,13 @@ export type Fait = {
  * « Le saviez-vous ? »: une phrase recopiée telle quelle d'un passage certifié, avec sa position
  * dans le document. Rien n'est généré.
  */
-export function faitAuHasard(db: Db): Fait | undefined {
+export function faitAuHasard(db: Db, l: Lecteur): Fait | undefined {
   const passages = db.prepare(
     `SELECT c.source_id, c.titre, c.texte, c.debut FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE s.statut = 'certifiee' AND c.school_id = ? AND length(c.texte) >= 300
-       AND s.audience = 'eleves'
+       AND s.audience = 'eleves' AND ${FILTRE_ACCES}
      ORDER BY random() LIMIT 10`,
-  ).all(lireInstance(db).school_id) as {
+  ).all(lireInstance(db).school_id, ...parametresAcces(l)) as {
     source_id: string;
     titre: string;
     texte: string;
@@ -132,14 +132,14 @@ export function faitAuHasard(db: Db): Fait | undefined {
   return undefined;
 }
 
-export function suggestionsDuPerimetre(db: Db, ids: Set<string>, question = "") {
+/** Les questions suggérées viennent des sources publiées aux élèves que le lecteur lit. */
+export function suggestionsDuPerimetre(db: Db, l: Lecteur, ids: Set<string>, question = "") {
   return db.prepare(
     `SELECT sg.question, sg.source_id FROM suggestions sg JOIN sources s ON s.id = sg.source_id
-    WHERE s.statut = 'certifiee' AND sg.question != ?
+    WHERE s.statut = 'certifiee' AND sg.question != ? AND ${FILTRE_ACCES}
       AND s.audience = 'eleves'
       AND s.reponses = 1
     ORDER BY random()`,
-  ).all(question).filter((s) => ids.has(s.source_id as string)).slice(0, 3).map((s) =>
-    s.question as string
-  );
+  ).all(question, ...parametresAcces(l)).filter((s) => ids.has(s.source_id as string)).slice(0, 3)
+    .map((s) => s.question as string);
 }

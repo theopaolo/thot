@@ -2,6 +2,7 @@ import { join } from "@std/path";
 import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
+import { inscrire } from "./domaines.ts";
 
 export type Role = "enseignant" | "eleve";
 export type Compte = {
@@ -122,7 +123,8 @@ export function lireListe(csv: string): { identifiant: string; nom: string }[] {
   return comptes;
 }
 
-export async function importerEleves(db: Db, csv: string) {
+/** Crée les comptes élèves et les inscrit aux cours donnés, dans la même transaction. */
+export async function importerEleves(db: Db, csv: string, cours: string[] = []) {
   const comptes = lireListe(csv);
   const existants = db.prepare("SELECT identifiant FROM comptes WHERE identifiant = ?");
   for (const c of comptes) {
@@ -153,6 +155,7 @@ export async function importerEleves(db: Db, csv: string) {
     );
     for (const c of resultats) {
       insert.run(c.id, c.identifiant, c.nom, c.sel, c.empreinte, maintenant());
+      for (const coursId of cours) inscrire(db, coursId, c.id);
     }
   });
   return resultats.map(({ identifiant, nom, motDePasse }) => ({ identifiant, nom, motDePasse }));
@@ -270,11 +273,23 @@ export const lecteur = (c: Compte): Lecteur => ({
 export const peutLire = (db: Db, c: Compte, sourceId: string) =>
   db.prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
     .get(sourceId, ...parametresAcces(lecteur(c))) !== undefined;
-/** Seuls le propriétaire et les administrateurs modifient, certifient ou relisent une source. */
+/**
+ * Modifient, certifient et relisent une source : son propriétaire, les administrateurs, et les
+ * enseignants de ses cours quand elle n'est pas privée.
+ */
+export const filtreModification = (s = "s") =>
+  `(? OR ${s}.proprietaire_id = ? OR (? AND ${s}.audience != 'prive'
+    AND EXISTS (SELECT 1 FROM source_cours sc JOIN membres_cours mc ON mc.cours_id = sc.cours_id
+      WHERE sc.source_id = ${s}.id AND mc.compte_id = ?)))`;
+export const parametresModification = (c: Compte) => [
+  c.administrateur === 1 ? 1 : 0,
+  c.id,
+  c.role === "enseignant" ? 1 : 0,
+  c.id,
+];
 export const peutModifier = (db: Db, c: Compte, sourceId: string) =>
-  c.administrateur === 1 ||
-  db.prepare("SELECT 1 FROM sources WHERE id = ? AND proprietaire_id = ?").get(sourceId, c.id) !==
-    undefined;
+  db.prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${filtreModification()}`)
+    .get(sourceId, ...parametresModification(c)) !== undefined;
 
 /** Secret de signature des cookies. Créé au premier lancement, conservé avec les données. */
 export function secretSession(): string {

@@ -136,7 +136,7 @@ const models = openrouter({
   soutienMistral: variant.judge ?? config.modeles.soutienMistral,
 });
 const rows: Record<string, unknown>[] = [];
-const scope = { schoolId: config.schoolId };
+const scope = { lecteur: null, schoolId: config.schoolId };
 if (mode === "generation") {
   const game = JSON.parse(await Deno.readTextFile("evaluation/queries_generation.json"));
   const qs = [

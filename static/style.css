@@ -795,7 +795,8 @@ input[type="checkbox"] {
 .barre .espace {
   margin-left: auto;
 }
-.barre input[type="text"] {
+.barre input[type="text"],
+.barre > select {
   flex: 1 1 18rem;
   width: auto;
   max-width: 24rem;
@@ -1401,7 +1402,8 @@ form.question-form {
 form.question-form textarea {
   min-height: 3rem;
 }
-form.question-form small {
+form.question-form small,
+.question-rapide small {
   display: block;
   margin-top: var(--s2);
 }
@@ -1581,6 +1583,35 @@ details summary {
   min-height: 44px;
   color: var(--ink-muted);
   cursor: pointer;
+}
+/* Les membres d'un cours se lisent sous sa ligne, pas avant le cours suivant. */
+.barre + details {
+  margin: calc(-1 * var(--s3)) 0 var(--s5);
+}
+.barre + details summary {
+  gap: var(--s2);
+}
+.barre + details summary::after {
+  content: "";
+  width: 0.4em;
+  height: 0.4em;
+  margin-top: -0.2em;
+  border-right: 1.5px solid;
+  border-bottom: 1.5px solid;
+  transform: rotate(45deg);
+}
+.barre + details[open] summary::after {
+  margin-top: 0.2em;
+  transform: rotate(-135deg);
+}
+details table {
+  margin-bottom: var(--s3);
+}
+details td {
+  vertical-align: middle;
+}
+details td:last-child {
+  width: 1%;
 }
 
 @media print {

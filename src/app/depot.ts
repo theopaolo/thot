@@ -125,6 +125,8 @@ export async function deposer(
     /** nom affiché. Sans `proprietaireId`, il désigne le compte s'il est le seul à le porter. */
     enseignant: string;
     proprietaireId?: string;
+    /** le compte qui dépose par le web : il ne range la source que dans ses cours */
+    par?: { id: string; administrateur: number };
     audience: Audience;
     reponses: boolean;
     liens?: Affiliation[];
@@ -182,7 +184,7 @@ export async function deposer(
         source_id,
       );
       if (d.liens !== undefined) affiliations(db, source_id, d.liens);
-      else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence);
+      else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence, d.par);
       db.prepare(
         "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
       ).run(job_id, source_id, t, t);

@@ -175,6 +175,71 @@ export function domaineSource(db: Db, champs: Record<string, string>) {
     langue: langueSource(champs.langue),
   };
 }
+/** Les cours dont le compte est membre. */
+export const coursDuCompte = (db: Db, compteId: string) =>
+  new Set(
+    db.prepare("SELECT cours_id FROM membres_cours WHERE compte_id = ?").all(compteId)
+      .map((l) => l.cours_id as string),
+  );
+export const membres = (db: Db, coursId: string) =>
+  db.prepare(
+    `SELECT a.id, a.identifiant, a.nom, a.role FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
+     WHERE m.cours_id = ? ORDER BY a.role, a.nom`,
+  ).all(coursId) as { id: string; identifiant: string; nom: string; role: string }[];
+export function inscrire(db: Db, coursId: string, compteId: string) {
+  if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
+    throw new Error("Cours inconnu.");
+  }
+  if (!db.prepare("SELECT 1 FROM comptes WHERE id = ?").get(compteId)) {
+    throw new Error("Compte inconnu.");
+  }
+  db.prepare("INSERT OR IGNORE INTO membres_cours VALUES (?, ?)").run(coursId, compteId);
+}
+export const desinscrire = (db: Db, coursId: string, compteId: string) =>
+  db.prepare("DELETE FROM membres_cours WHERE cours_id = ? AND compte_id = ?").run(
+    coursId,
+    compteId,
+  );
+
+type Membre = { id: string; administrateur: number };
+/** Les cours et thèmes qu'un enseignant peut choisir : les siens. Un administrateur voit tout. */
+export function catalogueDe(db: Db, c: Membre): Catalogue {
+  const cat = catalogue(db);
+  if (c.administrateur === 1) return cat;
+  const siens = coursDuCompte(db, c.id);
+  return {
+    ...cat,
+    cours: cat.cours.filter((x) => siens.has(x.id)),
+    themes: cat.themes.filter((t) => siens.has(t.cours_id)),
+  };
+}
+/**
+ * Un enseignant ne rattache une source qu'à ses propres cours. Les rattachements de la source à
+ * d'autres cours restent en place, puisque son formulaire ne les montre pas.
+ */
+export function liensAutorises(
+  db: Db,
+  c: Membre,
+  liens: Affiliation[],
+  sourceId?: string,
+): Affiliation[] {
+  const siens = c.administrateur === 1 ? null : coursDuCompte(db, c.id);
+  if (siens && liens.some((l) => !siens.has(l.cours_id))) {
+    throw new Error("Rattachement refusé : ce cours n'est pas le vôtre.");
+  }
+  const actuels = sourceId
+    ? db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?").all(
+      sourceId,
+    ) as Affiliation[]
+    : [];
+  const autres = siens ? actuels.filter((l) => !siens.has(l.cours_id)) : [];
+  // Sans cours, une source partagée se lirait dans toute l'instance.
+  if (actuels.length && !liens.length && !autres.length) {
+    throw new Error("Une ressource rattachée garde au moins un cours.");
+  }
+  return [...liens, ...autres];
+}
+
 export type Affiliation = { cours_id: string; theme_id: string | null };
 export function affiliations(db: Db, sourceId: string, liens: Affiliation[]) {
   for (const l of liens) {
@@ -198,11 +263,30 @@ export function liensFormulaire(b: Record<string, unknown>): Affiliation[] {
     theme_id: String(b[`theme_${id}`] ?? "") || null,
   }));
 }
-export function rangerLegacy(db: Db, sourceId: string, matiereId: string | null, sequence: string) {
+/**
+ * Range une source sans cours choisi dans le premier cours de sa matière, sous le thème de sa
+ * séquence. L'import CLI et un administrateur créent ce cours s'il manque. Un enseignant ne range
+ * que dans ses propres cours : sans cours à lui dans la matière, la source reste non classée.
+ */
+export function rangerLegacy(
+  db: Db,
+  sourceId: string,
+  matiereId: string | null,
+  sequence: string,
+  par?: Membre,
+) {
   if (!matiereId) return;
-  let c = db.prepare("SELECT id FROM cours WHERE matiere_id = ? ORDER BY rowid LIMIT 1").get(
-    matiereId,
-  )?.id as string | undefined;
+  const restreint = par && par.administrateur !== 1;
+  let c = db.prepare(
+    `SELECT id FROM cours WHERE matiere_id = ? AND (? OR id IN
+      (SELECT cours_id FROM membres_cours WHERE compte_id = ?))
+     ORDER BY rowid LIMIT 1`,
+  ).get(matiereId, restreint ? 0 : 1, par?.id ?? "")?.id as string | undefined;
+  if (!c && restreint) {
+    // Le formulaire ne montre pas les cours des autres enseignants : leurs liens restent.
+    affiliations(db, sourceId, liensAutorises(db, par, [], sourceId));
+    return;
+  }
   c ??= cours(
     db,
     matiereId,
@@ -213,7 +297,8 @@ export function rangerLegacy(db: Db, sourceId: string, matiereId: string | null,
       | string
       | undefined ?? theme(db, c, sequence)
     : null;
-  affiliations(db, sourceId, [{ cours_id: c, theme_id: t }]);
+  const lien = [{ cours_id: c, theme_id: t }];
+  affiliations(db, sourceId, par ? liensAutorises(db, par, lien, sourceId) : lien);
 }
 
 export type Scope = { matiere_id: string; cours_id: string; theme_id: string };
@@ -228,6 +313,7 @@ export function sourcesPerimetre(db: Db, p: Scope) {
       .all(
         ...parametresDomaine({
           schoolId: "",
+          lecteur: null,
           matiereId: p.matiere_id,
           coursId: p.cours_id,
           themeId: p.theme_id,
@@ -236,12 +322,16 @@ export function sourcesPerimetre(db: Db, p: Scope) {
   );
 }
 
+/** Un rattachement ne nomme un cours qu'à ses membres et aux administrateurs. */
+export const MES_COURS =
+  "(? OR sc.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = ?))";
+export const mesCours = (l: Lecteur) => [l.administrateur ? 1 : 0, l.id];
 export function catalogueVisible(db: Db, l: Lecteur): Catalogue {
   const cat = catalogue(db);
   const liens = db.prepare(
     `SELECT sc.cours_id, sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
-    WHERE s.statut = 'certifiee' AND ${FILTRE_ACCES}`,
-  ).all(...parametresAcces(l));
+    WHERE s.statut = 'certifiee' AND ${FILTRE_ACCES} AND ${MES_COURS}`,
+  ).all(...parametresAcces(l), ...mesCours(l));
   const ids = new Set(liens.map((s) => s.cours_id));
   const themes = new Set(liens.map((s) => s.theme_id));
   cat.cours = cat.cours.filter((c) => ids.has(c.id));

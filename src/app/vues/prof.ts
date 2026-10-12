@@ -265,16 +265,33 @@ export const sources = (
 
 export const eleves = (
   liste: { id: string; identifiant: string; nom: string }[],
+  cat: Catalogue,
   erreur?: string,
 ) =>
   html`
     <h1>Élèves</h1>
     <p>Importer une classe avec un CSV UTF-8 contenant les colonnes <code>identifiant,nom</code>. Les identifiants doivent être uniques.</p>
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
-    <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data" class="barre">
-      <label for="fichier">Liste CSV</label>
-      ${champFichier(".csv,text/csv")}
-      <button class="principal">Importer et afficher les mots de passe</button>
+    <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data">
+      ${cat.cours.length
+        ? html`
+          <fieldset>
+            <legend>Cours des nouveaux comptes</legend>
+            <p class="discret">Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.</p>
+            ${cat.cours.map((c) =>
+              html`<label><input type="checkbox" name="cours" value="${c.id}" checked> ${
+                cat.matieres
+                  .find((m) => m.id === c.matiere_id)?.nom
+              } / ${c.nom}</label>`
+            )}
+          </fieldset>
+        `
+        : ""}
+      <div class="barre">
+        <label for="fichier">Liste CSV</label>
+        ${champFichier(".csv,text/csv")}
+        <button class="principal">Importer et afficher les mots de passe</button>
+      </div>
     </form>
     ${liste.length
       ? html`

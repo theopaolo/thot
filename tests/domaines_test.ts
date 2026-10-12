@@ -15,11 +15,13 @@ import {
   catalogueVisible,
   changerProfil,
   cours,
+  coursDuCompte,
+  inscrire,
   matiere,
   renommer,
   theme,
 } from "../src/app/domaines.ts";
-import { lireInstance } from "../src/app/instance.ts";
+import { configurerInstance, lireInstance } from "../src/app/instance.ts";
 import {
   indexer,
   proposerInformations,
@@ -92,7 +94,7 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, 'Prof historique', 'fixture')`,
       ).run(String(i), JSON.stringify(m));
     }
-    assertEquals(migrer(db), ["0007_domaines.sql", "0008_acces.sql"]);
+    assertEquals(migrer(db), ["0007_domaines.sql", "0008_acces.sql", "0009_membres.sql"]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
     assertEquals(sources.map((s) => s.metadonnees), metas.map((m) => JSON.stringify(m)));
@@ -149,30 +151,44 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
       avant.metadonnees,
     );
     assertEquals(
-      chercherFts(db, "lumière", { schoolId: "pilote", coursId: c1, themeId: t1 }).map((c) =>
-        c.source_id
-      ),
+      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c1, themeId: t1 })
+        .map((c) => c.source_id),
       [id],
     );
     assertEquals(
-      chercherFts(db, "lumière", { schoolId: "pilote", coursId: c1, themeId: t2 }).length,
+      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c1, themeId: t2 })
+        .length,
       0,
     );
-    const chunk = chercherFts(db, "lumière", { schoolId: "pilote", coursId: c1, themeId: t1 })[0];
-    assert(lireChunk(db, id, chunk.id, { schoolId: "pilote", coursId: c1, themeId: t1 }));
+    const chunk = chercherFts(db, "lumière", {
+      lecteur: null,
+      schoolId: "pilote",
+      coursId: c1,
+      themeId: t1,
+    })[0];
+    assert(
+      lireChunk(db, id, chunk.id, { lecteur: null, schoolId: "pilote", coursId: c1, themeId: t1 }),
+    );
     assertEquals(
-      lireChunk(db, id, chunk.id, { schoolId: "pilote", coursId: c1, themeId: t2 }),
+      lireChunk(db, id, chunk.id, { lecteur: null, schoolId: "pilote", coursId: c1, themeId: t2 }),
       undefined,
     );
-    assertEquals(lireChunk(db, id, chunk.id, { schoolId: "pilote", sourceId: "autre" }), undefined);
     assertEquals(
-      chercherFts(db, "lumière", { schoolId: "pilote", matiereId: physique, coursId: c2 }).length,
+      lireChunk(db, id, chunk.id, { lecteur: null, schoolId: "pilote", sourceId: "autre" }),
+      undefined,
+    );
+    assertEquals(
+      chercherFts(db, "lumière", {
+        lecteur: null,
+        schoolId: "pilote",
+        matiereId: physique,
+        coursId: c2,
+      }).length,
       0,
     );
     assertEquals(
-      chercherFts(db, "lumière", { schoolId: "pilote", coursId: c2, themeId: t2 }).map((c) =>
-        c.source_id
-      ),
+      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c2, themeId: t2 })
+        .map((c) => c.source_id),
       [id],
     );
     assertThrows(() => affiliations(db, id, [{ cours_id: c1, theme_id: t2 }]));
@@ -223,7 +239,10 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
     db.prepare(
       "UPDATE sources SET audience = 'collegues' WHERE id = ?",
     ).run(id);
-    assertEquals(chercherFts(db, "lumière", { schoolId: "pilote", coursId: c2 }).length, 0);
+    assertEquals(
+      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c2 }).length,
+      0,
+    );
     assertEquals((await eleve.requete(`/eleve/themes/${t2}`)).status, 404);
     assert(
       !catalogueVisible(db, { id: "", enseignant: false, administrateur: false }).themes.some((t) =>
@@ -345,7 +364,8 @@ Deno.test("prompts neutres, preuves conservées, rubriques ATC et légendes rés
       ],
     });
     assertEquals(
-      (await demander(db, faux.modeles, "lumière", { schoolId: "pilote" }, 0.01)).resultat.etat,
+      (await demander(db, faux.modeles, "lumière", { lecteur: null, schoolId: "pilote" }, 0.01))
+        .resultat.etat,
       "answered",
     );
     await genererSuggestions(db, faux.modeles, id);
@@ -423,7 +443,7 @@ Deno.test("arts appliqués : consignes mesurées, matière proposée, profil de 
         sortie,
       ],
     });
-    await demander(db, faux.modeles, "lumière", { schoolId: "pilote" }, 0.01);
+    await demander(db, faux.modeles, "lumière", { lecteur: null, schoolId: "pilote" }, 0.01);
     await genererSuggestions(db, faux.modeles, arts);
     const systeme = faux.vus.flat().filter((m) => m.role === "system").map((m) => m.content);
     // Consignes de `reponse.ts` et `suggestions.ts` avant DOM-101, celles des mesures ml4.
@@ -734,7 +754,7 @@ Deno.test("sonde lexicale français / anglais : français conservé, anglais non
         })),
       );
       resultats[langue] = jeu.filter((x, i) =>
-        chercherFts(db, x.q, { schoolId: "pilote", sourceId: id }).some((c) =>
+        chercherFts(db, x.q, { lecteur: null, schoolId: "pilote", sourceId: id }).some((c) =>
           c.id === String(i)
         )
       ).length;
@@ -783,6 +803,20 @@ Deno.test("CLI : configurer des collections, changer le profil, importer, rattac
     await cli("matiere", "REAPER");
     const socio = await cli("matiere", "Sociologie");
     const c = await cli("cours", physique, "Optique"), t = await cli("theme", c, "Introduction");
+    await cli("compte", "lea", "Léa Martin", "eleve");
+    const effectif = async () =>
+      JSON.parse(await cli("domaines")).cours.find((x: { id: string }) => x.id === c).membres;
+    assertEquals(await effectif(), 0);
+    await cli("membre", c, "lea");
+    await cli("membre", c, "LEA");
+    assertEquals(await effectif(), 1);
+    const inconnu = await lancer("membre", c, "personne");
+    assert(!inconnu.success);
+    assertStringIncludes(new TextDecoder().decode(inconnu.stderr), "Compte introuvable");
+    assert(!(await lancer("membre", "absent", "lea")).success);
+    assertEquals(await effectif(), 1);
+    await cli("retirer-membre", c, "lea");
+    assertEquals(await effectif(), 0);
     const fichier = join(dir, "physique.html");
     await Deno.writeTextFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
     await cli(
@@ -827,5 +861,187 @@ Deno.test("CLI : configurer des collections, changer le profil, importer, rattac
     }
   } finally {
     await Deno.remove(dir, { recursive: true });
+  }
+});
+
+async function enseignantDe(db: ReturnType<typeof connexion>, cours_id: string[]) {
+  const prof = await session(db, fauxModeles().modeles, "enseignant", false);
+  const id = db.prepare("SELECT id FROM comptes ORDER BY rowid DESC LIMIT 1").get()!.id as string;
+  for (const c of cours_id) inscrire(db, c, id);
+  return { ...prof, id };
+}
+
+Deno.test("membres d'un cours : l'administrateur inscrit et retire, les autres comptes reçoivent 403", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const admin = await administrateur(db);
+    const c = cours(db, matiere(db, "Physique"), "Optique");
+    const eleve = await session(db, fauxModeles().modeles, "eleve", false);
+    const prof = await session(db, fauxModeles().modeles, "enseignant", false);
+    const eleveId = db.prepare("SELECT id FROM comptes WHERE role = 'eleve'").get()!.id as string;
+    const champs = new URLSearchParams({ cours_id: c, compte_id: eleveId });
+    for (const autre of [eleve, prof]) {
+      assertEquals((await autre.requete("/administration/domaines")).status, 403);
+      const refus = await autre.requete("/administration/domaines/inscrire", {
+        method: "POST",
+        body: champs,
+      });
+      assertEquals(refus.status, 403);
+    }
+    assertEquals(coursDuCompte(db, eleveId).size, 0);
+
+    let page = await (await admin.requete("/administration/domaines")).text();
+    assertStringIncludes(page, "Membres : 0");
+    assertStringIncludes(page, "Aucun membre.");
+    assertStringIncludes(page, `<option value="${eleveId}">Compte eleve`);
+    const ajout = await admin.poster("inscrire", { cours_id: c, compte_id: eleveId });
+    assertEquals(ajout.status, 303);
+    assertStringIncludes(ajout.headers.get("location")!, `ouvert=${c}`);
+    assert(coursDuCompte(db, eleveId).has(c));
+    page = await (await admin.requete(`/administration/domaines?ouvert=${c}`)).text();
+    assertStringIncludes(page, "Membres : 1");
+    assertStringIncludes(page, `<details id="membres-${c}" open>`);
+    assertStringIncludes(page, "Compte eleve");
+    assertStringIncludes(page, ", élève</span>");
+    assert(!page.includes(`<option value="${eleveId}">`));
+
+    // Un seul rang par compte et par cours.
+    assertEquals((await admin.poster("inscrire", { cours_id: c, compte_id: eleveId })).status, 303);
+    assertEquals(db.prepare("SELECT count(*) n FROM membres_cours").get()!.n, 1);
+    for (
+      const mauvais of [{ cours_id: "absent", compte_id: eleveId }, { cours_id: c, compte_id: "x" }]
+    ) {
+      const refus = await admin.poster("inscrire", mauvais);
+      assertEquals(refus.status, 400);
+      assertStringIncludes(await refus.text(), "inconnu");
+    }
+
+    assertEquals(
+      (await admin.poster("desinscrire", { cours_id: c, compte_id: eleveId })).status,
+      303,
+    );
+    assertEquals(coursDuCompte(db, eleveId).size, 0);
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais ceux d'un autre enseignant", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const m = matiere(db, "Physique");
+    const [optique, mecanique] = [cours(db, m, "Optique"), cours(db, m, "Mécanique")];
+    const prof = await enseignantDe(db, [optique]);
+    const classe = (lignes: string, coches: string[]) => {
+      const f = new FormData();
+      f.append("fichier", new File([`identifiant,nom\n${lignes}\n`], "classe.csv"));
+      for (const id of coches) f.append("cours", id);
+      return f;
+    };
+    const eleves = () => db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n;
+
+    const page = await (await prof.requete("/prof/eleves")).text();
+    assertStringIncludes(page, `name="cours" value="${optique}" checked`);
+    assert(!page.includes(mecanique));
+
+    const refus = await prof.requete("/prof/eleves/importer", {
+      method: "POST",
+      body: classe("lea,Léa Martin", [optique, mecanique]),
+    });
+    assertEquals(refus.status, 400);
+    assertStringIncludes(await refus.text(), "pas le vôtre");
+    assertEquals(eleves(), 0);
+
+    const bon = await prof.requete("/prof/eleves/importer", {
+      method: "POST",
+      body: classe("lea,Léa Martin\nnoe,Noé Petit", [optique]),
+    });
+    assertEquals(bon.status, 200);
+    const lea = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea'").get()!.id as string;
+    assertEquals([...coursDuCompte(db, lea)], [optique]);
+
+    const sans = await prof.requete("/prof/eleves/importer", {
+      method: "POST",
+      body: classe("max,Max Roux", []),
+    });
+    assertEquals(sans.status, 200);
+    const max = db.prepare("SELECT id FROM comptes WHERE identifiant = 'max'").get()!.id as string;
+    assertEquals(coursDuCompte(db, max).size, 0);
+
+    // Un administrateur choisit parmi tous les cours, un cours inconnu annule l'import.
+    const admin = await administrateur(db);
+    assertStringIncludes(await (await admin.requete("/prof/eleves")).text(), mecanique);
+    const ajout = await admin.requete("/prof/eleves/importer", {
+      method: "POST",
+      body: classe("eva,Éva Roy", [mecanique]),
+    });
+    assertEquals(ajout.status, 200);
+    const eva = db.prepare("SELECT id FROM comptes WHERE identifiant = 'eva'").get()!.id as string;
+    assertEquals([...coursDuCompte(db, eva)], [mecanique]);
+    const inconnu = await admin.requete("/prof/eleves/importer", {
+      method: "POST",
+      body: classe("zoe,Zoé Blanc", [optique, "absent"]),
+    });
+    assertEquals(inconnu.status, 400);
+    assertEquals(
+      db.prepare("SELECT count(*) n FROM comptes WHERE identifiant = 'zoe'").get()!.n,
+      0,
+    );
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("CSV élèves : sans cours dans l'instance, pas de liste de cours", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const page = await (await prof.requete("/prof/eleves")).text();
+    assert(!page.includes("Cours des nouveaux comptes"));
+    const f = new FormData();
+    f.append("fichier", new File(["identifiant,nom\nlea,Léa Martin\n"], "classe.csv"));
+    assertEquals(
+      (await prof.requete("/prof/eleves/importer", { method: "POST", body: f })).status,
+      200,
+    );
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("l'élève apprend qui lit ses questions, sauf en mode personnel", async () => {
+  const { db, dir } = await environnement();
+  try {
+    cours(db, matiere(db, "Physique"), "Optique");
+    const inscrit = await session(db, fauxModeles().modeles, "eleve");
+    const libre = await session(db, fauxModeles().modeles, "eleve", false);
+    for (const chemin of ["/eleve", "/eleve/chat"]) {
+      assertStringIncludes(
+        await (await inscrit.requete(chemin)).text(),
+        "Les enseignants de tes cours lisent tes questions.",
+      );
+      const sans = await (await libre.requete(chemin)).text();
+      assertStringIncludes(sans, "Les enseignants lisent tes questions.");
+      assert(!sans.includes("de tes cours"));
+    }
+  } finally {
+    db.close();
+    await Deno.remove(dir, { recursive: true });
+  }
+  const perso = await environnement();
+  try {
+    configurerInstance(perso.db, "Mon étude", "personal");
+    const moi = await session(perso.db, fauxModeles().modeles, "enseignant");
+    for (const chemin of ["/eleve", "/eleve/chat"]) {
+      const r = await moi.requete(chemin);
+      assertEquals(r.status, 200);
+      assert(!(await r.text()).includes("lisent tes questions"));
+    }
+  } finally {
+    perso.db.close();
+    await Deno.remove(perso.dir, { recursive: true });
   }
 });

@@ -13,6 +13,7 @@ import {
   chercher,
   chercherFts,
   FILTRE_ACCES,
+  filtreAcces,
   indexerSource,
   type Lecteur,
   parametresAcces,
@@ -24,9 +25,11 @@ import {
   choisirMotDePasse,
   type Compte,
   consommerProvisoire,
+  filtreModification,
   importerEleves,
   lecteur,
   lireCompte,
+  parametresModification,
   peutLire,
   peutModifier,
   reinitialiserMotDePasse,
@@ -122,8 +125,15 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
 
   const lu = (c: Context<Env>) => lecteur(c.get("compte"));
+  // Qui lit les questions d'un élève : les enseignants de ses cours, ou tous s'il n'en a aucun.
+  const mentionLecteurs = (c: Context<Env>) =>
+    lireInstance(db).mode === "personal"
+      ? ""
+      : Domaines.coursDuCompte(db, c.get("compte").id).size
+      ? "Les enseignants de tes cours lisent tes questions."
+      : "Les enseignants lisent tes questions.";
   const MODIFICATION_REFUSEE =
-    "Seuls son propriétaire et les administrateurs modifient cette source.";
+    "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.";
 
   // ------------------------------------------------------------ connexion
   app.get("/connexion", (c) => c.html(rendre(c, "Connexion", formulaireConnexion())));
@@ -194,8 +204,12 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   const scope = (c: Context<Env>) => Domaines.lireScope(c.req.query());
   const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
-  const optionsDepot = (champs: Record<string, string> = {}, b: Record<string, unknown> = {}) => {
-    const cat = Domaines.catalogue(db);
+  const optionsDepot = (
+    c: Context<Env>,
+    champs: Record<string, string> = {},
+    b: Record<string, unknown> = {},
+  ) => {
+    const cat = Domaines.catalogueDe(db, c.get("compte"));
     // Une seule matière: le dépôt la prend d'office. « Non classée » reste un choix explicite.
     if (cat.matieres.length === 1 && champs.matiere_id === undefined && !champs.matiere) {
       champs = { ...champs, matiere_id: cat.matieres[0].id };
@@ -212,21 +226,34 @@ export function creerApp(db: Db, modeles: Modeles) {
       liens: Domaines.liensFormulaire(b),
     };
   };
-  const pageDomaines = (c: Context<Env>, erreur = "") =>
-    rendre(
+  const pageDomaines = (c: Context<Env>, erreur = "", ouvert = "") => {
+    const cat = Domaines.catalogue(db);
+    return rendre(
       c,
       "Matières et cours",
       DomaineVue.gestion(
-        Domaines.catalogue(db),
+        cat,
         erreur,
         !!db.prepare("SELECT 1 FROM sources").get(),
+        {
+          membres: new Map(cat.cours.map((x) => [x.id, Domaines.membres(db, x.id)])),
+          comptes: db.prepare("SELECT id, identifiant, nom, role FROM comptes ORDER BY nom")
+            .all() as DomaineVue.Inscrit[],
+          ouvert,
+        },
       ),
     );
-  app.get("/administration/domaines", (c) => c.html(pageDomaines(c)));
+  };
+  app.get("/administration/domaines", (c) => c.html(pageDomaines(c, "", c.req.query("ouvert"))));
   app.post("/administration/domaines/:action", async (c) => {
     const b = await c.req.parseBody();
+    const action = c.req.param("action");
+    // Les membres d'un cours restent affichés après un ajout ou un retrait.
+    const ouvert = action === "inscrire" || action === "desinscrire"
+      ? String(b.cours_id ?? "")
+      : "";
     try {
-      switch (c.req.param("action")) {
+      switch (action) {
         case "matiere":
           Domaines.matiere(db, String(b.nom ?? ""), b.profil ? String(b.profil) : undefined);
           break;
@@ -251,13 +278,23 @@ export function creerApp(db: Db, modeles: Modeles) {
         case "supprimer":
           Domaines.supprimer(db, String(b.genre ?? ""), String(b.id ?? ""));
           break;
+        case "inscrire":
+          Domaines.inscrire(db, String(b.cours_id ?? ""), String(b.compte_id ?? ""));
+          break;
+        case "desinscrire":
+          Domaines.desinscrire(db, String(b.cours_id ?? ""), String(b.compte_id ?? ""));
+          break;
         default:
           return c.notFound();
       }
     } catch (e) {
-      return c.html(pageDomaines(c, (e as Error).message), 400);
+      return c.html(pageDomaines(c, (e as Error).message, ouvert), 400);
     }
-    return c.redirect("/administration/domaines", 303);
+    const id = encodeURIComponent(ouvert);
+    return c.redirect(
+      ouvert ? `/administration/domaines?ouvert=${id}#membres-${id}` : "/administration/domaines",
+      303,
+    );
   });
 
   // ------------------------------------------------------------ images
@@ -285,7 +322,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const lignes = (c: Context<Env>, statut: string, sequence: string) =>
     db.prepare(
       `SELECT s.id, s.titre, s.profil, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
-         s.audience, coalesce(? OR s.proprietaire_id = ?, 0) AS modifiable,
+         s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
@@ -294,8 +331,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          AND (? = '' OR sequence = ?)
        ORDER BY sequence, s.titre`,
     ).all(
-      lu(c).administrateur ? 1 : 0,
-      lu(c).id,
+      ...parametresModification(c.get("compte")),
       instance.school_id,
       ...parametresAcces(lu(c)),
       statut,
@@ -326,7 +362,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(
         c,
         "Bibliothèque",
-        html`${DomaineVue.filtre(Domaines.catalogue(db), scope(c), "/prof")}${
+        html`${DomaineVue.filtre(Domaines.catalogueDe(db, c.get("compte")), scope(c), "/prof")}${
           Prof.sources(
             ressources.filter((s) =>
               (!f.statut || s.statut === f.statut) && (!f.sequence || s.sequence === f.sequence)
@@ -339,20 +375,39 @@ export function creerApp(db: Db, modeles: Modeles) {
       ),
     );
   });
-  app.get("/prof/eleves", (c) => {
-    const eleves = db.prepare(
-      "SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve' ORDER BY nom",
-    )
-      .all() as { id: string; identifiant: string; nom: string }[];
-    return c.html(rendre(c, "Élèves", Prof.eleves(eleves)));
-  });
+  // Réinitialiser ouvre le compte : seuls les administrateurs gèrent les élèves sans cours.
+  const ELEVES_GERES = `role = 'eleve' AND (? OR EXISTS (SELECT 1 FROM membres_cours lui
+      JOIN membres_cours moi ON moi.cours_id = lui.cours_id
+      WHERE lui.compte_id = comptes.id AND moi.compte_id = ?))`;
+  const elevesGeres = (c: Context<Env>) => [lu(c).administrateur ? 1 : 0, lu(c).id];
+  const pageEleves = (c: Context<Env>, erreur?: string) =>
+    rendre(
+      c,
+      "Élèves",
+      Prof.eleves(
+        db.prepare(`SELECT id, identifiant, nom FROM comptes WHERE ${ELEVES_GERES} ORDER BY nom`)
+          .all(...elevesGeres(c)) as { id: string; identifiant: string; nom: string }[],
+        Domaines.catalogueDe(db, c.get("compte")),
+        erreur,
+      ),
+    );
+  app.get("/prof/eleves", (c) => c.html(pageEleves(c)));
   app.post("/prof/eleves/importer", async (c) => {
-    const fichier = (await c.req.parseBody()).fichier;
+    const b = await c.req.parseBody({ all: true });
+    const fichier = b.fichier;
     if (!(fichier instanceof File) || fichier.size > 100_000) {
       return c.text("Fichier CSV invalide (100 Ko maximum).", 400);
     }
+    const cours = [...new Set([b.cours ?? []].flat().map(String))];
+    const siens = Domaines.coursDuCompte(db, c.get("compte").id);
+    if (!c.get("compte").administrateur && cours.some((id) => !siens.has(id))) {
+      return c.html(
+        pageEleves(c, "Inscription refusée : un de ces cours n'est pas le vôtre."),
+        400,
+      );
+    }
     try {
-      const comptes = await importerEleves(db, await fichier.text());
+      const comptes = await importerEleves(db, await fichier.text(), cours);
       c.header("Cache-Control", "no-store");
       return c.html(
         rendre(
@@ -362,13 +417,15 @@ export function creerApp(db: Db, modeles: Modeles) {
         ),
       );
     } catch (e) {
-      return c.html(rendre(c, "Élèves", Prof.eleves([], (e as Error).message)), 400);
+      return c.html(pageEleves(c, (e as Error).message), 400);
     }
   });
   app.post("/prof/eleves/:id/reinitialiser", async (c) => {
     const id = c.req.param("id");
-    const eleve = db.prepare("SELECT identifiant, nom FROM comptes WHERE id = ? AND role = 'eleve'")
-      .get(id) as { identifiant: string; nom: string } | undefined;
+    const eleve = db.prepare(
+      `SELECT identifiant, nom FROM comptes WHERE id = ? AND ${ELEVES_GERES}`,
+    )
+      .get(id, ...elevesGeres(c)) as { identifiant: string; nom: string } | undefined;
     if (!eleve) return c.notFound();
     const motDePasse = await reinitialiserMotDePasse(db, id);
     c.header("Cache-Control", "no-store");
@@ -383,20 +440,45 @@ export function creerApp(db: Db, modeles: Modeles) {
       ),
     );
   });
+  // Un enseignant lit les questions posées dans ses cours. Sans cours choisi, celles des élèves
+  // avec qui il partage un cours, ou de tout élève qui n'a aucun cours. Un administrateur lit tout.
   app.get("/prof/questions", (c) => {
+    const l = lu(c);
     const messages = db.prepare(
       `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
          json_extract(m.resultat, '$.code') AS code,
-         coalesce(nullif(m.chapitre, ''), json_extract(s.metadonnees, '$.sequence'),
+         coalesce(
+           CASE WHEN EXISTS (SELECT 1 FROM sources s3
+             WHERE json_extract(s3.metadonnees, '$.sequence') = m.chapitre AND ${filtreAcces("s3")})
+           THEN nullif(m.chapitre, '') END,
+           json_extract(s.metadonnees, '$.sequence'),
            json_extract(s2.metadonnees, '$.sequence'), '') AS chapitre
        FROM messages m JOIN comptes c ON c.id = m.compte_id
        LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
          AND ${FILTRE_ACCES}
        LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
-         AND ${FILTRE_ACCES.replaceAll("s.", "s2.")}
-       WHERE c.role = 'eleve'
+         AND ${filtreAcces("s2")}
+       WHERE c.role = 'eleve' AND (? OR CASE
+         WHEN m.cours_id != '' THEN m.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = ?)
+         WHEN m.theme_id != '' THEN EXISTS (SELECT 1 FROM themes t JOIN membres_cours mc
+           ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = ?)
+         WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = ?)
+         ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
+           OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
+             ON lui.cours_id = moi.cours_id WHERE moi.compte_id = ? AND lui.compte_id = m.compte_id)
+         END)
        ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
-    ).all(...parametresAcces(lu(c)), ...parametresAcces(lu(c))) as Prof.QuestionProf[];
+    ).all(
+      ...parametresAcces(l),
+      ...parametresAcces(l),
+      ...parametresAcces(l),
+      l.administrateur ? 1 : 0,
+      l.id,
+      l.id,
+      l.id,
+      l.id,
+    ) as Prof.QuestionProf[];
     return c.html(rendre(c, "Questions des élèves", Prof.questionsProf(messages)));
   });
   app.get("/prof/lignes", (c) => {
@@ -433,7 +515,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.get(
     "/prof/depot",
-    (c) => c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c.req.query())))),
+    (c) => c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query())))),
   );
   app.post(
     "/prof/depot",
@@ -451,7 +533,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           rendre(
             c,
             "Déposer",
-            Prof.depot({ ...optionsDepot(champs, b), erreurs }),
+            Prof.depot({ ...optionsDepot(c, champs, b), erreurs }),
           ),
           400,
         );
@@ -483,10 +565,13 @@ export function creerApp(db: Db, modeles: Modeles) {
           schoolId: instance.school_id,
           enseignant: c.get("compte").nom,
           proprietaireId: c.get("compte").id,
+          par: c.get("compte"),
           // Sans le choix des lecteurs, la ressource va aux élèves et sert aux réponses.
           audience: audience(b.audience ?? "eleves"),
           reponses: b.audience === undefined || Boolean(b.reponses),
-          liens: b.cours !== undefined ? Domaines.liensFormulaire(b) : undefined,
+          liens: b.cours !== undefined
+            ? Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b))
+            : undefined,
         });
       } catch (e) {
         return refus({ domaine: (e as Error).message });
@@ -496,7 +581,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           c,
           "Déposer",
           Prof.depot({
-            ...optionsDepot(champs),
+            ...optionsDepot(c, champs),
             ok:
               `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
           }),
@@ -525,7 +610,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     return {
       source,
       modifiable: peutModifier(db, compte, id),
-      catalogue: Domaines.catalogue(db),
+      catalogue: Domaines.catalogueDe(db, compte),
       affiliations: db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
         .all(id) as Domaines.Affiliation[],
       meta: JSON.parse(source.metadonnees),
@@ -586,7 +671,11 @@ export function creerApp(db: Db, modeles: Modeles) {
     try {
       transaction(db, () => {
         if (b.affiliations_presentes) {
-          Domaines.affiliations(db, d.source.id, Domaines.liensFormulaire(b));
+          Domaines.affiliations(
+            db,
+            d.source.id,
+            Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b), d.source.id),
+          );
         } else if (sequence !== d.meta.sequence) {
           Domaines.rangerLegacy(
             db,
@@ -594,6 +683,7 @@ export function creerApp(db: Db, modeles: Modeles) {
             db.prepare("SELECT matiere_id FROM sources WHERE id = ?").get(d.source.id)!
               .matiere_id as string | null,
             sequence,
+            c.get("compte"),
           );
         }
         db.prepare(
@@ -630,8 +720,11 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   // La file ne propose que les images des sources que le compte peut relire.
   const FILE = `i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
-    AND (? OR s.proprietaire_id = ?)`;
-  const file = (c: Context<Env>) => [instance.school_id, lu(c).administrateur ? 1 : 0, lu(c).id];
+    AND ${filtreModification()}`;
+  const file = (c: Context<Env>) => [
+    instance.school_id,
+    ...parametresModification(c.get("compte")),
+  ];
   const aLegender = (c: Context<Env>, imageId?: string) => {
     const restantes = db.prepare(
       `SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`,
@@ -695,8 +788,9 @@ export function creerApp(db: Db, modeles: Modeles) {
     const chapitres: Eleve.ChapitreVue[] = [];
     const rattachements = db.prepare(
       `SELECT sc.*, c.nom AS cours, t.nom AS theme FROM source_cours sc
-      JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id`,
-    ).all();
+      JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id
+      WHERE ${Domaines.MES_COURS}`,
+    ).all(...Domaines.mesCours(lu(c)));
     for (const r of visibles) {
       const liens = rattachements.filter((l) => l.source_id === r.id);
       for (const lien of liens.length ? liens : [undefined]) {
@@ -727,14 +821,15 @@ export function creerApp(db: Db, modeles: Modeles) {
         theme_id: ch.themeId ?? "",
       });
       ch.questions = ch.coursId
-        ? suggestionsDuPerimetre(db, ids)
-        : suggestionsParChapitre(db).get(ch.nom) ?? [];
+        ? suggestionsDuPerimetre(db, lu(c), ids)
+        : suggestionsParChapitre(db, lu(c)).get(ch.nom) ?? [];
     }
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db, lu(c));
     const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", "", c.req.query("vue"));
     const generique = visibles.every((r) => r.profil === "general") ||
       Object.values(scope(c)).some(Boolean);
+    const mention = mentionLecteurs(c);
     if (generique) {
       return c.html(rendre(
         c,
@@ -744,6 +839,7 @@ export function creerApp(db: Db, modeles: Modeles) {
             ${DomaineVue.champsScope(scope(c))}
             <label for="texte">Une question dans ce périmètre ?</label>
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
+            ${mention ? html`<small>${mention}</small>` : ""}
           </form>
           <ul class="${c.req.query("vue") === "grille" ? "tuiles" : ""}">${
           visibles.map((r) =>
@@ -763,7 +859,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     const oeuvres = visibles.filter((s) =>
       s.image_id && !/vid[ée]o|\d+ ?mn\b/i.test(`${s.titre} ${s.seance}`)
     );
-    const fait = faitAuHasard(db);
+    const fait = faitAuHasard(db, lu(c));
     const oeuvre = (!fait || Math.random() < 0.5) && oeuvres.length
       ? oeuvres[Math.floor(Math.random() * oeuvres.length)]
       : undefined;
@@ -778,6 +874,7 @@ export function creerApp(db: Db, modeles: Modeles) {
             oeuvre ? undefined : fait,
             oeuvre,
             lireInstance(db).mode === "personal",
+            mention,
           )
         }`,
         "accueil",
@@ -824,12 +921,14 @@ export function creerApp(db: Db, modeles: Modeles) {
           themeId
             ? suggestionsDuPerimetre(
               db,
+              lu(c),
               Domaines.sourcesPerimetre(db, { matiere_id: "", cours_id: "", theme_id: themeId }),
             )
-            : suggestionsParChapitre(db).get(nom) ?? [],
+            : suggestionsParChapitre(db, lu(c)).get(nom) ?? [],
           apercu(doc.id, lu(c)),
           themeId,
           theme ? `${matiere?.nom} / ${cours?.nom} / ${nom}` : "",
+          mentionLecteurs(c),
         ),
       ),
     );
@@ -977,7 +1076,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         return { ...m, etat: r.etat, resultat: JSON.stringify(r) };
       });
 
-  const ideesPour = (r: Resultat, question = "", messageId = "") => {
+  const ideesPour = (l: Lecteur, r: Resultat, question = "", messageId = "") => {
     const m = messageId
       ? db.prepare("SELECT matiere_id, cours_id, theme_id FROM messages WHERE id = ?").get(
         messageId,
@@ -986,6 +1085,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     if (m && Object.values(m).some(Boolean)) {
       return suggestionsDuPerimetre(
         db,
+        l,
         Domaines.sourcesPerimetre(db, Domaines.lireScope(m)),
         question,
       );
@@ -997,7 +1097,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          FROM messages m LEFT JOIN sources s ON s.id = json_extract(m.journal, '$.candidats[0].source_id')
          WHERE m.id = ?`,
       ).get(messageId) as { nom: string } | undefined;
-      return m?.nom ? (suggestionsParChapitre(db).get(m.nom) ?? []).slice(0, 3) : [];
+      return m?.nom ? (suggestionsParChapitre(db, l).get(m.nom) ?? []).slice(0, 3) : [];
     }
     if (r.etat !== "answered") return [];
     const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
@@ -1006,14 +1106,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       `SELECT sg.question FROM suggestions sg JOIN sources s ON s.id = sg.source_id
        WHERE sg.source_id IN (${ids.map(() => "?").join(",")}) AND s.statut = 'certifiee'
          AND s.school_id = ? AND sg.question != ? AND s.audience = 'eleves' AND s.reponses = 1
+         AND ${FILTRE_ACCES}
        ORDER BY random() LIMIT 3`,
-    ).all(...ids, instance.school_id, question).map((x) => x.question as string);
+    ).all(...ids, instance.school_id, question, ...parametresAcces(l)).map((x) =>
+      x.question as string
+    );
     if (memesSources.length) return memesSources;
     const chapitre = db.prepare(
       "SELECT json_extract(metadonnees, '$.sequence') AS nom FROM sources WHERE id = ? AND school_id = ?",
     ).get(ids[0], instance.school_id)?.nom as string | undefined;
     return chapitre
-      ? (suggestionsParChapitre(db).get(chapitre) ?? []).filter((q) => q !== question)
+      ? (suggestionsParChapitre(db, l).get(chapitre) ?? []).filter((q) => q !== question)
       : [];
   };
 
@@ -1023,13 +1126,13 @@ export function creerApp(db: Db, modeles: Modeles) {
       const messages = messagesDe(c.get("compte"));
       const dernier = [...messages].reverse().find((m) => m.resultat);
       const idees = dernier
-        ? ideesPour(JSON.parse(dernier.resultat!), dernier.question, dernier.id)
+        ? ideesPour(lu(c), JSON.parse(dernier.resultat!), dernier.question, dernier.id)
         : [];
       return c.html(
         rendre(
           c,
           "Question",
-          Eleve.chat(messages, idees, lireInstance(db).mode === "personal"),
+          Eleve.chat(messages, idees, lireInstance(db).mode === "personal", mentionLecteurs(c)),
           "page-chat",
         ),
       );
@@ -1050,6 +1153,15 @@ export function creerApp(db: Db, modeles: Modeles) {
         disponibles.has(s.id as string)
       );
       if (!visible) return c.text("Périmètre indisponible.", 400);
+      // Un élève ne pose une question dans un cours que s'il en est membre.
+      const coursId = p.cours_id ||
+        String(
+          db.prepare("SELECT cours_id FROM themes WHERE id = ?").get(p.theme_id)?.cours_id ?? "",
+        );
+      if (
+        (p.cours_id || p.theme_id) && !lu(c).administrateur &&
+        !Domaines.coursDuCompte(db, lu(c).id).has(coursId)
+      ) return c.text("Périmètre indisponible.", 400);
     }
     if (
       chapitre && !db.prepare(
@@ -1173,7 +1285,9 @@ export function creerApp(db: Db, modeles: Modeles) {
           const r = resultatActuel(m.resultat, lecteur(compte));
           await flux.writeSSE({
             event: "reponse",
-            data: String(await Eleve.reponse(id, r, null, ideesPour(r, m.question, id), true))
+            data: String(
+              await Eleve.reponse(id, r, null, ideesPour(lecteur(compte), r, m.question, id), true),
+            )
               .replace(
                 /\n/g,
                 " ",

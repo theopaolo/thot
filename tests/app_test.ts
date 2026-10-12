@@ -28,6 +28,7 @@ import {
   suggestionsParChapitre,
 } from "../src/app/suggestions.ts";
 import { config } from "../src/app/config.ts";
+import { cours, matiere } from "../src/app/domaines.ts";
 import { reponse } from "../src/app/vues/eleve.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
@@ -56,6 +57,8 @@ const formulaire = (
 };
 
 const enc = (s: string) => new TextEncoder().encode(s);
+/** Un administrateur : ces tests portent sur la sélection, pas sur les cours du lecteur. */
+const ELEVE = { id: "", enseignant: false, administrateur: true };
 
 // Une page HTML suffit à exercer extraction, légende, certification et recherche sans pdftotext.
 const PAGE = enc(`<html><head><title>t</title></head><body><h1>Casa Batlló, Antoni Gaudí</h1>
@@ -197,16 +200,25 @@ Deno.test("une source non certifiée n'apparaît sur aucune route élève ni dan
   assert(!(await (await requete("/eleve")).text()).includes("Art nouveau, panorama"));
   assertEquals((await requete(`/eleve/sources/${id}`)).status, 404);
   assertEquals((await requete(`/media/${id}-0`)).status, 404);
-  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+  assertEquals(
+    chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+    0,
+  );
 
   statuer(db, id, "certifiee", "test");
   assertStringIncludes(await (await requete("/eleve")).text(), "Art nouveau, panorama");
   assertEquals((await requete(`/eleve/sources/${id}`)).status, 200);
-  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 1);
+  assertEquals(
+    chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+    1,
+  );
 
   statuer(db, id, "rejetee", "test");
   assertEquals((await requete(`/eleve/sources/${id}`)).status, 404);
-  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+  assertEquals(
+    chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+    0,
+  );
 });
 
 Deno.test("une génération en cours conserve les légendes relues par un enseignant", async () => {
@@ -260,11 +272,17 @@ Deno.test("une certification prématurée ne publie rien après le passage du wo
     }
     db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
     await traiter(db, revendiquer(db)!, fauxModeles().modeles);
-    assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+    assertEquals(
+      chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+      0,
+    );
     const eleve = await session(db, fauxModeles().modeles, "eleve");
     assertEquals((await eleve.requete(`/eleve/sources/${id}`)).status, 404);
     statuer(db, id, "certifiee", "Prof");
-    assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 1);
+    assertEquals(
+      chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+      1,
+    );
   } finally {
     db.close();
     await Deno.remove(dir, { recursive: true });
@@ -357,8 +375,11 @@ Deno.test("sans public Élèves, une source certifiée reste invisible aux élè
     })).status,
     400,
   );
-  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
-  assertEquals(faitAuHasard(db), undefined);
+  assertEquals(
+    chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+    0,
+  );
+  assertEquals(faitAuHasard(db, ELEVE), undefined);
   assertEquals(sourceSansSuggestions(db), undefined);
 });
 
@@ -371,14 +392,17 @@ Deno.test("sans public Thot, une source reste lisible mais ne sert pas aux répo
   assertStringIncludes(await (await requete("/eleve")).text(), CHAMPS.titre);
   assertEquals((await requete(`/eleve/sources/${id}`)).status, 200);
   assertEquals((await requete(`/media/${id}-0`)).status, 200);
-  assertEquals(chercherFts(db, "Casa Batlló façade", { schoolId: "pilote" }).length, 0);
+  assertEquals(
+    chercherFts(db, "Casa Batlló façade", { lecteur: null, schoolId: "pilote" }).length,
+    0,
+  );
   assertEquals(sourceSansSuggestions(db), undefined);
   assertEquals(
     (await demander(
       db,
       fauxModeles().modeles,
       "Pourquoi Gaudí refuse la ligne droite ?",
-      { schoolId: "pilote" },
+      { lecteur: null, schoolId: "pilote" },
       0.023,
     )).resultat.etat,
     "out_of_corpus",
@@ -390,15 +414,18 @@ Deno.test("une légende non relue aide la recherche mais n'atteint jamais le gé
   const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.");
   statuer(db, id, "certifiee", "test");
   // Le mot n'est que dans la légende: la recherche le trouve grâce à elle.
-  assertEquals(chercherFts(db, "dragon turquoise", { schoolId: "pilote" }).length, 1);
+  assertEquals(
+    chercherFts(db, "dragon turquoise", { lecteur: null, schoolId: "pilote" }).length,
+    1,
+  );
 
   const f = fauxModeles({ sorties: ['{"refus": true}'] });
-  await demander(db, f.modeles, "dragon turquoise", { schoolId: "pilote" }, 0.023);
+  await demander(db, f.modeles, "dragon turquoise", { lecteur: null, schoolId: "pilote" }, 0.023);
   assert(!JSON.stringify(f.vus).includes("Carapace"), "légende non relue envoyée au générateur");
 
   relireLegende(db, `${id}-0`, "certified", "", "test");
   const g = fauxModeles({ sorties: ['{"refus": true}'] });
-  await demander(db, g.modeles, "dragon turquoise", { schoolId: "pilote" }, 0.023);
+  await demander(db, g.modeles, "dragon turquoise", { lecteur: null, schoolId: "pilote" }, 0.023);
   assertStringIncludes(JSON.stringify(g.vus), "Image : Carapace de dragon");
 });
 
@@ -425,7 +452,7 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
   const q = "Pourquoi la façade de la Casa Batlló n'a pas de ligne droite ?";
-  const p = { schoolId: "pilote" };
+  const p = { lecteur: null, schoolId: "pilote" };
 
   const bonne = JSON.stringify({
     affirmations: [{
@@ -623,23 +650,28 @@ Deno.test("une question proposée n'est gardée que si Thot y répond avec une c
     db.prepare("SELECT question FROM suggestions").all().map((l) => l.question),
     ["Pourquoi Gaudí refuse-t-il la ligne droite ?"],
   );
-  assertEquals([...suggestionsParChapitre(db).values()].flat().length, 1);
+  assertEquals([...suggestionsParChapitre(db, ELEVE).values()].flat().length, 1);
   statuer(db, id, "rejetee", "test");
-  assertEquals(suggestionsParChapitre(db).size, 0, "une source rejetée ne propose plus rien");
+  assertEquals(
+    suggestionsParChapitre(db, ELEVE).size,
+    0,
+    "une source rejetée ne propose plus rien",
+  );
 });
 
 Deno.test("le saviez-vous recopie une phrase certifiée et pointe sa position exacte", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
-  assertEquals(faitAuHasard(db), undefined, "rien tant que la source n'est pas certifiée");
+  assertEquals(faitAuHasard(db, ELEVE), undefined, "rien tant que la source n'est pas certifiée");
   statuer(db, id, "certifiee", "test");
-  const fait = faitAuHasard(db)!;
+  const fait = faitAuHasard(db, ELEVE)!;
   const texte = await Deno.readTextFile(`${config.donnees}/content/${id}/document.txt`);
   assertEquals(Array.from(texte).slice(fait.debut, fait.fin).join(""), fait.phrase);
 });
 
 Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la session", async () => {
   const { db } = await environnement();
+  const coursId = cours(db, matiere(db, "Design"), "Design graphique");
   assertEquals(lireListe('identifiant;nom\r\nlea;"Léa, Martin"\r\n'), [{
     identifiant: "lea",
     nom: "Léa, Martin",
@@ -651,6 +683,7 @@ Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la s
     "fichier",
     new File(["identifiant,nom\nlea,Léa Martin\nnoe,Noé Petit\n"], "classe.csv"),
   );
+  fichier.append("cours", coursId);
   const reponse = await requete("/prof/eleves/importer", { method: "POST", body: fichier });
   assertEquals(reponse.status, 200);
   assertEquals(reponse.headers.get("cache-control"), "no-store");
@@ -797,7 +830,8 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
     "une panne sans résultat enregistré reste relançable",
   );
   assertEquals(
-    chercherFts(db, "Gaudí", { schoolId: "pilote", chapitre: "Chapitre absent" }).length,
+    chercherFts(db, "Gaudí", { lecteur: null, schoolId: "pilote", chapitre: "Chapitre absent" })
+      .length,
     0,
   );
 });
@@ -865,7 +899,8 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
   });
   assertEquals(r.status, 303);
   assertStringIncludes(
-    chercherFts(db, "corrigée", { schoolId: "pilote", chapitre: "Architecture" })[0].titre,
+    chercherFts(db, "corrigée", { lecteur: null, schoolId: "pilote", chapitre: "Architecture" })[0]
+      .titre,
     "corrigée",
   );
   relireLegende(db, `${id}-0`, "certified", "", "test");
@@ -880,7 +915,7 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
     db,
     fauxModeles({ sorties: [bonne] }).modeles,
     "balcons masques",
-    { schoolId: "pilote" },
+    { lecteur: null, schoolId: "pilote" },
     0.023,
   );
   assertEquals(resultat.etat, "answered");
@@ -896,7 +931,7 @@ Deno.test("titre édité réindexé, image certifiée liée à la réponse et me
     db,
     fauxModeles({ sorties: [texteCite] }).modeles,
     "ligne droite",
-    { schoolId: "pilote" },
+    { lecteur: null, schoolId: "pilote" },
     0.023,
   );
   assertEquals(texteResultat.resultat.etat, "answered");
@@ -1134,7 +1169,10 @@ Deno.test("une sortie vide du reclasseur reste une panne de fournisseur", async 
     statuer(db, id, "certifiee", "Prof");
     globalThis.fetch = () => Promise.resolve(Response.json({ results: [] }));
     const modeles = openrouter({ ...config.modeles, cle: "test" });
-    const { resultat } = await demander(db, modeles, "ligne droite", { schoolId: "pilote" }, 0.023);
+    const { resultat } = await demander(db, modeles, "ligne droite", {
+      lecteur: null,
+      schoolId: "pilote",
+    }, 0.023);
     assertEquals(resultat.etat, "failed");
     if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_INVALID_RESPONSE");
   } finally {
@@ -1295,7 +1333,10 @@ Deno.test("le délai du juge annule son signal avant de laisser passer la citati
           non(signal!.reason);
         }, { once: true });
       });
-    const r = await demander(db, fake.modeles, "ligne droite", { schoolId: "pilote" }, 0.023);
+    const r = await demander(db, fake.modeles, "ligne droite", {
+      lecteur: null,
+      schoolId: "pilote",
+    }, 0.023);
     assertEquals(r.resultat.etat, "answered");
     assertEquals(annule, true);
     assertStringIncludes(String(r.journal.juge_indisponible), "délai");

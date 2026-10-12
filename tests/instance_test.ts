@@ -47,7 +47,12 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
     cacheModeles(db).ecrire("commun", "pilote");
     db.exec(`INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le)
       SELECT 'historique', id, 'Question du pilote', 'out_of_corpus', 'fixture', 'fixture' FROM comptes`);
-    assertEquals(migrer(db), ["0006_instance.sql", "0007_domaines.sql", "0008_acces.sql"]);
+    assertEquals(migrer(db), [
+      "0006_instance.sql",
+      "0007_domaines.sql",
+      "0008_acces.sql",
+      "0009_membres.sql",
+    ]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
     assertEquals(instance.mode, "shared");
@@ -215,6 +220,8 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
       });
       await traiter(db, revendiquer(db)!, fauxModeles().modeles);
       statuer(db, source_id, "certifiee", "Prof");
+      // L'import crée le cours « Arts appliqués » : l'opérateur y inscrit le compte.
+      db.exec("INSERT INTO membres_cours SELECT id, 'compte-commun' FROM cours");
       cacheModeles(db).ecrire("cle-commune", nom);
       const id = lireInstance(db).id;
       return { dir, mdp, source_id, id };

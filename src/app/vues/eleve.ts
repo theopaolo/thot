@@ -64,6 +64,7 @@ export const accueilEleve = (
   fait?: FaitVue,
   oeuvre?: SourceChapitre,
   personnel = false,
+  mention = "",
 ) =>
   html`
     <h1>Bonjour ${prenom}</h1>
@@ -74,6 +75,7 @@ export const accueilEleve = (
           placeholder="Pose ta question sur les ressources">
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
+      ${mention ? html`<small>${mention}</small>` : ""}
     </form>
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
@@ -359,7 +361,9 @@ export const pageChapitre = (
   choisi?: Apercu,
   themeId?: string,
   perimetre = "",
+  mention = "",
 ) => {
+  const quiLit = mention ? html`<small>${mention}</small>` : "";
   if (sources.every((s) => s.profil === "general")) {
     return html`
       <p><a href="/eleve">Ressources</a></p><h1>${nom ||
@@ -368,7 +372,7 @@ export const pageChapitre = (
         class="question-rapide"><label for="texte">Une question sur ce thème ?</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${themeId ??
           ""}"><input type="hidden" name="chapitre" value="${themeId
           ? ""
-          : nom}"><button>Demander</button></div></form>
+          : nom}"><button>Demander</button></div>${quiLit}</form>
           <ul>${sources.map((s) =>
             html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`
           )}</ul>${questions.length
@@ -395,6 +399,7 @@ export const pageChapitre = (
           : html`<input type="hidden" name="chapitre" value="${nom}">`}
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
+      ${quiLit}
     </form>
     ${questions.length
       ? html`<div class="idees">${
@@ -710,6 +715,7 @@ export const chat = (
   messages: MessageVue[],
   idees: string[] = [],
   personnel = false,
+  mention = "",
 ) => {
   const derniere = messages.findLastIndex((m) => m.etat === "answered");
   return html`
@@ -756,7 +762,7 @@ export const chat = (
           </div>
           <small>${personnel
             ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
-            : "Thot répond seulement avec les documents publiés par tes enseignants."}</small>
+            : "Thot répond seulement avec les documents publiés par tes enseignants."} ${mention}</small>
         </form>
       </section>
       <div class="colonne-source">${panneauSource()}</div>

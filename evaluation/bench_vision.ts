@@ -146,7 +146,7 @@ async function evaluer(modele: string) {
     const modeles = openrouter(config.modeles); // même reclasseur que la production, sans cache
     for (const r of requetes) {
       const attendus = r.gold.flatMap(cible);
-      const trouves = (await chercher(db, modeles, r.q, { schoolId: config.schoolId }, config.seuil)).retenus;
+      const trouves = (await chercher(db, modeles, r.q, { lecteur: null, schoolId: config.schoolId }, config.seuil)).retenus;
       const rang = trouves.findIndex((c) => attendus.some((a) =>
         a.source === c.source_id && (!a.rubrique || c.titre.endsWith(`: ${a.rubrique}`))
       )) + 1;

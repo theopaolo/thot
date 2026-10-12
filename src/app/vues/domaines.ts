@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import { CHAMPS, type Profil, PROFILS } from "../../core/profils.ts";
-import type { Affiliation, Catalogue, Scope } from "../domaines.ts";
+import type { Affiliation, Catalogue, Cours, Scope } from "../domaines.ts";
 
 const options = (liste: { id: string; nom: string }[], valeur = "") =>
   liste.map((m) =>
@@ -25,7 +25,68 @@ const ligne = (genre: keyof typeof LIBELLES, id: string, nom: string, contexte =
     </form>
   `;
 };
-export const gestion = (cat: Catalogue, erreur = "", figee = false) => {
+export type Inscrit = { id: string; identifiant: string; nom: string; role: string };
+export type Inscriptions = { membres: Map<string, Inscrit[]>; comptes: Inscrit[]; ouvert: string };
+const ROLES: Record<string, string> = { enseignant: "enseignant", eleve: "élève" };
+const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouvert: boolean) => {
+  const dehors = comptes.filter((a) => !inscrits.some((m) => m.id === a.id));
+  const groupe = (role: string, libelle: string) => {
+    const liste = dehors.filter((a) => a.role === role);
+    return liste.length
+      ? html`<optgroup label="${libelle}">${
+        liste.map((a) => html`<option value="${a.id}">${a.nom} (${a.identifiant})</option>`)
+      }</optgroup>`
+      : "";
+  };
+  return html`
+    <details id="membres-${c.id}" ${ouvert ? "open" : ""}>
+      <summary>Membres : ${inscrits.length}</summary>
+      ${inscrits.length
+        ? html`
+          <table>
+            <tbody>${inscrits.map((m) =>
+              html`
+                <tr>
+                  <td>${m.nom} <span class="discret">${m.identifiant}, ${ROLES[m.role]}</span></td>
+                  <td>
+                    <form method="post" action="/administration/domaines/desinscrire">
+                      <input type="hidden" name="cours_id" value="${c
+                        .id}"><input type="hidden" name="compte_id" value="${m.id}">
+                      <button aria-label="Retirer ${m.nom} de ${c.nom}">Retirer</button>
+                    </form>
+                  </td>
+                </tr>
+              `
+            )}</tbody>
+          </table>
+        `
+        : html`<p class="discret">Aucun membre.</p>`}
+      ${dehors.length
+        ? html`
+          <form method="post" action="/administration/domaines/inscrire" class="barre">
+            <input type="hidden" name="cours_id" value="${c.id}">
+            <select name="compte_id" required aria-label="Compte à ajouter à ${c.nom}">
+              <option value="">Ajouter un compte</option>${groupe(
+                "enseignant",
+                "Enseignants",
+              )}${groupe(
+                "eleve",
+                "Élèves",
+              )}
+            </select>
+            <button>Ajouter</button>
+          </form>
+        `
+        : ""}
+    </details>
+  `;
+};
+export const gestion = (
+  cat: Catalogue,
+  erreur: string,
+  figee: boolean,
+  inscriptions: Inscriptions,
+) => {
   const profil = cat.matieres[0]?.profil;
   const controleProfil = !profil
     ? ""
@@ -52,15 +113,26 @@ export const gestion = (cat: Catalogue, erreur = "", figee = false) => {
       class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${profil
         ? ""
         : selectionProfil()}<button>Créer la matière</button></form>
-    <h2>Cours</h2>${cat.cours.map((c) =>
-      ligne(
-        "cours",
-        c.id,
-        c.nom,
-        `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${c.public ? `, ${c.public}` : ""}${
-          c.objectif ? ` : ${c.objectif}` : ""
-        }`,
-      )
+    <h2>Cours</h2>
+    <p>Un nouveau cours démarre sans membre, et seuls ses membres, les administrateurs et les
+    propriétaires lisent les ressources qu'il partage.</p>${cat.cours.map((c) =>
+      html`${
+        ligne(
+          "cours",
+          c.id,
+          c.nom,
+          `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${
+            c.public ? `, ${c.public}` : ""
+          }${c.objectif ? ` : ${c.objectif}` : ""}`,
+        )
+      }${
+        membresDuCours(
+          c,
+          inscriptions.membres.get(c.id) ?? [],
+          inscriptions.comptes,
+          inscriptions.ouvert === c.id,
+        )
+      }`
     )}
     <form method="post" action="/administration/domaines/cours"
       class="etroit"><label>Matière <select name="matiere_id" required>${options(
@@ -140,7 +212,7 @@ export const choixMatiere = (cat: Catalogue, id = "") =>
       )}</select></label><button>Choisir les champs</button></form>
   `;
 export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
-  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Le rattachement ne change pas les lecteurs de la ressource.</p>${
+  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${
     cat.cours.map((c) =>
       html`
         <div

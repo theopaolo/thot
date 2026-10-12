@@ -43,11 +43,19 @@ export function fauxModeles(
 
 export const ORIGINE = "http://localhost";
 
-/** Une application et un cookie de session pour le rôle demandé. */
-export async function session(db: Db, modeles: Modeles, role: Role) {
+/**
+ * Une application et un cookie de session pour le rôle demandé. Le compte rejoint les cours
+ * existants, comme la migration 0009 l'a fait pour les comptes du pilote, sauf `inscrit: false`.
+ */
+export async function session(db: Db, modeles: Modeles, role: Role, inscrit = true) {
   const app = creerApp(db, modeles);
   const identifiant = `${role}-${crypto.randomUUID().slice(0, 6)}`;
   const mot_de_passe = await creerCompte(db, identifiant, `Compte ${role}`, role);
+  if (inscrit) {
+    db.prepare(
+      "INSERT INTO membres_cours SELECT c.id, a.id FROM cours c, comptes a WHERE a.identifiant = ?",
+    ).run(identifiant);
+  }
   const r = await app.request("/connexion", {
     method: "POST",
     headers: { origin: ORIGINE },

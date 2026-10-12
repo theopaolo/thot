@@ -35,19 +35,29 @@ export type Perimetre = {
   sourceId?: string;
   /** recherche de la bibliothèque: toute source lisible, même hors des preuves de réponse */
   bibliotheque?: boolean;
-  /** absent: le périmètre d'un élève */
-  lecteur?: Lecteur;
+  /** null : vue système des sources publiées, tous cours confondus */
+  lecteur: Lecteur | null;
 };
 
 export type Lecteur = { id: string; enseignant: boolean; administrateur: boolean };
-/** Sources lisibles par le lecteur. Un administrateur lit tout, un enseignant ce que ses
- * collègues partagent, chacun ses propres sources. */
-export const FILTRE_ACCES = `(s.audience = 'eleves' OR ? OR s.proprietaire_id = ?
-  OR (? AND s.audience = 'collegues'))`;
-export const parametresAcces = (l?: Lecteur) => [
+/**
+ * Sources lisibles par le lecteur. Un administrateur lit tout, chacun ses propres sources. Une
+ * source partagée ou publiée se lit par les membres de ses cours, ou par tous si elle n'a pas de
+ * cours. Avec un lecteur null, le système voit ce qui est publié aux élèves, tous cours confondus.
+ */
+export const filtreAcces = (s = "s") =>
+  `(? OR ${s}.proprietaire_id = ?
+  OR ((${s}.audience = 'eleves' OR (? AND ${s}.audience = 'collegues'))
+    AND (? OR NOT EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = ${s}.id)
+      OR EXISTS (SELECT 1 FROM source_cours sc JOIN membres_cours mc ON mc.cours_id = sc.cours_id
+        WHERE sc.source_id = ${s}.id AND mc.compte_id = ?))))`;
+export const FILTRE_ACCES = filtreAcces();
+export const parametresAcces = (l: Lecteur | null) => [
   l?.administrateur ? 1 : 0,
   l?.id ?? "",
   l?.enseignant ? 1 : 0,
+  l ? 0 : 1,
+  l?.id ?? "",
 ];
 
 export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')

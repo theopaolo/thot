@@ -71,8 +71,11 @@ l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
 
 Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
-Son propriétaire, sa certification et ses lecteurs restent ceux de la source. Un rattachement ne
-publie rien.
+Son propriétaire, sa certification et ses lecteurs restent ceux de la source. Un rattachement
+ouvre la source aux membres du cours, dans la limite de ses lecteurs. Un enseignant ne rattache
+qu'à ses cours. Tout compte, administrateur compris, garde au moins un cours sur une source déjà
+rattachée : sans cours, toute l'instance la lirait. Un dépôt sans cours coché se range dans le
+premier cours de sa matière dont le déposant est membre. Sans un tel cours, il reste non classé.
 
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
 neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
@@ -96,11 +99,27 @@ une source dans une réponse seulement si la case « Thot s'en sert pour répond
 source peut se lire sans servir de preuve. La recherche de la bibliothèque montre toute source
 certifiée lisible.
 
+Les membres d'un cours sont ses enseignants et ses élèves. Une source partagée avec les enseignants
+se lit par les enseignants membres de ses cours, une source publiée aux élèves par tous leurs
+membres. Une source sans cours garde l'audience de toute l'instance. Le propriétaire et les
+administrateurs lisent sans être membres.
+
 `FILTRE_ACCES` dans `src/core/recherche.ts` porte cette règle. La recherche, les pages de lecture,
 les images, les filtres de cours et la relecture des réponses l'appliquent avec le compte qui lit.
-Seuls le propriétaire et les administrateurs modifient une source, la certifient ou relisent ses
-légendes. Les questions suggérées restent celles des sources publiées aux élèves. Une image se
-revalide à chaque affichage : un accès retiré s'applique aussitôt.
+Retirer un membre retire l'accès à la prochaine requête, y compris à la revalidation des preuves
+d'une ancienne réponse. Un appel avec `lecteur: null`, comme la génération de suggestions par le
+worker ou les évaluations en ligne de commande, voit les sources publiées aux élèves de tous les
+cours.
+
+Le propriétaire et les administrateurs modifient une source, la certifient et relisent ses
+légendes. Les enseignants de ses cours le font aussi quand elle n'est pas privée. Les questions
+suggérées et le fait de l'accueil suivent le lecteur. Un cours ne se nomme qu'à ses membres, et un
+élève ne pose une question dans un cours que s'il en est membre. `/prof/questions` montre à un
+enseignant les échanges de ses cours. Un échange sans cours va aux enseignants qui partagent un
+cours avec l'élève, ou à tous s'il n'en a aucun. Un enseignant ne voit et ne réinitialise que les
+élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Les
+administrateurs lisent tout. Une image se revalide à chaque affichage : un accès retiré s'applique
+aussitôt.
 
 Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
 enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.

@@ -102,7 +102,12 @@ profil, qui détermine les champs et traitements des dépôts.
 
 **Cours**
 Collection de ressources, avec un public et un objectif facultatifs. Une ressource peut appartenir
-à plusieurs cours. Ce rattachement ne change pas ses lecteurs.
+à plusieurs cours. Les membres de ces cours la lisent, dans la limite de ses lecteurs.
+
+**Membre d'un cours**
+Enseignant ou élève inscrit à un cours. Un membre lit les ressources que le cours partage ou
+publie. L'administrateur inscrit et retire les membres, et un enseignant inscrit les élèves qu'il
+importe à ses propres cours.
 
 **Thème**
 Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents

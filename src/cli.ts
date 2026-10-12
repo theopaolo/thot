@@ -36,7 +36,7 @@ const AIDE = `thot <commande>
   compte <identifiant> <nom> <enseignant|eleve>
                                             crée un compte et affiche son mot de passe
   reinitialiser <identifiant>               renouvelle le mot de passe enseignant
-  domaines                                 affiche les identifiants du catalogue
+  domaines                                 affiche le catalogue et le nombre de membres par cours
   matiere <nom> [--profil=general|arts-appliques]
   profil <general|arts-appliques>           change le profil de toutes les matières,
                                             refusé si une ressource a un autre profil
@@ -47,7 +47,9 @@ const AIDE = `thot <commande>
   supprimer <matiere|cours|theme> <id>      refusé si une ressource ou une question l'utilise,
                                             emporte les cours et thèmes d'une matière
   rattacher <source_id> <cours_id> [--theme-id=...]
-                                            ajoute un rattachement sans changer ses lecteurs
+                                            ajoute un rattachement : les membres du cours la lisent
+  membre <cours_id> <identifiant>           inscrit un compte à un cours
+  retirer-membre <cours_id> <identifiant>   retire un compte d'un cours
   ingest <dossier|fichier> [--matiere-id=...] [--cours-id=...] [--theme-id=...]
          [--matiere=arts-appliques] [--classe=...] [--type=cours] [--langue=fr]
          [--auteur=...] [--version=...] [--juridiction=...]
@@ -326,8 +328,14 @@ async function evalRecherche() {
   for (const r of requetes) {
     const attendus = r.gold.flatMap(cibles);
     const trouves = args["sans-reclasseur"]
-      ? chercherFts(db, r.q, { schoolId: lireInstance(db).school_id }).slice(0, 5)
-      : (await chercher(db, modeles, r.q, { schoolId: lireInstance(db).school_id }, config.seuil))
+      ? chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(0, 5)
+      : (await chercher(
+        db,
+        modeles,
+        r.q,
+        { lecteur: null, schoolId: lireInstance(db).school_id },
+        config.seuil,
+      ))
         .retenus;
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({
@@ -381,7 +389,7 @@ async function evalGeneration() {
         s,
       ) => [s.id, plier(`${s.sequence} ${s.fichier}`)]),
   );
-  const p = { schoolId: lireInstance(db).school_id };
+  const p = { lecteur: null, schoolId: lireInstance(db).school_id };
   const paires: Paire[] = [];
   const lignes: {
     qid: string;
@@ -567,9 +575,18 @@ async function evalSoutien() {
 }
 
 switch (commande) {
-  case "domaines":
-    console.log(JSON.stringify(Domaines.catalogue(db), null, 2));
+  case "domaines": {
+    const cat = Domaines.catalogue(db);
+    console.log(JSON.stringify(
+      {
+        ...cat,
+        cours: cat.cours.map((c) => ({ ...c, membres: Domaines.membres(db, c.id).length })),
+      },
+      null,
+      2,
+    ));
     break;
+  }
   case "matiere":
     console.log(Domaines.matiere(db, reste.join(" "), args.profil));
     break;
@@ -600,6 +617,23 @@ switch (commande) {
         theme_id: args["theme-id"] ?? null,
       }]);
     });
+    break;
+  }
+  case "membre":
+  case "retirer-membre": {
+    const [coursId, identifiant] = reste;
+    if (!coursId || !identifiant || reste.length !== 2) {
+      console.error(`usage: thot ${commande} <cours_id> <identifiant>`);
+      Deno.exit(2);
+    }
+    const compte = db.prepare("SELECT id FROM comptes WHERE identifiant = ?")
+      .get(identifiant.trim().toLowerCase());
+    if (!compte) {
+      console.error(`Compte introuvable : ${identifiant}`);
+      Deno.exit(1);
+    }
+    if (commande === "membre") Domaines.inscrire(db, coursId, compte.id as string);
+    else Domaines.desinscrire(db, coursId, compte.id as string);
     break;
   }
   case "instance":
@@ -714,6 +748,7 @@ switch (commande) {
   }
   case "ask": {
     const { resultat, journal } = await demander(db, modeles, reste.join(" "), {
+      lecteur: null,
       schoolId: lireInstance(db).school_id,
       matiereId: args["matiere-id"],
       coursId: args["cours-id"],

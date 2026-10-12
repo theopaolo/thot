@@ -30,7 +30,7 @@ puis accède à leur gestion et à l’administration depuis la navigation.
 
 Depuis l’administration, configurer les matières, les cours et leurs thèmes. Le profil de
 l’instance, général ou arts appliqués, détermine les champs du dépôt. Une ressource peut
-appartenir à plusieurs cours sans changer ses lecteurs.
+appartenir à plusieurs cours : les membres de ces cours la lisent.
 
 En production, suivre le [provisionnement par instance](docs/exploitation.md).
 
