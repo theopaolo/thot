@@ -1,7 +1,7 @@
 # 0003. Unifier l'application avec Deno, Hono, `hono/html` et HTMX
 
 Date: 12/09/2026  
-Statut: accepté. Le 22/09/2026, le code SvelteKit et FastAPI est archivé avant portage, dans `archive/thot-mvp-python-sveltekit/` du dépôt de recherche. Le dépôt ne contient plus que la cible. Le 25/09/2026, le JavaScript navigateur passe en TypeScript compilé par `deno bundle`, voir Livraison.  
+Statut: accepté. Le 22/09/2026, le code SvelteKit et FastAPI est archivé avant portage, dans `archive/thot-mvp-python-sveltekit/` du dépôt de recherche. Le dépôt ne contient plus que la cible. Le 25/09/2026, le JavaScript navigateur passe en TypeScript compilé par `deno bundle`, voir Livraison. Le 12/10/2026, le runtime et l'outillage passent à Node.js et Vite+, voir [0007](0007-passer-de-deno-a-node.md).  
 Portée: application du pilote, espaces professeur et élève
 
 ## Contexte
