@@ -3,8 +3,10 @@ import type { Profil } from "./profils.ts";
 
 /** Une panne de fournisseur. Elle ne doit jamais se lire comme un refus hors corpus. */
 export class PanneModele extends Error {
-  constructor(message: string, readonly code = "MODEL_UNAVAILABLE") {
+  readonly code: string;
+  constructor(message: string, code = "MODEL_UNAVAILABLE") {
     super(message);
+    this.code = code;
   }
 }
 
@@ -180,7 +182,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         if (reponse.status === 429 || reponse.status >= 500) continue;
         throw new PanneModele(derniere);
       }
-      const json = await reponse.json().catch(() => {
+      const json: any = await reponse.json().catch(() => {
         signal?.throwIfAborted();
         throw new PanneModele("Réponse JSON du fournisseur invalide.", "MODEL_INVALID_RESPONSE");
       });
@@ -341,7 +343,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
             signal: AbortSignal.any([AbortSignal.timeout(2500), ...(signal ? [signal] : [])]),
           });
           if (r.ok) {
-            const probabilite = lireVerdict((await r.json()).choices?.[0]);
+            const probabilite = lireVerdict(((await r.json()) as any).choices?.[0]);
             if (probabilite !== undefined) {
               return { probabilite, modele: `mistral/${config.soutienMistral}` };
             }

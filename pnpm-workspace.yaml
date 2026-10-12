@@ -1,0 +1,3 @@
+# Racine pnpm du projet. Sans ce fichier, pnpm rattache le dépôt à un espace de travail parent.
+packages:
+  - "."

@@ -1,5 +1,9 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { rm, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { join } from "node:path";
 import { connexion, type Db, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { type Audience, deposer, valider } from "../src/app/depot.ts";
@@ -85,7 +89,7 @@ async function instance(modeles?: Modeles) {
   return { db, dir, a, b, eleve, admin, prive, collegues, eleves };
 }
 
-Deno.test("lecture : propriétaire, collègue, élève et administrateur", async () => {
+test("lecture : propriétaire, collègue, élève et administrateur", async () => {
   const { db, dir, a, b, eleve, admin, prive, collegues, eleves } = await instance();
   try {
     const attendu: [typeof a, string, number][] = [
@@ -170,11 +174,11 @@ Deno.test("lecture : propriétaire, collègue, élève et administrateur", async
     assertEquals(trouve(lecteur(admin.id, true)), new Set([prive, collegues, eleves]));
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("écriture : le propriétaire et les administrateurs seulement", async () => {
+test("écriture : le propriétaire et les administrateurs seulement", async () => {
   const { db, dir, a, b, admin, collegues } = await instance();
   try {
     const poster = (qui: typeof a, chemin: string, corps: Record<string, string>) =>
@@ -229,11 +233,11 @@ Deno.test("écriture : le propriétaire et les administrateurs seulement", async
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("réponses : preuves lisibles par le lecteur, retrait pendant la génération", async () => {
+test("réponses : preuves lisibles par le lecteur, retrait pendant la génération", async () => {
   const f = fauxModeles({ sorties: [BONNE, BONNE] });
   const { db, dir, b, eleve, collegues, eleves } = await instance(f.modeles);
   try {
@@ -306,11 +310,11 @@ Deno.test("réponses : preuves lisibles par le lecteur, retrait pendant la gén�
     assertEquals(db.prepare("SELECT etat FROM messages WHERE id = ?").get(mid)!.etat, "failed");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("partager une source ne partage pas les échanges de son propriétaire", async () => {
+test("partager une source ne partage pas les échanges de son propriétaire", async () => {
   const f = fauxModeles({ sorties: [BONNE] });
   const { db, dir, a, b } = await instance(f.modeles);
   try {
@@ -331,11 +335,11 @@ Deno.test("partager une source ne partage pas les échanges de son propriétaire
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("instance personnelle : le propriétaire étudie ses ressources privées", async () => {
+test("instance personnelle : le propriétaire étudie ses ressources privées", async () => {
   const { db, dir } = await environnement();
   try {
     configurerInstance(db, "Mon étude", "personal");
@@ -346,19 +350,19 @@ Deno.test("instance personnelle : le propriétaire étudie ses ressources privé
     assertEquals(await statut(moi.requete(`/eleve/sources/${id}`)), 200);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
-  const dir = await Deno.makeTempDir();
+test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
   config.donnees = dir;
   const db = connexion(join(dir, "state.sqlite3"));
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (const nom of [...Deno.readDirSync(join(RACINE, "migrations"))].map((f) => f.name).sort()) {
+    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true }).map((f) => f.name).sort()) {
       if (nom >= "0008") continue;
-      db.exec(Deno.readTextFileSync(join(RACINE, "migrations", nom)));
+      db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
     for (const [id, nom] of [["d", "M. Detienne"], ["h1", "Homonyme"], ["h2", "Homonyme"]]) {
@@ -397,7 +401,7 @@ Deno.test("migration des lecteurs : aucun accès élargi ni retiré", async () =
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
@@ -418,7 +422,7 @@ async function deuxCours(modeles?: Modeles) {
   return { db, dir, m, c1, c2, profA, profB, profC, eleveA, eleveB, publie, partage, prive, libre };
 }
 
-Deno.test("cours : seuls ses membres lisent et modifient ce qu'il partage", async () => {
+test("cours : seuls ses membres lisent et modifient ce qu'il partage", async () => {
   const { db, dir, c1, profA, profB, profC, eleveA, eleveB, publie, partage, prive, libre } =
     await deuxCours();
   try {
@@ -483,11 +487,11 @@ Deno.test("cours : seuls ses membres lisent et modifient ce qu'il partage", asyn
     assertEquals(await statut(profB.requete("/prof/depot", { method: "POST", body: f })), 400);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("cours : retirer un élève pendant la génération garde le texte hors de sa réponse", async () => {
+test("cours : retirer un élève pendant la génération garde le texte hors de sa réponse", async () => {
   const f = fauxModeles({ sorties: [BONNE] });
   const { db, dir, c1, eleveA, libre } = await deuxCours(f.modeles);
   try {
@@ -508,11 +512,11 @@ Deno.test("cours : retirer un élève pendant la génération garde le texte hor
     assertEquals(db.prepare("SELECT etat FROM messages WHERE id = ?").get(mid)!.etat, "failed");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("questions des élèves : chaque enseignant lit celles de ses cours", async () => {
+test("questions des élèves : chaque enseignant lit celles de ses cours", async () => {
   const { db, dir, c1, profA, profB, eleveA, eleveB } = await deuxCours();
   try {
     const sansCours = await compte(db, "eleve");
@@ -537,19 +541,19 @@ Deno.test("questions des élèves : chaque enseignant lit celles de ses cours", 
     assertEquals(await lues(profB), [q2, q3]);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("migration des membres : chaque compte rejoint chaque cours existant", async () => {
-  const dir = await Deno.makeTempDir();
+test("migration des membres : chaque compte rejoint chaque cours existant", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
   config.donnees = dir;
   const db = connexion(join(dir, "state.sqlite3"));
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (const nom of [...Deno.readDirSync(join(RACINE, "migrations"))].map((f) => f.name).sort()) {
+    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true }).map((f) => f.name).sort()) {
       if (nom >= "0009") continue;
-      db.exec(Deno.readTextFileSync(join(RACINE, "migrations", nom)));
+      db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
     db.exec(`INSERT INTO matieres VALUES ('m', 'Arts appliqués', 'arts-appliques');
@@ -564,7 +568,7 @@ Deno.test("migration des membres : chaque compte rejoint chaque cours existant",
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
@@ -619,7 +623,7 @@ function poserQuestion(
   );
 }
 
-Deno.test("élèves : seuls les administrateurs gèrent ceux sans cours", async () => {
+test("élèves : seuls les administrateurs gèrent ceux sans cours", async () => {
   const { db, dir, c1, profA, profB, eleveA, eleveB } = await deuxCours();
   try {
     const sansCours = await compte(db, "eleve");
@@ -667,11 +671,11 @@ Deno.test("élèves : seuls les administrateurs gèrent ceux sans cours", async 
     assertEquals(await reinitialiser(admin, eleveA), 200);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("modifier : un changement de séquence range la source dans un cours de l'enseignant", async () => {
+test("modifier : un changement de séquence range la source dans un cours de l'enseignant", async () => {
   const { db, dir, m, c1, c2, profA, profB, publie } = await deuxCours();
   try {
     const autre = await autreMatiere(db);
@@ -710,11 +714,11 @@ Deno.test("modifier : un changement de séquence range la source dans un cours d
     assertEquals(theme_(c1, "Nuit"), undefined);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("dépôt : sans cours choisi, la source va au premier cours de l'enseignant dans la matière", async () => {
+test("dépôt : sans cours choisi, la source va au premier cours de l'enseignant dans la matière", async () => {
   const { db, dir, m, c2, profB } = await deuxCours();
   try {
     const autre = await autreMatiere(db);
@@ -752,11 +756,11 @@ Deno.test("dépôt : sans cours choisi, la source va au premier cours de l'ensei
     assertEquals(decompte(), avant);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("modifier : décocher tous les cours est refusé pour tout compte", async () => {
+test("modifier : décocher tous les cours est refusé pour tout compte", async () => {
   const { db, dir, c1, profA, publie } = await deuxCours();
   try {
     const admin = await administrateur(db);
@@ -781,11 +785,11 @@ Deno.test("modifier : décocher tous les cours est refusé pour tout compte", as
     assertEquals(ressource(), avant);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("questions des élèves : la séquence mémorisée n'est montrée qu'à qui lit une source qui la porte", async () => {
+test("questions des élèves : la séquence mémorisée n'est montrée qu'à qui lit une source qui la porte", async () => {
   const { db, dir, profA, profB, profC, prive, partage, libre } = await deuxCours();
   try {
     const [secrete, collegues, ouverte] = [
@@ -816,11 +820,11 @@ Deno.test("questions des élèves : la séquence mémorisée n'est montrée qu'�
     assertStringIncludes(await texteDe(profB, "/prof/questions"), "Sans séquence");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'est pas membre", async () => {
+test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'est pas membre", async () => {
   const { db, dir, c1, c2, eleveA, eleveB, publie } = await deuxCours();
   try {
     const impressionnisme = theme(db, c2, "Impressionnisme");
@@ -853,11 +857,11 @@ Deno.test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("questions des élèves : un thème va aux enseignants de son cours, une matière à ceux de ses cours", async () => {
+test("questions des élèves : un thème va aux enseignants de son cours, une matière à ceux de ses cours", async () => {
   const { db, dir, m, c1, profA, profB, profC, eleveA } = await deuxCours();
   try {
     const autre = await autreMatiere(db);
@@ -876,11 +880,11 @@ Deno.test("questions des élèves : un thème va aux enseignants de son cours, u
     assertEquals(await lues(admin), [duTheme, deLaMatiere]);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("suggestions : un élève ne reçoit ni question ni fait d'une source hors de ses cours", async () => {
+test("suggestions : un élève ne reçoit ni question ni fait d'une source hors de ses cours", async () => {
   const { db, dir, c1, profA, eleveA, eleveB, publie, libre } = await deuxCours();
   try {
     const phrase = "Gaudí construit la façade de la Casa Batlló à Barcelone entre 1904 et 1906 " +
@@ -906,11 +910,11 @@ Deno.test("suggestions : un élève ne reçoit ni question ni fait d'une source 
     assertEquals(faitAuHasard(db, commeEleve(eleveB.id)), undefined);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("bibliothèque : la case d'une ressource que l'enseignant ne peut pas modifier est désactivée", async () => {
+test("bibliothèque : la case d'une ressource que l'enseignant ne peut pas modifier est désactivée", async () => {
   const { db, dir, profA, profB, profC, publie, partage, libre } = await deuxCours();
   try {
     const desactivee = async (qui: Qui, id: string) => {
@@ -928,11 +932,11 @@ Deno.test("bibliothèque : la case d'une ressource que l'enseignant ne peut pas 
     assertEquals(await desactivee(profC, libre), true);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("modifier : cocher son cours garde les rattachements des autres cours", async () => {
+test("modifier : cocher son cours garde les rattachements des autres cours", async () => {
   const { db, dir, c1, c2, profC, eleveA, eleveB, publie } = await deuxCours();
   try {
     affiliations(db, publie, [{ cours_id: c1, theme_id: null }, { cours_id: c2, theme_id: null }]);
@@ -958,6 +962,6 @@ Deno.test("modifier : cocher son cours garde les rattachements des autres cours"
     assertEquals(await lit(eleveA), 404);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });

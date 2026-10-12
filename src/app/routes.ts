@@ -1,10 +1,11 @@
+import { readFile } from "node:fs/promises";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { csrf } from "hono/csrf";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { serveStatic } from "hono/deno";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
 import { actualiserResultat, type Affirmation, demander, type Resultat } from "../core/reponse.ts";
@@ -314,7 +315,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     // Le navigateur revalide à chaque affichage : une source devenue privée cesse aussitôt de servir.
     const entetes = { "cache-control": "private, no-cache", etag: `"${i.checksum}"` };
     if (c.req.header("if-none-match") === entetes.etag) return c.body(null, 304, entetes);
-    const octets = await Deno.readFile(contenu(i.source_id, "assets", i.fichier));
+    const octets = await readFile(contenu(i.source_id, "assets", i.fichier));
     return c.body(octets, 200, { ...entetes, "content-type": i.mime });
   });
 
@@ -630,7 +631,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof/sources/:id/original", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     if (d?.source.format !== "pdf") return c.notFound();
-    return c.body(await Deno.readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
+    return c.body(await readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
       "content-type": "application/pdf",
       "content-disposition": "inline",
     });

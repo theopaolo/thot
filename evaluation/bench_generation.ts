@@ -1,3 +1,4 @@
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import { backup, DatabaseSync } from "node:sqlite";
 import { createHash } from "node:crypto";
 import { config } from "../src/app/config.ts";
@@ -27,33 +28,33 @@ const percentile = (ns: number[], p: number) => {
   const sorted = ns.toSorted((a, b) => a - b);
   return sorted.length ? sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)] : null;
 };
-if (Deno.args[0] === "--self-test") {
+if (process.argv.slice(2)[0] === "--self-test") {
   if (
     percentile([4, 1, 2, 3], 0.5) !== 2 || percentile([], .95) !== null ||
     fold("Art déco") !== "art deco"
   ) throw new Error("benchmark self-test failed");
   console.log("benchmark self-test OK");
-  Deno.exit();
+  process.exit();
 }
-const name = Deno.args[0] ?? "deepseek";
+const name = process.argv.slice(2)[0] ?? "deepseek";
 const variant = variants[name];
 if (!variant) throw new Error(`Unknown variant: ${name}`);
-const pass = Deno.args[1] ?? "1";
-const mode = Deno.args[2] ?? "generation";
+const pass = process.argv.slice(2)[1] ?? "1";
+const mode = process.argv.slice(2)[2] ?? "generation";
 const tag = `${name}-${mode}-${pass}`;
-await Deno.mkdir(privateDir, { recursive: true });
+await mkdir(privateDir, { recursive: true });
 const output = `${privateDir}/${tag}.json`;
 try {
-  await Deno.stat(output);
+  await stat(output);
   throw new Error(`Already exists: ${output}`);
 } catch (e) {
-  if (!(e instanceof Deno.errors.NotFound)) throw e;
+  if (!((e as NodeJS.ErrnoException).code === "ENOENT")) throw e;
 }
 const snapshot = `${privateDir}/snapshot.sqlite3`;
 try {
-  await Deno.stat(snapshot);
+  await stat(snapshot);
 } catch (e) {
-  if (!(e instanceof Deno.errors.NotFound)) throw e;
+  if (!((e as NodeJS.ErrnoException).code === "ENOENT")) throw e;
   const source = new DatabaseSync(`${config.donnees}/state.sqlite3`, { readOnly: true });
   try {
     await backup(source, snapshot);
@@ -118,10 +119,10 @@ globalThis.fetch = async (input, init) => {
       error: json.error ? JSON.stringify(json.error).slice(0, 300) : undefined,
     };
     calls.push(call);
-    await Deno.writeTextFile(
+    await writeFile(
       `${privateDir}/${tag}-calls.jsonl`,
       JSON.stringify({ ...call, body, response: json }) + "\n",
-      { append: true },
+      { flag: "a" },
     );
     return response;
   } catch (e) {
@@ -138,7 +139,7 @@ const models = openrouter({
 const rows: Record<string, unknown>[] = [];
 const scope = { lecteur: null, schoolId: config.schoolId };
 if (mode === "generation") {
-  const game = JSON.parse(await Deno.readTextFile("evaluation/queries_generation.json"));
+  const game = JSON.parse(await readFile("evaluation/queries_generation.json", "utf8"));
   const qs = [
     ...game.questions.map((q: Record<string, unknown>) => ({ ...q, kind: "answerable" })),
     ...game.sans_reponse.map((q: Record<string, unknown>) => ({ ...q, gold: [], kind: "trap" })),
@@ -166,7 +167,7 @@ if (mode === "generation") {
       journal,
     };
     rows.push(row);
-    await Deno.writeTextFile(output, JSON.stringify(rows, null, 2));
+    await writeFile(output, JSON.stringify(rows, null, 2));
     console.log(tag, q.qid, row.state, Math.round(row.ms), row.judge_unavailable ?? "");
   }
 } else if (mode === "suggestions") {
@@ -200,7 +201,7 @@ if (mode === "generation") {
         calls: calls.slice(before),
       });
     }
-    await Deno.writeTextFile(output, JSON.stringify(rows, null, 2));
+    await writeFile(output, JSON.stringify(rows, null, 2));
     console.log(tag, passage.source_id, rows.at(-1)?.kept);
   }
 } else if (mode === "followup") {
@@ -234,7 +235,7 @@ if (mode === "generation") {
     } catch (e) {
       rows.push({ id: `F${rows.length + 1}`, error: String(e), ms: performance.now() - t });
     }
-    await Deno.writeTextFile(output, JSON.stringify(rows, null, 2));
+    await writeFile(output, JSON.stringify(rows, null, 2));
     console.log(tag, rows.at(-1)?.id, rows.at(-1)?.text ?? rows.at(-1)?.error);
   }
 } else throw new Error(`Unknown mode: ${mode}`);
@@ -274,7 +275,7 @@ const report = {
       "src/core/suggestions.ts",
     ].map(async (
       path,
-    ) => [path, createHash("sha256").update(await Deno.readFile(path)).digest("hex")])),
+    ) => [path, createHash("sha256").update(await readFile(path)).digest("hex")])),
   ),
   configured_judge: variant.judge ?? config.modeles.soutienMistral,
   answerable: summarize(inside),
@@ -309,7 +310,7 @@ const report = {
   kept: mode === "suggestions" ? rows.reduce((s, r) => s + Number(r.kept), 0) : undefined,
   rows: rows.map(({ resultat: _r, journal: _j, calls: _c, questions: _q, ...row }) => row),
 };
-await Deno.writeTextFile(
+await writeFile(
   `evaluation/resultats/ml4-${tag}.json`,
   JSON.stringify(report, null, 2) + "\n",
 );

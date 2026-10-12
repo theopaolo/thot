@@ -1,3 +1,4 @@
+import { test } from "vite-plus/test";
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { type Cache, type ConfigModeles, openrouter, PanneModele } from "../src/core/modeles.ts";
 
@@ -10,7 +11,7 @@ const config: ConfigModeles = {
   soutienMistral: "juge",
 };
 
-Deno.test("le reclasseur refuse les sorties vides, scores invalides et indices incohérents", async () => {
+test("le reclasseur refuse les sorties vides, scores invalides et indices incohérents", async () => {
   const fetch = globalThis.fetch;
   try {
     for (
@@ -52,7 +53,7 @@ Deno.test("le reclasseur refuse les sorties vides, scores invalides et indices i
   }
 });
 
-Deno.test("seules les légendes alimentent le cache, jamais les jugements", async () => {
+test("seules les légendes alimentent le cache, jamais les jugements", async () => {
   const fetch = globalThis.fetch;
   const valeurs = new Map<string, string>();
   const cache: Cache = {
@@ -81,7 +82,7 @@ Deno.test("seules les légendes alimentent le cache, jamais les jugements", asyn
   }
 });
 
-Deno.test("annuler le juge interrompt la requête et interdit les reprises et la relève", async () => {
+test("annuler le juge interrompt la requête et interdit les reprises et la relève", async () => {
   const fetch = globalThis.fetch;
   try {
     for (const cleMistral of [undefined, "test"]) {

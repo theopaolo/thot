@@ -1,3 +1,8 @@
+import { spawnSync } from "node:child_process";
+import { readFileSync, readdirSync } from "node:fs";
+import { writeFile, rm, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { test } from "vite-plus/test";
 import {
   assert,
   assertEquals,
@@ -5,7 +10,7 @@ import {
   assertStringIncludes,
   assertThrows,
 } from "@std/assert";
-import { join } from "@std/path";
+import { join } from "node:path";
 import { connexion, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { deposer, valider } from "../src/app/depot.ts";
@@ -65,8 +70,8 @@ async function ressource(
   return source_id;
 }
 
-Deno.test("migration des matières : métadonnées intactes, thèmes homonymes séparés, inconnus visibles", async () => {
-  const dir = await Deno.makeTempDir();
+test("migration des matières : métadonnées intactes, thèmes homonymes séparés, inconnus visibles", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
   config.donnees = dir;
   const db = connexion(join(dir, "state.sqlite3"));
   try {
@@ -81,7 +86,7 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
         "0006_instance.sql",
       ]
     ) {
-      db.exec(Deno.readTextFileSync(join(RACINE, "migrations", nom)));
+      db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
     const metas = [{ matiere: "arts-appliques", sequence: "Lumière", artiste: "Auteur relu" }, {
@@ -119,11 +124,11 @@ Deno.test("migration des matières : métadonnées intactes, thèmes homonymes s
     assertStringIncludes(await (await prof.requete("/prof")).text(), "/prof/sources/2");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("général : champs facultatifs, attribution, profil unique et rattachements sans copie ni publication", async () => {
+test("général : champs facultatifs, attribution, profil unique et rattachements sans copie ni publication", async () => {
   const { db, dir } = await environnement();
   try {
     const physique = matiere(db, "Physique");
@@ -259,11 +264,11 @@ Deno.test("général : champs facultatifs, attribution, profil unique et rattach
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("dépôt web et questions : périmètres par identifiants conservés jusqu’au flux, erreurs sans données partielles", async () => {
+test("dépôt web et questions : périmètres par identifiants conservés jusqu’au flux, erreurs sans données partielles", async () => {
   const { db, dir } = await environnement();
   try {
     const m = matiere(db, "Sociologie"), c = cours(db, m, "Théories"), t = theme(db, c, "Auteurs");
@@ -323,7 +328,7 @@ Deno.test("dépôt web et questions : périmètres par identifiants conservés j
     assertEquals(refus.status, 400);
     assertStringIncludes(await refus.text(), "Cours ou thème inconnu");
     assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 1);
-    assertEquals([...Deno.readDirSync(join(dir, "content"))].length, 1);
+    assertEquals(readdirSync(join(dir, "content"), { withFileTypes: true }).length, 1);
     assertEquals((await eleve.requete("/administration/domaines")).status, 403);
     assertEquals((await prof.requete("/administration/domaines")).status, 403);
     const compte = db.prepare("SELECT id FROM comptes WHERE role = 'enseignant'").get()!.id;
@@ -345,11 +350,11 @@ Deno.test("dépôt web et questions : périmètres par identifiants conservés j
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("prompts neutres, preuves conservées, rubriques ATC et légendes réservées au profil arts", async () => {
+test("prompts neutres, preuves conservées, rubriques ATC et légendes réservées au profil arts", async () => {
   const { db, dir } = await environnement();
   try {
     const citation =
@@ -415,11 +420,11 @@ Deno.test("prompts neutres, preuves conservées, rubriques ATC et légendes rés
     await assertRejects(() => ressource(db, { matiere_id: "inconnue" }));
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("arts appliqués : consignes mesurées, matière proposée, profil de l’instance pour les ressources", async () => {
+test("arts appliqués : consignes mesurées, matière proposée, profil de l’instance pour les ressources", async () => {
   const { db, dir } = await environnement();
   const empreinte = async (t: string) =>
     [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))]
@@ -525,7 +530,7 @@ Deno.test("arts appliqués : consignes mesurées, matière proposée, profil de 
     assertStringIncludes(await (await eleve.requete("/eleve")).text(), "Tes séquences");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
@@ -542,7 +547,7 @@ async function administrateur(db: ReturnType<typeof connexion>) {
   };
 }
 
-Deno.test("profil de l’instance : deux matières arts passent au général en une action, refus dès qu’une ressource existe", async () => {
+test("profil de l’instance : deux matières arts passent au général en une action, refus dès qu’une ressource existe", async () => {
   const { db, dir } = await environnement();
   try {
     const arts = matiere(db, "Arts", "arts-appliques");
@@ -570,11 +575,11 @@ Deno.test("profil de l’instance : deux matières arts passent au général en 
     assertStringIncludes(figee, "Des ressources sont déposées");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("renommer : le cours pilote et un thème gardent leurs rattachements et les pages élèves", async () => {
+test("renommer : le cours pilote et un thème gardent leurs rattachements et les pages élèves", async () => {
   const { db, dir } = await environnement();
   try {
     const id = await ressource(db, { matiere: "arts-appliques", sequence: "Art Nouveau" });
@@ -611,11 +616,11 @@ Deno.test("renommer : le cours pilote et un thème gardent leurs rattachements e
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
+test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
   const { db, dir } = await environnement();
   try {
     const arts = matiere(db, "Arts appliqués", "arts-appliques"), chimie = matiere(db, "Chimie");
@@ -658,11 +663,11 @@ Deno.test("renommer : un nom pris est refusé en français, un import par nom ch
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("supprimer : refusée avec sa raison tant qu’une ressource ou une question utilise l’entrée, sinon retirée des filtres et du dépôt", async () => {
+test("supprimer : refusée avec sa raison tant qu’une ressource ou une question utilise l’entrée, sinon retirée des filtres et du dépôt", async () => {
   const { db, dir } = await environnement();
   try {
     const physique = matiere(db, "Physique"), socio = matiere(db, "Sociologie");
@@ -713,11 +718,11 @@ Deno.test("supprimer : refusée avec sa raison tant qu’une ressource ou une qu
     }
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("sonde lexicale français / anglais : français conservé, anglais non qualifié", async () => {
+test("sonde lexicale français / anglais : français conservé, anglais non qualifié", async () => {
   const { db, dir } = await environnement();
   try {
     const fr = await ressource(db, { langue: "fr" }), en = await ressource(db, { langue: "en" });
@@ -768,30 +773,29 @@ Deno.test("sonde lexicale français / anglais : français conservé, anglais non
     assertStringIncludes(avertissements, "Langue non prise en charge");
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("CLI : configurer des collections, changer le profil, importer, rattacher, renommer, supprimer, refuser un second profil", async () => {
-  const dir = await Deno.makeTempDir();
+test("CLI : configurer des collections, changer le profil, importer, rattacher, renommer, supprimer, refuser un second profil", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
   try {
     const lancer = (...args: string[]) =>
-      new Deno.Command(Deno.execPath(), {
-        args: ["run", "-RWNE", "--allow-run=pdftotext", "src/cli.ts", ...args],
+      spawnSync(process.execPath, ["src/cli.ts", ...args], {
         cwd: RACINE,
+        encoding: "utf8",
         env: {
+          ...process.env,
           THOT_DATA_DIR: dir,
           THOT_ORIGIN: "",
           THOT_OPENROUTER_ENABLED: "0",
           THOT_MISTRAL_ENABLED: "0",
         },
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
+      });
     const cli = async (...args: string[]) => {
       const r = await lancer(...args);
-      assert(r.success, new TextDecoder().decode(r.stderr));
-      return new TextDecoder().decode(r.stdout).trim();
+      assert(r.status === 0, r.stderr);
+      return r.stdout.trim();
     };
     const profils = async () =>
       JSON.parse(await cli("domaines")).matieres.map((m: { profil: string }) => m.profil);
@@ -810,15 +814,15 @@ Deno.test("CLI : configurer des collections, changer le profil, importer, rattac
     await cli("membre", c, "lea");
     await cli("membre", c, "LEA");
     assertEquals(await effectif(), 1);
-    const inconnu = await lancer("membre", c, "personne");
-    assert(!inconnu.success);
-    assertStringIncludes(new TextDecoder().decode(inconnu.stderr), "Compte introuvable");
-    assert(!(await lancer("membre", "absent", "lea")).success);
+    const inconnu = lancer("membre", c, "personne");
+    assert(inconnu.status !== 0);
+    assertStringIncludes(inconnu.stderr, "Compte introuvable");
+    assert(lancer("membre", "absent", "lea").status !== 0);
     assertEquals(await effectif(), 1);
     await cli("retirer-membre", c, "lea");
     assertEquals(await effectif(), 0);
     const fichier = join(dir, "physique.html");
-    await Deno.writeTextFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
+    await writeFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
     await cli(
       "ingest",
       fichier,
@@ -841,9 +845,9 @@ Deno.test("CLI : configurer des collections, changer le profil, importer, rattac
       const c2 = await cli("cours", arts, "Images");
       await cli("rattacher", s.id as string, c2);
       assertEquals(db.prepare("SELECT count(*) n FROM source_cours").get()!.n, 2);
-      assert(!(await lancer("profil", "arts-appliques")).success);
-      assert(!(await lancer("matiere", "Design", "--profil=arts-appliques")).success);
-      assert(!(await lancer("supprimer", "matiere", physique)).success);
+      assert(lancer("profil", "arts-appliques").status !== 0);
+      assert(lancer("matiere", "Design", "--profil=arts-appliques").status !== 0);
+      assert(lancer("supprimer", "matiere", physique).status !== 0);
       await cli("renommer", "cours", c, "Optique", "géométrique");
       await cli("supprimer", "matiere", socio);
       assertEquals(
@@ -860,7 +864,7 @@ Deno.test("CLI : configurer des collections, changer le profil, importer, rattac
       db.close();
     }
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
@@ -871,7 +875,7 @@ async function enseignantDe(db: ReturnType<typeof connexion>, cours_id: string[]
   return { ...prof, id };
 }
 
-Deno.test("membres d'un cours : l'administrateur inscrit et retire, les autres comptes reçoivent 403", async () => {
+test("membres d'un cours : l'administrateur inscrit et retire, les autres comptes reçoivent 403", async () => {
   const { db, dir } = await environnement();
   try {
     const admin = await administrateur(db);
@@ -923,11 +927,11 @@ Deno.test("membres d'un cours : l'administrateur inscrit et retire, les autres c
     assertEquals(coursDuCompte(db, eleveId).size, 0);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais ceux d'un autre enseignant", async () => {
+test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais ceux d'un autre enseignant", async () => {
   const { db, dir } = await environnement();
   try {
     const m = matiere(db, "Physique");
@@ -990,11 +994,11 @@ Deno.test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jam
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("CSV élèves : sans cours dans l'instance, pas de liste de cours", async () => {
+test("CSV élèves : sans cours dans l'instance, pas de liste de cours", async () => {
   const { db, dir } = await environnement();
   try {
     const prof = await session(db, fauxModeles().modeles, "enseignant");
@@ -1008,11 +1012,11 @@ Deno.test("CSV élèves : sans cours dans l'instance, pas de liste de cours", as
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("l'élève apprend qui lit ses questions, sauf en mode personnel", async () => {
+test("l'élève apprend qui lit ses questions, sauf en mode personnel", async () => {
   const { db, dir } = await environnement();
   try {
     cours(db, matiere(db, "Physique"), "Optique");
@@ -1029,7 +1033,7 @@ Deno.test("l'élève apprend qui lit ses questions, sauf en mode personnel", asy
     }
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
   const perso = await environnement();
   try {
@@ -1042,6 +1046,6 @@ Deno.test("l'élève apprend qui lit ses questions, sauf en mode personnel", asy
     }
   } finally {
     perso.db.close();
-    await Deno.remove(perso.dir, { recursive: true });
+    await rm(perso.dir, { recursive: true });
   }
 });

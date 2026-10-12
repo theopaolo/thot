@@ -1,10 +1,11 @@
+import { test } from "vite-plus/test";
 import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { lireVerdict, probabiliteOui } from "../src/core/modeles.ts";
 import { assembler, decouper } from "../src/core/document.ts";
 import { racines } from "../src/core/recherche.ts";
 import { contexte, longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
 
-Deno.test("les offsets comptent des points de code, pas des unités UTF-16", () => {
+test("les offsets comptent des points de code, pas des unités UTF-16", () => {
   const s = "Clé 𝄞 de sol";
   assertEquals(s.length, 13);
   assertEquals(longueur(s), 12);
@@ -12,7 +13,7 @@ Deno.test("les offsets comptent des points de code, pas des unités UTF-16", () 
   assertEquals(tranche(s, 6, 8), "de");
 });
 
-Deno.test("chaque bloc restitue exactement sa tranche de document.txt", () => {
+test("chaque bloc restitue exactement sa tranche de document.txt", () => {
   const doc = assembler([
     { texte: "Titre 𝄞", section: "Titre 𝄞" },
     { texte: "  Premier paragraphe.  ", section: "Quoi ?" },
@@ -24,7 +25,7 @@ Deno.test("chaque bloc restitue exactement sa tranche de document.txt", () => {
   for (const c of decouper(doc)) assertEquals(tranche(doc.texte, c.debut, c.fin), c.texte);
 });
 
-Deno.test("une citation se retrouve malgré les apostrophes, la casse et les espaces", () => {
+test("une citation se retrouve malgré les apostrophes, la casse et les espaces", () => {
   const texte =
     "Le Cubisme veut représenter la connaissance totale d’un objet, 😀 pas sa seule apparence.";
   const [a, b] = trouver(texte, "la connaissance  totale d'un objet")!;
@@ -34,13 +35,13 @@ Deno.test("une citation se retrouve malgré les apostrophes, la casse et les esp
   assertEquals(trouver(texte, "une phrase absente"), null);
 });
 
-Deno.test("une citation qui recolle une liste à puces se retrouve", () => {
+test("une citation qui recolle une liste à puces se retrouve", () => {
   const texte = "par un artisan :\n• Possibilité de personnaliser\n• Marge de manoeuvre";
   const [a, b] = trouver(texte, "par un artisan : Possibilité de personnaliser")!;
   assertEquals(tranche(texte, a, b), "par un artisan :\n• Possibilité de personnaliser");
 });
 
-Deno.test("une casse qui s'étend conserve les offsets des citations", () => {
+test("une casse qui s'étend conserve les offsets des citations", () => {
   const texte = "😀 İSTANBUL porte un décor bleu.";
   for (const citation of ["İSTANBUL porte", "porte un décor bleu.", texte]) {
     const position = trouver(texte, citation.toLowerCase())!;
@@ -49,7 +50,7 @@ Deno.test("une casse qui s'étend conserve les offsets des citations", () => {
   }
 });
 
-Deno.test("les paragraphes longs restent bornés sans perdre le texte ni ses offsets", () => {
+test("les paragraphes longs restent bornés sans perdre le texte ni ses offsets", () => {
   for (const texte of ["a".repeat(100_000), "😀 un mot ".repeat(1500)]) {
     const doc = assembler([{ texte, section: "Texte" }]);
     const chunks = decouper(doc);
@@ -67,12 +68,12 @@ Deno.test("les paragraphes longs restent bornés sans perdre le texte ni ses off
   assertEquals(decouper(doc).length, 2, "le séparateur compte dans la limite");
 });
 
-Deno.test("la racinisation retire l'élision et rapproche les formes", () => {
+test("la racinisation retire l'élision et rapproche les formes", () => {
   assertEquals(racines("d'architecture"), racines("architecture"));
   assertEquals(racines("peintres")[0], racines("peintre")[0]);
 });
 
-Deno.test("une citation coupée par des points de suspension passe si chaque fragment est dans l'ordre", () => {
+test("une citation coupée par des points de suspension passe si chaque fragment est dans l'ordre", () => {
   const texte =
     "Il possède un savoir-faire et une marge de manoeuvre créative. Son travail est donc émancipateur et non aliénant.";
   const r = trouverFragments(
@@ -92,7 +93,7 @@ Deno.test("une citation coupée par des points de suspension passe si chaque fra
   assertEquals(trouverFragments(facade, "… […] ..."), null);
 });
 
-Deno.test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot", () => {
+test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot", () => {
   const doc = "Art\n\nNouveau\n\nL'art nouveau est un mouvement. On parle d'art total.\n\nSuite";
   const debut = doc.indexOf("On parle");
   const fin = debut + "On parle d'art total.".length;
@@ -109,7 +110,7 @@ Deno.test("le contexte d'une citation reste dans son paragraphe et coupe sur un 
   assertEquals([r.avant, r.apres, r.coupeAvant, r.coupeApres], ["beta ", " delta", true, true]);
 });
 
-Deno.test("le juge de soutien lit P(oui) parmi oui et non, casse et espaces confondus", () => {
+test("le juge de soutien lit P(oui) parmi oui et non, casse et espaces confondus", () => {
   const lp = Math.log;
   assertAlmostEquals(
     probabiliteOui([{ token: " Oui", logprob: lp(0.6) }, { token: "non", logprob: lp(0.2) }])!,
@@ -119,7 +120,7 @@ Deno.test("le juge de soutien lit P(oui) parmi oui et non, casse et espaces conf
   assertEquals(probabiliteOui([{ token: "La", logprob: 0 }]), undefined);
 });
 
-Deno.test("le verdict du juge se lit après le raisonnement, ou à défaut dans le texte", () => {
+test("le verdict du juge se lit après le raisonnement, ou à défaut dans le texte", () => {
   const lp = Math.log;
   // Mistral: le contenu mêle raisonnement et texte, les logprobs couvrent les deux.
   const mistral = {

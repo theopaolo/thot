@@ -1,8 +1,10 @@
-import { fromFileUrl, join, resolve } from "@std/path";
+import { mkdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const env = (cle: string, defaut: string) => Deno.env.get(cle) || defaut;
+const env = (cle: string, defaut: string) => process.env[cle] || defaut;
 
-export const RACINE = fromFileUrl(new URL("../../", import.meta.url));
+export const RACINE = fileURLToPath(new URL("../../", import.meta.url));
 
 const autorise = (cle: string) => {
   const valeur = env(cle, "1");
@@ -10,7 +12,7 @@ const autorise = (cle: string) => {
   return valeur === "1";
 };
 
-const origine = Deno.env.get("THOT_ORIGIN") || "";
+const origine = process.env["THOT_ORIGIN"] || "";
 if (origine) {
   const url = new URL(origine);
   if (
@@ -32,8 +34,8 @@ export const fournisseurs = {
 };
 
 export const config = {
-  // Posé par `deno task dev` (src/main.ts). Les mots de passe ordinaires ne sont plus vérifiés.
-  dev: Deno.env.get("THOT_DEV") === "1",
+  // Posé par `pnpm dev` (src/main.ts). Les mots de passe ordinaires ne sont plus vérifiés.
+  dev: process.env["THOT_DEV"] === "1",
   donnees: resolve(env("THOT_DATA_DIR", join(RACINE, "data"))),
   origine,
   port: Number(env("THOT_PORT", "8000")),
@@ -43,13 +45,13 @@ export const config = {
   // qwen3-reranker-8b, AUC 0,952. Tout changement de modèle ou de corpus le rend obsolète.
   seuil: Number(env("THOT_SEUIL_ABSTENTION", "0.023")),
   modeles: {
-    cle: fournisseurs.openrouter.autorise ? Deno.env.get("OPENROUTER_API_KEY") : undefined,
+    cle: fournisseurs.openrouter.autorise ? process.env["OPENROUTER_API_KEY"] : undefined,
     url: env("THOT_OPENROUTER_URL", "https://openrouter.ai/api/v1"),
     legende: env("THOT_MODELE_LEGENDE", "google/gemma-4-26b-a4b-it"),
     reclasseur: env("THOT_MODELE_RECLASSEUR", "qwen/qwen3-reranker-8b"),
     generation: env("THOT_MODELE_GENERATION", "deepseek/deepseek-v4.1-flash"),
     soutien: env("THOT_MODELE_SOUTIEN", "z-ai/glm-5.3"),
-    cleMistral: fournisseurs.mistral.autorise ? Deno.env.get("MISTRAL_API_KEY") : undefined,
+    cleMistral: fournisseurs.mistral.autorise ? process.env["MISTRAL_API_KEY"] : undefined,
     soutienMistral: env("THOT_MODELE_SOUTIEN_MISTRAL", "zai-glm-5-3"),
     // DeepSeek V4.1 Flash sans raisonnement: 1,7 s de médiane et des citations plus fidèles
     // que gpt-oss-120b (tasks/ensuite/mod-101.md).
@@ -60,9 +62,9 @@ export const config = {
 export const contenu = (...chemin: string[]) => join(config.donnees, "content", ...chemin);
 
 export function preparerDonnees() {
-  Deno.mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
+  mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
   const temporaire = join(config.donnees, "tmp");
-  Deno.mkdirSync(temporaire, { recursive: true, mode: 0o700 });
-  Deno.env.set("TMPDIR", temporaire);
-  Deno.env.set("SQLITE_TMPDIR", temporaire);
+  mkdirSync(temporaire, { recursive: true, mode: 0o700 });
+  process.env["TMPDIR"] = temporaire;
+  process.env["SQLITE_TMPDIR"] = temporaire;
 }

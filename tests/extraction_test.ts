@@ -1,11 +1,13 @@
+import { readdirSync } from "node:fs";
+import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { fileURLToPath } from "node:url";
 import { assembler } from "../src/core/document.ts";
 import { extraireHtml, pageVide, rubriquesSommaire } from "../src/core/html.ts";
 import { decouperPdf, extrairePdf } from "../src/core/pdf.ts";
 import { tranche } from "../src/core/texte.ts";
 
-Deno.test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, page muette signalée", () => {
+test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, page muette signalée", () => {
   const brut = [
     "ATC : Fiche\n\nCubisme\n\nOù et Quand ?\nQuand\n1907–1920, deux phases :\n• analytique\n• synthétique\n\nLa théorie de la relativité\nd'Einstein circule.\n\n1 sur 3",
     "ATC : Fiche\n\nCubisme\n\nPourquoi ?\nLa perspective impose un\nmensonge.",
@@ -28,7 +30,7 @@ Deno.test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, pag
   ]);
 });
 
-Deno.test("un PDF de deux pages conserve le texte propre à chaque page", () => {
+test("un PDF de deux pages conserve le texte propre à chaque page", () => {
   const { parties } = decouperPdf(
     "Fiche ATC\n\nLe cubisme transforme la peinture.\f" +
       "Fiche ATC\n\nLe fauvisme emploie des couleurs vives.\f",
@@ -39,7 +41,7 @@ Deno.test("un PDF de deux pages conserve le texte propre à chaque page", () => 
   ]);
 });
 
-Deno.test("les répétitions dans le corps d'un PDF restent dans le cours", () => {
+test("les répétitions dans le corps d'un PDF restent dans le cours", () => {
   const phrase = "Gaudí refuse la ligne droite dans toute la façade.";
   const brut = [
     `Fiche ATC\n\nPremier chapitre\n\n${phrase}\n\nAnalyse première.\n\nPied de page`,
@@ -52,10 +54,10 @@ Deno.test("les répétitions dans le corps d'un PDF restent dans le cours", () =
   assert(!parties.some((p) => p.texte === "Pied de page"));
 });
 
-const corpus = fromFileUrl(new URL("../../corpus/", import.meta.url));
+const corpus = fileURLToPath(new URL("../../corpus/", import.meta.url));
 const fiches = (() => {
   try {
-    return [...Deno.readDirSync(`${corpus}ATC Les avants gardes du XXs`)]
+    return readdirSync(`${corpus}ATC Les avants gardes du XXs`, { withFileTypes: true })
       .filter((f) => f.name.endsWith(".pdf")).map((f) =>
         `${corpus}ATC Les avants gardes du XXs/${f.name}`
       );
@@ -64,17 +66,16 @@ const fiches = (() => {
   }
 })();
 
-Deno.test({
-  name: "PDF réels du corpus ATC: l'invariant d'offset tient sur chaque bloc",
-  ignore: !fiches.length,
-  async fn() {
+test.skipIf(!fiches.length)(
+  "PDF réels du corpus ATC: l'invariant d'offset tient sur chaque bloc",
+  async () => {
     for (const f of fiches) {
       const doc = assembler((await extrairePdf(f, "arts-appliques")).parties);
       assert(doc.blocs.length > 5, f);
       for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);
     }
   },
-});
+);
 
 const PAGE = `<html><head><title>Titre de repli</title><style>p{}</style></head><body>
 <div class="central-column"><div class="card"><h1 class="pearl-title">Antoni Gaudi, Casa Batll&oacute; (1906)</h1>
@@ -85,7 +86,7 @@ const PAGE = `<html><head><title>Titre de repli</title><style>p{}</style></head>
 <h2>D&eacute;tails</h2><p>Main courante en bois.</p>
 <img src="data:image/png;base64,iVBORw0KGgo=" /></div></div></body></html>`;
 
-Deno.test("HTML Pearltrees: titre, texte décodé, intertitre, première image seule", () => {
+test("HTML Pearltrees: titre, texte décodé, intertitre, première image seule", () => {
   const ext = extraireHtml(PAGE, "repli");
   assertEquals(ext.parties[0].texte, "Antoni Gaudi, Casa Batlló (1906)");
   assertEquals(ext.parties.map((p) => p.texte).slice(1), [
@@ -100,7 +101,7 @@ Deno.test("HTML Pearltrees: titre, texte décodé, intertitre, première image s
   assertEquals(Array.from(ext.images[0].octets.slice(0, 3)), [0xff, 0xd8, 0xff]);
 });
 
-Deno.test("HTML Pearltrees: une page réduite à son titre est vide, sa fiche liée nommée", () => {
+test("HTML Pearltrees: une page réduite à son titre est vide, sa fiche liée nommée", () => {
   const carte = (lien: string) =>
     `<h1 class="pearl-title">ATC Art Nouveau</h1>
 <div class="medals"><div class="author-medal"><a href="x">Sdetienne</a></div><div> – </div>
@@ -111,7 +112,7 @@ Deno.test("HTML Pearltrees: une page réduite à son titre est vide, sa fiche li
   assertEquals(pageVide(PAGE), undefined);
 });
 
-Deno.test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le précède", () => {
+test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le précède", () => {
   const s = rubriquesSommaire(`<div class="pearl"><a href="Synthese sequence.html">x</a></div>
 <div class="section">______<br/>S&eacute;ance 1 : Fauvisme</div>
 <div class="pearl"><a class="relative-url" href="ATC Fiche Fauvisme.html">y</a></div>`);
@@ -119,7 +120,7 @@ Deno.test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le préc�
   assertEquals(s.get("ATC Fiche Fauvisme.html"), "Séance 1 : Fauvisme");
 });
 
-Deno.test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une étiquette non", () => {
+test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une étiquette non", () => {
   const ext = extraireHtml(
     `<h1>Synthèse séance 1</h1>
      <p><b>Fauvisme · Expressionnisme · Cubisme</b></p>

@@ -18,7 +18,7 @@ const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 let arret = false;
 let prochainePurge = 0;
-Deno.addSignalListener("SIGTERM", () => (arret = true));
+process.on("SIGTERM", () => (arret = true));
 
 console.log("worker: en attente de travaux");
 

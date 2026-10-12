@@ -33,13 +33,13 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
 
 ## Forme du système
 
-Un monolithe Deno lance deux processus depuis le même code : le serveur Hono, qui rend les pages
+Un monolithe Node.js lance deux processus depuis le même code : le serveur Hono, qui rend les pages
 et calcule les réponses pendant le flux SSE de l'élève, et le worker, qui extrait les documents
 et génère légendes et questions suggérées. Ils partagent `state.sqlite3`. La file de travaux est
 une table SQLite avec un verrou expirable : un worker tué reprend le travail au redémarrage.
 
 `src/core/` porte l'ingestion, la recherche et la réponse. Il n'importe rien de `src/app/`
-(`deno task frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
+(`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
 
 ## Instances

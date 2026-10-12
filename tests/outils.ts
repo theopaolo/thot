@@ -1,4 +1,6 @@
-import { join } from "@std/path";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Message, Modeles } from "../src/core/modeles.ts";
 import { creerCompte, type Role } from "../src/app/comptes.ts";
 import { config } from "../src/app/config.ts";
@@ -7,7 +9,7 @@ import { creerApp } from "../src/app/routes.ts";
 
 /** Un répertoire de données neuf et une base migrée. */
 export async function environnement() {
-  const dir = await Deno.makeTempDir({ prefix: "thot-test-" });
+  const dir = await mkdtemp(join(tmpdir(), "thot-test-"));
   config.donnees = dir;
   const db = connexion(join(dir, "state.sqlite3"));
   migrer(db);

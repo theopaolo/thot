@@ -1,5 +1,6 @@
+import { readFileSync, mkdirSync, readdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { join } from "@std/path";
+import { join } from "node:path";
 import type { Cache } from "../core/modeles.ts";
 import { config, RACINE } from "./config.ts";
 import { initialiserInstance } from "./instance.ts";
@@ -18,7 +19,7 @@ export function purgerMessages(db: Db, jours: number, date = Date.now()) {
 
 /** Une connexion par processus. WAL laisse lire pendant une écriture du worker. */
 export function connexion(chemin = join(config.donnees, "state.sqlite3")): Db {
-  Deno.mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
+  mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(chemin);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   return db;
@@ -33,7 +34,7 @@ export function migrer(db: Db): string[] {
     db.prepare("SELECT nom FROM migrations").all().map((l) => l.nom as string),
   );
   const dossier = join(RACINE, "migrations");
-  const fichiers = [...Deno.readDirSync(dossier)].map((f) => f.name).filter((n) =>
+  const fichiers = readdirSync(dossier, { withFileTypes: true }).map((f) => f.name).filter((n) =>
     n.endsWith(".sql")
   )
     .sort();
@@ -42,7 +43,7 @@ export function migrer(db: Db): string[] {
     if (faites.has(nom)) continue;
     db.exec("BEGIN IMMEDIATE");
     try {
-      db.exec(Deno.readTextFileSync(join(dossier, nom)));
+      db.exec(readFileSync(join(dossier, nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, ?)").run(nom, maintenant());
       db.exec("COMMIT");
     } catch (e) {

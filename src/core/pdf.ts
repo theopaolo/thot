@@ -1,3 +1,6 @@
+import { execFile, spawn } from "node:child_process";
+import { once } from "node:events";
+import { promisify } from "node:util";
 import type { Extraction, Partie } from "./document.ts";
 import { sansAccents } from "./texte.ts";
 import { type Profil, PROFILS } from "./profils.ts";
@@ -5,27 +8,26 @@ import { type Profil, PROFILS } from "./profils.ts";
 const SEUIL_PAGE_MUETTE = 200;
 
 /** Numéro de page, puce isolée, ligne d'un caractère. */
+const execFileP = promisify(execFile);
+
 const bruit = (l: string) => l.length < 2 || /^\d+\s*(sur|\/)\s*[\d!]+$/i.test(l);
 
 export async function extrairePdf(chemin: string, profil: Profil = "general"): Promise<Extraction> {
-  const linux = Deno.build.os === "linux";
-  const processus = new Deno.Command(linux ? "/usr/bin/prlimit" : "pdftotext", {
-    args: [...(linux ? ["--as=536870912", "--cpu=30", "--", "pdftotext"] : []), chemin, "-"],
-    stdin: "null",
-    stdout: "piped",
-    stderr: "null",
-  }).spawn();
+  const linux = process.platform === "linux";
+  const processus = spawn(
+    linux ? "/usr/bin/prlimit" : "pdftotext",
+    [...(linux ? ["--as=536870912", "--cpu=30", "--", "pdftotext"] : []), chemin, "-"],
+    { stdio: ["ignore", "pipe", "ignore"] },
+  );
   let termine = false;
-  const statut = processus.status.then((s) => {
+  const statut = once(processus, "close").then(([code]) => {
     termine = true;
-    return s;
+    return code as number | null;
   });
   let erreur: Error | undefined;
   const arreter = (raison: string) => {
     erreur ??= new Error(raison);
-    try {
-      processus.kill("SIGKILL");
-    } catch { /* déjà sorti */ }
+    processus.kill("SIGKILL");
   };
   const minuteur = setTimeout(() => arreter("PDF : extraction au-delà de 30 secondes."), 30_000);
   let controleEnCours: Promise<void> | undefined;
@@ -33,14 +35,10 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
   const memoire = linux ? undefined : setInterval(() => {
     if (controleEnCours) return;
     controleEnCours = (async () => {
-      const r = await new Deno.Command("/bin/ps", {
-        args: ["-o", "rss=", "-p", String(processus.pid)],
-        stdout: "piped",
-        stderr: "null",
-        signal: AbortSignal.timeout(1000),
-      }).output();
-      if (!r.success && !termine) throw new Error("ps indisponible");
-      if (Number(new TextDecoder().decode(r.stdout).trim()) > 512 * 1024) {
+      const { stdout } = await execFileP("/bin/ps", ["-o", "rss=", "-p", String(processus.pid)], {
+        timeout: 1000,
+      });
+      if (Number(stdout.trim()) > 512 * 1024) {
         arreter("PDF : extraction au-delà de 512 Mo de mémoire.");
       }
     })().catch(() => {
@@ -62,18 +60,16 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
       }
       texte += decoder.decode(bloc, { stream: true });
     }
-    const sortie = await statut;
+    const code = await statut;
     clearInterval(memoire);
     await controleEnCours;
     if (erreur) throw erreur;
-    if (!sortie.success) throw new Error(`pdftotext a échoué (code ${sortie.code})`);
+    if (code !== 0) throw new Error(`pdftotext a échoué (code ${code})`);
     return decouperPdf(texte + decoder.decode(), profil);
   } finally {
     clearTimeout(minuteur);
     clearInterval(memoire);
-    try {
-      processus.kill("SIGKILL");
-    } catch { /* déjà sorti */ }
+    processus.kill("SIGKILL");
     await statut;
     await controleEnCours;
   }

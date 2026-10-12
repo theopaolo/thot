@@ -1,3 +1,4 @@
+import { writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { contenu } from "./config.ts";
 import { transaction } from "../core/recherche.ts";
 import { type Db, maintenant } from "./db.ts";
@@ -136,9 +137,9 @@ export async function deposer(
   const job_id = crypto.randomUUID();
   const nom = nomSur(d.nomFichier);
   const dossier = contenu(source_id, "original");
-  await Deno.mkdir(dossier, { recursive: true });
-  await Deno.writeFile(`${dossier}/.${nom}.partiel`, d.octets);
-  await Deno.rename(`${dossier}/.${nom}.partiel`, `${dossier}/${nom}`);
+  await mkdir(dossier, { recursive: true });
+  await writeFile(`${dossier}/.${nom}.partiel`, d.octets);
+  await rename(`${dossier}/.${nom}.partiel`, `${dossier}/${nom}`);
 
   const checksum = await sha256(d.octets);
   const t = maintenant();
@@ -190,7 +191,7 @@ export async function deposer(
       ).run(job_id, source_id, t, t);
     });
   } catch (e) {
-    await Deno.remove(contenu(source_id), { recursive: true });
+    await rm(contenu(source_id), { recursive: true });
     throw e;
   }
   return { source_id, job_id };

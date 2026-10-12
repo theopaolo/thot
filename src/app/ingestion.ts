@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { assembler, type Bloc, decouper, type Extraction } from "../core/document.ts";
 import { extraireHtml } from "../core/html.ts";
 import type { Modeles } from "../core/modeles.ts";
@@ -51,9 +53,9 @@ export function revendiquer(db: Db, maintenantMs = Date.now()): Job | undefined 
 
 async function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
   const tmp = `${chemin}.partiel`;
-  if (typeof donnees === "string") await Deno.writeTextFile(tmp, donnees);
-  else await Deno.writeFile(tmp, donnees);
-  await Deno.rename(tmp, chemin);
+  if (typeof donnees === "string") await writeFile(tmp, donnees);
+  else await writeFile(tmp, donnees);
+  await rename(tmp, chemin);
 }
 
 const lireSource = (db: Db, id: string) =>
@@ -62,12 +64,12 @@ const lireSource = (db: Db, id: string) =>
 async function extraire(s: Source): Promise<Extraction> {
   const chemin = contenu(s.id, "original", s.fichier);
   if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
-  if (s.format === "html") return extraireHtml(await Deno.readTextFile(chemin), s.titre);
+  if (s.format === "html") return extraireHtml(await readFile(chemin, "utf8"), s.titre);
   const extension = s.format;
   return {
     parties: [{ texte: s.titre, section: s.titre }],
     images: [{
-      octets: await Deno.readFile(chemin),
+      octets: await readFile(chemin),
       mime: extension === "jpg" ? "image/jpeg" : `image/${extension}`,
       extension,
     }],
@@ -104,7 +106,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");
 
     const dossier = contenu(s.id);
-    await Deno.mkdir(`${dossier}/assets`, { recursive: true });
+    await mkdir(`${dossier}/assets`, { recursive: true });
     await ecrireAtomique(`${dossier}/document.txt`, doc.texte);
     await ecrireAtomique(
       `${dossier}/blocs.jsonl`,
@@ -128,7 +130,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     for (const img of aLegender) {
       try {
         const { texte, modele } = await modeles.legender(
-          await Deno.readFile(`${dossier}/assets/${img.fichier}`),
+          await readFile(`${dossier}/assets/${img.fichier}`),
           img.mime,
           s.profil,
         );
@@ -161,9 +163,9 @@ export async function reextraire(db: Db, sourceId: string) {
   if (s.format !== "html" && s.format !== "pdf") return "ignoree";
   const doc = assembler((await extraire(s)).parties);
   const dossier = contenu(s.id);
-  if (doc.texte !== await Deno.readTextFile(`${dossier}/document.txt`)) return "texte_change";
+  if (doc.texte !== await readFile(`${dossier}/document.txt`, "utf8")) return "texte_change";
   const blocs = doc.blocs.map((b) => JSON.stringify(b)).join("\n");
-  if (blocs === await Deno.readTextFile(`${dossier}/blocs.jsonl`)) return "identique";
+  if (blocs === await readFile(`${dossier}/blocs.jsonl`, "utf8")) return "identique";
   await ecrireAtomique(`${dossier}/blocs.jsonl`, blocs);
   indexer(db, s.id);
   return "mise_a_jour";
@@ -173,8 +175,8 @@ export type Meta = { sequence?: string; seance?: string };
 
 export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] } {
   const dossier = contenu(sourceId);
-  const texte = Deno.readTextFileSync(`${dossier}/document.txt`);
-  const blocs = Deno.readTextFileSync(`${dossier}/blocs.jsonl`).split("\n").filter(Boolean)
+  const texte = readFileSync(`${dossier}/document.txt`, "utf8");
+  const blocs = readFileSync(`${dossier}/blocs.jsonl`, "utf8").split("\n").filter(Boolean)
     .map((l) => JSON.parse(l) as Bloc);
   return { texte, blocs };
 }

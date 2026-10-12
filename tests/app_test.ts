@@ -1,5 +1,7 @@
+import { readFile, writeFile, rm } from "node:fs/promises";
+import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
-import { join } from "@std/path";
+import { join } from "node:path";
 import { openrouter, PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
@@ -67,7 +69,7 @@ const PAGE = enc(`<html><head><title>t</title></head><body><h1>Casa Batlló, Ant
 <p>Gaudí refuse la ligne droite dans toute la façade.</p>
 <p>Le toit en écailles de céramique rappelle le dos d'un dragon, et les cheminées torsadées prolongent le mouvement de la façade jusqu'au ciel de Barcelone.</p></body></html>`);
 
-Deno.test("le format vient des octets, un nom reçu ne devient pas un chemin", () => {
+test("le format vient des octets, un nom reçu ne devient pas un chemin", () => {
   assertEquals(detecterFormat(enc("%PDF-1.7")), "pdf");
   assertEquals(detecterFormat(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])), "jpg");
   assertEquals(
@@ -81,7 +83,7 @@ Deno.test("le format vient des octets, un nom reçu ne devient pas un chemin", (
   assertEquals(nomSur("..."), "sans-nom");
 });
 
-Deno.test("dépôt complet: original écrit, source et travail créés", async () => {
+test("dépôt complet: original écrit, source et travail créés", async () => {
   const { db, dir } = await environnement();
   const { requete } = await session(db, fauxModeles().modeles, "enseignant");
   const r = await requete("/prof/depot", {
@@ -97,14 +99,14 @@ Deno.test("dépôt complet: original écrit, source et travail créés", async (
   assertEquals(acces.audience, "eleves");
   assertEquals(acces.reponses, 1);
   assertEquals(acces.proprietaire_id, db.prepare("SELECT id FROM comptes").get()!.id);
-  const original = await Deno.readTextFile(
-    join(dir, "content", s.id as string, "original", "fiche.pdf"),
+  const original = await readFile(
+    join(dir, "content", s.id as string, "original", "fiche.pdf"), "utf8",
   );
   assertEquals(original, "%PDF-1.7 contenu");
   assertEquals(db.prepare("SELECT etat FROM ingestion_jobs").get()!.etat, "received");
 });
 
-Deno.test("champs manquants et format refusé: erreurs par champ, saisie conservée", async () => {
+test("champs manquants et format refusé: erreurs par champ, saisie conservée", async () => {
   const { db } = await environnement();
   const { requete } = await session(db, fauxModeles().modeles, "enseignant");
   const r = await requete("/prof/depot", {
@@ -126,12 +128,12 @@ Deno.test("champs manquants et format refusé: erreurs par champ, saisie conserv
   assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
 });
 
-Deno.test("les migrations se rejouent sans effet", async () => {
+test("les migrations se rejouent sans effet", async () => {
   const { db } = await environnement();
   assertEquals(migrer(db), []);
 });
 
-Deno.test("une session élève reçoit 403 sur chaque route enseignant", async () => {
+test("une session élève reçoit 403 sur chaque route enseignant", async () => {
   const { db } = await environnement();
   const { requete } = await session(db, fauxModeles().modeles, "eleve");
   for (const chemin of ["/prof", "/prof/depot", "/prof/legendes", "/prof/sources/x"]) {
@@ -161,23 +163,23 @@ async function sourceTraitee(
   return db.prepare("SELECT id FROM sources").get()!.id as string;
 }
 
-Deno.test("réextraire met à jour les sections, jamais le texte des citations", async () => {
+test("réextraire met à jour les sections, jamais le texte des citations", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   assertEquals(await reextraire(db, id), "identique");
   const blocs = join(config.donnees, "content", id, "blocs.jsonl");
-  const avant = await Deno.readTextFile(blocs);
-  await Deno.writeTextFile(blocs, avant.replaceAll('"section":"', '"section":"ancienne '));
+  const avant = await readFile(blocs, "utf8");
+  await writeFile(blocs, avant.replaceAll('"section":"', '"section":"ancienne '));
   assertEquals(await reextraire(db, id), "mise_a_jour");
-  assertEquals(await Deno.readTextFile(blocs), avant);
+  assertEquals(await readFile(blocs, "utf8"), avant);
   const doc = join(config.donnees, "content", id, "document.txt");
-  await Deno.writeTextFile(doc, (await Deno.readTextFile(doc)) + " modifié");
-  await Deno.writeTextFile(blocs, "");
+  await writeFile(doc, (await readFile(doc, "utf8")) + " modifié");
+  await writeFile(blocs, "");
   assertEquals(await reextraire(db, id), "texte_change", "des offsets bougeraient");
-  assertEquals(await Deno.readTextFile(blocs), "", "la source reste telle quelle");
+  assertEquals(await readFile(blocs, "utf8"), "", "la source reste telle quelle");
 });
 
-Deno.test("un travail interrompu reprend après expiration du verrou, sans image en double", async () => {
+test("un travail interrompu reprend après expiration du verrou, sans image en double", async () => {
   const { db } = await environnement();
   const { requete } = await session(db, fauxModeles().modeles, "enseignant");
   await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
@@ -193,7 +195,7 @@ Deno.test("un travail interrompu reprend après expiration du verrou, sans image
   assertEquals(db.prepare("SELECT etat FROM ingestion_jobs").get()!.etat, "awaiting_review");
 });
 
-Deno.test("une source non certifiée n'apparaît sur aucune route élève ni dans l'index", async () => {
+test("une source non certifiée n'apparaît sur aucune route élève ni dans l'index", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   const { requete } = await session(db, fauxModeles().modeles, "eleve");
@@ -221,7 +223,7 @@ Deno.test("une source non certifiée n'apparaît sur aucune route élève ni dan
   );
 });
 
-Deno.test("une génération en cours conserve les légendes relues par un enseignant", async () => {
+test("une génération en cours conserve les légendes relues par un enseignant", async () => {
   const { db, dir } = await environnement();
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
@@ -253,11 +255,11 @@ Deno.test("une génération en cours conserve les légendes relues par un enseig
     }
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("une certification prématurée ne publie rien après le passage du worker", async () => {
+test("une certification prématurée ne publie rien après le passage du worker", async () => {
   const { db, dir } = await environnement();
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
@@ -285,11 +287,11 @@ Deno.test("une certification prématurée ne publie rien après le passage du wo
     );
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("un échec d'indexation annule aussi la certification", async () => {
+test("un échec d'indexation annule aussi la certification", async () => {
   const { db, dir } = await environnement();
   try {
     const id = await sourceTraitee(db);
@@ -303,11 +305,11 @@ Deno.test("un échec d'indexation annule aussi la certification", async () => {
     assertEquals(db.prepare("SELECT count(*) n FROM chunks_fts").get()!.n, 0);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("les documents sans séquence ont leur propre route, distincte d'une séquence homonyme", async () => {
+test("les documents sans séquence ont leur propre route, distincte d'une séquence homonyme", async () => {
   const { db, dir } = await environnement();
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
@@ -346,11 +348,11 @@ Deno.test("les documents sans séquence ont leur propre route, distincte d'une s
     assertEquals((await eleve.requete("/eleve/sans-sequence")).status, 404);
   } finally {
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("sans public Élèves, une source certifiée reste invisible aux élèves et à Thot", async () => {
+test("sans public Élèves, une source certifiée reste invisible aux élèves et à Thot", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db, undefined, { audience: "collegues", reponses: true });
   statuer(db, id, "certifiee", "test");
@@ -383,7 +385,7 @@ Deno.test("sans public Élèves, une source certifiée reste invisible aux élè
   assertEquals(sourceSansSuggestions(db), undefined);
 });
 
-Deno.test("sans public Thot, une source reste lisible mais ne sert pas aux réponses", async () => {
+test("sans public Thot, une source reste lisible mais ne sert pas aux réponses", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db, undefined, { audience: "eleves", reponses: false });
   statuer(db, id, "certifiee", "test");
@@ -409,7 +411,7 @@ Deno.test("sans public Thot, une source reste lisible mais ne sert pas aux répo
   );
 });
 
-Deno.test("une légende non relue aide la recherche mais n'atteint jamais le générateur", async () => {
+test("une légende non relue aide la recherche mais n'atteint jamais le générateur", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.");
   statuer(db, id, "certifiee", "test");
@@ -429,7 +431,7 @@ Deno.test("une légende non relue aide la recherche mais n'atteint jamais le gé
   assertStringIncludes(JSON.stringify(g.vus), "Image : Carapace de dragon");
 });
 
-Deno.test("la recherche trouve une image par sa légende non relue sans la montrer", async () => {
+test("la recherche trouve une image par sa légende non relue sans la montrer", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db, "Carapace de dragon en écailles turquoise.", {
     audience: "eleves",
@@ -447,7 +449,7 @@ Deno.test("la recherche trouve une image par sa légende non relue sans la montr
   assert(!(await (await bas("/eleve/recherche?q=dragon")).text()).includes(`/media/${id}-0`));
 });
 
-Deno.test("trois états de réponse distincts, et une citation fausse ne passe jamais", async () => {
+test("trois états de réponse distincts, et une citation fausse ne passe jamais", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
@@ -465,8 +467,8 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
   assertEquals(ok.resultat.etat, "answered");
   if (ok.resultat.etat === "answered") {
     const a = ok.resultat.affirmations[0];
-    const texte = await Deno.readTextFile(
-      `${(await import("../src/app/config.ts")).config.donnees}/content/${id}/document.txt`,
+    const texte = await readFile(
+      `${(await import("../src/app/config.ts")).config.donnees}/content/${id}/document.txt`, "utf8",
     );
     assertEquals(
       Array.from(texte).slice(a.debut, a.fin).join(""),
@@ -585,7 +587,7 @@ Deno.test("trois états de réponse distincts, et une citation fausse ne passe j
   if (panne.resultat.etat === "failed") assertEquals(panne.resultat.code, "MODEL_EMPTY_RESPONSE");
 });
 
-Deno.test("le chat: question, flux SSE, réponse citée, panneau source", async () => {
+test("le chat: question, flux SSE, réponse citée, panneau source", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
@@ -618,7 +620,7 @@ Deno.test("le chat: question, flux SSE, réponse citée, panneau source", async 
   assertStringIncludes(panneau, `/eleve/sources/${id}?debut=`);
 });
 
-Deno.test("une question proposée n'est gardée que si Thot y répond avec une citation vérifiée", async () => {
+test("une question proposée n'est gardée que si Thot y répond avec une citation vérifiée", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
@@ -659,17 +661,17 @@ Deno.test("une question proposée n'est gardée que si Thot y répond avec une c
   );
 });
 
-Deno.test("le saviez-vous recopie une phrase certifiée et pointe sa position exacte", async () => {
+test("le saviez-vous recopie une phrase certifiée et pointe sa position exacte", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   assertEquals(faitAuHasard(db, ELEVE), undefined, "rien tant que la source n'est pas certifiée");
   statuer(db, id, "certifiee", "test");
   const fait = faitAuHasard(db, ELEVE)!;
-  const texte = await Deno.readTextFile(`${config.donnees}/content/${id}/document.txt`);
+  const texte = await readFile(`${config.donnees}/content/${id}/document.txt`, "utf8");
   assertEquals(Array.from(texte).slice(fait.debut, fait.fin).join(""), fait.phrase);
 });
 
-Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la session", async () => {
+test("CSV élèves: import imprimable, doublon refusé, reset invalide la session", async () => {
   const { db } = await environnement();
   const coursId = cours(db, matiere(db, "Design"), "Design graphique");
   assertEquals(lireListe('identifiant;nom\r\nlea;"Léa, Martin"\r\n'), [{
@@ -712,7 +714,7 @@ Deno.test("CSV élèves: import imprimable, doublon refusé, reset invalide la s
   assertEquals(db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n, 2);
 });
 
-Deno.test("un mot de passe enseignant se renouvelle sans ouvrir le reset élève", async () => {
+test("un mot de passe enseignant se renouvelle sans ouvrir le reset élève", async () => {
   const { db } = await environnement();
   const ancien = await creerCompte(db, "prof-test", "Prof", "enseignant");
   const id = db.prepare("SELECT id FROM comptes WHERE identifiant = 'prof-test'").get()!
@@ -728,7 +730,7 @@ Deno.test("un mot de passe enseignant se renouvelle sans ouvrir le reset élève
   );
 });
 
-Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la question", async () => {
+test("chapitre, suivi, avis et revue enseignant restent liés à la question", async () => {
   const { db } = await environnement();
   const source = await sourceTraitee(db);
   statuer(db, source, "certifiee", "test");
@@ -836,7 +838,7 @@ Deno.test("chapitre, suivi, avis et revue enseignant restent liés à la questio
   );
 });
 
-Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", async () => {
+test("Thot propose date, artiste et mouvement, l'enseignant les valide", async () => {
   const { db } = await environnement();
   const prof = await session(db, fauxModeles().modeles, "enseignant");
   const id = await sourceTraitee(db, undefined, undefined, prof);
@@ -883,7 +885,7 @@ Deno.test("Thot propose date, artiste et mouvement, l'enseignant les valide", as
   assertEquals(sourceSansInformations(db), undefined);
 });
 
-Deno.test("titre édité réindexé, image certifiée liée à la réponse et messages purgés", async () => {
+test("titre édité réindexé, image certifiée liée à la réponse et messages purgés", async () => {
   const { db } = await environnement();
   const prof = await session(db, fauxModeles().modeles, "enseignant");
   const id = await sourceTraitee(db, undefined, undefined, prof);
@@ -970,7 +972,7 @@ async function poserQuestion(
   return (await r.text()).match(/messages\/([\w-]+)\/flux/)![1];
 }
 
-Deno.test("une panne d'indexation annule aussi les éditions de légende et de métadonnées", async () => {
+test("une panne d'indexation annule aussi les éditions de légende et de métadonnées", async () => {
   const { db } = await environnement();
   try {
     const prof = await session(db, fauxModeles().modeles, "enseignant");
@@ -1000,7 +1002,7 @@ Deno.test("une panne d'indexation annule aussi les éditions de légende et de m
   }
 });
 
-Deno.test("un retrait pendant la génération ou le reclassement n'est pas publié", async () => {
+test("un retrait pendant la génération ou le reclassement n'est pas publié", async () => {
   const { db } = await environnement();
   try {
     const id = await sourceTraitee(db);
@@ -1035,7 +1037,7 @@ Deno.test("un retrait pendant la génération ou le reclassement n'est pas publi
   }
 });
 
-Deno.test("les réponses conservées et leurs panneaux revérifient la preuve actuelle", async () => {
+test("les réponses conservées et leurs panneaux revérifient la preuve actuelle", async () => {
   for (const retrait of ["legende", "source", "public", "titre"] as const) {
     const { db } = await environnement();
     try {
@@ -1092,7 +1094,7 @@ Deno.test("les réponses conservées et leurs panneaux revérifient la preuve ac
   }
 });
 
-Deno.test("la durée de session est vérifiée côté serveur même pour un cookie copié", async () => {
+test("la durée de session est vérifiée côté serveur même pour un cookie copié", async () => {
   const { db } = await environnement();
   const now = Date.now;
   try {
@@ -1107,7 +1109,7 @@ Deno.test("la durée de session est vérifiée côté serveur même pour un cook
   }
 });
 
-Deno.test("les dépôts trop grands sont refusés avant lecture du fichier", async () => {
+test("les dépôts trop grands sont refusés avant lecture du fichier", async () => {
   const { db } = await environnement();
   const arrayBuffer = File.prototype.arrayBuffer;
   try {
@@ -1134,6 +1136,7 @@ Deno.test("les dépôts trop grands sont refusés avant lecture du fichier", asy
       method: "POST",
       headers: { "content-type": "multipart/form-data; boundary=test" },
       body,
+      duplex: "half",
     });
     assertEquals(trop.status, 413);
     assert(lus <= 28, "le flux est arrêté sans lire tout le corps");
@@ -1145,7 +1148,7 @@ Deno.test("les dépôts trop grands sont refusés avant lecture du fichier", asy
   }
 });
 
-Deno.test("la migration efface les jugements anciens et ne se rejoue pas", async () => {
+test("la migration efface les jugements anciens et ne se rejoue pas", async () => {
   const { db } = await environnement();
   try {
     db.exec("ALTER TABLE messages DROP COLUMN generation_id");
@@ -1161,7 +1164,7 @@ Deno.test("la migration efface les jugements anciens et ne se rejoue pas", async
   }
 });
 
-Deno.test("une sortie vide du reclasseur reste une panne de fournisseur", async () => {
+test("une sortie vide du reclasseur reste une panne de fournisseur", async () => {
   const { db } = await environnement();
   const fetch = globalThis.fetch;
   try {
@@ -1181,7 +1184,7 @@ Deno.test("une sortie vide du reclasseur reste une panne de fournisseur", async 
   }
 });
 
-Deno.test("une génération active renouvelle son bail et partage son résultat", async () => {
+test("une génération active renouvelle son bail et partage son résultat", async () => {
   const { db } = await environnement();
   const interval = globalThis.setInterval;
   const termine = Promise.withResolvers<void>();
@@ -1228,7 +1231,7 @@ Deno.test("une génération active renouvelle son bail et partage son résultat"
   }
 });
 
-Deno.test("un ancien propriétaire du message ne peut écraser son successeur", async () => {
+test("un ancien propriétaire du message ne peut écraser son successeur", async () => {
   const { db } = await environnement();
   const termine = Promise.withResolvers<void>();
   let premier: Promise<string> | undefined;
@@ -1272,7 +1275,7 @@ Deno.test("un ancien propriétaire du message ne peut écraser son successeur", 
   }
 });
 
-Deno.test("une déconnexion arrête l'attente mais laisse la génération revendiquée se terminer", async () => {
+test("une déconnexion arrête l'attente mais laisse la génération revendiquée se terminer", async () => {
   const { db } = await environnement();
   const termine = Promise.withResolvers<void>();
   try {
@@ -1316,7 +1319,7 @@ Deno.test("une déconnexion arrête l'attente mais laisse la génération revend
   }
 });
 
-Deno.test("le délai du juge annule son signal avant de laisser passer la citation", async () => {
+test("le délai du juge annule son signal avant de laisser passer la citation", async () => {
   const { db } = await environnement();
   const timeout = globalThis.setTimeout;
   try {

@@ -1,3 +1,8 @@
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
+import { once } from "node:events";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { test } from "vite-plus/test";
 import {
   assert,
   assertEquals,
@@ -5,8 +10,8 @@ import {
   assertStringIncludes,
   assertThrows,
 } from "@std/assert";
-import { join } from "@std/path";
-import { cp } from "node:fs/promises";
+import { join } from "node:path";
+import { cp, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import {
   authentifier,
   creerAdministrateur,
@@ -21,8 +26,8 @@ import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import { creerApp } from "../src/app/routes.ts";
 import { environnement, fauxModeles, ORIGINE, session } from "./outils.ts";
 
-Deno.test("migration du pilote : comptes, sources, cache et identité conservés", async () => {
-  const dir = await Deno.makeTempDir();
+test("migration du pilote : comptes, sources, cache et identité conservés", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
   const avant = config.donnees;
   config.donnees = dir;
   const db = connexion();
@@ -37,7 +42,7 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
         "0005_coherence.sql",
       ]
     ) {
-      db.exec(await Deno.readTextFile(join(RACINE, "migrations", nom)));
+      db.exec(await readFile(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
     const mdp = await creerCompte(db, "pilote", "Prof pilote", "enseignant");
@@ -75,11 +80,11 @@ Deno.test("migration du pilote : comptes, sources, cache et identité conservés
   } finally {
     db.close();
     config.donnees = avant;
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("administrateur personnel : code à usage unique, changement obligatoire, récupération", async () => {
+test("administrateur personnel : code à usage unique, changement obligatoire, récupération", async () => {
   const { db, dir } = await environnement();
   const dev = config.dev;
   try {
@@ -160,19 +165,20 @@ Deno.test("administrateur personnel : code à usage unique, changement obligatoi
   } finally {
     config.dev = dev;
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });
 
-Deno.test("deux déploiements et restauration indépendante, mêmes comptes et titres", async () => {
-  const racine = await Deno.makeTempDir();
+test("deux déploiements et restauration indépendante, mêmes comptes et titres", async () => {
+  const racine = await mkdtemp(join(tmpdir(), "thot-"));
   const avant = config.donnees;
-  const processus = new Set<Deno.ChildProcess>();
+  const processus = new Set<ChildProcess>();
   const cli = async (dir: string, ...args: string[]) => {
-    const sortie = await new Deno.Command(Deno.execPath(), {
-      args: ["run", "-RWNE", "--allow-run=pdftotext", "src/cli.ts", ...args],
+    const sortie = spawnSync(process.execPath, ["src/cli.ts", ...args], {
       cwd: RACINE,
+      encoding: "utf8",
       env: {
+        ...process.env,
         THOT_DATA_DIR: dir,
         OPENROUTER_API_KEY: "cle-interdite",
         MISTRAL_API_KEY: "cle-interdite",
@@ -181,11 +187,9 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
         THOT_ORIGIN: "",
         THOT_DEV: "0",
       },
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    assert(sortie.success, new TextDecoder().decode(sortie.stderr));
-    return new TextDecoder().decode(sortie.stdout);
+    });
+    assert(sortie.status === 0, sortie.stderr);
+    return sortie.stdout;
   };
   const preparer = async (nom: string) => {
     const dir = join(racine, nom);
@@ -230,14 +234,16 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
     }
   };
   const lancer = async (dir: string) => {
-    const reservation = Deno.listen({ hostname: "127.0.0.1", port: 0 });
-    const port = (reservation.addr as Deno.NetAddr).port;
+    const reservation = createServer().listen(0, "127.0.0.1");
+    await once(reservation, "listening");
+    const { port } = reservation.address() as { port: number };
     reservation.close();
     const origine = `http://127.0.0.1:${port}`;
-    const p = new Deno.Command(Deno.execPath(), {
-      args: ["run", "-RWNE", "--allow-run", "src/main.ts"],
+    const p = spawn(process.execPath, ["src/main.ts"], {
       cwd: RACINE,
+      stdio: "ignore",
       env: {
+        ...process.env,
         THOT_DATA_DIR: dir,
         THOT_HOST: "127.0.0.1",
         THOT_PORT: String(port),
@@ -249,9 +255,7 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
         THOT_DEV: "0",
         THOT_SECRET: "",
       },
-      stdout: "null",
-      stderr: "null",
-    }).spawn();
+    });
     processus.add(p);
     for (let i = 0; i < 100; i++) {
       try {
@@ -263,9 +267,10 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
     }
     throw new Error("Le déploiement ne démarre pas.");
   };
-  const arreter = async (p: Deno.ChildProcess) => {
+  const arreter = async (p: ChildProcess) => {
+    const fin = once(p, "exit");
     p.kill("SIGTERM");
-    await p.status;
+    await fin;
     processus.delete(p);
   };
   const requete = async (origine: string, path: string, cookie = "", body?: URLSearchParams) => {
@@ -330,15 +335,15 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
       "Atelier B",
     );
     assert(
-      await Deno.readTextFile(join(a.dir, "secret")) !==
-        await Deno.readTextFile(join(b.dir, "secret")),
+      await readFile(join(a.dir, "secret"), "utf8") !==
+        await readFile(join(b.dir, "secret"), "utf8"),
     );
-    assert((await Deno.stat(join(a.dir, "tmp"))).isDirectory);
+    assert((await stat(join(a.dir, "tmp"))).isDirectory());
     await arreter(serveurA.p);
     const sauvegarde = join(racine, "sauvegarde-a");
     await cp(a.dir, sauvegarde, { recursive: true });
     await cli(a.dir, "instance", "--nom=Modifié après sauvegarde");
-    await Deno.remove(a.dir, { recursive: true });
+    await rm(a.dir, { recursive: true });
     await cp(sauvegarde, a.dir, { recursive: true });
     serveurA = await lancer(a.dir);
     assertStringIncludes(
@@ -365,11 +370,11 @@ Deno.test("deux déploiements et restauration indépendante, mêmes comptes et t
   } finally {
     for (const p of processus) await arreter(p);
     config.donnees = avant;
-    await Deno.remove(racine, { recursive: true });
+    await rm(racine, { recursive: true });
   }
 });
 
-Deno.test("origine HTTPS derrière proxy : cookies sécurisés et formulaires limités à l'instance", async () => {
+test("origine HTTPS derrière proxy : cookies sécurisés et formulaires limités à l'instance", async () => {
   const { db, dir } = await environnement();
   const avant = config.origine;
   try {
@@ -400,6 +405,6 @@ Deno.test("origine HTTPS derrière proxy : cookies sécurisés et formulaires li
   } finally {
     config.origine = avant;
     db.close();
-    await Deno.remove(dir, { recursive: true });
+    await rm(dir, { recursive: true });
   }
 });

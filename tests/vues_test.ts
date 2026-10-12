@@ -1,10 +1,11 @@
+import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
 import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource } from "../src/app/vues/eleve.ts";
 import { texteDocument } from "../src/app/vues/document.ts";
 
-Deno.test("les vues partagent le bundle et gardent leurs contrats de fragments et d'échappement", async () => {
+test("les vues partagent le bundle et gardent leurs contrats de fragments et d'échappement", async () => {
   const titre = "<script>alert(1)</script>";
   const chapitre = await pageChapitre("Arts", [{
     id: "source-1",
@@ -65,7 +66,7 @@ Deno.test("les vues partagent le bundle et gardent leurs contrats de fragments e
   assertStringIncludes(String(await blocs[0]), '<mark id="passage">Gaudí</mark>');
 });
 
-Deno.test("le rafraîchissement enseignant exclut le formulaire et conserve les sélections", async () => {
+test("le rafraîchissement enseignant exclut le formulaire et conserve les sélections", async () => {
   const source = {
     id: "source-1",
     titre: "Document",

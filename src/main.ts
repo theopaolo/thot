@@ -1,3 +1,6 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { join } from "node:path";
 import { config, preparerDonnees, RACINE } from "./app/config.ts";
 import { connexion, migrer } from "./app/db.ts";
 
@@ -8,39 +11,38 @@ const faites = migrer(db);
 db.close();
 if (faites.length) console.log(`migrations appliquées: ${faites.join(", ")}`);
 
-const dev = Deno.args.includes("--watch");
-const surveiller = dev ? ["--watch=src/,static/"] : [];
-const envFile = ["--env-file=.env"];
-const lancer = (fichier: string, droits: string[]) =>
-  new Deno.Command(Deno.execPath(), {
-    args: ["run", ...droits, ...envFile, ...surveiller, fichier],
+const dev = process.argv.includes("--watch");
+const surveiller = dev ? ["--watch-path=src/", "--watch-path=static/"] : [];
+// Lecture du code et des données, écriture des données seules. Le worker lance pdftotext.
+const droits = [
+  "--permission",
+  `--allow-fs-read=${RACINE}`,
+  `--allow-fs-read=${config.donnees}`,
+  `--allow-fs-write=${config.donnees}`,
+  "--allow-net",
+];
+const lancer = (args: string[]) =>
+  spawn(process.execPath, args, {
     cwd: RACINE,
-    env: { THOT_DATA_DIR: config.donnees, ...(dev ? { THOT_DEV: "1" } : {}) },
-    stdin: "null",
-  }).spawn();
+    env: { ...process.env, THOT_DATA_DIR: config.donnees, ...(dev ? { THOT_DEV: "1" } : {}) },
+    stdio: ["ignore", "inherit", "inherit"],
+  });
 
-const serveur = lancer("src/server.ts", ["-RWNE"]);
-const worker = lancer("src/worker.ts", ["-RWNE", "--allow-run=pdftotext,/usr/bin/prlimit,/bin/ps"]);
-const processus = [serveur, worker];
-if (dev) {
-  processus.push(new Deno.Command(Deno.execPath(), {
-    args: ["task", "build", "--watch"],
-    cwd: RACINE,
-    stdin: "null",
-  }).spawn());
-}
+const commun = ["--env-file-if-exists=.env", ...surveiller];
+const processus = [
+  lancer([...droits, ...commun, "src/server.ts"]),
+  lancer([...droits, "--allow-child-process", ...commun, "src/worker.ts"]),
+];
+if (dev) processus.push(lancer([join(RACINE, "node_modules/vite-plus/bin/vp"), "build", "--watch"]));
 console.log(`Thot sur http://127.0.0.1:${config.port}`);
 
 // Un processus arrêté entraîne les autres: le serveur ne doit pas accepter de dépôts sans worker.
 const arreter = () => {
-  for (const p of processus) {
-    try {
-      p.kill("SIGTERM");
-    } catch { /* déjà sorti */ }
-  }
+  for (const p of processus) p.kill("SIGTERM");
 };
-for (const signal of ["SIGINT", "SIGTERM"] as const) Deno.addSignalListener(signal, arreter);
-const premier = await Promise.race(processus.map((p) => p.status));
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, arreter);
+const fins = processus.map((p) => once(p, "exit"));
+const [code] = await Promise.race(fins);
 arreter();
-await Promise.allSettled(processus.map((p) => p.status));
-Deno.exit(premier.success ? 0 : 1);
+await Promise.allSettled(fins);
+process.exit(code === 0 ? 0 : 1);

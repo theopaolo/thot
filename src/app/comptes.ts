@@ -1,4 +1,5 @@
-import { join } from "@std/path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
@@ -293,21 +294,21 @@ export const peutModifier = (db: Db, c: Compte, sourceId: string) =>
 
 /** Secret de signature des cookies. Créé au premier lancement, conservé avec les données. */
 export function secretSession(): string {
-  const fromEnv = Deno.env.get("THOT_SECRET");
+  const fromEnv = process.env["THOT_SECRET"];
   if (fromEnv) return fromEnv;
   const chemin = join(config.donnees, "secret");
   try {
-    const secret = Deno.readTextFileSync(chemin).trim();
+    const secret = readFileSync(chemin, "utf8").trim();
     if (!secret) throw new Error("Secret de session vide. Restaurer le secret de l'instance.");
     return secret;
   } catch (e) {
-    if (!(e instanceof Deno.errors.NotFound)) throw e;
-    Deno.mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
+    if (!((e as NodeJS.ErrnoException).code === "ENOENT")) throw e;
+    mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
     const s = hex(crypto.getRandomValues(new Uint8Array(32)));
     try {
-      Deno.writeTextFileSync(chemin, s, { mode: 0o600, createNew: true });
+      writeFileSync(chemin, s, { mode: 0o600, flag: "wx" });
     } catch (e) {
-      if (!(e instanceof Deno.errors.AlreadyExists)) throw e;
+      if (!((e as NodeJS.ErrnoException).code === "EEXIST")) throw e;
       return secretSession();
     }
     return s;

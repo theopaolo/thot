@@ -1,6 +1,7 @@
-// Banc privé : deno run -RWNE --env-file=.env evaluation/bench_vision.ts probe|run|eval
+import { readFile, writeFile, copyFile, stat } from "node:fs/promises";
+// Banc privé : node --env-file=.env evaluation/bench_vision.ts probe|run|eval
 import { DatabaseSync } from "node:sqlite";
-import { basename, dirname, join } from "@std/path";
+import { basename, dirname, join } from "node:path";
 import { config, RACINE } from "../src/app/config.ts";
 import { nomSur } from "../src/app/depot.ts";
 import { indexer } from "../src/app/ingestion.ts";
@@ -10,12 +11,12 @@ import { chercher } from "../src/core/recherche.ts";
 const modeleIds = ["google/gemma-4-26b-a4b-it", "mistralai/mistral-large-4-0"];
 const dossier = join(RACINE, "data/benchmark-ml4");
 const imgOrder = JSON.parse(
-  await Deno.readTextFile(join(RACINE, "../mesures/thot-real/img_order.json")),
+  await readFile(join(RACINE, "../mesures/thot-real/img_order.json"), "utf8"),
 ) as string[];
 const docs = JSON.parse(
-  await Deno.readTextFile(join(RACINE, "../mesures/thot-real/docs.json")),
+  await readFile(join(RACINE, "../mesures/thot-real/docs.json"), "utf8"),
 ) as { id: string; titre: string }[];
-const requetes = JSON.parse(await Deno.readTextFile(join(RACINE, "evaluation/queries_real.json"))) as
+const requetes = JSON.parse(await readFile(join(RACINE, "evaluation/queries_real.json"), "utf8")) as
   { qid: string; type: string; q: string; gold: (number | string)[] }[];
 type Ligne = { id: string; sourceId: string; fichier: string; mime: string; rel: string };
 type Mesure = {
@@ -83,7 +84,7 @@ let mesureActive: Mesure | undefined;
 globalThis.fetch = async (input, init) => {
   const reponse = await vraiFetch(input, init);
   if (mesureActive && String(input).endsWith("/chat/completions") && reponse.ok) {
-    const json = await reponse.clone().json();
+    const json: any = await reponse.clone().json();
     if (typeof json.usage?.completion_tokens === "number") {
       mesureActive.completionTokens = json.usage.completion_tokens;
     }
@@ -96,7 +97,7 @@ globalThis.fetch = async (input, init) => {
 
 async function legender(modele: string, probe: boolean) {
   const chemin = join(dossier, `vision-${modele.replaceAll("/", "-")}.json`);
-  const donnees: Record<string, Mesure> = await Deno.readTextFile(chemin).then(JSON.parse).catch(() => ({}));
+  const donnees: Record<string, Mesure> = await readFile(chemin, "utf8").then(JSON.parse).catch(() => ({}));
   const modeles = openrouter({ ...config.modeles, legende: modele }); // aucun cache
   const aFaire = probe ? lignes.slice(0, 1) : lignes;
   for (const [i, l] of aFaire.entries()) {
@@ -105,7 +106,7 @@ async function legender(modele: string, probe: boolean) {
     const mesure: Mesure = { ms: 0 };
     mesureActive = mesure;
     try {
-      const img = await Deno.readFile(join(RACINE, "data/content", l.sourceId, "assets", l.fichier));
+      const img = await readFile(join(RACINE, "data/content", l.sourceId, "assets", l.fichier));
       const { texte } = await modeles.legender(img, l.mime, "arts-appliques");
       donnees[l.id] = { ...mesure, texte, ms: Math.round(performance.now() - t) };
     } catch (e) {
@@ -114,7 +115,7 @@ async function legender(modele: string, probe: boolean) {
     } finally {
       mesureActive = undefined;
     }
-    await Deno.writeTextFile(chemin, JSON.stringify(donnees));
+    await writeFile(chemin, JSON.stringify(donnees));
     console.log(`${modele} ${i + 1}/${aFaire.length} ${donnees[l.id].erreur ? "ERREUR" : "ok"}`);
     // Mistral direct est partagé avec un autre banc ; même via OpenRouter, 24 débuts/min maximum.
     if (modele.startsWith("mistralai/") && !probe) {
@@ -126,12 +127,12 @@ async function legender(modele: string, probe: boolean) {
 
 async function evaluer(modele: string) {
   const slug = modele.replaceAll("/", "-");
-  const donnees = JSON.parse(await Deno.readTextFile(join(dossier, `vision-${slug}.json`))) as
+  const donnees = JSON.parse(await readFile(join(dossier, `vision-${slug}.json`), "utf8")) as
     Record<string, Mesure>;
   if (lignes.some((l) => !donnees[l.id]?.texte)) throw new Error(`${modele}: légendes incomplètes`);
   const copie = join(dossier, `vision-${slug}.sqlite3`);
-  if (!(await Deno.stat(copie).catch(() => null))) {
-    await Deno.copyFile(join(dossier, "snapshot.sqlite3"), copie);
+  if (!(await stat(copie).catch(() => null))) {
+    await copyFile(join(dossier, "snapshot.sqlite3"), copie);
   }
   const db = new DatabaseSync(copie);
   const maj = db.prepare(
@@ -141,7 +142,7 @@ async function evaluer(modele: string) {
   for (const s of sources) if (lignes.some((l) => l.sourceId === s.id)) indexer(db, s.id);
   const rechercheChemin = join(dossier, `recherche-${slug}.json`);
   const resultats: { qid: string; type: string; rang: number; cibles: number }[] =
-    await Deno.readTextFile(rechercheChemin).then(JSON.parse).catch(() => []);
+    await readFile(rechercheChemin, "utf8").then(JSON.parse).catch(() => []);
   if (!resultats.length) {
     const modeles = openrouter(config.modeles); // même reclasseur que la production, sans cache
     for (const r of requetes) {
@@ -153,7 +154,7 @@ async function evaluer(modele: string) {
       resultats.push({ qid: r.qid, type: r.type, rang, cibles: attendus.length });
       console.log(`${modele} recherche ${resultats.length}/${requetes.length}`);
     }
-    await Deno.writeTextFile(rechercheChemin, JSON.stringify(resultats));
+    await writeFile(rechercheChemin, JSON.stringify(resultats));
   }
   db.close();
   const mesures = lignes.map((l) => donnees[l.id]);
@@ -186,7 +187,7 @@ async function evaluer(modele: string) {
 }
 
 async function empreinte(chemin: string) {
-  const bytes = await Deno.readFile(chemin);
+  const bytes = await readFile(chemin);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -214,7 +215,7 @@ async function enveloppe(rapports: unknown[]) {
   };
 }
 
-const action = Deno.args[0];
+const action = process.argv.slice(2)[0];
 if (action === "probe") {
   for (const m of modeleIds) await legender(m, true);
 } else if (action === "run") {
@@ -223,12 +224,12 @@ if (action === "probe") {
     await legender(m, false);
     rapports.push(await evaluer(m));
   }
-  await Deno.writeTextFile(join(RACINE, "evaluation/resultats/ml4-vision.json"),
+  await writeFile(join(RACINE, "evaluation/resultats/ml4-vision.json"),
     JSON.stringify(await enveloppe(rapports), null, 2));
 } else if (action === "eval") {
   const rapports = [];
   for (const m of modeleIds) rapports.push(await evaluer(m));
-  await Deno.writeTextFile(join(RACINE, "evaluation/resultats/ml4-vision.json"),
+  await writeFile(join(RACINE, "evaluation/resultats/ml4-vision.json"),
     JSON.stringify(await enveloppe(rapports), null, 2));
 } else {
   throw new Error("Usage: bench_vision.ts probe|run|eval");

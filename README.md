@@ -8,21 +8,23 @@ de modèles et rapports.
 
 ## Lancer
 
-Il faut Deno et `pdftotext` (Poppler). Sous Linux, il faut aussi `/usr/bin/prlimit`
-(util-linux) pour borner la mémoire du convertisseur. L'image Docker les installe.
+Il faut pnpm et `pdftotext` (Poppler). pnpm installe Node.js 26 dans le projet. Sous Linux,
+il faut aussi `/usr/bin/prlimit` (util-linux) pour borner la mémoire du convertisseur.
+L'image Docker les installe.
 
 ```bash
+pnpm install
 cp .env.example .env                                  # renseigner OPENROUTER_API_KEY
-deno task thot instance --nom="Mon Thot" --mode=shared
-deno task thot administrateur prof "M. Detienne"       # code de connexion à usage unique
-deno task dev                                         # serveur et worker, http://127.0.0.1:8000
+pnpm thot instance --nom="Mon Thot" --mode=shared
+pnpm thot administrateur prof "M. Detienne"            # code de connexion à usage unique
+pnpm dev                                              # serveur et worker, http://127.0.0.1:8000
 ```
 
-- `deno task dev` accepte n'importe quel mot de passe pour les comptes ordinaires. Un
+- `pnpm dev` accepte n'importe quel mot de passe pour les comptes ordinaires. Un
   administrateur garde une authentification complète.
-- `deno task check` : format, lint, types serveur et navigateur, frontière `core/`/`app/`, tests
-- `deno task thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
-- `deno task board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878
+- `pnpm check` : format, lint et types (`vp check`), build, frontière `core/`/`app/`, tests
+- `pnpm thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
+- `pnpm board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878
 
 Pour un usage personnel, choisir `--mode=personal` avant de créer le compte. Aucun établissement
 ni aucune classe ne sont nécessaires. Le propriétaire ouvre ses documents et ses questions,

@@ -1,5 +1,7 @@
-import { parseArgs } from "@std/cli/parse-args";
-import { basename, dirname, extname, join, relative } from "@std/path";
+import { readFileSync } from "node:fs";
+import { mkdir, opendir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { parseArgs } from "node:util";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
@@ -71,36 +73,42 @@ const AIDE = `thot <commande>
                                             écrit les paires affirmation-citation à annoter
   eval soutien --paires=<paires.json>       juge chaque paire annotée, mesure l'accord`;
 
-const args = parseArgs(Deno.args, {
-  boolean: ["json", "tout", "sans-reclasseur", "help"],
-  string: [
-    "matiere",
-    "classe",
-    "type",
-    "img-order",
-    "docs",
-    "enseignant",
-    "par",
-    "paires",
-    "nom",
-    "mode",
-    "profil",
-    "matiere-id",
-    "cours-id",
-    "theme-id",
-    "langue",
-    "auteur",
-    "version",
-    "juridiction",
-    "date-publication",
-    "date-evenement",
-    "valide-du",
-    "valide-au",
-    "niveau",
-    "objectif",
-  ],
+const oui = { type: "boolean" } as const;
+const texte = { type: "string" } as const;
+const { values: args, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    json: oui,
+    tout: oui,
+    "sans-reclasseur": oui,
+    help: oui,
+    matiere: texte,
+    classe: texte,
+    type: texte,
+    "img-order": texte,
+    docs: texte,
+    enseignant: texte,
+    par: texte,
+    paires: texte,
+    nom: texte,
+    mode: texte,
+    profil: texte,
+    "matiere-id": texte,
+    "cours-id": texte,
+    "theme-id": texte,
+    langue: texte,
+    auteur: texte,
+    version: texte,
+    juridiction: texte,
+    "date-publication": texte,
+    "date-evenement": texte,
+    "valide-du": texte,
+    "valide-au": texte,
+    niveau: texte,
+    objectif: texte,
+  },
 });
-const [commande, ...reste] = args._.map(String);
+const [commande, ...reste] = positionals;
 preparerDonnees();
 const db = connexion();
 migrer(db);
@@ -109,20 +117,20 @@ const modeles = openrouter(config.modeles, cacheModeles(db));
 const FORMATS_ACCEPTES = new Set([".pdf", ".html", ".htm", ".png", ".jpg", ".jpeg"]);
 
 async function* fichiers(chemin: string): AsyncGenerator<string> {
-  const info = await Deno.stat(chemin);
-  if (info.isFile) return yield chemin;
+  const info = await stat(chemin);
+  if (info.isFile()) return yield chemin;
   const entrees = [];
-  for await (const e of Deno.readDir(chemin)) entrees.push(e);
+  for await (const e of await opendir(chemin)) entrees.push(e);
   entrees.sort((a, b) => a.name.localeCompare(b.name));
   for (const e of entrees) {
     if (e.name.startsWith(".")) continue;
-    if (e.isDirectory) yield* fichiers(join(chemin, e.name));
+    if (e.isDirectory()) yield* fichiers(join(chemin, e.name));
     else yield join(chemin, e.name);
   }
 }
 
 async function ingest(chemin: string) {
-  const racine = (await Deno.stat(chemin)).isFile ? dirname(chemin) : chemin;
+  const racine = (await stat(chemin)).isFile() ? dirname(chemin) : chemin;
   const sommaires = new Map<string, Map<string, string>>();
   let deposes = 0;
   const refus: string[] = [];
@@ -133,7 +141,7 @@ async function ingest(chemin: string) {
       refus.push(`${relative(racine, f)}: extension non acceptée`);
       continue;
     }
-    const octets = await Deno.readFile(f);
+    const octets = await readFile(f);
     const controle = controlerFichier(octets);
     if ("erreur" in controle) {
       refus.push(`${relative(racine, f)}: ${controle.erreur}`);
@@ -157,12 +165,12 @@ async function ingest(chemin: string) {
     }
     const dossier = dirname(f);
     if (!sommaires.has(dossier)) {
-      const s = await Deno.readTextFile(join(dossier, "Sommaire.html")).catch(() => "");
+      const s = await readFile(join(dossier, "Sommaire.html"), "utf8").catch(() => "");
       const rubriques = rubriquesSommaire(s);
       // Le sommaire range la page qui présente une fiche PDF, pas la fiche: elle hérite de sa
       // rubrique.
       for (const [href, rubrique] of [...rubriques]) {
-        const page = await Deno.readTextFile(join(dossier, href)).catch(() => "");
+        const page = await readFile(join(dossier, href), "utf8").catch(() => "");
         const lie = page && pageVide(page)?.fichier;
         if (lie) rubriques.set(lie, rubrique);
       }
@@ -226,7 +234,7 @@ async function nettoyer() {
   ).all(lireInstance(db).school_id) as { id: string; fichier: string; metadonnees: string }[];
   let n = 0;
   for (const p of pages) {
-    const vide = pageVide(await Deno.readTextFile(contenu(p.id, "original", p.fichier)));
+    const vide = pageVide(await readFile(contenu(p.id, "original", p.fichier), "utf8"));
     if (!vide) continue;
     const { sequence, seance } = JSON.parse(p.metadonnees);
     const fiche = vide.fichier && db.prepare(
@@ -247,7 +255,7 @@ async function nettoyer() {
       }
     });
     if (fiche) indexer(db, fiche);
-    await Deno.remove(contenu(p.id), { recursive: true });
+    await rm(contenu(p.id), { recursive: true });
     console.log(`  ${p.fichier}${fiche ? ` → ${vide.fichier}` : ""}`);
     n++;
   }
@@ -265,7 +273,7 @@ async function traiterFile() {
 
 /** Légendes produites par le banc d'essai avec le même modèle et la même consigne. */
 function importerLegendes(chemin: string) {
-  const json = JSON.parse(Deno.readTextFileSync(chemin));
+  const json = JSON.parse(readFileSync(chemin, "utf8"));
   const modele = json._meta?.modele ?? "inconnu";
   let n = 0;
   for (const [rel, legende] of Object.entries(json.legendes as Record<string, string>)) {
@@ -290,9 +298,9 @@ const plier = (s: string) =>
 
 async function evalRecherche() {
   if (!args["img-order"]) throw new Error("--img-order=<chemin vers img_order.json> est requis.");
-  const ordre = JSON.parse(await Deno.readTextFile(args["img-order"])) as string[];
+  const ordre = JSON.parse(await readFile(args["img-order"], "utf8")) as string[];
   const requetes = JSON.parse(
-    await Deno.readTextFile(join(RACINE, "evaluation/queries_real.json")),
+    await readFile(join(RACINE, "evaluation/queries_real.json"), "utf8"),
   ) as Requete[];
   const sources = db.prepare(
     "SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources",
@@ -300,7 +308,7 @@ async function evalRecherche() {
   // Une cible de section (« Cubisme.pdf#02 ») désigne une rubrique d'une fiche PDF. Le banc
   // numérotait ses sections, `docs.json` du dépôt de recherche donne leur rubrique.
   const docs = args.docs
-    ? (JSON.parse(await Deno.readTextFile(args.docs)) as { id: string; titre: string }[])
+    ? (JSON.parse(await readFile(args.docs, "utf8")) as { id: string; titre: string }[])
     : [];
   type Cible = { source: string; rubrique?: string };
   const cibles = (g: number | string): Cible[] => {
@@ -364,19 +372,19 @@ async function evalRecherche() {
     sans_cible: lignes.filter((l) => !l.cibles).map((l) => l.qid),
     echecs: lignes.filter((l) => !l.rang).map((l) => l.qid),
   };
-  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
+  await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(
     config.donnees,
     `evaluation/resultats/recherche-${args["sans-reclasseur"] ? "fts5" : "reclasseur"}.json`,
   );
-  await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
+  await writeFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
-  console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
+  console.log(`écrit dans ${relative(process.cwd(), sortie)}`);
 }
 
 async function evalGeneration() {
   const jeu = JSON.parse(
-    await Deno.readTextFile(join(RACINE, "evaluation/queries_generation.json")),
+    await readFile(join(RACINE, "evaluation/queries_generation.json"), "utf8"),
   ) as {
     questions: { qid: string; q: string; gold: string[] }[];
     sans_reponse: { qid: string; q: string; registre: string }[];
@@ -480,17 +488,17 @@ async function evalGeneration() {
     latence_mediane_ms:
       lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
   };
-  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
+  await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(config.donnees, "evaluation/resultats/generation.json");
-  await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
+  await writeFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
-  console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
+  console.log(`écrit dans ${relative(process.cwd(), sortie)}`);
   if (args.paires) {
     // Une ligne par paire pour annoter à la main. `createNew` protège un fichier déjà annoté.
-    await Deno.writeTextFile(
+    await writeFile(
       args.paires,
       `[\n${paires.map((x) => JSON.stringify(x)).join(",\n")}\n]\n`,
-      { createNew: true },
+      { flag: "wx" },
     );
     console.log(`${paires.length} paires à annoter dans ${args.paires}`);
   }
@@ -516,7 +524,7 @@ function paragraphe(a: { source_id: string; citation: string; debut?: number; fi
 
 async function evalSoutien() {
   if (!args.paires) throw new Error("--paires=<chemin vers paires.json> est requis.");
-  const toutes = JSON.parse(await Deno.readTextFile(args.paires)) as Paire[];
+  const toutes = JSON.parse(await readFile(args.paires, "utf8")) as Paire[];
   const annotees = toutes.filter((x) => typeof x.soutient === "boolean");
   if (!annotees.some((x) => x.soutient) || !annotees.some((x) => !x.soutient)) {
     throw new Error("Il faut des paires annotées `soutient: true` et `soutient: false`.");
@@ -567,11 +575,11 @@ async function evalSoutien() {
       lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
   };
   // Les citations restent hors du dépôt: le rapport ne garde que les identifiants.
-  await Deno.mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
+  await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(config.donnees, "evaluation/resultats/soutien.json");
-  await Deno.writeTextFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
+  await writeFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
-  console.log(`écrit dans ${relative(Deno.cwd(), sortie)}`);
+  console.log(`écrit dans ${relative(process.cwd(), sortie)}`);
 }
 
 switch (commande) {
@@ -624,13 +632,13 @@ switch (commande) {
     const [coursId, identifiant] = reste;
     if (!coursId || !identifiant || reste.length !== 2) {
       console.error(`usage: thot ${commande} <cours_id> <identifiant>`);
-      Deno.exit(2);
+      process.exit(2);
     }
     const compte = db.prepare("SELECT id FROM comptes WHERE identifiant = ?")
       .get(identifiant.trim().toLowerCase());
     if (!compte) {
       console.error(`Compte introuvable : ${identifiant}`);
-      Deno.exit(1);
+      process.exit(1);
     }
     if (commande === "membre") Domaines.inscrire(db, coursId, compte.id as string);
     else Domaines.desinscrire(db, coursId, compte.id as string);
@@ -662,7 +670,7 @@ switch (commande) {
     const [identifiant, nom, role] = reste;
     if (!identifiant || !nom || !["enseignant", "eleve"].includes(role)) {
       console.error("usage: thot compte <identifiant> <nom> <enseignant|eleve>");
-      Deno.exit(2);
+      process.exit(2);
     }
     console.log(
       `Mot de passe de ${identifiant}: ${await creerCompte(db, identifiant, nom, role as Role)}`,
@@ -673,7 +681,7 @@ switch (commande) {
     const identifiant = reste[0]?.trim().toLowerCase();
     if (!identifiant || reste.length !== 1) {
       console.error("usage: thot reinitialiser <identifiant enseignant>");
-      Deno.exit(2);
+      process.exit(2);
     }
     const compte = db.prepare(
       "SELECT id FROM comptes WHERE identifiant = ? AND role = 'enseignant'",
@@ -681,7 +689,7 @@ switch (commande) {
       .get(identifiant);
     if (!compte) {
       console.error(`Compte enseignant introuvable : ${identifiant}`);
-      Deno.exit(1);
+      process.exit(1);
     }
     console.log(
       `Nouveau mot de passe de ${identifiant}: ${await reinitialiserMotDePasse(
