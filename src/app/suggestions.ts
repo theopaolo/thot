@@ -11,13 +11,15 @@ const LONGUEUR_MIN = 250;
 
 /** Questions vérifiées sur les plus longs passages d'une source certifiée. */
 export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: string) {
-  const passages = db.prepare(
-    `SELECT c.source_id, c.titre, c.texte FROM chunks c JOIN sources s ON s.id = c.source_id
+  const passages = db
+    .prepare(
+      `SELECT c.source_id, c.titre, c.texte FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE c.source_id = ? AND s.statut = 'certifiee' AND length(c.texte) >= ?
        AND s.audience = 'eleves'
        AND s.reponses = 1
      ORDER BY length(c.texte) DESC LIMIT ?`,
-  ).all(sourceId, LONGUEUR_MIN, PASSAGES_PAR_SOURCE) as {
+    )
+    .all(sourceId, LONGUEUR_MIN, PASSAGES_PAR_SOURCE) as {
     source_id: string;
     titre: string;
     texte: string;
@@ -25,13 +27,13 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
   const questions: Awaited<ReturnType<typeof questionsVerifiees>> = [];
   for (const p of passages) {
     questions.push(
-      ...await questionsVerifiees(
+      ...(await questionsVerifiees(
         db,
         modeles,
         p,
         { lecteur: null, schoolId: lireInstance(db).school_id, sourceId },
         config.seuil,
-      ),
+      )),
     );
   }
   transaction(db, () => {
@@ -47,12 +49,14 @@ export async function genererSuggestions(db: Db, modeles: Modeles, sourceId: str
 
 /** Prochaine source certifiée sans suggestions, pour le worker. */
 export const sourceSansSuggestions = (db: Db) =>
-  db.prepare(
-    `SELECT id FROM sources s WHERE statut = 'certifiee' AND suggestions_le IS NULL
+  db
+    .prepare(
+      `SELECT id FROM sources s WHERE statut = 'certifiee' AND suggestions_le IS NULL
        AND s.audience = 'eleves'
        AND s.reponses = 1
      LIMIT 1`,
-  ).get()?.id as string | undefined;
+    )
+    .get()?.id as string | undefined;
 
 export const marquerSuggestions = (db: Db, sourceId: string) =>
   db.prepare("UPDATE sources SET suggestions_le = ? WHERE id = ?").run(maintenant(), sourceId);
@@ -61,14 +65,16 @@ export type Suggestion = { question: string; chapitre: string };
 
 /** Quelques questions par chapitre, tirées au hasard parmi celles des sources certifiées. */
 export function suggestionsParChapitre(db: Db, l: Lecteur, parChapitre = 3): Map<string, string[]> {
-  const lignes = db.prepare(
-    `SELECT sg.question, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS chapitre
+  const lignes = db
+    .prepare(
+      `SELECT sg.question, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS chapitre
      FROM suggestions sg JOIN sources s ON s.id = sg.source_id
      WHERE s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}
        AND s.audience = 'eleves'
        AND s.reponses = 1
      ORDER BY random()`,
-  ).all(lireInstance(db).school_id, ...parametresAcces(l)) as Suggestion[];
+    )
+    .all(lireInstance(db).school_id, ...parametresAcces(l)) as Suggestion[];
   const out = new Map<string, string[]>();
   for (const l of lignes) {
     const liste = out.get(l.chapitre) ?? [];
@@ -86,9 +92,15 @@ const DEPENDANTE =
 /** Une phrase qui se lit seule et porte un fait: une date ou un nom propre après le premier mot. */
 function autonome(x: string) {
   const mots = x.split(/\s+/);
-  return mots.length >= 12 && mots.length <= 40 && /^\p{Lu}/u.test(x) && /[.!]$/.test(x) &&
-    !DEPENDANTE.test(x) && !/[«»|]/.test(x) &&
-    (/\b1[5-9]\d\d\b|\b20\d\d\b/.test(x) || mots.slice(1).some((m) => /^\p{Lu}\p{Ll}/u.test(m)));
+  return (
+    mots.length >= 12 &&
+    mots.length <= 40 &&
+    /^\p{Lu}/u.test(x) &&
+    /[.!]$/.test(x) &&
+    !DEPENDANTE.test(x) &&
+    !/[«»|]/.test(x) &&
+    (/\b1[5-9]\d\d\b|\b20\d\d\b/.test(x) || mots.slice(1).some((m) => /^\p{Lu}\p{Ll}/u.test(m)))
+  );
 }
 
 export type Fait = {
@@ -104,19 +116,24 @@ export type Fait = {
  * dans le document. Rien n'est généré.
  */
 export function faitAuHasard(db: Db, l: Lecteur): Fait | undefined {
-  const passages = db.prepare(
-    `SELECT c.source_id, c.titre, c.texte, c.debut FROM chunks c JOIN sources s ON s.id = c.source_id
+  const passages = db
+    .prepare(
+      `SELECT c.source_id, c.titre, c.texte, c.debut FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE s.statut = 'certifiee' AND c.school_id = ? AND length(c.texte) >= 300
        AND s.audience = 'eleves' AND ${FILTRE_ACCES}
      ORDER BY random() LIMIT 10`,
-  ).all(lireInstance(db).school_id, ...parametresAcces(l)) as {
+    )
+    .all(lireInstance(db).school_id, ...parametresAcces(l)) as {
     source_id: string;
     titre: string;
     texte: string;
     debut: number;
   }[];
   for (const p of passages) {
-    const phrases = p.texte.split(/(?<=[.!])\s+|\n+/).map((x) => x.trim()).filter(autonome);
+    const phrases = p.texte
+      .split(/(?<=[.!])\s+|\n+/)
+      .map((x) => x.trim())
+      .filter(autonome);
     if (!phrases.length) continue;
     const phrase = phrases[Math.floor(Math.random() * phrases.length)];
     const position = trouver(p.texte, phrase);
@@ -134,12 +151,16 @@ export function faitAuHasard(db: Db, l: Lecteur): Fait | undefined {
 
 /** Les questions suggérées viennent des sources publiées aux élèves que le lecteur lit. */
 export function suggestionsDuPerimetre(db: Db, l: Lecteur, ids: Set<string>, question = "") {
-  return db.prepare(
-    `SELECT sg.question, sg.source_id FROM suggestions sg JOIN sources s ON s.id = sg.source_id
+  return db
+    .prepare(
+      `SELECT sg.question, sg.source_id FROM suggestions sg JOIN sources s ON s.id = sg.source_id
     WHERE s.statut = 'certifiee' AND sg.question != ? AND ${FILTRE_ACCES}
       AND s.audience = 'eleves'
       AND s.reponses = 1
     ORDER BY random()`,
-  ).all(question, ...parametresAcces(l)).filter((s) => ids.has(s.source_id as string)).slice(0, 3)
+    )
+    .all(question, ...parametresAcces(l))
+    .filter((s) => ids.has(s.source_id as string))
+    .slice(0, 3)
     .map((s) => s.question as string);
 }

@@ -66,7 +66,9 @@ export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')
     WHERE sc.source_id = s.id AND (? = '' OR co.matiere_id = ?)
       AND (? = '' OR sc.cours_id = ?) AND (? = '' OR sc.theme_id = ?)))`;
 export const parametresDomaine = (p: Perimetre) => {
-  const m = p.matiereId ?? "", c = p.coursId ?? "", t = p.themeId ?? "";
+  const m = p.matiereId ?? "",
+    c = p.coursId ?? "",
+    t = p.themeId ?? "";
   return [m, c, t, m, c, t, m, m, m, c, c, t, t];
 };
 
@@ -90,8 +92,9 @@ export function transaction<T>(db: DatabaseSync, f: () => T): T {
 }
 
 export function retirerSource(db: DatabaseSync, sourceId: string) {
-  db.prepare("DELETE FROM chunks_fts WHERE rowid IN (SELECT n FROM chunks WHERE source_id = ?)")
-    .run(sourceId);
+  db.prepare(
+    "DELETE FROM chunks_fts WHERE rowid IN (SELECT n FROM chunks WHERE source_id = ?)",
+  ).run(sourceId);
   db.prepare("DELETE FROM chunks WHERE source_id = ?").run(sourceId);
 }
 
@@ -113,8 +116,9 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   const termes = [...new Set(racines(question))];
   if (!termes.length) return [];
   // Le filtre d'établissement s'applique dans la même requête que le classement.
-  const lignes = db.prepare(
-    `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
+  const lignes = db
+    .prepare(
+      `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
        AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
@@ -122,42 +126,43 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
        AND (? = '' OR s.id = ?)
        AND ${FILTRE_DOMAINE}
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
-  ).all(
-    termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
-    p.schoolId,
-    ...parametresAcces(p.lecteur),
-    p.bibliotheque ? 1 : 0,
-    p.chapitre ?? "",
-    p.chapitre ?? "",
-    p.sourceId ?? "",
-    p.sourceId ?? "",
-    ...parametresDomaine(p),
-    k,
-  );
+    )
+    .all(
+      termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
+      p.schoolId,
+      ...parametresAcces(p.lecteur),
+      p.bibliotheque ? 1 : 0,
+      p.chapitre ?? "",
+      p.chapitre ?? "",
+      p.sourceId ?? "",
+      p.sourceId ?? "",
+      ...parametresDomaine(p),
+      k,
+    );
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));
 }
 
 export function lireChunk(db: DatabaseSync, sourceId: string, id: string, p: Perimetre) {
-  return db.prepare(
-    `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
+  return db
+    .prepare(
+      `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE c.source_id = ? AND c.id = ? AND s.school_id = ? AND s.statut = 'certifiee'
        AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
        AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
        AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`,
-  ).get(
-    sourceId,
-    id,
-    p.schoolId,
-    ...parametresAcces(p.lecteur),
-    p.bibliotheque ? 1 : 0,
-    p.chapitre ?? "",
-    p.chapitre ?? "",
-    p.sourceId ?? "",
-    p.sourceId ?? "",
-    ...parametresDomaine(p),
-  ) as
-    | ChunkIndexe
-    | undefined;
+    )
+    .get(
+      sourceId,
+      id,
+      p.schoolId,
+      ...parametresAcces(p.lecteur),
+      p.bibliotheque ? 1 : 0,
+      p.chapitre ?? "",
+      p.chapitre ?? "",
+      p.sourceId ?? "",
+      p.sourceId ?? "",
+      ...parametresDomaine(p),
+    ) as ChunkIndexe | undefined;
 }
 
 /** FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. */
@@ -170,13 +175,24 @@ export async function chercher(
 ): Promise<Recherche> {
   const candidats = chercherFts(db, question, p);
   if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
-  const ordre = await modeles.reclasser(question, candidats.map((c) => c.rappel));
+  const ordre = await modeles.reclasser(
+    question,
+    candidats.map((c) => c.rappel),
+  );
   for (const { index, score } of ordre) candidats[index].score = score;
-  const classes = ordre.map(({ index }) => candidats[index]).filter((c) => {
-    const actuel = lireChunk(db, c.source_id, c.id, p);
-    return actuel && actuel.titre === c.titre && actuel.rappel === c.rappel &&
-      actuel.preuve === c.preuve && actuel.debut === c.debut && actuel.fin === c.fin;
-  });
+  const classes = ordre
+    .map(({ index }) => candidats[index])
+    .filter((c) => {
+      const actuel = lireChunk(db, c.source_id, c.id, p);
+      return (
+        actuel &&
+        actuel.titre === c.titre &&
+        actuel.rappel === c.rappel &&
+        actuel.preuve === c.preuve &&
+        actuel.debut === c.debut &&
+        actuel.fin === c.fin
+      );
+    });
   const score = classes[0]?.score ?? 0;
   return {
     candidats: classes,

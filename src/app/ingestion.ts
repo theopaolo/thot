@@ -40,15 +40,17 @@ export function revendiquer(db: Db, maintenantMs = Date.now()): Job | undefined 
        erreur = 'Interrompu ${MAX_TENTATIVES} fois, abandonné.'
      WHERE etat IN ('extracting', 'enriching') AND verrou_expire_le < ? AND tentatives >= ?`,
   ).run(t, t, MAX_TENTATIVES);
-  return db.prepare(
-    `UPDATE ingestion_jobs SET etat = 'extracting', tentatives = tentatives + 1,
+  return db
+    .prepare(
+      `UPDATE ingestion_jobs SET etat = 'extracting', tentatives = tentatives + 1,
        verrou_expire_le = ?, maj_le = ?
      WHERE id = (SELECT id FROM ingestion_jobs
                  WHERE etat = 'received'
                     OR (etat IN ('extracting', 'enriching') AND verrou_expire_le < ?)
                  ORDER BY cree_le LIMIT 1)
      RETURNING id, source_id, tentatives`,
-  ).get(horodatage(maintenantMs + VERROU_MS), t, t) as Job | undefined;
+    )
+    .get(horodatage(maintenantMs + VERROU_MS), t, t) as Job | undefined;
 }
 
 async function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
@@ -68,11 +70,13 @@ async function extraire(s: Source): Promise<Extraction> {
   const extension = s.format;
   return {
     parties: [{ texte: s.titre, section: s.titre }],
-    images: [{
-      octets: await readFile(chemin),
-      mime: extension === "jpg" ? "image/jpeg" : `image/${extension}`,
-      extension,
-    }],
+    images: [
+      {
+        octets: await readFile(chemin),
+        mime: extension === "jpg" ? "image/jpeg" : `image/${extension}`,
+        extension,
+      },
+    ],
     avertissements: [],
   };
 }
@@ -123,10 +127,12 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     }
     etat(db, job, "enriching", avertissements);
 
-    const aLegender = db.prepare(
-      `SELECT id, fichier, mime FROM images
+    const aLegender = db
+      .prepare(
+        `SELECT id, fichier, mime FROM images
        WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
-    ).all(s.id) as { id: string; fichier: string; mime: string }[];
+      )
+      .all(s.id) as { id: string; fichier: string; mime: string }[];
     for (const img of aLegender) {
       try {
         const { texte, modele } = await modeles.legender(
@@ -163,9 +169,9 @@ export async function reextraire(db: Db, sourceId: string) {
   if (s.format !== "html" && s.format !== "pdf") return "ignoree";
   const doc = assembler((await extraire(s)).parties);
   const dossier = contenu(s.id);
-  if (doc.texte !== await readFile(`${dossier}/document.txt`, "utf8")) return "texte_change";
+  if (doc.texte !== (await readFile(`${dossier}/document.txt`, "utf8"))) return "texte_change";
   const blocs = doc.blocs.map((b) => JSON.stringify(b)).join("\n");
-  if (blocs === await readFile(`${dossier}/blocs.jsonl`, "utf8")) return "identique";
+  if (blocs === (await readFile(`${dossier}/blocs.jsonl`, "utf8"))) return "identique";
   await ecrireAtomique(`${dossier}/blocs.jsonl`, blocs);
   indexer(db, s.id);
   return "mise_a_jour";
@@ -176,7 +182,9 @@ export type Meta = { sequence?: string; seance?: string };
 export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] } {
   const dossier = contenu(sourceId);
   const texte = readFileSync(`${dossier}/document.txt`, "utf8");
-  const blocs = readFileSync(`${dossier}/blocs.jsonl`, "utf8").split("\n").filter(Boolean)
+  const blocs = readFileSync(`${dossier}/blocs.jsonl`, "utf8")
+    .split("\n")
+    .filter(Boolean)
     .map((l) => JSON.parse(l) as Bloc);
   return { texte, blocs };
 }
@@ -188,18 +196,23 @@ export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
   const contexte = [
     s.profil === "arts-appliques" ? meta.sequence?.replace(/^ATC /, "") : meta.sequence,
     meta.seance,
-  ].filter(Boolean).join(" / ");
-  const images = db.prepare(
-    `SELECT legende, legende_statut FROM images
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  const images = db
+    .prepare(
+      `SELECT legende, legende_statut FROM images
      WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
-  ).all(sourceId) as { legende: string; legende_statut: string }[];
+    )
+    .all(sourceId) as { legende: string; legende_statut: string }[];
   const chunks = decouper(lireDocument(sourceId));
   return chunks.map((c, i) => {
     // Les images d'une page accompagnent son premier passage.
     const legendes = i === 0 ? images : [];
-    const titre = c.section && c.section !== s.titre && c.section !== "Introduction"
-      ? `${s.titre} : ${c.section}`
-      : s.titre;
+    const titre =
+      c.section && c.section !== s.titre && c.section !== "Introduction"
+        ? `${s.titre} : ${c.section}`
+        : s.titre;
     return {
       id: c.id,
       source_id: s.id,
@@ -208,14 +221,14 @@ export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
       debut: c.debut,
       fin: c.fin,
       texte: c.texte,
-      rappel: [contexte, titre, c.texte, ...legendes.map((l) => l.legende)].filter(Boolean).join(
-        "\n",
-      ),
+      rappel: [contexte, titre, c.texte, ...legendes.map((l) => l.legende)]
+        .filter(Boolean)
+        .join("\n"),
       preuve: [
         c.texte,
-        ...legendes.filter((l) => l.legende_statut === "certified").map((l) =>
-          `Image : ${l.legende}`
-        ),
+        ...legendes
+          .filter((l) => l.legende_statut === "certified")
+          .map((l) => `Image : ${l.legende}`),
       ].join("\n\n"),
     };
   });
@@ -236,10 +249,12 @@ ce que tu sais par ailleurs.
 Réponds par un objet JSON seul : {"date": "", "artiste": "", "mouvement": ""}`;
 
 const plier = (s: string) =>
-  ` ${
-    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ")
-      .trim()
-  } `;
+  ` ${s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()} `;
 
 /**
  * Date, artiste et mouvement lus dans la sortie du modèle. Une valeur dont un morceau ne se lit
@@ -248,22 +263,29 @@ const plier = (s: string) =>
 export function lireInformations(sortie: string, fiche: string): Record<string, string> {
   const brut = JSON.parse(sortie.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
   const lue = plier(fiche);
-  return Object.fromEntries(INFORMATIONS.map((nom) => {
-    const v = typeof brut[nom] === "string" ? brut[nom].trim().slice(0, 120) : "";
-    const morceaux = v.split(/,| et /).map(plier).filter((m) => m.trim());
-    return [nom, morceaux.every((m) => lue.includes(m)) ? v : ""];
-  }));
+  return Object.fromEntries(
+    INFORMATIONS.map((nom) => {
+      const v = typeof brut[nom] === "string" ? brut[nom].trim().slice(0, 120) : "";
+      const morceaux = v
+        .split(/,| et /)
+        .map(plier)
+        .filter((m) => m.trim());
+      return [nom, morceaux.every((m) => lue.includes(m)) ? v : ""];
+    }),
+  );
 }
 
 /** Prochaine source extraite sans proposition, que l'enseignant n'a pas encore enregistrée. */
 export const sourceSansInformations = (db: Db) =>
-  db.prepare(
-    `SELECT s.id FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
+  db
+    .prepare(
+      `SELECT s.id FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
      WHERE j.etat = 'awaiting_review' AND s.statut != 'rejetee' AND s.profil = 'arts-appliques'
        AND json_type(s.metadonnees, '$.propositions') IS NULL
        AND json_type(s.metadonnees, '$.artiste') IS NULL
      LIMIT 1`,
-  ).get()?.id as string | undefined;
+    )
+    .get()?.id as string | undefined;
 
 /**
  * Propose date, artiste et mouvement d'après le titre, le nom du fichier et le début du texte.
@@ -317,8 +339,12 @@ export function statuer(db: Db, sourceId: string, statut: "certifiee" | "rejetee
     ) {
       throw new Error("La source n'est pas prête à être certifiée.");
     }
-    db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?")
-      .run(statut, par, maintenant(), sourceId);
+    db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?").run(
+      statut,
+      par,
+      maintenant(),
+      sourceId,
+    );
     indexerSource(db, sourceId, statut === "certifiee" ? chunksSource(db, sourceId) : []);
   });
 }

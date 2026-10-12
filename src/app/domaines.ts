@@ -103,29 +103,41 @@ export function renommer(db: Db, genre: string, id: string, nom: string) {
  */
 export function supprimer(db: Db, genre: string, id: string) {
   const nom = nomEntree(db, genre, id);
-  const liste = (sql: string, ...p: string[]) => db.prepare(sql).all(...p).map((l) => l.id);
+  const liste = (sql: string, ...p: string[]) =>
+    db
+      .prepare(sql)
+      .all(...p)
+      .map((l) => l.id);
   transaction(db, () => {
-    const cours = genre === "cours"
-      ? [id]
-      : genre === "matiere"
-      ? liste("SELECT id FROM cours WHERE matiere_id = ?", id)
-      : [];
-    const themes = genre === "theme" ? [id] : liste(
-      "SELECT id FROM themes WHERE cours_id IN (SELECT value FROM json_each(?))",
-      JSON.stringify(cours),
-    );
+    const cours =
+      genre === "cours"
+        ? [id]
+        : genre === "matiere"
+          ? liste("SELECT id FROM cours WHERE matiere_id = ?", id)
+          : [];
+    const themes =
+      genre === "theme"
+        ? [id]
+        : liste(
+            "SELECT id FROM themes WHERE cours_id IN (SELECT value FROM json_each(?))",
+            JSON.stringify(cours),
+          );
     const [m, c, t] = [genre === "matiere" ? [id] : [], cours, themes].map((l) =>
-      JSON.stringify(l)
+      JSON.stringify(l),
     );
     const dans = "IN (SELECT value FROM json_each(?))";
-    const ressources = db.prepare(
-      `SELECT count(*) AS n FROM (SELECT id FROM sources WHERE matiere_id ${dans}
+    const ressources = db
+      .prepare(
+        `SELECT count(*) AS n FROM (SELECT id FROM sources WHERE matiere_id ${dans}
         UNION SELECT source_id FROM source_cours WHERE cours_id ${dans} OR theme_id ${dans})`,
-    ).get(m, c, t)!.n as number;
-    const questions = db.prepare(
-      `SELECT count(*) AS n FROM messages
+      )
+      .get(m, c, t)!.n as number;
+    const questions = db
+      .prepare(
+        `SELECT count(*) AS n FROM messages
        WHERE matiere_id ${dans} OR cours_id ${dans} OR theme_id ${dans}`,
-    ).get(m, c, t)!.n as number;
+      )
+      .get(m, c, t)!.n as number;
     if (ressources || questions) {
       const emplois = [
         ressources && `${ressources} ressource(s)`,
@@ -133,7 +145,11 @@ export function supprimer(db: Db, genre: string, id: string) {
       ];
       throw new Error(`« ${nom} » est utilisé par ${emplois.filter(Boolean).join(" et ")}.`);
     }
-    for (const [table, ids] of [["themes", t], ["cours", c], ["matieres", m]]) {
+    for (const [table, ids] of [
+      ["themes", t],
+      ["cours", c],
+      ["matieres", m],
+    ]) {
       db.prepare(`DELETE FROM ${table} WHERE id ${dans}`).run(ids);
     }
   });
@@ -178,14 +194,18 @@ export function domaineSource(db: Db, champs: Record<string, string>) {
 /** Les cours dont le compte est membre. */
 export const coursDuCompte = (db: Db, compteId: string) =>
   new Set(
-    db.prepare("SELECT cours_id FROM membres_cours WHERE compte_id = ?").all(compteId)
+    db
+      .prepare("SELECT cours_id FROM membres_cours WHERE compte_id = ?")
+      .all(compteId)
       .map((l) => l.cours_id as string),
   );
 export const membres = (db: Db, coursId: string) =>
-  db.prepare(
-    `SELECT a.id, a.identifiant, a.nom, a.role FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
+  db
+    .prepare(
+      `SELECT a.id, a.identifiant, a.nom, a.role FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
      WHERE m.cours_id = ? ORDER BY a.role, a.nom`,
-  ).all(coursId) as { id: string; identifiant: string; nom: string; role: string }[];
+    )
+    .all(coursId) as { id: string; identifiant: string; nom: string; role: string }[];
 export function inscrire(db: Db, coursId: string, compteId: string) {
   if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
     throw new Error("Cours inconnu.");
@@ -196,10 +216,9 @@ export function inscrire(db: Db, coursId: string, compteId: string) {
   db.prepare("INSERT OR IGNORE INTO membres_cours VALUES (?, ?)").run(coursId, compteId);
 }
 export const desinscrire = (db: Db, coursId: string, compteId: string) =>
-  db.prepare("DELETE FROM membres_cours WHERE cours_id = ? AND compte_id = ?").run(
-    coursId,
-    compteId,
-  );
+  db
+    .prepare("DELETE FROM membres_cours WHERE cours_id = ? AND compte_id = ?")
+    .run(coursId, compteId);
 
 type Membre = { id: string; administrateur: number };
 /** Les cours et thèmes qu'un enseignant peut choisir : les siens. Un administrateur voit tout. */
@@ -228,9 +247,9 @@ export function liensAutorises(
     throw new Error("Rattachement refusé : ce cours n'est pas le vôtre.");
   }
   const actuels = sourceId
-    ? db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?").all(
-      sourceId,
-    ) as Affiliation[]
+    ? (db
+        .prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
+        .all(sourceId) as Affiliation[])
     : [];
   const autres = siens ? actuels.filter((l) => !siens.has(l.cours_id)) : [];
   // Sans cours, une source partagée se lirait dans toute l'instance.
@@ -246,11 +265,11 @@ export function affiliations(db: Db, sourceId: string, liens: Affiliation[]) {
     if (
       !db.prepare("SELECT id FROM cours WHERE id = ?").get(l.cours_id) ||
       (l.theme_id &&
-        !db.prepare("SELECT id FROM themes WHERE id = ? AND cours_id = ?").get(
-          l.theme_id,
-          l.cours_id,
-        ))
-    ) throw new Error("Cours ou thème inconnu.");
+        !db
+          .prepare("SELECT id FROM themes WHERE id = ? AND cours_id = ?")
+          .get(l.theme_id, l.cours_id))
+    )
+      throw new Error("Cours ou thème inconnu.");
   }
   db.prepare("DELETE FROM source_cours WHERE source_id = ?").run(sourceId);
   for (const l of liens) {
@@ -277,11 +296,13 @@ export function rangerLegacy(
 ) {
   if (!matiereId) return;
   const restreint = par && par.administrateur !== 1;
-  let c = db.prepare(
-    `SELECT id FROM cours WHERE matiere_id = ? AND (? OR id IN
+  let c = db
+    .prepare(
+      `SELECT id FROM cours WHERE matiere_id = ? AND (? OR id IN
       (SELECT cours_id FROM membres_cours WHERE compte_id = ?))
      ORDER BY rowid LIMIT 1`,
-  ).get(matiereId, restreint ? 0 : 1, par?.id ?? "")?.id as string | undefined;
+    )
+    .get(matiereId, restreint ? 0 : 1, par?.id ?? "")?.id as string | undefined;
   if (!c && restreint) {
     // Le formulaire ne montre pas les cours des autres enseignants : leurs liens restent.
     affiliations(db, sourceId, liensAutorises(db, par, [], sourceId));
@@ -293,9 +314,9 @@ export function rangerLegacy(
     db.prepare("SELECT nom FROM matieres WHERE id = ?").get(matiereId)!.nom as string,
   );
   const t = sequence
-    ? db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = ?").get(c, sequence)?.id as
-      | string
-      | undefined ?? theme(db, c, sequence)
+    ? ((db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = ?").get(c, sequence)?.id as
+        | string
+        | undefined) ?? theme(db, c, sequence))
     : null;
   const lien = [{ cours_id: c, theme_id: t }];
   affiliations(db, sourceId, par ? liensAutorises(db, par, lien, sourceId) : lien);
@@ -309,7 +330,8 @@ export const lireScope = (champs: Record<string, unknown>): Scope => ({
 });
 export function sourcesPerimetre(db: Db, p: Scope) {
   return new Set(
-    db.prepare(`SELECT s.id FROM sources s WHERE ${FILTRE_DOMAINE}`)
+    db
+      .prepare(`SELECT s.id FROM sources s WHERE ${FILTRE_DOMAINE}`)
       .all(
         ...parametresDomaine({
           schoolId: "",
@@ -318,7 +340,8 @@ export function sourcesPerimetre(db: Db, p: Scope) {
           coursId: p.cours_id,
           themeId: p.theme_id,
         }),
-      ).map((s) => s.id as string),
+      )
+      .map((s) => s.id as string),
   );
 }
 
@@ -328,10 +351,12 @@ export const MES_COURS =
 export const mesCours = (l: Lecteur) => [l.administrateur ? 1 : 0, l.id];
 export function catalogueVisible(db: Db, l: Lecteur): Catalogue {
   const cat = catalogue(db);
-  const liens = db.prepare(
-    `SELECT sc.cours_id, sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
+  const liens = db
+    .prepare(
+      `SELECT sc.cours_id, sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
     WHERE s.statut = 'certifiee' AND ${FILTRE_ACCES} AND ${MES_COURS}`,
-  ).all(...parametresAcces(l), ...mesCours(l));
+    )
+    .all(...parametresAcces(l), ...mesCours(l));
   const ids = new Set(liens.map((s) => s.cours_id));
   const themes = new Set(liens.map((s) => s.theme_id));
   cat.cours = cat.cours.filter((c) => ids.has(c.id));

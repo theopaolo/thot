@@ -65,12 +65,16 @@ export async function creerCompte(db: Db, identifiant: string, nom: string, role
 /** CSV UTF-8 avec colonnes identifiant,nom. Les guillemets et retours de ligne sont permis. */
 export function lireListe(csv: string): { identifiant: string; nom: string }[] {
   const lignes: string[][] = [];
-  let ligne: string[] = [], valeur = "", cite = false, ferme = false;
+  let ligne: string[] = [],
+    valeur = "",
+    cite = false,
+    ferme = false;
   csv = csv.replace(/^\uFEFF/, "");
-  const separateur = (csv.split(/\r?\n/, 1)[0].match(/;/g)?.length ?? 0) >
-      (csv.split(/\r?\n/, 1)[0].match(/,/g)?.length ?? 0)
-    ? ";"
-    : ",";
+  const separateur =
+    (csv.split(/\r?\n/, 1)[0].match(/;/g)?.length ?? 0) >
+    (csv.split(/\r?\n/, 1)[0].match(/,/g)?.length ?? 0)
+      ? ";"
+      : ",";
   for (let i = 0; i < csv.length; i++) {
     const c = csv[i];
     if (ferme && c !== separateur && c !== "\n" && c !== "\r") {
@@ -112,7 +116,10 @@ export function lireListe(csv: string): { identifiant: string; nom: string }[] {
     identifiant = identifiant?.trim().toLowerCase();
     nom = nom?.trim();
     if (
-      lignes[i].length !== 2 || !/^[a-z0-9._-]{3,40}$/.test(identifiant) || !nom || nom.length > 100
+      lignes[i].length !== 2 ||
+      !/^[a-z0-9._-]{3,40}$/.test(identifiant) ||
+      !nom ||
+      nom.length > 100
     ) {
       throw new Error(`Ligne ${i + 2}: identifiant ou nom invalide.`);
     }
@@ -133,7 +140,7 @@ export async function importerEleves(db: Db, csv: string, cours: string[] = []) 
       throw new Error(`Identifiant déjà utilisé : ${c.identifiant}.`);
     }
   }
-  const resultats: (typeof comptes[number] & {
+  const resultats: ((typeof comptes)[number] & {
     motDePasse: string;
     id: string;
     sel: string;
@@ -170,8 +177,7 @@ export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "
   db.prepare(
     `UPDATE comptes SET sel = ?, empreinte = ?, session_version = session_version + 1,
       renouveler_mdp = administrateur WHERE id = ?`,
-  )
-    .run(sel, await deriver(motDePasse, sel), id);
+  ).run(sel, await deriver(motDePasse, sel), id);
   return motDePasse;
 }
 
@@ -182,9 +188,9 @@ export async function creerAdministrateur(db: Db, identifiant: string, nom: stri
     );
   }
   identifiant = identifiant.trim().toLowerCase();
-  const existant = db.prepare("SELECT id, role FROM comptes WHERE identifiant = ?").get(
-    identifiant,
-  );
+  const existant = db
+    .prepare("SELECT id, role FROM comptes WHERE identifiant = ?")
+    .get(identifiant);
   if (existant && existant.role !== "enseignant") {
     throw new Error(
       "Ce compte est un élève. Choisir un compte enseignant ou un nouvel identifiant.",
@@ -199,8 +205,9 @@ export async function creerAdministrateur(db: Db, identifiant: string, nom: stri
     const motDePasse = existant
       ? await reinitialiserMotDePasse(db, existant.id as string, "enseignant")
       : await creerCompte(db, identifiant, nom, "enseignant");
-    db.prepare("UPDATE comptes SET administrateur = 1, renouveler_mdp = 1 WHERE identifiant = ?")
-      .run(identifiant);
+    db.prepare(
+      "UPDATE comptes SET administrateur = 1, renouveler_mdp = 1 WHERE identifiant = ?",
+    ).run(identifiant);
     db.exec("COMMIT");
     return motDePasse!;
   } catch (e) {
@@ -210,10 +217,12 @@ export async function creerAdministrateur(db: Db, identifiant: string, nom: stri
 }
 
 export function consommerProvisoire(db: Db, compte: Compte) {
-  const { changes } = db.prepare(
-    `UPDATE comptes SET empreinte = '', session_version = session_version + 1
+  const { changes } = db
+    .prepare(
+      `UPDATE comptes SET empreinte = '', session_version = session_version + 1
      WHERE id = ? AND session_version = ? AND renouveler_mdp = 1`,
-  ).run(compte.id, compte.session_version);
+    )
+    .run(compte.id, compte.session_version);
   if (changes) compte.session_version++;
   return !!changes;
 }
@@ -223,19 +232,22 @@ export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: stri
     throw new Error("Choisir un mot de passe de 12 à 200 caractères.");
   }
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
-  const { changes } = db.prepare(
-    `UPDATE comptes SET sel = ?, empreinte = ?, renouveler_mdp = 0,
+  const { changes } = db
+    .prepare(
+      `UPDATE comptes SET sel = ?, empreinte = ?, renouveler_mdp = 0,
        session_version = session_version + 1
      WHERE id = ? AND session_version = ? AND renouveler_mdp = 1`,
-  ).run(sel, await deriver(motDePasse, sel), compte.id, compte.session_version);
+    )
+    .run(sel, await deriver(motDePasse, sel), compte.id, compte.session_version);
   if (!changes) throw new Error("Session expirée. Demander une récupération à l'opérateur.");
 }
 
 export async function authentifier(db: Db, identifiant: string, motDePasse: string) {
-  const l = db.prepare("SELECT * FROM comptes WHERE identifiant = ?")
+  const l = db
+    .prepare("SELECT * FROM comptes WHERE identifiant = ?")
     .get(identifiant.trim().toLowerCase()) as
-      | (Compte & { sel: string; empreinte: string })
-      | undefined;
+    | (Compte & { sel: string; empreinte: string })
+    | undefined;
   // Une dérivation a lieu même sans compte: la durée ne révèle pas quels identifiants existent.
   const empreinte = await deriver(motDePasse, l?.sel ?? "absent");
   if (!l || empreinte.length !== l.empreinte.length) return null;
@@ -246,25 +258,23 @@ export async function authentifier(db: Db, identifiant: string, motDePasse: stri
   // Le contournement en développement exclut les administrateurs.
   return diff === 0 || (config.dev && !l.administrateur)
     ? {
-      id: l.id,
-      identifiant: l.identifiant,
-      nom: l.nom,
-      role: l.role,
-      session_version: l.session_version,
-      administrateur: l.administrateur,
-      renouveler_mdp: l.renouveler_mdp,
-    }
+        id: l.id,
+        identifiant: l.identifiant,
+        nom: l.nom,
+        role: l.role,
+        session_version: l.session_version,
+        administrateur: l.administrateur,
+        renouveler_mdp: l.renouveler_mdp,
+      }
     : null;
 }
 
 export const lireCompte = (db: Db, id: string) =>
-  db.prepare(
-    "SELECT id, identifiant, nom, role, session_version, administrateur, renouveler_mdp FROM comptes WHERE id = ?",
-  ).get(
-    id,
-  ) as
-    | Compte
-    | undefined;
+  db
+    .prepare(
+      "SELECT id, identifiant, nom, role, session_version, administrateur, renouveler_mdp FROM comptes WHERE id = ?",
+    )
+    .get(id) as Compte | undefined;
 
 export const lecteur = (c: Compte): Lecteur => ({
   id: c.id,
@@ -272,7 +282,8 @@ export const lecteur = (c: Compte): Lecteur => ({
   administrateur: c.administrateur === 1,
 });
 export const peutLire = (db: Db, c: Compte, sourceId: string) =>
-  db.prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
+  db
+    .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
     .get(sourceId, ...parametresAcces(lecteur(c))) !== undefined;
 /**
  * Modifient, certifient et relisent une source : son propriétaire, les administrateurs, et les
@@ -289,7 +300,8 @@ export const parametresModification = (c: Compte) => [
   c.id,
 ];
 export const peutModifier = (db: Db, c: Compte, sourceId: string) =>
-  db.prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${filtreModification()}`)
+  db
+    .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${filtreModification()}`)
     .get(sourceId, ...parametresModification(c)) !== undefined;
 
 /** Secret de signature des cookies. Créé au premier lancement, conservé avec les données. */

@@ -14,19 +14,20 @@ const config: ConfigModeles = {
 test("le reclasseur refuse les sorties vides, scores invalides et indices incohÃ©rents", async () => {
   const fetch = globalThis.fetch;
   try {
-    for (
-      const results of [
-        undefined,
-        [],
-        [null],
-        [{ index: -1, relevance_score: 1 }],
-        [{ index: 1, relevance_score: 1 }],
-        [{ index: 0.5, relevance_score: 1 }],
-        [{ index: 0, relevance_score: "0.9" }],
-        [{ index: 0, relevance_score: null }],
-        [{ index: 0, relevance_score: 1 }, { index: 0, relevance_score: 0.5 }],
-      ]
-    ) {
+    for (const results of [
+      undefined,
+      [],
+      [null],
+      [{ index: -1, relevance_score: 1 }],
+      [{ index: 1, relevance_score: 1 }],
+      [{ index: 0.5, relevance_score: 1 }],
+      [{ index: 0, relevance_score: "0.9" }],
+      [{ index: 0, relevance_score: null }],
+      [
+        { index: 0, relevance_score: 1 },
+        { index: 0, relevance_score: 0.5 },
+      ],
+    ]) {
       globalThis.fetch = () => Promise.resolve(Response.json({ results }));
       const e = await assertRejects(
         () => openrouter(config).reclasser("question", ["texte"]),
@@ -36,10 +37,12 @@ test("le reclasseur refuse les sorties vides, scores invalides et indices incohÃ
     }
     globalThis.fetch = () =>
       Promise.resolve(Response.json({ results: [{ index: 0, relevance_score: 0 }] }));
-    assertEquals(await openrouter(config).reclasser("question", ["texte"]), [{
-      index: 0,
-      score: 0,
-    }]);
+    assertEquals(await openrouter(config).reclasser("question", ["texte"]), [
+      {
+        index: 0,
+        score: 0,
+      },
+    ]);
     for (const body of ["null", "[]", "not JSON"]) {
       globalThis.fetch = () => Promise.resolve(new Response(body));
       const e = await assertRejects(
@@ -119,7 +122,7 @@ test("annuler le juge interrompt la requÃªte et interdit les reprises et la relÃ
       return Promise.resolve(new Response("indisponible", { status: 503 }));
     };
     await assertRejects(() =>
-      openrouter(config).soutenir("phrase", "citation", "titre", controle.signal)
+      openrouter(config).soutenir("phrase", "citation", "titre", controle.signal),
     );
     assertEquals(appels, 1);
   } finally {

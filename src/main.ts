@@ -33,7 +33,8 @@ const processus = [
   lancer([...droits, ...commun, "src/server.ts"]),
   lancer([...droits, "--allow-child-process", ...commun, "src/worker.ts"]),
 ];
-if (dev) processus.push(lancer([join(RACINE, "node_modules/vite-plus/bin/vp"), "build", "--watch"]));
+if (dev)
+  processus.push(lancer([join(RACINE, "node_modules/vite-plus/bin/vp"), "build", "--watch"]));
 console.log(`Thot sur http://127.0.0.1:${config.port}`);
 
 // Un processus arrêté entraîne les autres: le serveur ne doit pas accepter de dépôts sans worker.

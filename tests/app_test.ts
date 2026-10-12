@@ -100,7 +100,8 @@ test("dépôt complet: original écrit, source et travail créés", async () => 
   assertEquals(acces.reponses, 1);
   assertEquals(acces.proprietaire_id, db.prepare("SELECT id FROM comptes").get()!.id);
   const original = await readFile(
-    join(dir, "content", s.id as string, "original", "fiche.pdf"), "utf8",
+    join(dir, "content", s.id as string, "original", "fiche.pdf"),
+    "utf8",
   );
   assertEquals(original, "%PDF-1.7 contenu");
   assertEquals(db.prepare("SELECT etat FROM ingestion_jobs").get()!.etat, "received");
@@ -111,13 +112,16 @@ test("champs manquants et format refusé: erreurs par champ, saisie conservée",
   const { requete } = await session(db, fauxModeles().modeles, "enseignant");
   const r = await requete("/prof/depot", {
     method: "POST",
-    body: formulaire({
-      titre: "   ",
-      type_document: "cours",
-      matiere: "",
-      classe: "2nde",
-      seance: "S1",
-    }, enc("MZ\x90 exe")),
+    body: formulaire(
+      {
+        titre: "   ",
+        type_document: "cours",
+        matiere: "",
+        classe: "2nde",
+        seance: "S1",
+      },
+      enc("MZ\x90 exe"),
+    ),
   });
   assertEquals(r.status, 400);
   const page = await r.text();
@@ -153,7 +157,7 @@ async function sourceTraitee(
   // Le compte qui dépose possède la source: lui seul (ou un administrateur) peut ensuite la modifier.
   prof?: Awaited<ReturnType<typeof session>>,
 ) {
-  const { requete } = prof ?? await session(db, fauxModeles().modeles, "enseignant");
+  const { requete } = prof ?? (await session(db, fauxModeles().modeles, "enseignant"));
   await requete("/prof/depot", {
     method: "POST",
     body: formulaire(CHAMPS, PAGE, "casa.html", acces),
@@ -268,7 +272,8 @@ test("une certification prématurée ne publie rien après le passage du worker"
     for (const etat of ["received", "extracting", "enriching", "failed"]) {
       db.prepare("UPDATE ingestion_jobs SET etat = ? WHERE source_id = ?").run(etat, id);
       assertThrows(() => statuer(db, id, "certifiee", "Prof"), Error, "pas prête");
-      const source = db.prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
+      const source = db
+        .prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
         .get(id)!;
       assertEquals([source.statut, source.statut_par, source.statut_le], ["a_relire", null, null]);
     }
@@ -298,7 +303,8 @@ test("un échec d'indexation annule aussi la certification", async () => {
     db.exec(`CREATE TRIGGER index_indisponible BEFORE INSERT ON chunks
       BEGIN SELECT RAISE(ABORT, 'Index indisponible'); END`);
     assertThrows(() => statuer(db, id, "certifiee", "Prof"), Error, "Index indisponible");
-    const source = db.prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
+    const source = db
+      .prepare("SELECT statut, statut_par, statut_le FROM sources WHERE id = ?")
       .get(id)!;
     assertEquals([source.statut, source.statut_par, source.statut_le], ["a_relire", null, null]);
     assertEquals(db.prepare("SELECT count(*) n FROM chunks").get()!.n, 0);
@@ -332,8 +338,9 @@ test("les documents sans séquence ont leur propre route, distincte d'une séque
     const accueil = await (await eleve.requete("/eleve")).text();
     const chemins = ["/eleve/sans-sequence", "/eleve/sequences/Sans%20s%C3%A9quence"];
     for (const [i, chemin] of chemins.entries()) {
-      const theme = db.prepare("SELECT theme_id FROM source_cours WHERE source_id = ?").get(ids[i])
-        ?.theme_id;
+      const theme = db
+        .prepare("SELECT theme_id FROM source_cours WHERE source_id = ?")
+        .get(ids[i])?.theme_id;
       assertStringIncludes(accueil, `href="${theme ? `/eleve/themes/${theme}` : chemin}"`);
       const r = await eleve.requete(`${chemin}?doc=${ids[i]}`);
       assertEquals(r.status, 200);
@@ -362,19 +369,20 @@ test("sans public Élèves, une source certifiée reste invisible aux élèves e
   assertEquals((await prof.requete(`/prof/sources/${id}`)).status, 200);
   assertEquals((await prof.requete(`/media/${id}-0`)).status, 200);
   assert(!(await (await eleve.requete("/eleve")).text()).includes(CHAMPS.titre));
-  for (
-    const chemin of [
-      `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`,
-      `/eleve/documents/${id}/apercu`,
-      `/eleve/sources/${id}`,
-      `/media/${id}-0`,
-    ]
-  ) assertEquals((await eleve.requete(chemin)).status, 404, chemin);
+  for (const chemin of [
+    `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`,
+    `/eleve/documents/${id}/apercu`,
+    `/eleve/sources/${id}`,
+    `/media/${id}-0`,
+  ])
+    assertEquals((await eleve.requete(chemin)).status, 404, chemin);
   assertEquals(
-    (await eleve.requete("/eleve/questions", {
-      method: "POST",
-      body: new URLSearchParams({ texte: "Pourquoi ?", chapitre: CHAMPS.sequence }),
-    })).status,
+    (
+      await eleve.requete("/eleve/questions", {
+        method: "POST",
+        body: new URLSearchParams({ texte: "Pourquoi ?", chapitre: CHAMPS.sequence }),
+      })
+    ).status,
     400,
   );
   assertEquals(
@@ -400,13 +408,15 @@ test("sans public Thot, une source reste lisible mais ne sert pas aux réponses"
   );
   assertEquals(sourceSansSuggestions(db), undefined);
   assertEquals(
-    (await demander(
-      db,
-      fauxModeles().modeles,
-      "Pourquoi Gaudí refuse la ligne droite ?",
-      { lecteur: null, schoolId: "pilote" },
-      0.023,
-    )).resultat.etat,
+    (
+      await demander(
+        db,
+        fauxModeles().modeles,
+        "Pourquoi Gaudí refuse la ligne droite ?",
+        { lecteur: null, schoolId: "pilote" },
+        0.023,
+      )
+    ).resultat.etat,
     "out_of_corpus",
   );
 });
@@ -457,18 +467,21 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   const p = { lecteur: null, schoolId: "pilote" };
 
   const bonne = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
   const ok = await demander(db, fauxModeles({ sorties: [bonne] }).modeles, q, p, 0.023);
   assertEquals(ok.resultat.etat, "answered");
   if (ok.resultat.etat === "answered") {
     const a = ok.resultat.affirmations[0];
     const texte = await readFile(
-      `${(await import("../src/app/config.ts")).config.donnees}/content/${id}/document.txt`, "utf8",
+      `${(await import("../src/app/config.ts")).config.donnees}/content/${id}/document.txt`,
+      "utf8",
     );
     assertEquals(
       Array.from(texte).slice(a.debut, a.fin).join(""),
@@ -480,11 +493,13 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   assertEquals(bas.resultat, { etat: "out_of_corpus", raison: "seuil" });
 
   const fausse = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí utilisait du plutonium.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite … plutonium radioactif",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí utilisait du plutonium.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite … plutonium radioactif",
+      },
+    ],
   });
   const repare = await demander(db, fauxModeles({ sorties: [fausse, bonne] }).modeles, q, p, 0.023);
   assertEquals(repare.resultat.etat, "answered", "une réparation est permise");
@@ -498,10 +513,7 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   );
   assertEquals(forme.resultat.etat, "answered", "une sortie mal formée se répare aussi");
   const melange = JSON.stringify({
-    affirmations: [
-      JSON.parse(bonne).affirmations[0],
-      JSON.parse(fausse).affirmations[0],
-    ],
+    affirmations: [JSON.parse(bonne).affirmations[0], JSON.parse(fausse).affirmations[0]],
   });
   const partielle = await demander(
     db,
@@ -532,22 +544,21 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
 
   // Une citation réelle qui ne prouve pas sa phrase: le juge la refuse, le générateur la répare.
   const excessive = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite dans toutes ses œuvres.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite dans toutes ses œuvres.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
-  const juge = (texte: string) => texte.includes("toutes ses œuvres") ? 0.1 : 0.9;
+  const juge = (texte: string) => (texte.includes("toutes ses œuvres") ? 0.1 : 0.9);
   const corrige = fauxModeles({ sorties: [excessive, bonne], soutien: juge });
   const juge1 = await demander(db, corrige.modeles, q, p, 0.023);
   assertEquals(juge1.resultat.etat, "answered", "le juge renvoie en réparation");
   assertStringIncludes(corrige.vus[1].at(-1)!.content, "dit plus que sa citation");
   const avecExces = JSON.stringify({
-    affirmations: [
-      JSON.parse(bonne).affirmations[0],
-      JSON.parse(excessive).affirmations[0],
-    ],
+    affirmations: [JSON.parse(bonne).affirmations[0], JSON.parse(excessive).affirmations[0]],
   });
   const juge2 = await demander(
     db,
@@ -558,9 +569,10 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   );
   assertEquals(juge2.resultat.etat, "answered");
   if (juge2.resultat.etat === "answered") {
-    assertEquals(juge2.resultat.affirmations.map((a) => a.texte), [
-      "Gaudí refuse la ligne droite.",
-    ]);
+    assertEquals(
+      juge2.resultat.affirmations.map((a) => a.texte),
+      ["Gaudí refuse la ligne droite."],
+    );
     assertEquals(juge2.resultat.partielle, true, "l'affirmation refusée deux fois disparaît");
   }
   const juge3 = await demander(
@@ -592,11 +604,13 @@ test("le chat: question, flux SSE, réponse citée, panneau source", async () =>
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
   const bonne = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
   const { requete } = await session(db, fauxModeles({ sorties: [bonne] }).modeles, "eleve");
   const q = await requete("/eleve/questions", {
@@ -625,11 +639,13 @@ test("une question proposée n'est gardée que si Thot y répond avec une citati
   const id = await sourceTraitee(db);
   statuer(db, id, "certifiee", "test");
   const bonne = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
   const malformee = fauxModeles({ sorties: ['{"questions": "Pourquoi ?"}'] });
   assertEquals(await genererSuggestions(db, malformee.modeles, id), 0);
@@ -649,7 +665,10 @@ test("une question proposée n'est gardée que si Thot y répond avec une citati
   });
   assertEquals(await genererSuggestions(db, f.modeles, id), 1);
   assertEquals(
-    db.prepare("SELECT question FROM suggestions").all().map((l) => l.question),
+    db
+      .prepare("SELECT question FROM suggestions")
+      .all()
+      .map((l) => l.question),
     ["Pourquoi Gaudí refuse-t-il la ligne droite ?"],
   );
   assertEquals([...suggestionsParChapitre(db, ELEVE).values()].flat().length, 1);
@@ -674,10 +693,12 @@ test("le saviez-vous recopie une phrase certifiée et pointe sa position exacte"
 test("CSV élèves: import imprimable, doublon refusé, reset invalide la session", async () => {
   const { db } = await environnement();
   const coursId = cours(db, matiere(db, "Design"), "Design graphique");
-  assertEquals(lireListe('identifiant;nom\r\nlea;"Léa, Martin"\r\n'), [{
-    identifiant: "lea",
-    nom: "Léa, Martin",
-  }]);
+  assertEquals(lireListe('identifiant;nom\r\nlea;"Léa, Martin"\r\n'), [
+    {
+      identifiant: "lea",
+      nom: "Léa, Martin",
+    },
+  ]);
   assertThrows(() => lireListe('identifiant,nom\nlea,"Léa" Martin\n'));
   const { requete, app } = await session(db, fauxModeles().modeles, "enseignant");
   const fichier = new FormData();
@@ -735,11 +756,13 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
   const source = await sourceTraitee(db);
   statuer(db, source, "certifiee", "test");
   const bonne = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
   const f = fauxModeles({ sorties: [bonne, bonne, bonne] });
   let reformulation = "";
@@ -795,17 +818,21 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
     "une question sans chapitre ne reprend pas le chapitre précédent",
   );
   assertEquals(
-    (await eleve.requete("/eleve/questions", {
-      method: "POST",
-      body: new URLSearchParams({ texte: "Question", chapitre: "Chapitre absent" }),
-    })).status,
+    (
+      await eleve.requete("/eleve/questions", {
+        method: "POST",
+        body: new URLSearchParams({ texte: "Question", chapitre: "Chapitre absent" }),
+      })
+    ).status,
     400,
   );
   assertEquals(
-    (await eleve.requete(`/eleve/messages/${id2}/avis`, {
-      method: "POST",
-      body: new URLSearchParams({ avis: "faux" }),
-    })).status,
+    (
+      await eleve.requete(`/eleve/messages/${id2}/avis`, {
+        method: "POST",
+        body: new URLSearchParams({ avis: "faux" }),
+      })
+    ).status,
     200,
   );
   // hono/html rend `true` en attribut vide: l'avis choisi doit rester marqué au rechargement.
@@ -907,11 +934,13 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
   );
   relireLegende(db, `${id}-0`, "certified", "", "test");
   const bonne = JSON.stringify({
-    affirmations: [{
-      texte: "Les balcons ressemblent à des masques.",
-      extrait: 1,
-      citation: "façade ondulée aux balcons en forme de masques",
-    }],
+    affirmations: [
+      {
+        texte: "Les balcons ressemblent à des masques.",
+        extrait: 1,
+        citation: "façade ondulée aux balcons en forme de masques",
+      },
+    ],
   });
   const { resultat } = await demander(
     db,
@@ -923,11 +952,13 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
   assertEquals(resultat.etat, "answered");
   if (resultat.etat === "answered") assertEquals(resultat.affirmations[0].image_id, `${id}-0`);
   const texteCite = JSON.stringify({
-    affirmations: [{
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    }],
+    affirmations: [
+      {
+        texte: "Gaudí refuse la ligne droite.",
+        extrait: 1,
+        citation: "Gaudí refuse la ligne droite dans toute la façade",
+      },
+    ],
   });
   const texteResultat = await demander(
     db,
@@ -944,8 +975,9 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
   const accueil = await (await eleve.requete("/eleve")).text();
   assertStringIncludes(accueil, "Casa Batlló corrigée");
   assertStringIncludes(await (await eleve.requete("/eleve/sequences/Architecture")).text(), "1906");
-  const compte =
-    db.prepare("SELECT id FROM comptes WHERE role = 'eleve' ORDER BY rowid DESC LIMIT 1").get()!.id;
+  const compte = db
+    .prepare("SELECT id FROM comptes WHERE role = 'eleve' ORDER BY rowid DESC LIMIT 1")
+    .get()!.id;
   db.prepare(
     "INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le) VALUES ('ancien', ?, 'question', 'en_attente', '2020-01-01T00:00:00Z', '2020-01-01T00:00:00Z')",
   ).run(compte);
@@ -953,11 +985,13 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
 });
 
 const REPONSE_CITEE = JSON.stringify({
-  affirmations: [{
-    texte: "Gaudí refuse la ligne droite.",
-    extrait: 1,
-    citation: "Gaudí refuse la ligne droite dans toute la façade",
-  }],
+  affirmations: [
+    {
+      texte: "Gaudí refuse la ligne droite.",
+      extrait: 1,
+      citation: "Gaudí refuse la ligne droite dans toute la façade",
+    },
+  ],
 });
 
 async function poserQuestion(
@@ -1045,15 +1079,18 @@ test("les réponses conservées et leurs panneaux revérifient la preuve actuell
       const id = await sourceTraitee(db, undefined, undefined, prof);
       statuer(db, id, "certifiee", "Prof");
       relireLegende(db, `${id}-0`, "certified", "", "Prof");
-      const sortie = retrait === "legende"
-        ? JSON.stringify({
-          affirmations: [{
-            texte: "Les balcons ressemblent à des masques.",
-            extrait: 1,
-            citation: "Façade ondulée aux balcons en forme de masques",
-          }],
-        })
-        : REPONSE_CITEE;
+      const sortie =
+        retrait === "legende"
+          ? JSON.stringify({
+              affirmations: [
+                {
+                  texte: "Les balcons ressemblent à des masques.",
+                  extrait: 1,
+                  citation: "Façade ondulée aux balcons en forme de masques",
+                },
+              ],
+            })
+          : REPONSE_CITEE;
       const eleve = await session(db, fauxModeles({ sorties: [sortie] }).modeles, "eleve");
       const mid = await poserQuestion(eleve.requete, "ligne droite balcons masques");
       await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
@@ -1064,9 +1101,7 @@ test("les réponses conservées et leurs panneaux revérifient la preuve actuell
       if (retrait === "legende") relireLegende(db, `${id}-0`, "rejected", "", "Prof");
       if (retrait === "source") statuer(db, id, "rejetee", "Prof");
       if (retrait === "public") {
-        db.prepare(
-          "UPDATE sources SET reponses = 0 WHERE id = ?",
-        ).run(id);
+        db.prepare("UPDATE sources SET reponses = 0 WHERE id = ?").run(id);
       }
       if (retrait === "titre") {
         await prof.requete(`/prof/sources/${id}/modifier`, {
@@ -1172,10 +1207,16 @@ test("une sortie vide du reclasseur reste une panne de fournisseur", async () =>
     statuer(db, id, "certifiee", "Prof");
     globalThis.fetch = () => Promise.resolve(Response.json({ results: [] }));
     const modeles = openrouter({ ...config.modeles, cle: "test" });
-    const { resultat } = await demander(db, modeles, "ligne droite", {
-      lecteur: null,
-      schoolId: "pilote",
-    }, 0.023);
+    const { resultat } = await demander(
+      db,
+      modeles,
+      "ligne droite",
+      {
+        lecteur: null,
+        schoolId: "pilote",
+      },
+      0.023,
+    );
     assertEquals(resultat.etat, "failed");
     if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_INVALID_RESPONSE");
   } finally {
@@ -1331,15 +1372,25 @@ test("le délai du juge annule son signal avant de laisser passer la citation", 
     const fake = fauxModeles({ sorties: [REPONSE_CITEE] });
     fake.modeles.soutenir = (_texte, _citation, _titre, signal) =>
       new Promise((_oui, non) => {
-        signal!.addEventListener("abort", () => {
-          annule = true;
-          non(signal!.reason);
-        }, { once: true });
+        signal!.addEventListener(
+          "abort",
+          () => {
+            annule = true;
+            non(signal!.reason);
+          },
+          { once: true },
+        );
       });
-    const r = await demander(db, fake.modeles, "ligne droite", {
-      lecteur: null,
-      schoolId: "pilote",
-    }, 0.023);
+    const r = await demander(
+      db,
+      fake.modeles,
+      "ligne droite",
+      {
+        lecteur: null,
+        schoolId: "pilote",
+      },
+      0.023,
+    );
     assertEquals(r.resultat.etat, "answered");
     assertEquals(annule, true);
     assertStringIncludes(String(r.journal.juge_indisponible), "délai");

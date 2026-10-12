@@ -59,7 +59,8 @@ export function validerInformations(champs: Record<string, string>, profil: Prof
     const valeur = (champs[nom] ?? "").trim();
     if (valeur.length > 120) throw new Error(`${CHAMPS[nom].label} : 120 caractères maximum.`);
     if (
-      CHAMPS[nom].type === "date" && valeur &&
+      CHAMPS[nom].type === "date" &&
+      valeur &&
       (!/^\d{4}-\d{2}-\d{2}$/.test(valeur) ||
         new Date(valeur).toISOString().slice(0, 10) !== valeur)
     ) {

@@ -113,10 +113,19 @@ test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot",
 test("le juge de soutien lit P(oui) parmi oui et non, casse et espaces confondus", () => {
   const lp = Math.log;
   assertAlmostEquals(
-    probabiliteOui([{ token: " Oui", logprob: lp(0.6) }, { token: "non", logprob: lp(0.2) }])!,
+    probabiliteOui([
+      { token: " Oui", logprob: lp(0.6) },
+      { token: "non", logprob: lp(0.2) },
+    ])!,
     0.75,
   );
-  assertEquals(probabiliteOui([{ token: "Non", logprob: 0 }, { token: "**", logprob: -9 }]), 0);
+  assertEquals(
+    probabiliteOui([
+      { token: "Non", logprob: 0 },
+      { token: "**", logprob: -9 },
+    ]),
+    0,
+  );
   assertEquals(probabiliteOui([{ token: "La", logprob: 0 }]), undefined);
 });
 
@@ -135,7 +144,10 @@ test("le verdict du juge se lit après le raisonnement, ou à défaut dans le te
         {
           token: "non",
           logprob: lp(0.8),
-          top_logprobs: [{ token: "non", logprob: lp(0.8) }, { token: "oui", logprob: lp(0.2) }],
+          top_logprobs: [
+            { token: "non", logprob: lp(0.8) },
+            { token: "oui", logprob: lp(0.2) },
+          ],
         },
       ],
     },

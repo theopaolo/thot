@@ -20,12 +20,16 @@ export function contexte(texte: string, debut: number, fin: number, marge = 300)
   let a = debut;
   while (a > limiteA && !(c[a - 1] === "\n" && c[a - 2] === "\n")) a--;
   const coupeAvant = a === limiteA && a > 0 && !(c[a - 1] === "\n" && c[a - 2] === "\n");
-  if (coupeAvant) { while (a < debut && !/\s/.test(c[a - 1])) a++; }
+  if (coupeAvant) {
+    while (a < debut && !/\s/.test(c[a - 1])) a++;
+  }
   const limiteZ = Math.min(c.length, fin + marge);
   let z = fin;
   while (z < limiteZ && !(c[z] === "\n" && c[z + 1] === "\n")) z++;
   const coupeApres = z === limiteZ && z < c.length && !(c[z] === "\n" && c[z + 1] === "\n");
-  if (coupeApres) { while (z > fin && !/\s/.test(c[z])) z--; }
+  if (coupeApres) {
+    while (z > fin && !/\s/.test(c[z])) z--;
+  }
   return {
     avant: c.slice(a, debut).join(""),
     milieu: c.slice(debut, fin).join(""),
@@ -80,7 +84,9 @@ export function trouver(texte: string, citation: string): [number, number] | nul
  * dans l'ordre. Rend la portée du premier au dernier fragment.
  */
 export function trouverFragments(texte: string, citation: string): [number, number] | null {
-  const fragments = citation.split(/\s*(?:\[…\]|\(…\)|…|\.\.\.)\s*/).map((f) => f.trim())
+  const fragments = citation
+    .split(/\s*(?:\[…\]|\(…\)|…|\.\.\.)\s*/)
+    .map((f) => f.trim())
     .filter(Boolean);
   if (!fragments.length) return null;
   let debut = -1;

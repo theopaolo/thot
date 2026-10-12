@@ -33,15 +33,13 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
   const db = connexion();
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (
-      const nom of [
-        "0001_depot.sql",
-        "0002_mvp.sql",
-        "0003_suggestions.sql",
-        "0004_pilote.sql",
-        "0005_coherence.sql",
-      ]
-    ) {
+    for (const nom of [
+      "0001_depot.sql",
+      "0002_mvp.sql",
+      "0003_suggestions.sql",
+      "0004_pilote.sql",
+      "0005_coherence.sql",
+    ]) {
       db.exec(await readFile(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
@@ -132,23 +130,24 @@ test("administrateur personnel : code à usage unique, changement obligatoire, r
     assertStringIncludes(gestion, "Mon étude &lt;privée&gt;");
     assertEquals((await get("/administration")).status, 200);
     const formulaire = new FormData();
-    for (
-      const [k, v] of Object.entries({
-        titre: "Cours",
-        type_document: "cours",
-        matiere: "physique-chimie",
-      })
-    ) formulaire.set(k, v);
+    for (const [k, v] of Object.entries({
+      titre: "Cours",
+      type_document: "cours",
+      matiere: "physique-chimie",
+    }))
+      formulaire.set(k, v);
     formulaire.set(
       "fichier",
       new File(["<html><p>Un document sans classe.</p></html>"], "cours.html"),
     );
     assertEquals(
-      (await app.request("/prof/depot", {
-        method: "POST",
-        headers: { cookie, origin: ORIGINE },
-        body: formulaire,
-      })).status,
+      (
+        await app.request("/prof/depot", {
+          method: "POST",
+          headers: { cookie, origin: ORIGINE },
+          body: formulaire,
+        })
+      ).status,
       200,
     );
     const meta = JSON.parse(
@@ -262,7 +261,9 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
         const r = await fetch(`${origine}/connexion`);
         await r.text();
         if (r.ok) return { p, origine };
-      } catch { /* Le serveur n'écoute pas encore. */ }
+      } catch {
+        /* Le serveur n'écoute pas encore. */
+      }
       await new Promise((r) => setTimeout(r, 50));
     }
     throw new Error("Le déploiement ne démarre pas.");
@@ -304,12 +305,14 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
     const cookieA = await login(serveurA.origine, a.mdp);
     const cookieB = await login(serveurB.origine, b.mdp);
     assertEquals(
-      (await requete(
-        serveurB.origine,
-        "/connexion",
-        "",
-        new URLSearchParams({ identifiant: "commun", mot_de_passe: a.mdp }),
-      )).status,
+      (
+        await requete(
+          serveurB.origine,
+          "/connexion",
+          "",
+          new URLSearchParams({ identifiant: "commun", mot_de_passe: a.mdp }),
+        )
+      ).status,
       401,
     );
     assertEquals(
@@ -335,8 +338,8 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
       "Atelier B",
     );
     assert(
-      await readFile(join(a.dir, "secret"), "utf8") !==
-        await readFile(join(b.dir, "secret"), "utf8"),
+      (await readFile(join(a.dir, "secret"), "utf8")) !==
+        (await readFile(join(b.dir, "secret"), "utf8")),
     );
     assert((await stat(join(a.dir, "tmp"))).isDirectory());
     await arreter(serveurA.p);
@@ -354,7 +357,10 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
       (await requete(serveurB.origine, `/eleve/sources/${b.source_id}`, cookieB)).texte,
       "Atelier B",
     );
-    for (const [dir, valeur] of [[a.dir, "Atelier A"], [b.dir, "Atelier B"]]) {
+    for (const [dir, valeur] of [
+      [a.dir, "Atelier A"],
+      [b.dir, "Atelier B"],
+    ]) {
       config.donnees = dir;
       const db = connexion();
       assertEquals(cacheModeles(db).lire("cle-commune"), valeur);
@@ -362,8 +368,8 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
     }
     const politique = JSON.parse(await cli(a.dir, "instance"));
     assert(
-      politique.traitements.every((f: { autorise: boolean; disponible: boolean }) =>
-        !f.autorise && !f.disponible
+      politique.traitements.every(
+        (f: { autorise: boolean; disponible: boolean }) => !f.autorise && !f.disponible,
       ),
     );
     assertEquals(politique.id, a.id);

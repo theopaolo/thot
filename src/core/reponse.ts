@@ -63,9 +63,11 @@ const SYSTEME: Record<Profil, string> = {
 
 /** Les consignes d'arts appliqués servent quand toutes les sources citables en viennent. */
 export function profilSources(db: DatabaseSync, ids: string[]): Profil {
-  const arts = ids.length > 0 &&
-    ids.every((id) =>
-      db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)?.profil === "arts-appliques"
+  const arts =
+    ids.length > 0 &&
+    ids.every(
+      (id) =>
+        db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)?.profil === "arts-appliques",
     );
   return arts ? "arts-appliques" : "general";
 }
@@ -77,7 +79,7 @@ const bloc = (retenus: Candidat[]) =>
 type Brute = { refus?: unknown; affirmations?: unknown };
 type BruteAffirmation = { texte?: unknown; extrait?: unknown; citation?: unknown } | null;
 
-const chaine = (x: unknown) => typeof x === "string" ? x.trim() : "";
+const chaine = (x: unknown) => (typeof x === "string" ? x.trim() : "");
 
 function lire(sortie: string): Brute | null {
   const debut = sortie.indexOf("{");
@@ -212,23 +214,33 @@ export async function demander(
   let gardees: Affirmation[] = [];
   const repondre = (affirmations: Affirmation[], partielle = false) => {
     for (const a of affirmations) {
-      const images = db.prepare(
-        "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
-      ).all(a.source_id) as { id: string; legende: string | null; legende_statut: string }[];
-      const image = images.find((i) =>
-        a.debut === undefined && i.legende_statut === "certified" && i.legende &&
-        trouverFragments(i.legende, a.citation)
-      ) ?? images[0];
+      const images = db
+        .prepare(
+          "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
+        )
+        .all(a.source_id) as { id: string; legende: string | null; legende_statut: string }[];
+      const image =
+        images.find(
+          (i) =>
+            a.debut === undefined &&
+            i.legende_statut === "certified" &&
+            i.legende &&
+            trouverFragments(i.legende, a.citation),
+        ) ?? images[0];
       if (image) {
         a.image_id = image.id;
       }
     }
     return {
-      resultat: actualiserResultat(db, {
-        etat: "answered",
-        affirmations,
-        ...(partielle && { partielle }),
-      }, p),
+      resultat: actualiserResultat(
+        db,
+        {
+          etat: "answered",
+          affirmations,
+          ...(partielle && { partielle }),
+        },
+        p,
+      ),
       journal,
     };
   };
@@ -239,7 +251,9 @@ export async function demander(
       try {
         const reformulee = await modeles.reformuler(questionPrecedente, question);
         if (reformulee && reformulee.length <= 1000) recherche = reformulee;
-      } catch { /* Une reformulation indisponible ne bloque pas la question. */ }
+      } catch {
+        /* Une reformulation indisponible ne bloque pas la question. */
+      }
       journal.question_recherche = recherche;
     }
     etape("Recherche dans les documents du cours");
@@ -254,7 +268,10 @@ export async function demander(
     if (r.horsCorpus) return { resultat: { etat: "out_of_corpus", raison: "seuil" }, journal };
 
     etape("Rédaction à partir des passages trouvés");
-    const profil = profilSources(db, r.retenus.map((c) => c.source_id));
+    const profil = profilSources(
+      db,
+      r.retenus.map((c) => c.source_id),
+    );
     const messages: Message[] = [
       { role: "system", content: SYSTEME[profil] },
       {
@@ -286,7 +303,8 @@ export async function demander(
         { role: "assistant", content: texte },
         {
           role: "user",
-          content: `Ta reponse ne passe pas la verification :\n- ${erreurs.join("\n- ")}\n` +
+          content:
+            `Ta reponse ne passe pas la verification :\n- ${erreurs.join("\n- ")}\n` +
             `Rends le JSON complet corrige. Chaque citation doit etre recopiee mot pour mot de l'extrait indique.`,
         },
       );
@@ -307,7 +325,9 @@ export async function demander(
     if (gardees.length) {
       try {
         return repondre(gardees, true);
-      } catch { /* Une erreur de base reste une panne. */ }
+      } catch {
+        /* Une erreur de base reste une panne. */
+      }
     }
     return { resultat: { etat: "failed", code, message: (e as Error).message }, journal };
   }

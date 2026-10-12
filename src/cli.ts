@@ -155,10 +155,9 @@ async function ingest(chemin: string) {
       continue;
     }
     if (
-      db.prepare("SELECT 1 FROM sources WHERE checksum = ? AND school_id = ?").get(
-        await sha256(octets),
-        lireInstance(db).school_id,
-      )
+      db
+        .prepare("SELECT 1 FROM sources WHERE checksum = ? AND school_id = ?")
+        .get(await sha256(octets), lireInstance(db).school_id)
     ) {
       refus.push(`${relative(racine, f)}: déjà déposé`);
       continue;
@@ -178,11 +177,15 @@ async function ingest(chemin: string) {
       sommaires.set(dossier, rubriques);
     }
     const sequence = basename(dossier);
-    const titre = controle.format === "html"
-      ? decoder(
-        new TextDecoder().decode(octets).match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? nom,
-      )
-      : nom.replace(/\.[^.]+$/, "");
+    const titre =
+      controle.format === "html"
+        ? decoder(
+            new TextDecoder()
+              .decode(octets)
+              .match(/<title>([\s\S]*?)<\/title>/i)?.[1]
+              ?.trim() ?? nom,
+          )
+        : nom.replace(/\.[^.]+$/, "");
     const champs = {
       titre: titre.replace(/\s+/g, " ").slice(0, 200),
       type_document: args.type ?? "cours",
@@ -230,18 +233,22 @@ async function ingest(chemin: string) {
  * reprend sa rubrique, puis la page sort de la base et du disque.
  */
 async function nettoyer() {
-  const pages = db.prepare(
-    "SELECT id, fichier, metadonnees FROM sources WHERE format = 'html' AND school_id = ?",
-  ).all(lireInstance(db).school_id) as { id: string; fichier: string; metadonnees: string }[];
+  const pages = db
+    .prepare("SELECT id, fichier, metadonnees FROM sources WHERE format = 'html' AND school_id = ?")
+    .all(lireInstance(db).school_id) as { id: string; fichier: string; metadonnees: string }[];
   let n = 0;
   for (const p of pages) {
     const vide = pageVide(await readFile(contenu(p.id, "original", p.fichier), "utf8"));
     if (!vide) continue;
     const { sequence, seance } = JSON.parse(p.metadonnees);
-    const fiche = vide.fichier && db.prepare(
-      `SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?
+    const fiche =
+      vide.fichier &&
+      (db
+        .prepare(
+          `SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?
          AND school_id = ?`,
-    ).get(nomSur(vide.fichier), sequence, lireInstance(db).school_id)?.id as string | undefined;
+        )
+        .get(nomSur(vide.fichier), sequence, lireInstance(db).school_id)?.id as string | undefined);
     transaction(db, () => {
       if (fiche && seance) {
         db.prepare(
@@ -251,8 +258,9 @@ async function nettoyer() {
       }
       retirerSource(db, p.id);
       for (const table of ["images", "suggestions", "ingestion_jobs", "sources"]) {
-        db.prepare(`DELETE FROM ${table} WHERE ${table === "sources" ? "id" : "source_id"} = ?`)
-          .run(p.id);
+        db.prepare(
+          `DELETE FROM ${table} WHERE ${table === "sources" ? "id" : "source_id"} = ?`,
+        ).run(p.id);
       }
     });
     if (fiche) indexer(db, fiche);
@@ -279,11 +287,13 @@ function importerLegendes(chemin: string) {
   let n = 0;
   for (const [rel, legende] of Object.entries(json.legendes as Record<string, string>)) {
     const sequence = rel.split("/").at(-2) ?? "";
-    const r = db.prepare(
-      `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
+    const r = db
+      .prepare(
+        `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
        WHERE position = 0 AND legende IS NULL AND legende_statut = 'unreviewed' AND source_id IN (
          SELECT id FROM sources WHERE fichier = ? AND json_extract(metadonnees, '$.sequence') = ?)`,
-    ).run(legende, modele, nomSur(basename(rel)), sequence);
+      )
+      .run(legende, modele, nomSur(basename(rel)), sequence);
     n += Number(r.changes);
   }
   for (const { id } of db.prepare("SELECT id FROM sources WHERE statut = 'certifiee'").all()) {
@@ -295,7 +305,12 @@ function importerLegendes(chemin: string) {
 type Requete = { qid: string; type: string; q: string; gold: (number | string)[] };
 
 const plier = (s: string) =>
-  s.normalize("NFD").replace(/\p{Mn}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  s
+    .normalize("NFD")
+    .replace(/\p{Mn}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
 async function evalRecherche() {
   if (!args["img-order"]) throw new Error("--img-order=<chemin vers img_order.json> est requis.");
@@ -303,9 +318,9 @@ async function evalRecherche() {
   const requetes = JSON.parse(
     await readFile(join(RACINE, "evaluation/queries_real.json"), "utf8"),
   ) as Requete[];
-  const sources = db.prepare(
-    "SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources",
-  ).all() as { id: string; fichier: string; sequence: string }[];
+  const sources = db
+    .prepare("SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources")
+    .all() as { id: string; fichier: string; sequence: string }[];
   // Une cible de section (« Cubisme.pdf#02 ») désigne une rubrique d'une fiche PDF. Le banc
   // numérotait ses sections, `docs.json` du dépôt de recherche donne leur rubrique.
   const docs = args.docs
@@ -315,37 +330,43 @@ async function evalRecherche() {
   const cibles = (g: number | string): Cible[] => {
     if (typeof g === "number") {
       const [seq, nom] = [dirname(ordre[g]), nomSur(basename(ordre[g]))];
-      return sources.filter((s) => s.fichier === nom && s.sequence === seq).map((s) => ({
-        source: s.id,
-      }));
+      return sources
+        .filter((s) => s.fichier === nom && s.sequence === seq)
+        .map((s) => ({
+          source: s.id,
+        }));
     }
     if (g.includes("#")) {
-      return docs.filter((d) => d.id.toLowerCase().includes(g.toLowerCase())).flatMap((d) => {
-        const nom = nomSur(d.id.split("#")[0]);
-        const rubrique = d.titre.split(" — ").at(-1);
-        return sources.filter((s) => s.fichier === nom).map((s) => ({ source: s.id, rubrique }));
-      });
+      return docs
+        .filter((d) => d.id.toLowerCase().includes(g.toLowerCase()))
+        .flatMap((d) => {
+          const nom = nomSur(d.id.split("#")[0]);
+          const rubrique = d.titre.split(" — ").at(-1);
+          return sources.filter((s) => s.fichier === nom).map((s) => ({ source: s.id, rubrique }));
+        });
     }
-    return sources.filter((s) => plier(`${s.sequence} ${s.fichier}`).includes(plier(g)))
+    return sources
+      .filter((s) => plier(`${s.sequence} ${s.fichier}`).includes(plier(g)))
       .map((s) => ({ source: s.id }));
   };
   const touche = (c: { source_id: string; titre: string }, attendus: Cible[]) =>
-    attendus.some((a) =>
-      a.source === c.source_id && (!a.rubrique || c.titre.endsWith(`: ${a.rubrique}`))
+    attendus.some(
+      (a) => a.source === c.source_id && (!a.rubrique || c.titre.endsWith(`: ${a.rubrique}`)),
     );
   const lignes: Record<string, unknown>[] = [];
   for (const r of requetes) {
     const attendus = r.gold.flatMap(cibles);
     const trouves = args["sans-reclasseur"]
       ? chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(0, 5)
-      : (await chercher(
-        db,
-        modeles,
-        r.q,
-        { lecteur: null, schoolId: lireInstance(db).school_id },
-        config.seuil,
-      ))
-        .retenus;
+      : (
+          await chercher(
+            db,
+            modeles,
+            r.q,
+            { lecteur: null, schoolId: lireInstance(db).school_id },
+            config.seuil,
+          )
+        ).retenus;
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({
       qid: r.qid,
@@ -359,9 +380,9 @@ async function evalRecherche() {
   const resume = (ls: typeof lignes) => ({
     n: ls.length,
     succes_5: +(ls.filter((l) => (l.rang as number) > 0).length / ls.length).toFixed(2),
-    mrr:
-      +(ls.reduce((s, l) => s + ((l.rang as number) ? 1 / (l.rang as number) : 0), 0) / ls.length)
-        .toFixed(2),
+    mrr: +(
+      ls.reduce((s, l) => s + ((l.rang as number) ? 1 / (l.rang as number) : 0), 0) / ls.length
+    ).toFixed(2),
   });
   const rapport = {
     date: new Date().toISOString(),
@@ -391,12 +412,13 @@ async function evalGeneration() {
     sans_reponse: { qid: string; q: string; registre: string }[];
   };
   const sources = new Map(
-    (db.prepare(
-      "SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources",
-    )
-      .all() as { id: string; fichier: string; sequence: string }[]).map((
-        s,
-      ) => [s.id, plier(`${s.sequence} ${s.fichier}`)]),
+    (
+      db
+        .prepare(
+          "SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources",
+        )
+        .all() as { id: string; fichier: string; sequence: string }[]
+    ).map((s) => [s.id, plier(`${s.sequence} ${s.fichier}`)]),
   );
   const p = { lecteur: null, schoolId: lireInstance(db).school_id };
   const paires: Paire[] = [];
@@ -414,17 +436,16 @@ async function evalGeneration() {
     partielle: boolean;
     reponse?: string[];
   }[] = [];
-  for (
-    const q of [
-      ...jeu.questions.map((x) => ({ ...x, registre: "dans le corpus" })),
-      ...jeu.sans_reponse.map((x) => ({ ...x, gold: [] as string[] })),
-    ]
-  ) {
+  for (const q of [
+    ...jeu.questions.map((x) => ({ ...x, registre: "dans le corpus" })),
+    ...jeu.sans_reponse.map((x) => ({ ...x, gold: [] as string[] })),
+  ]) {
     const t = Date.now();
     const { resultat, journal } = await demander(db, modeles, q.q, p, config.seuil);
-    const citees = resultat.etat === "answered"
-      ? resultat.affirmations.map((a) => sources.get(a.source_id) ?? "")
-      : [];
+    const citees =
+      resultat.etat === "answered"
+        ? resultat.affirmations.map((a) => sources.get(a.source_id) ?? "")
+        : [];
     if (resultat.etat === "answered") {
       resultat.affirmations.forEach((a, i) =>
         paires.push({
@@ -435,7 +456,7 @@ async function evalGeneration() {
           paragraphe: paragraphe(a),
           citation: a.citation,
           soutient: null,
-        })
+        }),
       );
     }
     lignes.push({
@@ -443,11 +464,8 @@ async function evalGeneration() {
       registre: q.registre,
       question: q.q,
       etat: resultat.etat,
-      detail: "raison" in resultat
-        ? resultat.raison
-        : "code" in resultat
-        ? resultat.code
-        : undefined,
+      detail:
+        "raison" in resultat ? resultat.raison : "code" in resultat ? resultat.code : undefined,
       bonne_source: q.gold.length
         ? citees.some((c) => q.gold.some((g) => c.includes(plier(g))))
         : undefined,
@@ -455,9 +473,10 @@ async function evalGeneration() {
       ms: Date.now() - t,
       essais: (journal.tentatives as unknown[] | undefined)?.length ?? 0,
       partielle: resultat.etat === "answered" && !!resultat.partielle,
-      reponse: resultat.etat === "answered"
-        ? resultat.affirmations.map((a) => `${a.texte} [${a.titre}]`)
-        : undefined,
+      reponse:
+        resultat.etat === "answered"
+          ? resultat.affirmations.map((a) => `${a.texte} [${a.titre}]`)
+          : undefined,
     });
     console.log(`${q.qid} ${resultat.etat.padEnd(13)} ${q.q}`);
   }
@@ -479,15 +498,19 @@ async function evalGeneration() {
       partielle: taux(dedans, (l) => l.partielle),
     },
     hors_corpus: Object.fromEntries(
-      [...new Set(jeu.sans_reponse.map((x) => x.registre))].map((r) => [r, {
-        n: par(r).length,
-        refuse: taux(par(r), (l) => l.etat === "out_of_corpus"),
-        repond: taux(par(r), (l) => l.etat === "answered"),
-        panne: taux(par(r), (l) => l.etat === "failed"),
-      }]),
+      [...new Set(jeu.sans_reponse.map((x) => x.registre))].map((r) => [
+        r,
+        {
+          n: par(r).length,
+          refuse: taux(par(r), (l) => l.etat === "out_of_corpus"),
+          repond: taux(par(r), (l) => l.etat === "answered"),
+          panne: taux(par(r), (l) => l.etat === "failed"),
+        },
+      ]),
     ),
-    latence_mediane_ms:
-      lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
+    latence_mediane_ms: lignes.map((l) => l.ms).sort((a, b) => a - b)[
+      Math.floor(lignes.length / 2)
+    ],
   };
   await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(config.donnees, "evaluation/resultats/generation.json");
@@ -496,11 +519,9 @@ async function evalGeneration() {
   console.log(`écrit dans ${relative(process.cwd(), sortie)}`);
   if (args.paires) {
     // Une ligne par paire pour annoter à la main. `createNew` protège un fichier déjà annoté.
-    await writeFile(
-      args.paires,
-      `[\n${paires.map((x) => JSON.stringify(x)).join(",\n")}\n]\n`,
-      { flag: "wx" },
-    );
+    await writeFile(args.paires, `[\n${paires.map((x) => JSON.stringify(x)).join(",\n")}\n]\n`, {
+      flag: "wx",
+    });
     console.log(`${paires.length} paires à annoter dans ${args.paires}`);
   }
 }
@@ -569,11 +590,12 @@ async function evalSoutien() {
     par_famille: Object.fromEntries(
       [...new Set(lignes.map((l) => l.famille))].map((f) => {
         const ls = lignes.filter((l) => l.famille === f);
-        return [f, { n: ls.length, erreurs_a_0_5: taux(ls, (l) => (l.p >= 0.5) !== l.soutient) }];
+        return [f, { n: ls.length, erreurs_a_0_5: taux(ls, (l) => l.p >= 0.5 !== l.soutient) }];
       }),
     ),
-    latence_mediane_ms:
-      lignes.map((l) => l.ms).sort((a, b) => a - b)[Math.floor(lignes.length / 2)],
+    latence_mediane_ms: lignes.map((l) => l.ms).sort((a, b) => a - b)[
+      Math.floor(lignes.length / 2)
+    ],
   };
   // Les citations restent hors du dépôt: le rapport ne garde que les identifiants.
   await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
@@ -586,14 +608,16 @@ async function evalSoutien() {
 switch (commande) {
   case "domaines": {
     const cat = Domaines.catalogue(db);
-    console.log(JSON.stringify(
-      {
-        ...cat,
-        cours: cat.cours.map((c) => ({ ...c, membres: Domaines.membres(db, c.id).length })),
-      },
-      null,
-      2,
-    ));
+    console.log(
+      JSON.stringify(
+        {
+          ...cat,
+          cours: cat.cours.map((c) => ({ ...c, membres: Domaines.membres(db, c.id).length })),
+        },
+        null,
+        2,
+      ),
+    );
     break;
   }
   case "matiere":
@@ -618,13 +642,18 @@ switch (commande) {
   case "rattacher": {
     const [sourceId, coursId] = reste;
     transaction(db, () => {
-      const liens = db.prepare(
-        "SELECT cours_id, theme_id FROM source_cours WHERE source_id = ? AND cours_id != ?",
-      ).all(sourceId, coursId) as Domaines.Affiliation[];
-      Domaines.affiliations(db, sourceId, [...liens, {
-        cours_id: coursId,
-        theme_id: args["theme-id"] ?? null,
-      }]);
+      const liens = db
+        .prepare(
+          "SELECT cours_id, theme_id FROM source_cours WHERE source_id = ? AND cours_id != ?",
+        )
+        .all(sourceId, coursId) as Domaines.Affiliation[];
+      Domaines.affiliations(db, sourceId, [
+        ...liens,
+        {
+          cours_id: coursId,
+          theme_id: args["theme-id"] ?? null,
+        },
+      ]);
     });
     break;
   }
@@ -635,7 +664,8 @@ switch (commande) {
       console.error(`usage: thot ${commande} <cours_id> <identifiant>`);
       process.exit(2);
     }
-    const compte = db.prepare("SELECT id FROM comptes WHERE identifiant = ?")
+    const compte = db
+      .prepare("SELECT id FROM comptes WHERE identifiant = ?")
       .get(identifiant.trim().toLowerCase());
     if (!compte) {
       console.error(`Compte introuvable : ${identifiant}`);
@@ -646,14 +676,16 @@ switch (commande) {
     break;
   }
   case "instance":
-    console.log(JSON.stringify(
-      {
-        ...configurerInstance(db, args.nom, args.mode),
-        traitements: traitements(),
-      },
-      null,
-      2,
-    ));
+    console.log(
+      JSON.stringify(
+        {
+          ...configurerInstance(db, args.nom, args.mode),
+          traitements: traitements(),
+        },
+        null,
+        2,
+      ),
+    );
     break;
   case "administrateur": {
     if (reste.length !== 2) throw new Error("usage: thot administrateur <identifiant> <nom>");
@@ -684,9 +716,8 @@ switch (commande) {
       console.error("usage: thot reinitialiser <identifiant enseignant>");
       process.exit(2);
     }
-    const compte = db.prepare(
-      "SELECT id FROM comptes WHERE identifiant = ? AND role = 'enseignant'",
-    )
+    const compte = db
+      .prepare("SELECT id FROM comptes WHERE identifiant = ? AND role = 'enseignant'")
       .get(identifiant);
     if (!compte) {
       console.error(`Compte enseignant introuvable : ${identifiant}`);
@@ -712,9 +743,10 @@ switch (commande) {
     break;
   case "certifier": {
     const ids = args.tout
-      ? db.prepare("SELECT id FROM sources WHERE statut = 'a_relire' AND school_id = ?").all(
-        lireInstance(db).school_id,
-      ).map((l) => l.id as string)
+      ? db
+          .prepare("SELECT id FROM sources WHERE statut = 'a_relire' AND school_id = ?")
+          .all(lireInstance(db).school_id)
+          .map((l) => l.id as string)
       : reste;
     for (const id of ids) statuer(db, id, "certifiee", args.par ?? "cli");
     console.log(`${ids.length} source(s) certifiée(s).`);
@@ -722,8 +754,10 @@ switch (commande) {
   }
   case "suggestions": {
     const ids = args.tout
-      ? db.prepare("SELECT id FROM sources WHERE statut = 'certifiee' AND school_id = ?")
-        .all(lireInstance(db).school_id).map((l) => l.id as string)
+      ? db
+          .prepare("SELECT id FROM sources WHERE statut = 'certifiee' AND school_id = ?")
+          .all(lireInstance(db).school_id)
+          .map((l) => l.id as string)
       : reste;
     let n = 0;
     for (const [i, id] of ids.entries()) {
@@ -749,25 +783,34 @@ switch (commande) {
     break;
   }
   case "rebuild": {
-    const ids = db.prepare("SELECT id FROM sources").all().map((l) => l.id as string);
+    const ids = db
+      .prepare("SELECT id FROM sources")
+      .all()
+      .map((l) => l.id as string);
     for (const id of ids) indexer(db, id);
     const n = db.prepare("SELECT count(*) n FROM chunks").get()!.n;
     console.log(`${ids.length} source(s) relue(s), ${n} chunk(s) indexé(s).`);
     break;
   }
   case "ask": {
-    const { resultat, journal } = await demander(db, modeles, reste.join(" "), {
-      lecteur: null,
-      schoolId: lireInstance(db).school_id,
-      matiereId: args["matiere-id"],
-      coursId: args["cours-id"],
-      themeId: args["theme-id"],
-    }, config.seuil);
+    const { resultat, journal } = await demander(
+      db,
+      modeles,
+      reste.join(" "),
+      {
+        lecteur: null,
+        schoolId: lireInstance(db).school_id,
+        matiereId: args["matiere-id"],
+        coursId: args["cours-id"],
+        themeId: args["theme-id"],
+      },
+      config.seuil,
+    );
     if (args.json) console.log(JSON.stringify({ resultat, journal }, null, 1));
     else if (resultat.etat === "answered") {
       resultat.affirmations.forEach((a, i) => console.log(`${a.texte} [${i + 1}]`));
       resultat.affirmations.forEach((a, i) =>
-        console.log(`  [${i + 1}] ${a.titre}: « ${a.citation} »`)
+        console.log(`  [${i + 1}] ${a.titre}: « ${a.citation} »`),
       );
     } else console.log(resultat.etat, "message" in resultat ? resultat.message : resultat.raison);
     break;

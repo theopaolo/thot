@@ -20,14 +20,17 @@ import {
 import { affiliations, cours, desinscrire, inscrire, matiere, theme } from "../src/app/domaines.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
-const TEXTE = "La façade de la Casa Batlló est couverte de céramique irisée. " +
+const TEXTE =
+  "La façade de la Casa Batlló est couverte de céramique irisée. " +
   "Gaudí refuse la ligne droite dans toute la façade.";
 const BONNE = JSON.stringify({
-  affirmations: [{
-    texte: "Gaudí refuse la ligne droite.",
-    extrait: 1,
-    citation: "Gaudí refuse la ligne droite dans toute la façade",
-  }],
+  affirmations: [
+    {
+      texte: "Gaudí refuse la ligne droite.",
+      extrait: 1,
+      citation: "Gaudí refuse la ligne droite dans toute la façade",
+    },
+  ],
 });
 
 async function source(
@@ -104,7 +107,11 @@ test("lecture : propriétaire, collègue, élève et administrateur", async () =
       assertEquals(await statut(qui.requete(`/prof/sources/${id}`)), code, `${id} ${code}`);
       assertEquals(await statut(qui.requete(`/media/${image(db, id)}`)), code, `image ${id}`);
     }
-    for (const [id, code] of [[prive, 404], [collegues, 404], [eleves, 200]] as const) {
+    for (const [id, code] of [
+      [prive, 404],
+      [collegues, 404],
+      [eleves, 200],
+    ] as const) {
       assertEquals(await statut(eleve.requete(`/eleve/sources/${id}`)), code, `élève ${id}`);
       assertEquals(await statut(eleve.requete(`/media/${image(db, id)}`)), code);
       assertEquals(await statut(eleve.requete(`/eleve/documents/${id}/apercu`)), code);
@@ -160,8 +167,10 @@ test("lecture : propriétaire, collègue, élève et administrateur", async () =
 
     const trouve = (l: Lecteur | null) =>
       new Set(
-        chercherFts(db, "façade céramique", { schoolId: lireInstance(db).school_id, lecteur: l })
-          .map((c) => c.source_id),
+        chercherFts(db, "façade céramique", {
+          schoolId: lireInstance(db).school_id,
+          lecteur: l,
+        }).map((c) => c.source_id),
       );
     const lecteur = (id: string, administrateur = false) => ({
       id,
@@ -225,9 +234,9 @@ test("écriture : le propriétaire et les administrateurs seulement", async () =
     assertEquals(await statut(b.requete("/prof/depot", { method: "POST", body: f })), 200);
     assertEquals(
       {
-        ...db.prepare(
-          "SELECT proprietaire_id, audience, reponses FROM sources WHERE titre = 'Dépôt'",
-        ).get(),
+        ...db
+          .prepare("SELECT proprietaire_id, audience, reponses FROM sources WHERE titre = 'Dépôt'")
+          .get(),
       },
       { proprietaire_id: b.id, audience: "collegues", reponses: 0 },
     );
@@ -270,11 +279,13 @@ test("réponses : preuves lisibles par le lecteur, retrait pendant la générati
     // Une réponse publiée perd sa preuve à la relecture quand la source devient privée.
     db.prepare("UPDATE sources SET reponses = 1 WHERE id = ?").run(eleves);
     const poser = async () => {
-      const fragment = await (await eleve.requete("/eleve/questions", {
-        method: "POST",
-        headers: { "HX-Request": "true" },
-        body: new URLSearchParams({ texte: q }),
-      })).text();
+      const fragment = await (
+        await eleve.requete("/eleve/questions", {
+          method: "POST",
+          headers: { "HX-Request": "true" },
+          body: new URLSearchParams({ texte: q }),
+        })
+      ).text();
       return fragment.match(/messages\/([\w-]+)\/flux/)![1];
     };
     const publie = await poser();
@@ -293,8 +304,9 @@ test("réponses : preuves lisibles par le lecteur, retrait pendant la générati
       ),
     );
     assert(
-      !(await (await eleve.requete(`/eleve/messages/${publie}/citations/0`)).text())
-        .includes("dans toute la façade"),
+      !(await (await eleve.requete(`/eleve/messages/${publie}/citations/0`)).text()).includes(
+        "dans toute la façade",
+      ),
     );
     db.prepare("UPDATE sources SET audience = 'eleves' WHERE id = ?").run(eleves);
 
@@ -318,11 +330,13 @@ test("partager une source ne partage pas les échanges de son propriétaire", as
   const f = fauxModeles({ sorties: [BONNE] });
   const { db, dir, a, b } = await instance(f.modeles);
   try {
-    const fragment = await (await a.requete("/eleve/questions", {
-      method: "POST",
-      headers: { "HX-Request": "true" },
-      body: new URLSearchParams({ texte: "Question privée sur la façade" }),
-    })).text();
+    const fragment = await (
+      await a.requete("/eleve/questions", {
+        method: "POST",
+        headers: { "HX-Request": "true" },
+        body: new URLSearchParams({ texte: "Question privée sur la façade" }),
+      })
+    ).text();
     const mid = fragment.match(/messages\/([\w-]+)\/flux/)![1];
     assertStringIncludes(await (await a.requete(`/eleve/messages/${mid}/flux`)).text(), "Gaudí");
     assertStringIncludes(
@@ -360,12 +374,18 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
   const db = connexion(join(dir, "state.sqlite3"));
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true }).map((f) => f.name).sort()) {
+    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true })
+      .map((f) => f.name)
+      .sort()) {
       if (nom >= "0008") continue;
       db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
-    for (const [id, nom] of [["d", "M. Detienne"], ["h1", "Homonyme"], ["h2", "Homonyme"]]) {
+    for (const [id, nom] of [
+      ["d", "M. Detienne"],
+      ["h1", "Homonyme"],
+      ["h2", "Homonyme"],
+    ]) {
       db.prepare(
         "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, 'enseignant', '', '', 'fixture')",
       ).run(id, id, nom);
@@ -384,8 +404,10 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
     }
     assertEquals(migrer(db), ["0008_acces.sql", "0009_membres.sql"]);
     assertEquals(
-      db.prepare("SELECT audience, reponses, proprietaire_id, metadonnees FROM sources ORDER BY id")
-        .all().map((s) => ({ ...s })),
+      db
+        .prepare("SELECT audience, reponses, proprietaire_id, metadonnees FROM sources ORDER BY id")
+        .all()
+        .map((s) => ({ ...s })),
       [
         ["eleves", 1, "d"],
         ["collegues", 0, null],
@@ -409,7 +431,8 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
 async function deuxCours(modeles?: Modeles) {
   const { db, dir } = await environnement();
   const m = matiere(db, "Arts appliqués");
-  const c1 = cours(db, m, "Design"), c2 = cours(db, m, "Histoire de l'art");
+  const c1 = cours(db, m, "Design"),
+    c2 = cours(db, m, "Histoire de l'art");
   const profA = await compte(db, "enseignant", modeles, [c1]);
   const profB = await compte(db, "enseignant", modeles, [c2]);
   const profC = await compte(db, "enseignant", modeles, [c1]);
@@ -440,13 +463,11 @@ test("cours : seuls ses membres lisent et modifient ce qu'il partage", async () 
       await (await eleveA.requete("/eleve/sans-sequence")).text(),
       "Les enseignants de tes cours lisent tes questions.",
     );
-    for (
-      const [qui, id, code] of [[eleveA, publie, 200], [eleveB, publie, 404], [
-        eleveB,
-        libre,
-        200,
-      ]] as const
-    ) {
+    for (const [qui, id, code] of [
+      [eleveA, publie, 200],
+      [eleveB, publie, 404],
+      [eleveB, libre, 200],
+    ] as const) {
       assertEquals(await statut(qui.requete(`/eleve/sources/${id}`)), code, `élève ${id}`);
       assertEquals(await statut(qui.requete(`/media/${image(db, id)}`)), code);
     }
@@ -475,7 +496,9 @@ test("cours : seuls ses membres lisent et modifient ce qu'il partage", async () 
     await poster(profB, "/prof/sources/statut", { ids: publie, statut: "rejetee" });
     await poster(profC, "/prof/sources/statut", { ids: prive, statut: "rejetee" });
     assertEquals(
-      db.prepare("SELECT statut FROM sources WHERE id IN (?, ?)").all(publie, prive)
+      db
+        .prepare("SELECT statut FROM sources WHERE id IN (?, ?)")
+        .all(publie, prive)
         .map((l) => l.statut),
       ["certifiee", "certifiee"],
     );
@@ -501,11 +524,13 @@ test("cours : retirer un élève pendant la génération garde le texte hors de 
       desinscrire(db, c1, eleveA.id);
       return generer(messages);
     };
-    const fragment = await (await eleveA.requete("/eleve/questions", {
-      method: "POST",
-      headers: { "HX-Request": "true" },
-      body: new URLSearchParams({ texte: "Pourquoi la façade n'a pas de ligne droite ?" }),
-    })).text();
+    const fragment = await (
+      await eleveA.requete("/eleve/questions", {
+        method: "POST",
+        headers: { "HX-Request": "true" },
+        body: new URLSearchParams({ texte: "Pourquoi la façade n'a pas de ligne droite ?" }),
+      })
+    ).text();
     const mid = fragment.match(/messages\/([\w-]+)\/flux/)![1];
     const flux = await (await eleveA.requete(`/eleve/messages/${mid}/flux`)).text();
     assert(!flux.includes("Gaudí refuse la ligne droite."), "texte publié après le retrait");
@@ -521,10 +546,12 @@ test("questions des élèves : chaque enseignant lit celles de ses cours", async
   try {
     const sansCours = await compte(db, "eleve");
     const poser = (id: string, eleve: string, question: string, coursId = "") =>
-      db.prepare(
-        `INSERT INTO messages (id, compte_id, question, etat, cours_id, cree_le, maj_le)
+      db
+        .prepare(
+          `INSERT INTO messages (id, compte_id, question, etat, cours_id, cree_le, maj_le)
          VALUES (?, ?, ?, 'out_of_corpus', ?, '2026-10-10T08:00:00Z', '2026-10-10T08:00:00Z')`,
-      ).run(id, eleve, question, coursId);
+        )
+        .run(id, eleve, question, coursId);
     const [q1, q2, q3] = [
       "Question posée dans Design",
       "Question libre de B",
@@ -551,7 +578,9 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
   const db = connexion(join(dir, "state.sqlite3"));
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true }).map((f) => f.name).sort()) {
+    for (const nom of readdirSync(join(RACINE, "migrations"), { withFileTypes: true })
+      .map((f) => f.name)
+      .sort()) {
       if (nom >= "0009") continue;
       db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
@@ -562,7 +591,9 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
         VALUES ('p', 'p', 'Prof', 'enseignant', '', '', 'x'), ('e', 'e', 'Élève', 'eleve', '', '', 'x');`);
     assertEquals(migrer(db), ["0009_membres.sql"]);
     assertEquals(
-      db.prepare("SELECT cours_id || compte_id AS m FROM membres_cours ORDER BY m").all()
+      db
+        .prepare("SELECT cours_id || compte_id AS m FROM membres_cours ORDER BY m")
+        .all()
         .map((l) => l.m),
       ["c1e", "c1p", "c2e", "c2p"],
     );
@@ -579,7 +610,9 @@ const texteDe = async (qui: Qui, chemin: string) => (await qui.requete(chemin)).
 /** Les rattachements d'une source, cours par cours : `{ cours_id: theme_id | null }`. */
 const liens = (db: Db, sourceId: string) =>
   Object.fromEntries(
-    db.prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?").all(sourceId)
+    db
+      .prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
+      .all(sourceId)
       .map((l) => [l.cours_id as string, l.theme_id as string | null]),
   );
 /** Le gabarit échappe l'apostrophe : `nom` se retrouve tel quel ou échappé. */
@@ -653,7 +686,10 @@ test("élèves : seuls les administrateurs gèrent ceux sans cours", async () =>
     assertEquals(await listes(profA), [eleveA.id]);
     assertEquals(await listes(profB), [eleveB.id]);
     assertEquals(await listes(profSansCours), []);
-    assertEquals(await listes(admin), eleves.map((e) => e.id));
+    assertEquals(
+      await listes(admin),
+      eleves.map((e) => e.id),
+    );
 
     assertEquals(await reinitialiser(profB, eleveA), 404);
     assertEquals(await reinitialiser(profB, eleveB), 200);
@@ -663,7 +699,10 @@ test("élèves : seuls les administrateurs gèrent ceux sans cours", async () =>
 
     desinscrire(db, c1, eleveA.id);
     assertEquals(await listes(profA), []);
-    assertEquals(await listes(admin), eleves.map((e) => e.id));
+    assertEquals(
+      await listes(admin),
+      eleves.map((e) => e.id),
+    );
     const apresRetrait = empreinte(eleveA);
     assertEquals(await reinitialiser(profA, eleveA), 404);
     assertEquals(await reinitialiser(profSansCours, eleveA), 404);
@@ -683,7 +722,10 @@ test("modifier : un changement de séquence range la source dans un cours de l'e
     const c3 = cours(db, m, "Atelier");
     inscrire(db, c3, profB.id);
     db.prepare("UPDATE sources SET matiere_id = ? WHERE id = ?").run(m, publie);
-    affiliations(db, publie, [{ cours_id: c1, theme_id: null }, { cours_id: c2, theme_id: null }]);
+    affiliations(db, publie, [
+      { cours_id: c1, theme_id: null },
+      { cours_id: c2, theme_id: null },
+    ]);
     const nCours = () => db.prepare("SELECT count(*) AS n FROM cours").get()!.n;
     const nombreDeCours = nCours();
     const theme_ = (coursId: string, nom: string) =>
@@ -724,28 +766,30 @@ test("dépôt : sans cours choisi, la source va au premier cours de l'enseignant
     const autre = await autreMatiere(db);
     const deposer = (qui: Qui, titre: string) => {
       const f = new FormData();
-      for (
-        const [k, v] of Object.entries({
-          titre,
-          type_document: "cours",
-          matiere_id: m,
-          sequence: "Lumière",
-        })
-      ) f.append(k, v);
+      for (const [k, v] of Object.entries({
+        titre,
+        type_document: "cours",
+        matiere_id: m,
+        sequence: "Lumière",
+      }))
+        f.append(k, v);
       f.append("fichier", new File([`<html><p>${TEXTE}</p></html>`], "depot.html"));
       return statut(qui.requete("/prof/depot", { method: "POST", body: f }));
     };
     const idDe = (titre: string) =>
       db.prepare("SELECT id FROM sources WHERE titre = ?").get(titre)!.id as string;
     const decompte = () => ({
-      ...db.prepare(
-        "SELECT (SELECT count(*) FROM cours) AS cours, (SELECT count(*) FROM themes) AS themes",
-      ).get(),
+      ...db
+        .prepare(
+          "SELECT (SELECT count(*) FROM cours) AS cours, (SELECT count(*) FROM themes) AS themes",
+        )
+        .get(),
     });
 
     // c1 est le premier cours de la matière, mais profB n'en est pas membre.
     assertEquals(await deposer(profB, "Dépôt de B"), 200);
-    const theme2 = db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = 'Lumière'")
+    const theme2 = db
+      .prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = 'Lumière'")
       .get(c2)!.id as string;
     assertEquals(liens(db, idDe("Dépôt de B")), { [c2]: theme2 });
 
@@ -797,17 +841,20 @@ test("questions des élèves : la séquence mémorisée n'est montrée qu'à qui
       "Séquence des collègues",
       "Séquence ouverte",
     ];
-    for (const [id, sequence] of [[prive, secrete], [partage, collegues], [libre, ouverte]]) {
+    for (const [id, sequence] of [
+      [prive, secrete],
+      [partage, collegues],
+      [libre, ouverte],
+    ]) {
       db.prepare(
         "UPDATE sources SET metadonnees = json_set(metadonnees, '$.sequence', ?) WHERE id = ?",
-      )
-        .run(sequence, id);
+      ).run(sequence, id);
     }
     // Sans cours, cet élève pose des questions que tous les enseignants lisent.
     const eleve = await compte(db, "eleve");
     const questions = ["Question un", "Question deux", "Question trois"];
     [secrete, collegues, ouverte].forEach((chapitre, i) =>
-      poserQuestion(db, `q${i}`, eleve.id, questions[i], { chapitre })
+      poserQuestion(db, `q${i}`, eleve.id, questions[i], { chapitre }),
     );
     const vues = async (qui: Qui) => {
       const page = await texteDe(qui, "/prof/questions");
@@ -828,10 +875,13 @@ test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'est p
   const { db, dir, c1, c2, eleveA, eleveB, publie } = await deuxCours();
   try {
     const impressionnisme = theme(db, c2, "Impressionnisme");
-    affiliations(db, publie, [{ cours_id: c1, theme_id: null }, {
-      cours_id: c2,
-      theme_id: impressionnisme,
-    }]);
+    affiliations(db, publie, [
+      { cours_id: c1, theme_id: null },
+      {
+        cours_id: c2,
+        theme_id: impressionnisme,
+      },
+    ]);
 
     const accueilA = await texteDe(eleveA, "/eleve");
     assertStringIncludes(accueilA, "Cours du design");
@@ -852,7 +902,10 @@ test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'est p
     assertEquals(nMessages(), 0);
     assertEquals(await poser({ cours_id: c1 }), 303);
     assertEquals(
-      db.prepare("SELECT cours_id FROM messages").all().map((l) => l.cours_id),
+      db
+        .prepare("SELECT cours_id FROM messages")
+        .all()
+        .map((l) => l.cours_id),
       [c1],
     );
   } finally {
@@ -887,17 +940,26 @@ test("questions des élèves : un thème va aux enseignants de son cours, une ma
 test("suggestions : un élève ne reçoit ni question ni fait d'une source hors de ses cours", async () => {
   const { db, dir, c1, profA, eleveA, eleveB, publie, libre } = await deuxCours();
   try {
-    const phrase = "Gaudí construit la façade de la Casa Batlló à Barcelone entre 1904 et 1906 " +
+    const phrase =
+      "Gaudí construit la façade de la Casa Batlló à Barcelone entre 1904 et 1906 " +
       "avec des fragments de céramique irisée et des balcons en forme de masques.";
     // Les autres phrases ont moins de douze mots ou aucun fait : une seule se lit seule.
-    const passage = `${phrase} La toiture ondule comme un dos de dragon. Les colonnes évoquent ` +
+    const passage =
+      `${phrase} La toiture ondule comme un dos de dragon. Les colonnes évoquent ` +
       "des os. Les couleurs changent avec la lumière du jour et le ciel de la ville. Chaque balcon " +
       "ressemble à un masque de carnaval et chaque fenêtre s'ouvre sans angle droit.";
     assert(passage.length >= 300);
     const faits = await source(db, "Faits du design", "eleves", profA.id, c1, passage);
-    for (const [id, sourceId] of [["s1", publie], ["s2", libre], ["s3", faits]]) {
-      db.prepare("INSERT INTO suggestions VALUES (?, ?, ?, 'faux', 'test')")
-        .run(id, sourceId, `Q ${id}`);
+    for (const [id, sourceId] of [
+      ["s1", publie],
+      ["s2", libre],
+      ["s3", faits],
+    ]) {
+      db.prepare("INSERT INTO suggestions VALUES (?, ?, ?, 'faux', 'test')").run(
+        id,
+        sourceId,
+        `Q ${id}`,
+      );
     }
     const questions = (id: string) =>
       [...suggestionsParChapitre(db, commeEleve(id)).values()].flat().sort();
@@ -939,16 +1001,21 @@ test("bibliothèque : la case d'une ressource que l'enseignant ne peut pas modif
 test("modifier : cocher son cours garde les rattachements des autres cours", async () => {
   const { db, dir, c1, c2, profC, eleveA, eleveB, publie } = await deuxCours();
   try {
-    affiliations(db, publie, [{ cours_id: c1, theme_id: null }, { cours_id: c2, theme_id: null }]);
+    affiliations(db, publie, [
+      { cours_id: c1, theme_id: null },
+      { cours_id: c2, theme_id: null },
+    ]);
     const lit = (qui: Qui) => statut(qui.requete(`/eleve/sources/${publie}`));
     assertEquals(await lit(eleveB), 200);
     const modifier = (corps: Record<string, string>) =>
-      statut(envoyer(profC, `/prof/sources/${publie}/modifier`, {
-        titre: "Cours du design",
-        sequence: "",
-        affiliations_presentes: "1",
-        ...corps,
-      }));
+      statut(
+        envoyer(profC, `/prof/sources/${publie}/modifier`, {
+          titre: "Cours du design",
+          sequence: "",
+          affiliations_presentes: "1",
+          ...corps,
+        }),
+      );
 
     assertEquals(await modifier({ cours: c1 }), 303);
     assertEquals(liens(db, publie), { [c1]: null, [c2]: null });

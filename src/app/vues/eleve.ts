@@ -80,79 +80,87 @@ export const accueilEleve = (
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
         <h2 id="tes-chapitres">${personnel ? "Mes documents" : "Tes séquences"}</h2>
-        ${chapitres.length
-          ? html`
-            <ul class="chapitres">${chapitres.map((c) =>
-              html`
+        ${
+          chapitres.length
+            ? html`
+            <ul class="chapitres">${chapitres.map(
+              (c) =>
+                html`
                 <li class="chapitre">
                   <div class="chapitre-tete">
-                    <h3><a href="${c.themeId
+                    <h3><a href="${
+                      c.themeId
+                        ? `/eleve/themes/${c.themeId}`
+                        : c.coursId && c.nom
+                          ? `/eleve?cours_id=${c.coursId}`
+                          : lienChapitre(c.nom)
+                    }">${nomChapitre(c.nom || "Sans séquence")}</a></h3>
+                    <span class="discret">${c.sources.length} documents${
+                      chapitres.some((autre) => autre.nom === c.nom && autre.coursId !== c.coursId)
+                        ? ` / ${c.cours}`
+                        : ""
+                    }</span>
+                  </div>
+                  <div class="apercu-oeuvres">${c.sources
+                    .filter((s) => s.image_id)
+                    .slice(0, 4)
+                    .map(
+                      (s) =>
+                        html`
+                        <a class="passe-partout"
+                          href="${
+                            c.themeId
+                              ? `/eleve/themes/${c.themeId}?doc=${s.id}`
+                              : lienChapitre(s.sequence ?? c.nom, s.id)
+                          }"><img src="/media/${s.image_id}" alt="${s.titre}" loading="lazy"></a>
+                      `,
+                    )}</div>
+                  ${
+                    c.questions.length
+                      ? html`
+                      <div class="idees">${c.questions
+                        .slice(0, 2)
+                        .map((q) => idee(q, false, q, c.themeId ? "" : c.nom, c.themeId))}</div>
+                    `
+                      : ""
+                  }
+                  <a class="bouton" href="${
+                    c.themeId
                       ? `/eleve/themes/${c.themeId}`
                       : c.coursId && c.nom
-                      ? `/eleve?cours_id=${c.coursId}`
-                      : lienChapitre(c.nom)}">${nomChapitre(
-                        c.nom || "Sans séquence",
-                      )}</a></h3>
-                    <span class="discret">${c.sources.length} documents${chapitres.some((autre) =>
-                        autre.nom === c.nom && autre.coursId !== c.coursId
-                      )
-                      ? ` / ${c.cours}`
-                      : ""}</span>
-                  </div>
-                  <div class="apercu-oeuvres">${c.sources.filter((s) => s.image_id).slice(0, 4).map(
-                    (
-                      s,
-                    ) =>
-                      html`
-                        <a class="passe-partout"
-                          href="${c.themeId
-                            ? `/eleve/themes/${c.themeId}?doc=${s.id}`
-                            : lienChapitre(s.sequence ?? c.nom, s.id)}"><img src="/media/${s
-                            .image_id}" alt="${s.titre}" loading="lazy"></a>
-                      `,
-                  )}</div>
-                  ${c.questions.length
-                    ? html`
-                      <div class="idees">${c.questions.slice(0, 2).map((q) =>
-                        idee(q, false, q, c.themeId ? "" : c.nom, c.themeId)
-                      )}</div>
-                    `
-                    : ""}
-                  <a class="bouton" href="${c.themeId
-                    ? `/eleve/themes/${c.themeId}`
-                    : c.coursId && c.nom
-                    ? `/eleve?cours_id=${c.coursId}`
-                    : lienChapitre(c.nom)}">${icone(
-                      "arrow-right",
-                    )}Ouvrir la séquence</a>
+                        ? `/eleve?cours_id=${c.coursId}`
+                        : lienChapitre(c.nom)
+                  }">${icone("arrow-right")}Ouvrir la séquence</a>
                 </li>
-              `
+              `,
             )}</ul>
           `
-          : html`
-            <p>${personnel
-              ? html`
+            : html`
+            <p>${
+              personnel
+                ? html`
                 Aucun document n'est encore prêt pour l'étude. <a
                   href="/prof/depot">Déposer un document</a>, puis le relire dans la bibliothèque.
               `
-              : "Aucun document n'est encore publié par tes enseignants."}</p>
-          `}
+                : "Aucun document n'est encore publié par tes enseignants."
+            }</p>
+          `
+        }
       </section>
-      ${oeuvre
-        ? html`<aside class="saviez-vous" aria-labelledby="saviez-vous">
+      ${
+        oeuvre
+          ? html`<aside class="saviez-vous" aria-labelledby="saviez-vous">
           <h2 id="saviez-vous">Le saviez-vous ?</h2>
           <a class="passe-partout" href="/eleve/sources/${oeuvre.id}"><img src="/media/${oeuvre.image_id}" alt="${oeuvre.titre}" loading="lazy"></a>
           <p><strong>${oeuvre.titre}</strong>${oeuvre.date ? ` · ${oeuvre.date}` : ""}</p>
-          ${
-          idee(
+          ${idee(
             `Qu'est-ce que tu sais de cette œuvre : ${oeuvre.titre} ?`,
             false,
             "Qu'est-ce que tu sais de cette œuvre ?",
-          )
-        }
+          )}
         </aside>`
-        : fait
-        ? html`
+          : fait
+            ? html`
           <aside class="saviez-vous" aria-labelledby="saviez-vous">
             <h2 id="saviez-vous">Le saviez-vous ?</h2>
             <blockquote>${fait.phrase}</blockquote>
@@ -164,7 +172,8 @@ export const accueilEleve = (
             ${idee(`Explique-moi : ${fait.phrase}`, false, "M'en dire plus")}
           </aside>
         `
-        : ""}
+            : ""
+      }
     </div>
   `;
 
@@ -199,37 +208,46 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
     <a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>
     <h1>Chercher une ressource</h1>
     ${formRecherche(q, p)}
-    ${!q ? "" : trouves.length
-      ? html`
-        <p class="sous-titre">${trouves.length === 1
-          ? "Un document proche"
-          : `${trouves.length} documents proches`} de ta recherche, du plus proche au moins proche.</p>
-        <div class="tuiles resultats">${trouves.map((s) =>
-          html`
-            <a class="tuile" href="${s.profil === "general"
-              ? `/eleve/sources/${s.id}`
-              : s.theme_id
-              ? `/eleve/themes/${s.theme_id}?doc=${s.id}`
-              : lienChapitre(s.sequence, s.id)}">
-              <span class="passe-partout">${s.image_id
-                ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
-                : html`<span class="sans-image">${icone("file-text")}</span>`}</span>
+    ${
+      !q
+        ? ""
+        : trouves.length
+          ? html`
+        <p class="sous-titre">${
+          trouves.length === 1 ? "Un document proche" : `${trouves.length} documents proches`
+        } de ta recherche, du plus proche au moins proche.</p>
+        <div class="tuiles resultats">${trouves.map(
+          (s) =>
+            html`
+            <a class="tuile" href="${
+              s.profil === "general"
+                ? `/eleve/sources/${s.id}`
+                : s.theme_id
+                  ? `/eleve/themes/${s.theme_id}?doc=${s.id}`
+                  : lienChapitre(s.sequence, s.id)
+            }">
+              <span class="passe-partout">${
+                s.image_id
+                  ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
+                  : html`<span class="sans-image">${icone("file-text")}</span>`
+              }</span>
               <span class="tuile-titre">${s.titre}</span>
               <span class="discret">${[
                 s.profil === "general" ? s.sequence : nomChapitre(s.sequence),
                 s.date,
-              ].filter(Boolean).join(
-                ", ",
-              )}</span>
+              ]
+                .filter(Boolean)
+                .join(", ")}</span>
               ${s.extrait ? html`<span class="tuile-extrait">${s.extrait}</span>` : ""}
             </a>
-          `
+          `,
         )}</div>
       `
-      : html`
+          : html`
         <p>Rien dans le cours ne ressemble à « ${q} ». Essaie d'autres mots.</p>
         ${idee(q, false, "Poser la question à Thot")}
-      `}
+      `
+    }
   `;
 
 const lienChapitre = (nom: string, doc?: string) =>
@@ -254,29 +272,39 @@ export type SourceLue = {
 };
 
 /** Cartel de musée: seulement les champs connus, rien d'inventé. */
-const cartel = (
-  d: { seance: string; chapitre: string; date: string; enseignant: string; profil?: Profil },
-) =>
+const cartel = (d: {
+  seance: string;
+  chapitre: string;
+  date: string;
+  enseignant: string;
+  profil?: Profil;
+}) =>
   html`
     <dl class="cartel">
-      ${d.date
-        ? html`
+      ${
+        d.date
+          ? html`
           <dt>Date</dt>
           <dd>${d.date}</dd>
         `
-        : ""}
-      ${d.seance
-        ? html`
+          : ""
+      }
+      ${
+        d.seance
+          ? html`
           <dt>Séance</dt>
           <dd>${d.seance}</dd>
         `
-        : ""}
-      ${d.chapitre
-        ? html`
+          : ""
+      }
+      ${
+        d.chapitre
+          ? html`
           <dt>${d.profil === "general" ? "Thème" : "Séquence"}</dt>
           <dd>${d.profil === "general" ? d.chapitre : nomChapitre(d.chapitre)}</dd>
         `
-        : ""}
+          : ""
+      }
       <dt>Publié par</dt><dd>${d.enseignant}</dd>
     </dl>
   `;
@@ -303,14 +331,16 @@ export const lecteur = (d?: Apercu) =>
           ${fermer}
         </div>
         <div class="defile">
-          ${d.image_id
-            ? html`
+          ${
+            d.image_id
+              ? html`
               <figure class="oeuvre-grande">
                 <img src="/media/${d.image_id}" alt="${d.legende ?? d.titre}">
                 ${d.legende ? html`<figcaption>${d.legende}</figcaption>` : ""}
               </figure>
             `
-            : ""}
+              : ""
+          }
           ${cartel(d)}
           ${d.images > 1 ? html`<p class="discret">${d.images} images dans le document.</p>` : ""}
           ${d.extrait ? html`<p class="extrait">${d.extrait}</p>` : ""}
@@ -346,9 +376,11 @@ const tuile = (s: SourceChapitre, nom: string, choisi: boolean, themeId?: string
       hx-push-url="${themeId ? `/eleve/themes/${themeId}?doc=${s.id}` : lienChapitre(nom, s.id)}"
       data-ouvrir-feuille
     >
-      <span class="passe-partout">${s.image_id
-        ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
-        : html`<span class="sans-image">${icone("file-text")}</span>`}</span>
+      <span class="passe-partout">${
+        s.image_id
+          ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
+          : html`<span class="sans-image">${icone("file-text")}</span>`
+      }</span>
       <span class="tuile-titre">${s.titre}</span>
       ${s.date ? html`<span class="discret">${s.date}</span>` : ""}
     </a>
@@ -366,18 +398,22 @@ export const pageChapitre = (
   const quiLit = mention ? html`<small>${mention}</small>` : "";
   if (sources.every((s) => s.profil === "general")) {
     return html`
-      <p><a href="/eleve">Ressources</a></p><h1>${nom ||
-        "Ressources non classées"}</h1><p class="discret">${perimetre}</p>
+      <p><a href="/eleve">Ressources</a></p><h1>${
+        nom || "Ressources non classées"
+      }</h1><p class="discret">${perimetre}</p>
           <form method="post" action="/eleve/questions"
-        class="question-rapide"><label for="texte">Une question sur ce thème ?</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${themeId ??
-          ""}"><input type="hidden" name="chapitre" value="${themeId
-          ? ""
-          : nom}"><button>Demander</button></div>${quiLit}</form>
-          <ul>${sources.map((s) =>
-            html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`
-          )}</ul>${questions.length
-            ? html`<div class="idees">${questions.map((q) => idee(q, false, q, "", themeId))}</div>`
-            : ""}
+        class="question-rapide"><label for="texte">Une question sur ce thème ?</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
+          themeId ?? ""
+        }"><input type="hidden" name="chapitre" value="${
+          themeId ? "" : nom
+        }"><button>Demander</button></div>${quiLit}</form>
+          <ul>${sources.map(
+            (s) => html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`,
+          )}</ul>${
+            questions.length
+              ? html`<div class="idees">${questions.map((q) => idee(q, false, q, "", themeId))}</div>`
+              : ""
+          }
     `;
   }
   const oeuvre = sources.find((s) => s.image_id && s.quiz_reponse);
@@ -387,41 +423,49 @@ export const pageChapitre = (
       <div class="mur">
     <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
     <h1>${themeId ? nom : nomChapitre(nom || "Sans séquence")}</h1>
-    <p class="sous-titre">${sources
-      .length} documents publiés par tes enseignants, rangés par séance.</p>
+    <p class="sous-titre">${
+      sources.length
+    } documents publiés par tes enseignants, rangés par séance.</p>
     <form method="post" action="/eleve/questions" class="question-rapide">
       <label for="texte">Une question sur cette séquence ?</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
           placeholder="Pose ta question">
-        ${themeId
-          ? html`<input type="hidden" name="theme_id" value="${themeId}">`
-          : html`<input type="hidden" name="chapitre" value="${nom}">`}
+        ${
+          themeId
+            ? html`<input type="hidden" name="theme_id" value="${themeId}">`
+            : html`<input type="hidden" name="chapitre" value="${nom}">`
+        }
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
       ${quiLit}
     </form>
-    ${questions.length
-      ? html`<div class="idees">${
-        questions.slice(0, 3).map((q) => idee(q, false, q, themeId ? "" : nom, themeId))
-      }</div>`
-      : ""}
-        ${[...seances].map(([seance, docs]) =>
-          html`
+    ${
+      questions.length
+        ? html`<div class="idees">${questions
+            .slice(0, 3)
+            .map((q) => idee(q, false, q, themeId ? "" : nom, themeId))}</div>`
+        : ""
+    }
+        ${[...seances].map(
+          ([seance, docs]) =>
+            html`
             <section class="seance" aria-labelledby="seance-${docs[0].id}">
-              <h2 id="seance-${docs[0].id}">${seance} <span class="discret">${docs
-                .length}</span></h2>
+              <h2 id="seance-${docs[0].id}">${seance} <span class="discret">${
+                docs.length
+              }</span></h2>
               <div class="tuiles">${docs.map((s) =>
-                tuile(s, nom, s.id === choisi?.id, themeId)
+                tuile(s, nom, s.id === choisi?.id, themeId),
               )}</div>
             </section>
-          `
+          `,
         )}
       </div>
       <div class="colonne-lecteur">${lecteur(choisi)}</div>
     </div>
-    ${oeuvre
-      ? html`
+    ${
+      oeuvre
+        ? html`
         <section class="quiz">
           <h2>Quelle œuvre est-ce ?</h2>
           <img src="/media/${oeuvre.image_id}" alt="Œuvre à identifier" loading="lazy">
@@ -429,14 +473,13 @@ export const pageChapitre = (
           <div class="saisie">
             <input id="quiz-reponse" type="text" autocomplete="off">
             <button type="button" data-answer="${oeuvre.quiz_reponse}"
-              data-verifier-quiz>${icone(
-                "check",
-              )}Vérifier</button>
+              data-verifier-quiz>${icone("check")}Vérifier</button>
           </div>
           <p id="quiz-resultat" role="status"></p>
         </section>
       `
-      : ""}
+        : ""
+    }
   `;
 };
 
@@ -447,29 +490,31 @@ export const lectureSource = (
   marque?: [number, number],
 ) =>
   html`
-    <a class="bouton retour" href="${s.profil === "general"
-      ? "/eleve"
-      : lienChapitre(s.sequence, s.id)}">${icone(
-        "arrow-left",
-      )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Sans séquence")}</a>
+    <a class="bouton retour" href="${
+      s.profil === "general" ? "/eleve" : lienChapitre(s.sequence, s.id)
+    }">${icone(
+      "arrow-left",
+    )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Sans séquence")}</a>
     <article class="document">
       <h1>${s.titre}</h1>
-      ${s.langue && s.langue !== "fr"
-        ? html`<p class="note">Langue non prise en charge pour la recherche : ${s.langue}</p>`
-        : ""}
-      ${s.metadonnees
-        ? html`<dl class="cartel">${
-          PROFILS[s.profil ?? "general"].informations.map((n) => {
-            const valeur = JSON.parse(s.metadonnees!)[n];
-            return valeur
-              ? html`
+      ${
+        s.langue && s.langue !== "fr"
+          ? html`<p class="note">Langue non prise en charge pour la recherche : ${s.langue}</p>`
+          : ""
+      }
+      ${
+        s.metadonnees
+          ? html`<dl class="cartel">${PROFILS[s.profil ?? "general"].informations.map((n) => {
+              const valeur = JSON.parse(s.metadonnees!)[n];
+              return valeur
+                ? html`
                 <dt>${CHAMPS[n].label}</dt>
                 <dd>${String(valeur)}</dd>
               `
-              : "";
-          })
-        }</dl>`
-        : ""}
+                : "";
+            })}</dl>`
+          : ""
+      }
       <div class="document-tete">
         ${cartel({ ...s, chapitre: s.sequence })}
         <form method="post" action="/eleve/questions">
@@ -478,15 +523,17 @@ export const lectureSource = (
           <button>${icone("chat-circle")}Poser une question dessus</button>
         </form>
       </div>
-      ${images.map((i) =>
-        html`
-          <figure class="oeuvre-grande"><img src="/media/${i.id}" alt="${i.legende ?? s.titre}">${i
-              .legende
-            ? html`
+      ${images.map(
+        (i) =>
+          html`
+          <figure class="oeuvre-grande"><img src="/media/${i.id}" alt="${i.legende ?? s.titre}">${
+            i.legende
+              ? html`
               <figcaption>${i.legende}</figcaption>
             `
-            : ""}</figure>
-        `
+              : ""
+          }</figure>
+        `,
       )} ${texteDocument(
         blocs.filter((b, n) => !(n === 0 && b.texte === s.titre)),
         marque,
@@ -518,16 +565,19 @@ export const avis = (id: string, choix: string | null) =>
   html`
     <div id="avis-${id}" class="avis" aria-label="Avis sur la réponse">
       <span>Cette réponse est-elle utile ?</span>
-      ${[["utile", "Utile"], ["confus", "Peu claire"], ["faux", "Fausse"]].map((
-        [valeur, libelle],
-      ) =>
-        html`
+      ${[
+        ["utile", "Utile"],
+        ["confus", "Peu claire"],
+        ["faux", "Fausse"],
+      ].map(
+        ([valeur, libelle]) =>
+          html`
           <button type="button" aria-pressed="${String(
             choix === valeur,
           )}" name="avis" value="${valeur}"
             hx-post="/eleve/messages/${id}/avis" hx-include="this" hx-target="#avis-${id}"
             hx-swap="outerHTML">${libelle}</button>
-        `
+        `,
       )}
     </div>
   `;
@@ -544,11 +594,14 @@ export const reponse = (
     const sources = [...new Map(r.affirmations.map((a) => [a.titre, a.source_id])).entries()];
     return html`
       <article class="reponse" id="reponse-${id}">
-        <p class="reponse-note">${r.partielle
-          ? "Réponse partielle : seuls les passages vérifiés sont affichés"
-          : "Réponse vérifiée dans les cours validés"}</p>
-        <p class="texte-reponse">${r.affirmations.map((a: Affirmation, n: number) =>
-          html`
+        <p class="reponse-note">${
+          r.partielle
+            ? "Réponse partielle : seuls les passages vérifiés sont affichés"
+            : "Réponse vérifiée dans les cours validés"
+        }</p>
+        <p class="texte-reponse">${r.affirmations.map(
+          (a: Affirmation, n: number) =>
+            html`
             ${n ? " " : ""}<span>${a.texte}</span>&nbsp;<button
               class="citation"
               aria-pressed="${String(auto && n === 0)}"
@@ -560,26 +613,31 @@ export const reponse = (
               hx-sync="#source:replace"
               data-ouvrir-feuille
             >${icone("quotes")}${n + 1}</button>
-          `
+          `,
         )}</p>
-        ${[...new Map(r.affirmations.filter((a) => a.image_id).map((a) => [a.image_id, a]))
-          .values()]
-          .map((a) =>
+        ${[
+          ...new Map(r.affirmations.filter((a) => a.image_id).map((a) => [a.image_id, a])).values(),
+        ].map(
+          (a) =>
             html`
               <a
-                href="/eleve/sources/${a.source_id}"><img class="image-reponse" src="/media/${a
-                  .image_id}" alt="${a.titre}" loading="lazy"></a>
-            `
-          )}
-        <p class="provenance">Sources : ${sources.map(([titre, sourceId], n) =>
-          html`${n ? ", " : ""}<a href="/eleve/sources/${sourceId}">${titre}</a>`
+                href="/eleve/sources/${a.source_id}"><img class="image-reponse" src="/media/${
+                  a.image_id
+                }" alt="${a.titre}" loading="lazy"></a>
+            `,
+        )}
+        <p class="provenance">Sources : ${sources.map(
+          ([titre, sourceId], n) =>
+            html`${n ? ", " : ""}<a href="/eleve/sources/${sourceId}">${titre}</a>`,
         )}</p>
         ${avis(id, choix)}
-        ${idees.length
-          ? html`<div class="idees-reponse"><strong>Pour continuer</strong>${
-            idees.map((q) => idee(q, true))
-          }</div>`
-          : ""}
+        ${
+          idees.length
+            ? html`<div class="idees-reponse"><strong>Pour continuer</strong>${idees.map((q) =>
+                idee(q, true),
+              )}</div>`
+            : ""
+        }
       </article>
     `;
   }
@@ -591,26 +649,32 @@ export const reponse = (
           Aucun passage publié par tes enseignants ne répond à cette question. Reformule-la avec d'autres
           mots, ou pose-la à ton professeur.
         </p>
-        ${idees.length
-          ? html`<div class="idees-reponse"><strong>Ce que ton cours couvre</strong>${
-            idees.map((q) => idee(q, true))
-          }</div>`
-          : ""}
+        ${
+          idees.length
+            ? html`<div class="idees-reponse"><strong>Ce que ton cours couvre</strong>${idees.map(
+                (q) => idee(q, true),
+              )}</div>`
+            : ""
+        }
       </article>
     `;
   }
   return html`
     <article class="reponse panne" id="reponse-${id}">
-      <p><strong>${r.code === "EVIDENCE_WITHDRAWN"
-        ? "Une source de cette réponse a été retirée ou modifiée."
-        : r.code === "CITATION_UNVERIFIED"
-        ? "Je n'ai pas pu vérifier les citations de cette réponse."
-        : "Thot n'a pas pu répondre, à cause d'une panne technique."}</strong></p>
-      <p>${r.code === "EVIDENCE_WITHDRAWN"
-        ? "Réessaie pour obtenir une réponse avec les sources disponibles."
-        : r.code === "CITATION_UNVERIFIED"
-        ? "Ta question est conservée. Réessaie ou demande à ton professeur."
-        : "Ce n'est pas une limite du cours. Ta question est conservée."}</p>
+      <p><strong>${
+        r.code === "EVIDENCE_WITHDRAWN"
+          ? "Une source de cette réponse a été retirée ou modifiée."
+          : r.code === "CITATION_UNVERIFIED"
+            ? "Je n'ai pas pu vérifier les citations de cette réponse."
+            : "Thot n'a pas pu répondre, à cause d'une panne technique."
+      }</strong></p>
+      <p>${
+        r.code === "EVIDENCE_WITHDRAWN"
+          ? "Réessaie pour obtenir une réponse avec les sources disponibles."
+          : r.code === "CITATION_UNVERIFIED"
+            ? "Ta question est conservée. Réessaie ou demande à ton professeur."
+            : "Ce n'est pas une limite du cours. Ta question est conservée."
+      }</p>
       <button
         hx-post="/eleve/messages/${id}/relancer"
         hx-target="#reponse-${id}"
@@ -623,9 +687,7 @@ export const reponse = (
 };
 
 const fermer = html`
-  <button type="button" class="fermer-feuille">${icone(
-    "x",
-  )}Fermer</button>
+  <button type="button" class="fermer-feuille">${icone("x")}Fermer</button>
 `;
 
 export const panneauSource = (
@@ -655,42 +717,51 @@ export const panneauSource = (
           <h3 id="source-titre" tabindex="-1">${a.titre}</h3>
           ${a.enseignant ? html`<p class="discret">Document de ${a.enseignant}</p>` : ""}
         </div>
-        ${suite && suite.total > 1
-          ? html`
+        ${
+          suite && suite.total > 1
+            ? html`
             <div class="source-nav">
-              ${[[-1, "Précédent", "caret-left"], [1, "Suivant", "caret-right"]].map((
-                [pas, libelle, nom],
-              ) =>
-                html`
+              ${[
+                [-1, "Précédent", "caret-left"],
+                [1, "Suivant", "caret-right"],
+              ].map(
+                ([pas, libelle, nom]) =>
+                  html`
                   <button
                     type="button"
-                    ${suite.n + Number(pas) < 0 || suite.n + Number(pas) >= suite.total
-                      ? "disabled"
-                      : ""}
+                    ${
+                      suite.n + Number(pas) < 0 || suite.n + Number(pas) >= suite.total
+                        ? "disabled"
+                        : ""
+                    }
                     data-reponse="${suite.id}" data-citation="${suite.n + Number(pas)}"
                   >${icone(nom as Icone)}${libelle}</button>
-                `
+                `,
               )}
               <span class="discret">${suite.n + 1} sur ${suite.total}</span>
             </div>
           `
-          : ""}
+            : ""
+        }
         <div class="defile">
-          ${a.milieu !== undefined
-            ? html`
+          ${
+            a.milieu !== undefined
+              ? html`
               <blockquote
-                class="passage">${a.coupeAvant ? "… " : ""}${a.avant}<mark>${a.milieu}</mark>${a
-                  .apres}${a.coupeApres ? " …" : ""}</blockquote>
+                class="passage">${a.coupeAvant ? "… " : ""}${a.avant}<mark>${a.milieu}</mark>${
+                  a.apres
+                }${a.coupeApres ? " …" : ""}</blockquote>
             `
-            : html`
+              : html`
               <p class="discret">Légende d'image relue par l'enseignant :</p>
               <blockquote class="passage"><mark>${a.citation}</mark></blockquote>
-            `}
+            `
+          }
         </div>
         <div class="feuille-pied">
-          <a class="bouton" href="/eleve/sources/${a.source_id}${a.debut !== undefined
-            ? `?debut=${a.debut}&fin=${a.fin}#passage`
-            : ""}">${icone("file-text")}Ouvrir le document complet</a>
+          <a class="bouton" href="/eleve/sources/${a.source_id}${
+            a.debut !== undefined ? `?debut=${a.debut}&fin=${a.fin}#passage` : ""
+          }">${icone("file-text")}Ouvrir le document complet</a>
         </div>
       </aside>
     `
@@ -727,18 +798,21 @@ export const chat = (
           aria-live="polite"
           aria-relevant="additions"
         >
-          ${messages.map((m, i) =>
-            html`
-              ${question(m.question)}${m.resultat
-                ? reponse(
-                  m.id,
-                  JSON.parse(m.resultat),
-                  m.avis,
-                  i === messages.length - 1 ? idees : [],
-                  i === derniere,
-                )
-                : attente(m.id)}
-            `
+          ${messages.map(
+            (m, i) =>
+              html`
+              ${question(m.question)}${
+                m.resultat
+                  ? reponse(
+                      m.id,
+                      JSON.parse(m.resultat),
+                      m.avis,
+                      i === messages.length - 1 ? idees : [],
+                      i === derniere,
+                    )
+                  : attente(m.id)
+              }
+            `,
           )}
         </div>
         <form
@@ -760,9 +834,11 @@ export const chat = (
             ></textarea>
             <button class="principal">${icone("arrow-up")}Envoyer</button>
           </div>
-          <small>${personnel
-            ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
-            : "Thot répond seulement avec les documents publiés par tes enseignants."} ${mention}</small>
+          <small>${
+            personnel
+              ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
+              : "Thot répond seulement avec les documents publiés par tes enseignants."
+          } ${mention}</small>
         </form>
       </section>
       <div class="colonne-source">${panneauSource()}</div>

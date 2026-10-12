@@ -76,24 +76,26 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
   const db = connexion(join(dir, "state.sqlite3"));
   try {
     db.exec("CREATE TABLE migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)");
-    for (
-      const nom of [
-        "0001_depot.sql",
-        "0002_mvp.sql",
-        "0003_suggestions.sql",
-        "0004_pilote.sql",
-        "0005_coherence.sql",
-        "0006_instance.sql",
-      ]
-    ) {
+    for (const nom of [
+      "0001_depot.sql",
+      "0002_mvp.sql",
+      "0003_suggestions.sql",
+      "0004_pilote.sql",
+      "0005_coherence.sql",
+      "0006_instance.sql",
+    ]) {
       db.exec(readFileSync(join(RACINE, "migrations", nom), "utf8"));
       db.prepare("INSERT INTO migrations VALUES (?, 'fixture')").run(nom);
     }
-    const metas = [{ matiere: "arts-appliques", sequence: "Lumière", artiste: "Auteur relu" }, {
-      matiere: "Physique",
-      sequence: "Lumière",
-      auteur: "Newton",
-    }, { sequence: "Non classée", auteur: "Inconnu" }];
+    const metas = [
+      { matiere: "arts-appliques", sequence: "Lumière", artiste: "Auteur relu" },
+      {
+        matiere: "Physique",
+        sequence: "Lumière",
+        auteur: "Newton",
+      },
+      { sequence: "Non classée", auteur: "Inconnu" },
+    ];
     for (const [i, m] of metas.entries()) {
       db.prepare(
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, 'Prof historique', 'fixture')`,
@@ -102,18 +104,33 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
     assertEquals(migrer(db), ["0007_domaines.sql", "0008_acces.sql", "0009_membres.sql"]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
-    assertEquals(sources.map((s) => s.metadonnees), metas.map((m) => JSON.stringify(m)));
-    assertEquals(sources.map((s) => s.profil), ["arts-appliques", "general", "general"]);
+    assertEquals(
+      sources.map((s) => s.metadonnees),
+      metas.map((m) => JSON.stringify(m)),
+    );
+    assertEquals(
+      sources.map((s) => s.profil),
+      ["arts-appliques", "general", "general"],
+    );
     // Sans `publics`, une source reste lisible des enseignants, sans propriétaire et sans réponses.
-    assertEquals(sources.map((s) => [s.audience, s.reponses, s.proprietaire_id]), [
-      ["collegues", 0, null],
-      ["collegues", 0, null],
-      ["collegues", 0, null],
-    ]);
+    assertEquals(
+      sources.map((s) => [s.audience, s.reponses, s.proprietaire_id]),
+      [
+        ["collegues", 0, null],
+        ["collegues", 0, null],
+        ["collegues", 0, null],
+      ],
+    );
     assertEquals(sources[2].matiere_id, null);
     const cat = catalogue(db);
-    assertEquals(cat.matieres.map((m) => m.nom), ["Arts appliqués", "Physique"]);
-    assertEquals(cat.themes.map((t) => t.nom), ["Lumière", "Lumière"]);
+    assertEquals(
+      cat.matieres.map((m) => m.nom),
+      ["Arts appliqués", "Physique"],
+    );
+    assertEquals(
+      cat.themes.map((t) => t.nom),
+      ["Lumière", "Lumière"],
+    );
     assert(cat.themes[0].id !== cat.themes[1].id);
     assert(cat.themes[0].cours_id !== cat.themes[1].cours_id);
     const prof = await session(db, fauxModeles().modeles, "enseignant");
@@ -137,14 +154,22 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
     const c1 = cours(db, physique, "Optique", "", "Comprendre la lumière"),
       c2 = cours(db, reaper, "Manuel");
     cours(db, socio, "Auteurs");
-    const t1 = theme(db, c1, "Introduction"), t2 = theme(db, c2, "Introduction");
-    const id = await ressource(db, {
-      matiere_id: physique,
-      auteur: "Isaac Newton",
-      version: "2",
-      date_evenement: "1704-01-01",
-      date_publication: "2025-01-01",
-    }, [{ cours_id: c1, theme_id: t1 }, { cours_id: c2, theme_id: t2 }]);
+    const t1 = theme(db, c1, "Introduction"),
+      t2 = theme(db, c2, "Introduction");
+    const id = await ressource(
+      db,
+      {
+        matiere_id: physique,
+        auteur: "Isaac Newton",
+        version: "2",
+        date_evenement: "1704-01-01",
+        date_publication: "2025-01-01",
+      },
+      [
+        { cours_id: c1, theme_id: t1 },
+        { cours_id: c2, theme_id: t2 },
+      ],
+    );
     const avant = db.prepare("SELECT * FROM sources WHERE id = ?").get(id)!;
     assertEquals(avant.profil, "general");
     assertEquals(JSON.parse(avant.metadonnees as string).classe, "");
@@ -156,8 +181,12 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
       avant.metadonnees,
     );
     assertEquals(
-      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c1, themeId: t1 })
-        .map((c) => c.source_id),
+      chercherFts(db, "lumière", {
+        lecteur: null,
+        schoolId: "pilote",
+        coursId: c1,
+        themeId: t1,
+      }).map((c) => c.source_id),
       [id],
     );
     assertEquals(
@@ -192,8 +221,12 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
       0,
     );
     assertEquals(
-      chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c2, themeId: t2 })
-        .map((c) => c.source_id),
+      chercherFts(db, "lumière", {
+        lecteur: null,
+        schoolId: "pilote",
+        coursId: c2,
+        themeId: t2,
+      }).map((c) => c.source_id),
       [id],
     );
     assertThrows(() => affiliations(db, id, [{ cours_id: c1, theme_id: t2 }]));
@@ -218,10 +251,12 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
       "Isaac Newton",
     );
     assertEquals(
-      (await prof.requete(`/prof/sources/${id}/modifier`, {
-        method: "POST",
-        body: new URLSearchParams({ titre: "ATC Lumière", sequence: "", langue: "en" }),
-      })).status,
+      (
+        await prof.requete(`/prof/sources/${id}/modifier`, {
+          method: "POST",
+          body: new URLSearchParams({ titre: "ATC Lumière", sequence: "", langue: "en" }),
+        })
+      ).status,
       303,
     );
     assertEquals(db.prepare("SELECT langue FROM sources WHERE id = ?").get(id)!.langue, "en");
@@ -241,17 +276,15 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
     indexer(db, id);
     await reextraire(db, id);
     assertEquals(db.prepare("SELECT profil FROM sources WHERE id = ?").get(id)!.profil, "general");
-    db.prepare(
-      "UPDATE sources SET audience = 'collegues' WHERE id = ?",
-    ).run(id);
+    db.prepare("UPDATE sources SET audience = 'collegues' WHERE id = ?").run(id);
     assertEquals(
       chercherFts(db, "lumière", { lecteur: null, schoolId: "pilote", coursId: c2 }).length,
       0,
     );
     assertEquals((await eleve.requete(`/eleve/themes/${t2}`)).status, 404);
     assert(
-      !catalogueVisible(db, { id: "", enseignant: false, administrateur: false }).themes.some((t) =>
-        t.id === t2
+      !catalogueVisible(db, { id: "", enseignant: false, administrateur: false }).themes.some(
+        (t) => t.id === t2,
       ),
     );
     assertEquals(
@@ -271,23 +304,24 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
 test("dépôt web et questions : périmètres par identifiants conservés jusqu’au flux, erreurs sans données partielles", async () => {
   const { db, dir } = await environnement();
   try {
-    const m = matiere(db, "Sociologie"), c = cours(db, m, "Théories"), t = theme(db, c, "Auteurs");
+    const m = matiere(db, "Sociologie"),
+      c = cours(db, m, "Théories"),
+      t = theme(db, c, "Auteurs");
     const citation = "Durkheim décrit les faits sociaux comme des manières collectives de penser.";
     const faux = fauxModeles({
       sorties: [JSON.stringify({ affirmations: [{ texte: citation, extrait: 1, citation }] })],
     });
     const prof = await session(db, faux.modeles, "enseignant");
     const form = new FormData();
-    for (
-      const [k, v] of Object.entries({
-        titre: "Faits sociaux",
-        type_document: "cours",
-        matiere_id: m,
-        auteur: "Durkheim",
-        cours: c,
-        [`theme_${c}`]: t,
-      })
-    ) form.set(k, v);
+    for (const [k, v] of Object.entries({
+      titre: "Faits sociaux",
+      type_document: "cours",
+      matiere_id: m,
+      auteur: "Durkheim",
+      cours: c,
+      [`theme_${c}`]: t,
+    }))
+      form.set(k, v);
     form.append("audience", "eleves");
     form.append("reponses", "1");
     form.set("fichier", new File([`<p>${citation}</p>`], "social.html"));
@@ -299,15 +333,18 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const page = await (await eleve.requete(`/eleve?cours_id=${c}&theme_id=${t}`)).text();
     assertStringIncludes(page, "Faits sociaux");
     assertStringIncludes(page, "Théories / Auteurs");
-    const recherche =
-      await (await eleve.requete(`/eleve/recherche?q=faits&cours_id=${c}&theme_id=${t}`)).text();
+    const recherche = await (
+      await eleve.requete(`/eleve/recherche?q=faits&cours_id=${c}&theme_id=${t}`)
+    ).text();
     assertStringIncludes(recherche, `name="cours_id" value="${c}"`);
     assertStringIncludes(recherche, `name="theme_id" value="${t}"`);
     assertEquals(
-      (await eleve.requete("/eleve/questions", {
-        method: "POST",
-        body: new URLSearchParams({ texte: "faits sociaux", cours_id: c, theme_id: t }),
-      })).status,
+      (
+        await eleve.requete("/eleve/questions", {
+          method: "POST",
+          body: new URLSearchParams({ texte: "faits sociaux", cours_id: c, theme_id: t }),
+        })
+      ).status,
       303,
     );
     const message = db.prepare("SELECT * FROM messages").get()!;
@@ -317,10 +354,12 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const flux = await (await eleve.requete(`/eleve/messages/${message.id}/flux`)).text();
     assertStringIncludes(flux, "Durkheim");
     assertEquals(
-      (await eleve.requete("/eleve/questions", {
-        method: "POST",
-        body: new URLSearchParams({ texte: "Question", theme_id: "absent" }),
-      })).status,
+      (
+        await eleve.requete("/eleve/questions", {
+          method: "POST",
+          body: new URLSearchParams({ texte: "Question", theme_id: "absent" }),
+        })
+      ).status,
       400,
     );
     form.set(`theme_${c}`, "absent");
@@ -335,17 +374,21 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     db.prepare("UPDATE comptes SET administrateur = 1 WHERE id = ?").run(compte!);
     assertEquals((await prof.requete("/administration/domaines")).status, 200);
     assertEquals(
-      (await prof.requete("/administration/domaines/matiere", {
-        method: "POST",
-        body: new URLSearchParams({ nom: "REAPER", profil: "general" }),
-      })).status,
+      (
+        await prof.requete("/administration/domaines/matiere", {
+          method: "POST",
+          body: new URLSearchParams({ nom: "REAPER", profil: "general" }),
+        })
+      ).status,
       303,
     );
     assertEquals(
-      (await prof.requete("/administration/domaines/matiere", {
-        method: "POST",
-        body: new URLSearchParams({ nom: "Invalide", profil: "arbitraire" }),
-      })).status,
+      (
+        await prof.requete("/administration/domaines/matiere", {
+          method: "POST",
+          body: new URLSearchParams({ nom: "Invalide", profil: "arbitraire" }),
+        })
+      ).status,
       400,
     );
   } finally {
@@ -374,9 +417,11 @@ test("prompts neutres, preuves conservées, rubriques ATC et légendes réservé
       "answered",
     );
     await genererSuggestions(db, faux.modeles, id);
-    const prompts = faux.vus.flat().filter((m) => m.role === "system").map((m) => m.content).join(
-      "\n",
-    );
+    const prompts = faux.vus
+      .flat()
+      .filter((m) => m.role === "system")
+      .map((m) => m.content)
+      .join("\n");
     assert(!/Terminale|lycee|artiste|mouvement|oeuvre/.test(prompts));
     assertStringIncludes(prompts, "mot pour mot");
     const appels: string[] = [];
@@ -395,10 +440,13 @@ test("prompts neutres, preuves conservées, rubriques ATC et légendes réservé
       );
     };
     try {
-      const modeles = openrouter({ ...config.modeles, cle: "factice" }, {
-        lire: () => undefined,
-        ecrire: () => {},
-      });
+      const modeles = openrouter(
+        { ...config.modeles, cle: "factice" },
+        {
+          lire: () => undefined,
+          ecrire: () => {},
+        },
+      );
       await modeles.legender(new Uint8Array([1]), "image/jpeg", "general");
       await modeles.legender(new Uint8Array([1]), "image/jpeg", "arts-appliques");
       await modeles.soutenir("Phrase", "Citation", "Titre");
@@ -414,7 +462,7 @@ test("prompts neutres, preuves conservées, rubriques ATC et légendes réservé
     assertEquals(PROFILS.general.activites, ["explication"]);
     assertEquals(CHAMPS.date_evenement.type, "date");
     assertThrows(() =>
-      validerInformations({ valide_du: "2026-01-01", valide_au: "2025-01-01" }, "general")
+      validerInformations({ valide_du: "2026-01-01", valide_au: "2025-01-01" }, "general"),
     );
     assertThrows(() => validerInformations({ date_publication: "2025-02-30" }, "general"));
     await assertRejects(() => ressource(db, { matiere_id: "inconnue" }));
@@ -428,7 +476,8 @@ test("arts appliqués : consignes mesurées, matière proposée, profil de l’i
   const { db, dir } = await environnement();
   const empreinte = async (t: string) =>
     [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)))]
-      .map((b) => b.toString(16).padStart(2, "0")).join("");
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   try {
     const citation =
       "La lumière traverse le prisme transparent et se décompose en couleurs visibles.";
@@ -450,7 +499,10 @@ test("arts appliqués : consignes mesurées, matière proposée, profil de l’i
     });
     await demander(db, faux.modeles, "lumière", { lecteur: null, schoolId: "pilote" }, 0.01);
     await genererSuggestions(db, faux.modeles, arts);
-    const systeme = faux.vus.flat().filter((m) => m.role === "system").map((m) => m.content);
+    const systeme = faux.vus
+      .flat()
+      .filter((m) => m.role === "system")
+      .map((m) => m.content);
     // Consignes de `reponse.ts` et `suggestions.ts` avant DOM-101, celles des mesures ml4.
     assertEquals(
       new Set(await Promise.all(systeme.map(empreinte))),
@@ -467,10 +519,13 @@ test("arts appliqués : consignes mesurées, matière proposée, profil de l’i
       return Promise.resolve(Response.json({ choices: [{ message: { content } }] }));
     };
     try {
-      const modeles = openrouter({ ...config.modeles, cle: "factice" }, {
-        lire: () => undefined,
-        ecrire: () => {},
-      });
+      const modeles = openrouter(
+        { ...config.modeles, cle: "factice" },
+        {
+          lire: () => undefined,
+          ecrire: () => {},
+        },
+      );
       await modeles.legender(new Uint8Array([1]), "image/jpeg", "arts-appliques");
       await modeles.soutenir("Phrase", "Citation", "Titre", undefined, "arts-appliques");
     } finally {
@@ -492,29 +547,32 @@ test("arts appliqués : consignes mesurées, matière proposée, profil de l’i
       `name="matiere_id" value="${m.id}"`,
     );
     const form = new FormData();
-    for (
-      const [k, v] of Object.entries({
-        titre: "Prisme",
-        type_document: "cours",
-        matiere_id: m.id,
-        sequence: "Lumière",
-        affiliations_presentes: "1",
-      })
-    ) form.set(k, v);
+    for (const [k, v] of Object.entries({
+      titre: "Prisme",
+      type_document: "cours",
+      matiere_id: m.id,
+      sequence: "Lumière",
+      affiliations_presentes: "1",
+    }))
+      form.set(k, v);
     form.set("fichier", new File([`<p>${citation}</p>`], "prisme.html"));
     assertEquals((await prof.requete("/prof/depot", { method: "POST", body: form })).status, 200);
     assertEquals(
-      db.prepare(
-        `SELECT t.nom FROM sources s JOIN source_cours sc ON sc.source_id = s.id
+      db
+        .prepare(
+          `SELECT t.nom FROM sources s JOIN source_cours sc ON sc.source_id = s.id
         JOIN themes t ON t.id = sc.theme_id WHERE s.titre = 'Prisme'`,
-      ).get()?.nom,
+        )
+        .get()?.nom,
       "Lumière",
     );
     await traiter(db, revendiquer(db)!, faux.modeles);
-    const rattachee = await ressource(db, {}, [{
-      cours_id: catalogue(db).cours[0].id,
-      theme_id: null,
-    }]);
+    const rattachee = await ressource(db, {}, [
+      {
+        cours_id: catalogue(db).cours[0].id,
+        theme_id: null,
+      },
+    ]);
     assertEquals(
       db.prepare("SELECT profil FROM sources WHERE id = ?").get(rattachee)!.profil,
       "arts-appliques",
@@ -583,7 +641,9 @@ test("renommer : le cours pilote et un thème gardent leurs rattachements et les
   const { db, dir } = await environnement();
   try {
     const id = await ressource(db, { matiere: "arts-appliques", sequence: "Art Nouveau" });
-    const [m] = catalogue(db).matieres, [c] = catalogue(db).cours, [t] = catalogue(db).themes;
+    const [m] = catalogue(db).matieres,
+      [c] = catalogue(db).cours,
+      [t] = catalogue(db).themes;
     assertEquals([c.nom, t.nom], ["Arts appliqués", "Art Nouveau"]);
     const liens = () => db.prepare("SELECT * FROM source_cours").all();
     const avant = liens();
@@ -623,8 +683,10 @@ test("renommer : le cours pilote et un thème gardent leurs rattachements et les
 test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
   const { db, dir } = await environnement();
   try {
-    const arts = matiere(db, "Arts appliqués", "arts-appliques"), chimie = matiere(db, "Chimie");
-    const c = cours(db, arts, "Images"), c2 = cours(db, arts, "Objets");
+    const arts = matiere(db, "Arts appliqués", "arts-appliques"),
+      chimie = matiere(db, "Chimie");
+    const c = cours(db, arts, "Images"),
+      c2 = cours(db, arts, "Objets");
     const t = theme(db, c, "Art Nouveau");
     theme(db, c, "Bauhaus");
     theme(db, c2, "Ornement");
@@ -650,12 +712,12 @@ test("renommer : un nom pris est refusé en français, un import par nom cherche
     renommer(db, "theme", t, "Art nouveau 1900");
     renommer(db, "matiere", arts, "Arts appliqués 2de");
     await ressource(db, { matiere_id: arts, sequence: "Art Nouveau" });
-    assertEquals(catalogue(db).themes.map((x) => x.nom).sort(), [
-      "Art Nouveau",
-      "Art nouveau 1900",
-      "Bauhaus",
-      "Ornement",
-    ]);
+    assertEquals(
+      catalogue(db)
+        .themes.map((x) => x.nom)
+        .sort(),
+      ["Art Nouveau", "Art nouveau 1900", "Bauhaus", "Ornement"],
+    );
     await ressource(db, { matiere: "arts-appliques" });
     assertEquals(
       catalogue(db).matieres.map((x) => x.nom),
@@ -670,9 +732,12 @@ test("renommer : un nom pris est refusé en français, un import par nom cherche
 test("supprimer : refusée avec sa raison tant qu’une ressource ou une question utilise l’entrée, sinon retirée des filtres et du dépôt", async () => {
   const { db, dir } = await environnement();
   try {
-    const physique = matiere(db, "Physique"), socio = matiere(db, "Sociologie");
-    const optique = cours(db, physique, "Optique"), mecanique = cours(db, physique, "Mécanique");
-    const lumiere = theme(db, optique, "Lumière"), couleurs = theme(db, optique, "Colorimétrie");
+    const physique = matiere(db, "Physique"),
+      socio = matiere(db, "Sociologie");
+    const optique = cours(db, physique, "Optique"),
+      mecanique = cours(db, physique, "Mécanique");
+    const lumiere = theme(db, optique, "Lumière"),
+      couleurs = theme(db, optique, "Colorimétrie");
     theme(db, cours(db, socio, "Théories"), "Auteurs");
     await ressource(db, { matiere_id: physique }, [{ cours_id: optique, theme_id: lumiere }]);
     const admin = await administrateur(db);
@@ -682,14 +747,12 @@ test("supprimer : refusée avec sa raison tant qu’une ressource ou une questio
        VALUES ('q', (SELECT id FROM comptes), 'Question', ?, 'answered', 'x', 'x')`,
     ).run(couleurs);
 
-    for (
-      const [genre, id, raison] of [
-        ["theme", lumiere, "« Lumière » est utilisé par 1 ressource(s)."],
-        ["theme", couleurs, "« Colorimétrie » est utilisé par 1 question(s)."],
-        ["cours", optique, "« Optique » est utilisé par 1 ressource(s) et 1 question(s)."],
-        ["matiere", physique, "« Physique » est utilisé par 1 ressource(s) et 1 question(s)."],
-      ]
-    ) {
+    for (const [genre, id, raison] of [
+      ["theme", lumiere, "« Lumière » est utilisé par 1 ressource(s)."],
+      ["theme", couleurs, "« Colorimétrie » est utilisé par 1 question(s)."],
+      ["cours", optique, "« Optique » est utilisé par 1 ressource(s) et 1 question(s)."],
+      ["matiere", physique, "« Physique » est utilisé par 1 ressource(s) et 1 question(s)."],
+    ]) {
       const refus = await supprimer(genre, id);
       assertEquals(refus.status, 400);
       assertStringIncludes(await refus.text(), raison);
@@ -706,9 +769,18 @@ test("supprimer : refusée avec sa raison tant qu’une ressource ou une questio
     // Une matière emporte ses cours et ses thèmes quand rien ne les utilise.
     assertEquals((await supprimer("matiere", socio)).status, 303);
     const apres = catalogue(db);
-    assertEquals(apres.matieres.map((x) => x.nom), ["Physique"]);
-    assertEquals(apres.cours.map((x) => x.nom), ["Optique"]);
-    assertEquals(apres.themes.map((x) => x.nom), ["Lumière"]);
+    assertEquals(
+      apres.matieres.map((x) => x.nom),
+      ["Physique"],
+    );
+    assertEquals(
+      apres.cours.map((x) => x.nom),
+      ["Optique"],
+    );
+    assertEquals(
+      apres.themes.map((x) => x.nom),
+      ["Lumière"],
+    );
     for (const chemin of ["/prof", "/prof/depot"]) {
       const page = await (await admin.requete(chemin)).text();
       assertStringIncludes(page, "Optique");
@@ -725,7 +797,8 @@ test("supprimer : refusée avec sa raison tant qu’une ressource ou une questio
 test("sonde lexicale français / anglais : français conservé, anglais non qualifié", async () => {
   const { db, dir } = await environnement();
   try {
-    const fr = await ressource(db, { langue: "fr" }), en = await ressource(db, { langue: "en" });
+    const fr = await ressource(db, { langue: "fr" }),
+      en = await ressource(db, { langue: "en" });
     const jeux = {
       fr: [
         { texte: "Les chanteurs chantent.", q: "chanter" },
@@ -759,17 +832,17 @@ test("sonde lexicale français / anglais : français conservé, anglais non qual
         })),
       );
       resultats[langue] = jeu.filter((x, i) =>
-        chercherFts(db, x.q, { lecteur: null, schoolId: "pilote", sourceId: id }).some((c) =>
-          c.id === String(i)
-        )
+        chercherFts(db, x.q, { lecteur: null, schoolId: "pilote", sourceId: id }).some(
+          (c) => c.id === String(i),
+        ),
       ).length;
     }
     console.log("Sonde FTS5 morphologie :", JSON.stringify(resultats), "sur 4 requêtes par langue");
     assertEquals(resultats.fr, 3);
     assert(resultats.en < 4);
-    const avertissements = db.prepare(
-      "SELECT avertissements FROM ingestion_jobs WHERE source_id = ?",
-    ).get(en)!.avertissements as string;
+    const avertissements = db
+      .prepare("SELECT avertissements FROM ingestion_jobs WHERE source_id = ?")
+      .get(en)!.avertissements as string;
     assertStringIncludes(avertissements, "Langue non prise en charge");
   } finally {
     db.close();
@@ -806,7 +879,8 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
     assertEquals(await profils(), ["general", "general"]);
     await cli("matiere", "REAPER");
     const socio = await cli("matiere", "Sociologie");
-    const c = await cli("cours", physique, "Optique"), t = await cli("theme", c, "Introduction");
+    const c = await cli("cours", physique, "Optique"),
+      t = await cli("theme", c, "Introduction");
     await cli("compte", "lea", "Léa Martin", "eleve");
     const effectif = async () =>
       JSON.parse(await cli("domaines")).cours.find((x: { id: string }) => x.id === c).membres;
@@ -912,9 +986,10 @@ test("membres d'un cours : l'administrateur inscrit et retire, les autres compte
     // Un seul rang par compte et par cours.
     assertEquals((await admin.poster("inscrire", { cours_id: c, compte_id: eleveId })).status, 303);
     assertEquals(db.prepare("SELECT count(*) n FROM membres_cours").get()!.n, 1);
-    for (
-      const mauvais of [{ cours_id: "absent", compte_id: eleveId }, { cours_id: c, compte_id: "x" }]
-    ) {
+    for (const mauvais of [
+      { cours_id: "absent", compte_id: eleveId },
+      { cours_id: c, compte_id: "x" },
+    ]) {
       const refus = await admin.poster("inscrire", mauvais);
       assertEquals(refus.status, 400);
       assertStringIncludes(await refus.text(), "inconnu");

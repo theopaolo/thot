@@ -4,7 +4,8 @@ function ouvrirFeuille(declencheur: HTMLElement) {
   const conteneur = declencheur.closest("[data-feuille]");
   if (!conteneur) return;
   if (innerWidth >= 1180) {
-    conteneur.querySelector(".colonne-source, .colonne-lecteur")
+    conteneur
+      .querySelector(".colonne-source, .colonne-lecteur")
       ?.setAttribute("aria-live", "polite");
     return;
   }
@@ -21,7 +22,8 @@ export function fermerFeuille() {
   if (!ouverte) return;
   ouverte.classList.remove("feuille-ouverte");
   focaliserFeuille = false;
-  ouverte.querySelector<HTMLElement>('[aria-pressed="true"], [aria-current="true"]')
+  ouverte
+    .querySelector<HTMLElement>('[aria-pressed="true"], [aria-current="true"]')
     ?.focus({ preventScroll: true });
 }
 
@@ -31,14 +33,18 @@ function verifierQuiz(bouton: HTMLButtonElement) {
   const reponse = bouton.dataset.answer;
   if (!(champ instanceof HTMLInputElement) || !sortie || reponse === undefined) return;
   const plier = (texte: string) =>
-    texte.trim().toLocaleLowerCase("fr").normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ");
+    texte
+      .trim()
+      .toLocaleLowerCase("fr")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
   const r = plier(champ.value);
   // L'artiste ou le mouvement, séparés par `|`.
   const admises = reponse.split("|");
   const juste = admises.find((x) => {
     const a = plier(x);
-    return r === a || (r.length >= 4 && (` ${a} `).includes(` ${r} `));
+    return r === a || (r.length >= 4 && ` ${a} `.includes(` ${r} `));
   });
   if (!r) sortie.textContent = "Écris une réponse avant de vérifier.";
   else if (juste) sortie.textContent = `Bravo, c'est bien ${juste}.`;
@@ -65,17 +71,21 @@ export function installerEleve() {
     if (quiz) verifierQuiz(quiz);
     const navigation = event.target.closest<HTMLButtonElement>("[data-citation]");
     if (navigation) {
-      document.getElementById(`reponse-${navigation.dataset.reponse}`)
-        ?.querySelectorAll<HTMLButtonElement>(".citation")[Number(navigation.dataset.citation)]
-        ?.click();
+      document
+        .getElementById(`reponse-${navigation.dataset.reponse}`)
+        ?.querySelectorAll<HTMLButtonElement>(".citation")
+        [Number(navigation.dataset.citation)]?.click();
     }
   });
 
   document.addEventListener("keydown", (event) => {
     const champ = event.target;
     if (
-      champ instanceof HTMLTextAreaElement && champ.matches(".question-form textarea") &&
-      event.key === "Enter" && !event.shiftKey && !event.isComposing
+      champ instanceof HTMLTextAreaElement &&
+      champ.matches(".question-form textarea") &&
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.isComposing
     ) {
       event.preventDefault();
       champ.form?.requestSubmit();
@@ -89,10 +99,12 @@ export function installerEleve() {
   });
 
   document.addEventListener("htmx:afterRequest", (event) => {
-    const { elt, successful } = (event as CustomEvent<{
-      elt: HTMLElement;
-      successful: boolean;
-    }>).detail;
+    const { elt, successful } = (
+      event as CustomEvent<{
+        elt: HTMLElement;
+        successful: boolean;
+      }>
+    ).detail;
     if (!successful) return;
     if (elt instanceof HTMLFormElement && elt.matches(".question-form")) elt.reset();
     if (elt.matches("button.idee")) elt.remove();
@@ -122,8 +134,8 @@ export function installerEleve() {
   });
 
   document.addEventListener("htmx:sseMessage", (event) => {
-    const conversation = event.target instanceof Element &&
-      event.target.closest<HTMLElement>("#conversation");
+    const conversation =
+      event.target instanceof Element && event.target.closest<HTMLElement>("#conversation");
     if (conversation) suivreConversation(conversation);
   });
 }

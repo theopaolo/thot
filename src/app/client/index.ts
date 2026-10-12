@@ -5,7 +5,8 @@ installerEleve();
 installerProf();
 
 document.addEventListener("keydown", (event) => {
-  const saisie = event.target instanceof Element &&
+  const saisie =
+    event.target instanceof Element &&
     event.target.closest("input,textarea,select,[contenteditable]");
   if (event.key === "/" && !saisie && !event.metaKey && !event.ctrlKey && !event.altKey) {
     const champ = document.getElementById("texte");

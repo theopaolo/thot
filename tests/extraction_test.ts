@@ -20,14 +20,14 @@ test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, page mue
   assert(textes.includes("Quand 1907–1920, deux phases :\n• analytique\n• synthétique"));
   assertEquals(parties.find((p) => p.texte.startsWith("La perspective"))?.section, "Pourquoi ?");
   assertEquals(avertissements.length, 3, "chaque page est sous 200 caractères");
-  const sousTitre =
-    decouperPdf("Quoi ?\nRéaction\nLe Fauvisme est une réaction au\nnaturalisme.", "arts-appliques")
-      .parties;
-  assertEquals(sousTitre.map((p) => p.texte), [
-    "Quoi ?",
-    "Réaction",
-    "Le Fauvisme est une réaction au naturalisme.",
-  ]);
+  const sousTitre = decouperPdf(
+    "Quoi ?\nRéaction\nLe Fauvisme est une réaction au\nnaturalisme.",
+    "arts-appliques",
+  ).parties;
+  assertEquals(
+    sousTitre.map((p) => p.texte),
+    ["Quoi ?", "Réaction", "Le Fauvisme est une réaction au naturalisme."],
+  );
 });
 
 test("un PDF de deux pages conserve le texte propre à chaque page", () => {
@@ -35,10 +35,13 @@ test("un PDF de deux pages conserve le texte propre à chaque page", () => {
     "Fiche ATC\n\nLe cubisme transforme la peinture.\f" +
       "Fiche ATC\n\nLe fauvisme emploie des couleurs vives.\f",
   );
-  assertEquals(parties.map((p) => [p.page, p.texte]), [
-    [1, "Le cubisme transforme la peinture."],
-    [2, "Le fauvisme emploie des couleurs vives."],
-  ]);
+  assertEquals(
+    parties.map((p) => [p.page, p.texte]),
+    [
+      [1, "Le cubisme transforme la peinture."],
+      [2, "Le fauvisme emploie des couleurs vives."],
+    ],
+  );
 });
 
 test("les répétitions dans le corps d'un PDF restent dans le cours", () => {
@@ -58,9 +61,8 @@ const corpus = fileURLToPath(new URL("../../corpus/", import.meta.url));
 const fiches = (() => {
   try {
     return readdirSync(`${corpus}ATC Les avants gardes du XXs`, { withFileTypes: true })
-      .filter((f) => f.name.endsWith(".pdf")).map((f) =>
-        `${corpus}ATC Les avants gardes du XXs/${f.name}`
-      );
+      .filter((f) => f.name.endsWith(".pdf"))
+      .map((f) => `${corpus}ATC Les avants gardes du XXs/${f.name}`);
   } catch {
     return [];
   }
@@ -132,14 +134,17 @@ test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une é
      <p><b>Décoration peinte</b>, composée de rangées.</p>`,
     "repli",
   );
-  assertEquals(ext.parties.map((p) => p.section), [
-    "Synthèse séance 1",
-    "Fauvisme · Expressionnisme · Cubisme",
-    "Fauvisme · Expressionnisme · Cubisme",
-    "Les Fauves",
-    "Les Fauves",
-    "Les Fauves",
-    "Les Fauves",
-    "Les Fauves",
-  ]);
+  assertEquals(
+    ext.parties.map((p) => p.section),
+    [
+      "Synthèse séance 1",
+      "Fauvisme · Expressionnisme · Cubisme",
+      "Fauvisme · Expressionnisme · Cubisme",
+      "Les Fauves",
+      "Les Fauves",
+      "Les Fauves",
+      "Les Fauves",
+      "Les Fauves",
+    ],
+  );
 });

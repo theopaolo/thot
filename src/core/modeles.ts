@@ -92,7 +92,8 @@ const CONSIGNE_SOUTIEN_GENERALE = CONSIGNE_SOUTIEN.replace(
 /** P(oui) parmi les jetons les plus probables du premier token de sortie. */
 export function probabiliteOui(tops: { token: string; logprob: number }[]) {
   const masse = (mot: string) =>
-    tops.filter((t) => t.token.trim().toLowerCase() === mot)
+    tops
+      .filter((t) => t.token.trim().toLowerCase() === mot)
       .reduce((s, t) => s + Math.exp(t.logprob), 0);
   const oui = masse("oui");
   const non = masse("non");
@@ -117,20 +118,30 @@ type Choix = {
  */
 export function lireVerdict(choix: Choix | undefined) {
   const contenu = choix?.message?.content;
-  const ecrit =
-    (Array.isArray(contenu)
-      ? contenu.filter((p) => p.type === "text").map((p) => p.text ?? "").join("")
-      : String(contenu ?? "")).split("</think>").at(-1)!.trim().toLowerCase();
+  const ecrit = (
+    Array.isArray(contenu)
+      ? contenu
+          .filter((p) => p.type === "text")
+          .map((p) => p.text ?? "")
+          .join("")
+      : String(contenu ?? "")
+  )
+    .split("</think>")
+    .at(-1)!
+    .trim()
+    .toLowerCase();
   const jetons = choix?.logprobs?.content ?? [];
   let i = jetons.findLastIndex((j) => j.token.includes("</think>")) + 1;
   while (i < jetons.length && !jetons[i].token.trim()) i++;
   const tops = jetons[i]?.top_logprobs;
-  return (tops && probabiliteOui(tops)) ??
+  return (
+    (tops && probabiliteOui(tops)) ??
     (/^[^\p{L}\p{N}]*(oui)(?![\p{L}\p{N}_])/u.test(ecrit)
       ? 1
       : /^[^\p{L}\p{N}]*(non)(?![\p{L}\p{N}_])/u.test(ecrit)
-      ? 0
-      : undefined);
+        ? 0
+        : undefined)
+  );
 }
 
 async function empreinte(s: string) {
@@ -229,16 +240,21 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       const url = `data:${mime};base64,${base64(image)}`;
       const { texte } = await chat(
         config.legende,
-        [{
-          role: "user",
-          content: [{
-            type: "text",
-            text: profil === "arts-appliques" ? CONSIGNE_LEGENDE : CONSIGNE_LEGENDE_GENERALE,
-          }, {
-            type: "image_url",
-            image_url: { url },
-          }],
-        }],
+        [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: profil === "arts-appliques" ? CONSIGNE_LEGENDE : CONSIGNE_LEGENDE_GENERALE,
+              },
+              {
+                type: "image_url",
+                image_url: { url },
+              },
+            ],
+          },
+        ],
         400,
         false,
         true,
@@ -257,13 +273,19 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       });
       const resultats = json.results;
       if (
-        !Array.isArray(resultats) || !resultats.length ||
-        resultats.some((r) =>
-          !r || !Number.isInteger(r.index) || r.index < 0 ||
-          r.index >= documents.length || !Number.isFinite(r.relevance_score)
+        !Array.isArray(resultats) ||
+        !resultats.length ||
+        resultats.some(
+          (r) =>
+            !r ||
+            !Number.isInteger(r.index) ||
+            r.index < 0 ||
+            r.index >= documents.length ||
+            !Number.isFinite(r.relevance_score),
         ) ||
         new Set(resultats.map((r) => r.index)).size !== resultats.length
-      ) throw new PanneModele("Résultat du reclasseur invalide.", "MODEL_INVALID_RESPONSE");
+      )
+        throw new PanneModele("Résultat du reclasseur invalide.", "MODEL_INVALID_RESPONSE");
       return (resultats as { index: number; relevance_score: number }[])
         .map((r) => ({ index: r.index, score: r.relevance_score }))
         .sort((a, b) => b.score - a.score);
@@ -348,7 +370,9 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
               return { probabilite, modele: `mistral/${config.soutienMistral}` };
             }
           } else await r.body?.cancel();
-        } catch { /* relève par OpenRouter */ }
+        } catch {
+          /* relève par OpenRouter */
+        }
       }
       const json = await post(
         "/chat/completions",
@@ -378,9 +402,9 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       const probabilite = lireVerdict(json.choices?.[0]);
       if (probabilite === undefined) {
         throw new PanneModele(
-          `Ni « oui » ni « non » en tête de sortie: ${
-            JSON.stringify(json.choices?.[0]?.message?.content ?? null).slice(0, 200)
-          }`,
+          `Ni « oui » ni « non » en tête de sortie: ${JSON.stringify(
+            json.choices?.[0]?.message?.content ?? null,
+          ).slice(0, 200)}`,
           "MODEL_EMPTY_RESPONSE",
         );
       }

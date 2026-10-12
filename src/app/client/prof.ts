@@ -13,7 +13,7 @@ function majSelection(form: HTMLFormElement | null) {
 }
 
 function cocherTout(form: HTMLFormElement | null, coche: boolean) {
-  form?.querySelectorAll<HTMLInputElement>("[name=ids]").forEach((c) => c.checked = coche);
+  form?.querySelectorAll<HTMLInputElement>("[name=ids]").forEach((c) => (c.checked = coche));
   majSelection(form);
 }
 
@@ -40,7 +40,8 @@ export function installerProf() {
     if (bouton?.form) {
       const n = bouton.form.querySelectorAll("[name=ids]:checked").length;
       if (
-        !n || !confirm(`Rejeter ${n} source${n > 1 ? "s" : ""} ? Les élèves ne les verront plus.`)
+        !n ||
+        !confirm(`Rejeter ${n} source${n > 1 ? "s" : ""} ? Les élèves ne les verront plus.`)
       ) {
         event.preventDefault();
       }
@@ -66,10 +67,16 @@ export function installerProf() {
   document.addEventListener("keydown", (event) => {
     const revue = document.querySelector("#legende.relecture");
     if (
-      !revue || event.metaKey || event.ctrlKey || event.altKey || event.repeat ||
-      event.isComposing || (event.target instanceof Element &&
+      !revue ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.repeat ||
+      event.isComposing ||
+      (event.target instanceof Element &&
         event.target.closest("input,textarea,select,[contenteditable]"))
-    ) return;
+    )
+      return;
     if (event.key === "e") {
       event.preventDefault();
       revue.querySelector<HTMLTextAreaElement>("#texte")?.focus();
@@ -87,14 +94,18 @@ export function installerProf() {
 
   document.addEventListener("keyup", (event) => {
     if (
-      event.metaKey || event.ctrlKey || event.altKey || event.isComposing ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.isComposing ||
       (event.target instanceof Element &&
         event.target.closest("input,textarea,select,[contenteditable]"))
-    ) return;
+    )
+      return;
     if (event.key === "v" || event.key === "r") {
-      document.querySelector<HTMLButtonElement>(
-        `#legende [data-raccourci="${event.key}"]`,
-      )?.click();
+      document
+        .querySelector<HTMLButtonElement>(`#legende [data-raccourci="${event.key}"]`)
+        ?.click();
     }
   });
 }

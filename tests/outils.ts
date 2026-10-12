@@ -21,8 +21,12 @@ export async function environnement() {
  * soutient tout sauf ce que `soutien` note plus bas.
  */
 export function fauxModeles(
-  o: { score?: number; sorties?: string[]; legende?: string; soutien?: (texte: string) => number } =
-    {},
+  o: {
+    score?: number;
+    sorties?: string[];
+    legende?: string;
+    soutien?: (texte: string) => number;
+  } = {},
 ) {
   const vus: Message[][] = [];
   const sorties = [...(o.sorties ?? [])];

@@ -32,22 +32,29 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
   const minuteur = setTimeout(() => arreter("PDF : extraction au-delà de 30 secondes."), 30_000);
   let controleEnCours: Promise<void> | undefined;
   // shortcut: macOS borne le RSS par sondage, utiliser Linux pour une limite mémoire stricte.
-  const memoire = linux ? undefined : setInterval(() => {
-    if (controleEnCours) return;
-    controleEnCours = (async () => {
-      const { stdout } = await execFileP("/bin/ps", ["-o", "rss=", "-p", String(processus.pid)], {
-        timeout: 1000,
-      });
-      if (Number(stdout.trim()) > 512 * 1024) {
-        arreter("PDF : extraction au-delà de 512 Mo de mémoire.");
-      }
-    })().catch(() => {
-      if (!termine) arreter("PDF : contrôle de mémoire impossible.");
-    })
-      .finally(() => {
-        controleEnCours = undefined;
-      });
-  }, 100);
+  const memoire = linux
+    ? undefined
+    : setInterval(() => {
+        if (controleEnCours) return;
+        controleEnCours = (async () => {
+          const { stdout } = await execFileP(
+            "/bin/ps",
+            ["-o", "rss=", "-p", String(processus.pid)],
+            {
+              timeout: 1000,
+            },
+          );
+          if (Number(stdout.trim()) > 512 * 1024) {
+            arreter("PDF : extraction au-delà de 512 Mo de mémoire.");
+          }
+        })()
+          .catch(() => {
+            if (!termine) arreter("PDF : contrôle de mémoire impossible.");
+          })
+          .finally(() => {
+            controleEnCours = undefined;
+          });
+      }, 100);
   try {
     const decoder = new TextDecoder();
     let texte = "";
@@ -83,7 +90,7 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
 
   // Seules les occurrences aux bords de page peuvent être des en-têtes ou pieds de page.
   const bords = pages.map((p) => {
-    const indices = p.flatMap((l, i) => l ? [i] : []);
+    const indices = p.flatMap((l, i) => (l ? [i] : []));
     return new Set([indices[0], indices.at(-1)]);
   });
   const vues = new Map<string, number>();
@@ -126,8 +133,10 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
       // « Réaction » puis « Le Fauvisme est… » ne forment pas une phrase.
       const precedente = paragraphe.at(-1);
       if (
-        paragraphe.length === 1 && precedente!.split(/\s+/).length <= 4 &&
-        !/[.,;:!?)]$/.test(precedente!) && /^\p{Lu}/u.test(l)
+        paragraphe.length === 1 &&
+        precedente!.split(/\s+/).length <= 4 &&
+        !/[.,;:!?)]$/.test(precedente!) &&
+        /^\p{Lu}/u.test(l)
       ) {
         fermer();
         paragraphe.push(l);

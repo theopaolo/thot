@@ -3,15 +3,13 @@ import { CHAMPS, type Profil, PROFILS } from "../../core/profils.ts";
 import type { Affiliation, Catalogue, Cours, Scope } from "../domaines.ts";
 
 const options = (liste: { id: string; nom: string }[], valeur = "") =>
-  liste.map((m) =>
-    html`<option value="${m.id}" ${m.id === valeur ? "selected" : ""}>${m.nom}</option>`
+  liste.map(
+    (m) => html`<option value="${m.id}" ${m.id === valeur ? "selected" : ""}>${m.nom}</option>`,
   );
 export const selectionProfil = (valeur = "general") =>
-  html`<label>Profil <select name="profil">${
-    Object.entries(PROFILS).map(([id, p]) =>
-      html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`
-    )
-  }</select></label>`;
+  html`<label>Profil <select name="profil">${Object.entries(PROFILS).map(
+    ([id, p]) => html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`,
+  )}</select></label>`;
 const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème" };
 const ligne = (genre: keyof typeof LIBELLES, id: string, nom: string, contexte = "") => {
   const libelle = `Nom (${LIBELLES[genre]})`;
@@ -33,51 +31,54 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouver
   const groupe = (role: string, libelle: string) => {
     const liste = dehors.filter((a) => a.role === role);
     return liste.length
-      ? html`<optgroup label="${libelle}">${
-        liste.map((a) => html`<option value="${a.id}">${a.nom} (${a.identifiant})</option>`)
-      }</optgroup>`
+      ? html`<optgroup label="${libelle}">${liste.map(
+          (a) => html`<option value="${a.id}">${a.nom} (${a.identifiant})</option>`,
+        )}</optgroup>`
       : "";
   };
   return html`
     <details id="membres-${c.id}" ${ouvert ? "open" : ""}>
       <summary>Membres : ${inscrits.length}</summary>
-      ${inscrits.length
-        ? html`
+      ${
+        inscrits.length
+          ? html`
           <table>
-            <tbody>${inscrits.map((m) =>
-              html`
+            <tbody>${inscrits.map(
+              (m) =>
+                html`
                 <tr>
                   <td>${m.nom} <span class="discret">${m.identifiant}, ${ROLES[m.role]}</span></td>
                   <td>
                     <form method="post" action="/administration/domaines/desinscrire">
-                      <input type="hidden" name="cours_id" value="${c
-                        .id}"><input type="hidden" name="compte_id" value="${m.id}">
+                      <input type="hidden" name="cours_id" value="${
+                        c.id
+                      }"><input type="hidden" name="compte_id" value="${m.id}">
                       <button aria-label="Retirer ${m.nom} de ${c.nom}">Retirer</button>
                     </form>
                   </td>
                 </tr>
-              `
+              `,
             )}</tbody>
           </table>
         `
-        : html`<p class="discret">Aucun membre.</p>`}
-      ${dehors.length
-        ? html`
+          : html`<p class="discret">Aucun membre.</p>`
+      }
+      ${
+        dehors.length
+          ? html`
           <form method="post" action="/administration/domaines/inscrire" class="barre">
             <input type="hidden" name="cours_id" value="${c.id}">
             <select name="compte_id" required aria-label="Compte à ajouter à ${c.nom}">
               <option value="">Ajouter un compte</option>${groupe(
                 "enseignant",
                 "Enseignants",
-              )}${groupe(
-                "eleve",
-                "Élèves",
-              )}
+              )}${groupe("eleve", "Élèves")}
             </select>
             <button>Ajouter</button>
           </form>
         `
-        : ""}
+          : ""
+      }
     </details>
   `;
 };
@@ -91,10 +92,10 @@ export const gestion = (
   const controleProfil = !profil
     ? ""
     : figee
-    ? html`<p>Profil de l'instance : <strong>${
-      PROFILS[profil].nom
-    }</strong>. Des ressources sont déposées, il ne change plus.</p>`
-    : html`
+      ? html`<p>Profil de l'instance : <strong>${
+          PROFILS[profil].nom
+        }</strong>. Des ressources sont déposées, il ne change plus.</p>`
+      : html`
       <form method="post" action="/administration/domaines/profil"
         class="barre">${selectionProfil(
           profil,
@@ -110,29 +111,26 @@ export const gestion = (
     <h2>Matières</h2>
     ${cat.matieres.map((m) => ligne("matiere", m.id, m.nom))}
     <form method="post" action="/administration/domaines/matiere"
-      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${profil
-        ? ""
-        : selectionProfil()}<button>Créer la matière</button></form>
+      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${
+        profil ? "" : selectionProfil()
+      }<button>Créer la matière</button></form>
     <h2>Cours</h2>
     <p>Un nouveau cours démarre sans membre, et seuls ses membres, les administrateurs et les
-    propriétaires lisent les ressources qu'il partage.</p>${cat.cours.map((c) =>
-      html`${
-        ligne(
+    propriétaires lisent les ressources qu'il partage.</p>${cat.cours.map(
+      (c) =>
+        html`${ligne(
           "cours",
           c.id,
           c.nom,
           `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${
             c.public ? `, ${c.public}` : ""
           }${c.objectif ? ` : ${c.objectif}` : ""}`,
-        )
-      }${
-        membresDuCours(
+        )}${membresDuCours(
           c,
           inscriptions.membres.get(c.id) ?? [],
           inscriptions.comptes,
           inscriptions.ouvert === c.id,
-        )
-      }`
+        )}`,
     )}
     <form method="post" action="/administration/domaines/cours"
       class="etroit"><label>Matière <select name="matiere_id" required>${options(
@@ -147,7 +145,7 @@ export const gestion = (
           cat.matieres.find((m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id)
             ?.nom
         } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom}`,
-      )
+      ),
     )}
     <form method="post" action="/administration/domaines/theme"
       class="etroit"><label>Cours <select name="cours_id" required>${options(
@@ -177,30 +175,37 @@ export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "
         cat.themes.map((t) => ({
           id: t.id,
           nom: `${
-            cat.matieres.find((m) =>
-              m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id
+            cat.matieres.find(
+              (m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id,
             )?.nom
           } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom} / ${t.nom}`,
         })),
         p.theme_id,
       )}</select></label>
-      ${action === "/eleve/recherche"
-        ? html`<input type="text" name="q" value="${q}" aria-label="Recherche" maxlength="300">`
-        : ""}
-      ${action === "/eleve"
-        ? html`<label>Affichage <select name="vue"><option value="">Liste</option><option value="grille" ${
-          vue === "grille" ? "selected" : ""
-        }>Images</option></select></label>`
-        : ""}
+      ${
+        action === "/eleve/recherche"
+          ? html`<input type="text" name="q" value="${q}" aria-label="Recherche" maxlength="300">`
+          : ""
+      }
+      ${
+        action === "/eleve"
+          ? html`<label>Affichage <select name="vue"><option value="">Liste</option><option value="grille" ${
+              vue === "grille" ? "selected" : ""
+            }>Images</option></select></label>`
+          : ""
+      }
       <button>Appliquer</button>
     </form>
-    <p class="discret">Périmètre : ${cat.matieres.find((m) => m.id === p.matiere_id)?.nom ??
-      (p.matiere_id ? "Matière indisponible" : "toutes les matières")} / ${cat.cours.find((c) =>
-        c.id === p.cours_id
-      )?.nom ??
-      (p.cours_id ? "Cours indisponible" : "tous les cours")} / ${cat.themes.find((t) =>
-        t.id === p.theme_id
-      )?.nom ?? (p.theme_id ? "Thème indisponible" : "tous les thèmes")}.</p>
+    <p class="discret">Périmètre : ${
+      cat.matieres.find((m) => m.id === p.matiere_id)?.nom ??
+      (p.matiere_id ? "Matière indisponible" : "toutes les matières")
+    } / ${
+      cat.cours.find((c) => c.id === p.cours_id)?.nom ??
+      (p.cours_id ? "Cours indisponible" : "tous les cours")
+    } / ${
+      cat.themes.find((t) => t.id === p.theme_id)?.nom ??
+      (p.theme_id ? "Thème indisponible" : "tous les thèmes")
+    }.</p>
   `;
 
 export const choixMatiere = (cat: Catalogue, id = "") =>
@@ -212,33 +217,34 @@ export const choixMatiere = (cat: Catalogue, id = "") =>
       )}</select></label><button>Choisir les champs</button></form>
   `;
 export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
-  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${
-    cat.cours.map((c) =>
+  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${cat.cours.map(
+    (c) =>
       html`
         <div
-          class="champ"><label><input type="checkbox" name="cours" value="${c
-            .id}" ${valeurs.some((v) => v.cours_id === c.id) ? "checked" : ""}> ${cat.matieres.find(
-              (m) => m.id === c.matiere_id,
-            )?.nom} / ${c.nom}</label><label>Thème <select name="theme_${c
-            .id}"><option value="">Sans thème</option>${options(
-              cat.themes.filter((t) => t.cours_id === c.id),
-              valeurs.find((v) => v.cours_id === c.id)?.theme_id ?? "",
-            )}</select></label></div>
-      `
-    )
-  }</fieldset>`;
+          class="champ"><label><input type="checkbox" name="cours" value="${
+            c.id
+          }" ${valeurs.some((v) => v.cours_id === c.id) ? "checked" : ""}> ${
+            cat.matieres.find((m) => m.id === c.matiere_id)?.nom
+          } / ${c.nom}</label><label>Thème <select name="theme_${
+            c.id
+          }"><option value="">Sans thème</option>${options(
+            cat.themes.filter((t) => t.cours_id === c.id),
+            valeurs.find((v) => v.cours_id === c.id)?.theme_id ?? "",
+          )}</select></label></div>
+      `,
+  )}</fieldset>`;
 export const informations = (profil: Profil, meta: Record<string, unknown>) =>
-  html`${
-    PROFILS[profil].informations.map((n) =>
+  html`${PROFILS[profil].informations.map(
+    (n) =>
       html`
         <div
-          class="champ"><label for="${n}">${CHAMPS[n]
-            .label}</label><input id="${n}" name="${n}" type="${CHAMPS[n].type === "date"
-            ? "date"
-            : "text"}" value="${String(meta[n] ?? "")}" maxlength="120"></div>
-      `
-    )
-  }`;
+          class="champ"><label for="${n}">${
+            CHAMPS[n].label
+          }</label><input id="${n}" name="${n}" type="${
+            CHAMPS[n].type === "date" ? "date" : "text"
+          }" value="${String(meta[n] ?? "")}" maxlength="120"></div>
+      `,
+  )}`;
 export const langue = (valeur = "fr") =>
   html`
     <label>Langue de la source <input type="text" name="langue" value="${valeur}" maxlength="30"></label><p

@@ -54,7 +54,8 @@ export function decouper(doc: Document): Chunk[] {
   };
   for (const b of doc.blocs) {
     if (
-      courant.length && (b.section !== courant[0].section || b.fin - courant[0].debut > MAX_CHUNK)
+      courant.length &&
+      (b.section !== courant[0].section || b.fin - courant[0].debut > MAX_CHUNK)
     ) {
       fermer();
     }

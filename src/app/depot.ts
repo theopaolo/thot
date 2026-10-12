@@ -8,7 +8,7 @@ import { CHAMPS, validerInformations } from "../core/profils.ts";
 export const MAX_OCTETS = 25 * 1024 * 1024;
 
 export const FORMATS = ["pdf", "html", "png", "jpg"] as const;
-export type Format = typeof FORMATS[number];
+export type Format = (typeof FORMATS)[number];
 
 // ponytail: listes en dur. Elles viendront du catalogue de l'établissement.
 export const TYPES_DOCUMENT = [
@@ -30,7 +30,7 @@ export const AUDIENCES = [
   { value: "collegues", label: "Les enseignants" },
   { value: "eleves", label: "Les enseignants et les élèves" },
 ] as const;
-export type Audience = typeof AUDIENCES[number]["value"];
+export type Audience = (typeof AUDIENCES)[number]["value"];
 export const audience = (v: unknown): Audience => {
   const a = AUDIENCES.find((a) => a.value === v);
   if (!a) throw new Error("Lecteurs inconnus.");
@@ -74,7 +74,9 @@ export function valider(
   if (Object.keys(erreurs).length) return { erreurs };
   const meta = Object.fromEntries([...REQUIS, ...LIBRES].map((n) => [n, lu(n)]));
   const informations = Object.fromEntries(
-    Object.keys(CHAMPS).filter((n) => champs[n]?.trim()).map((n) => [n, champs[n].trim()]),
+    Object.keys(CHAMPS)
+      .filter((n) => champs[n]?.trim())
+      .map((n) => [n, champs[n].trim()]),
   );
   return { meta: { ...meta, ...informations } as Metadonnees };
 }
@@ -95,7 +97,12 @@ export function detecterFormat(octets: Uint8Array): Format | null {
 /** Un nom reçu ne devient jamais un chemin. */
 export function nomSur(nom: string): string {
   const base = nom.split(/[/\\]/).at(-1)!;
-  return base.replace(/[^\p{L}\p{N}_.-]+/gu, "-").replace(/^\.+/, "").slice(0, 100) || "sans-nom";
+  return (
+    base
+      .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
+      .replace(/^\.+/, "")
+      .slice(0, 100) || "sans-nom"
+  );
 }
 
 export async function sha256(octets: Uint8Array) {

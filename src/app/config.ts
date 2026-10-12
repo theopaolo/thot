@@ -19,7 +19,8 @@ if (origine) {
     url.origin !== origine ||
     (url.protocol !== "https:" &&
       !(url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))
-  ) throw new Error("THOT_ORIGIN: origine HTTPS requise (HTTP permis sur localhost).");
+  )
+    throw new Error("THOT_ORIGIN: origine HTTPS requise (HTTP permis sur localhost).");
 }
 
 export const fournisseurs = {

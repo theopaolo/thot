@@ -31,12 +31,15 @@ export function migrer(db: Db): string[] {
     "CREATE TABLE IF NOT EXISTS migrations (nom TEXT PRIMARY KEY, applique_le TEXT NOT NULL)",
   );
   const faites = new Set(
-    db.prepare("SELECT nom FROM migrations").all().map((l) => l.nom as string),
+    db
+      .prepare("SELECT nom FROM migrations")
+      .all()
+      .map((l) => l.nom as string),
   );
   const dossier = join(RACINE, "migrations");
-  const fichiers = readdirSync(dossier, { withFileTypes: true }).map((f) => f.name).filter((n) =>
-    n.endsWith(".sql")
-  )
+  const fichiers = readdirSync(dossier, { withFileTypes: true })
+    .map((f) => f.name)
+    .filter((n) => n.endsWith(".sql"))
     .sort();
   const appliquees: string[] = [];
   for (const nom of fichiers) {
@@ -62,9 +65,7 @@ export const cacheModeles = (db: Db): Cache => ({
       | string
       | undefined,
   ecrire: (cle, valeur) =>
-    db.prepare("INSERT OR REPLACE INTO cache_modeles VALUES (?, ?, ?)").run(
-      cle,
-      valeur,
-      maintenant(),
-    ),
+    db
+      .prepare("INSERT OR REPLACE INTO cache_modeles VALUES (?, ?, ?)")
+      .run(cle, valeur, maintenant()),
 });

@@ -21,8 +21,7 @@ mentionne jamais « l'extrait », « le texte », « le document » ou « le pas
 Rends uniquement un objet JSON : {"questions": ["...", "..."]}`;
 const CONSIGNE: Record<Profil, string> = {
   "arts-appliques": CONSIGNE_ARTS,
-  general: CONSIGNE_ARTS
-    .replace("d'un cours de lycee", "d'une ressource pour apprendre")
+  general: CONSIGNE_ARTS.replace("d'un cours de lycee", "d'une ressource pour apprendre")
     .replace("qu'un eleve de Terminale", "qu'une personne qui apprend")
     .replace("ou une oeuvre, jamais", "ou un objet, jamais")
     .replace("nomme l'œuvre ou l'artiste si", "nomme son sujet si"),
@@ -51,11 +50,9 @@ export async function questionsVerifiees(
   }
   if (!Array.isArray(questions)) return [];
   const gardees = [];
-  for (
-    const q of questions.filter((q): q is string =>
-      typeof q === "string" && q.trim().endsWith("?") && !RENVOI.test(q)
-    ).slice(0, 2)
-  ) {
+  for (const q of questions
+    .filter((q): q is string => typeof q === "string" && q.trim().endsWith("?") && !RENVOI.test(q))
+    .slice(0, 2)) {
     const { resultat } = await demander(db, modeles, q.trim(), p, seuil);
     if (
       resultat.etat === "answered" &&

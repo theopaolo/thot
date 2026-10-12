@@ -32,24 +32,34 @@ export const page = (
         class="${prof ? `prof${railReplie ? " rail-replie" : ""}` : "eleve"}"
       >
         <a class="evitement" href="#contenu">Aller au contenu</a>
-        ${compte && prof ? rail(compte, chemin, railReplie, instance) : html`
+        ${
+          compte && prof
+            ? rail(compte, chemin, railReplie, instance)
+            : html`
           <header class="site">
             <a class="marque" href="/">${instance.nom}</a>
-            ${compte && !compte.renouveler_mdp && chemin !== "/eleve/recherche"
-              ? rechercheEntete
-              : ""}
-            ${compte
-              ? compte.renouveler_mdp
-                ? compteMenu(compte)
-                : navEleve(compte, chemin, instance.mode === "personal")
-              : ""}
+            ${
+              compte && !compte.renouveler_mdp && chemin !== "/eleve/recherche"
+                ? rechercheEntete
+                : ""
+            }
+            ${
+              compte
+                ? compte.renouveler_mdp
+                  ? compteMenu(compte)
+                  : navEleve(compte, chemin, instance.mode === "personal")
+                : ""
+            }
           </header>
-        `}
+        `
+        }
         <main id="contenu" tabindex="-1" class="${classe}">
           <p id="erreur-reseau" role="alert" hidden>
-            ${prof
-              ? "L'action n'a pas abouti. Votre saisie est conservée, réessayez."
-              : "L'action n'a pas abouti. Ta saisie est conservée, réessaie."}
+            ${
+              prof
+                ? "L'action n'a pas abouti. Votre saisie est conservée, réessayez."
+                : "L'action n'a pas abouti. Ta saisie est conservée, réessaie."
+            }
           </p>
           ${corps}
         </main>
@@ -91,8 +101,10 @@ const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
         "/eleve",
         personnel ? "Mes documents" : "Ressources",
         "books",
-        chemin === "/eleve" || chemin === "/eleve/sans-sequence" ||
-          chemin.startsWith("/eleve/sequences") || chemin.startsWith("/eleve/themes") ||
+        chemin === "/eleve" ||
+          chemin === "/eleve/sans-sequence" ||
+          chemin.startsWith("/eleve/sequences") ||
+          chemin.startsWith("/eleve/themes") ||
           chemin.startsWith("/eleve/sources"),
       )}
       ${lienNav(
@@ -101,24 +113,28 @@ const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
         "chat-circle",
         chemin.startsWith("/eleve/chat"),
       )}
-      ${c.role === "enseignant"
-        ? lienNav(
-          "/prof",
-          personnel ? "Gérer mes documents" : "Espace enseignant",
-          "arrow-left",
-          false,
-          false,
-        )
-        : ""}
-      ${c.administrateur
-        ? lienNav(
-          "/administration",
-          "Administration",
-          "sidebar-simple",
-          chemin === "/administration",
-          false,
-        )
-        : ""}
+      ${
+        c.role === "enseignant"
+          ? lienNav(
+              "/prof",
+              personnel ? "Gérer mes documents" : "Espace enseignant",
+              "arrow-left",
+              false,
+              false,
+            )
+          : ""
+      }
+      ${
+        c.administrateur
+          ? lienNav(
+              "/administration",
+              "Administration",
+              "sidebar-simple",
+              chemin === "/administration",
+              false,
+            )
+          : ""
+      }
       ${compteMenu(c)}
     </nav>
   `;
@@ -149,8 +165,9 @@ const rail = (
         )}
         ${lienNav("/prof/depot", "Déposer", "upload-simple", chemin.startsWith("/prof/depot"))}
         ${lienNav("/prof/legendes", "Légendes", "image", chemin.startsWith("/prof/legendes"))}
-        ${instance.mode === "shared"
-          ? html`
+        ${
+          instance.mode === "shared"
+            ? html`
             ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
             ${lienNav(
               "/prof/questions",
@@ -159,10 +176,13 @@ const rail = (
               chemin.startsWith("/prof/questions"),
             )}
           `
-          : ""}
-        ${c.administrateur
-          ? lienNav("/administration", "Administration", "sidebar-simple", false, false)
-          : ""}
+            : ""
+        }
+        ${
+          c.administrateur
+            ? lienNav("/administration", "Administration", "sidebar-simple", false, false)
+            : ""
+        }
       </nav>
       <div class="rail-pied">
         ${lienNav(
@@ -184,11 +204,13 @@ export const connexion = (erreur?: string, identifiant = "") =>
   html`
     <form method="post" action="/connexion" class="etroit" style="max-width: 24rem">
       <h1>Connexion</h1>
-      ${erreur
-        ? html`
+      ${
+        erreur
+          ? html`
           <p role="alert">${erreur}</p>
         `
-        : ""}
+          : ""
+      }
       <div class="champ">
         <label for="identifiant">Identifiant</label>
         <input
@@ -237,23 +259,22 @@ export const administration = (instance: Instance) =>
   html`
     <section class="etroit">
       <h1>Administration</h1>
-      <p><strong>${instance.nom}</strong> · ${instance.mode === "personal"
-        ? "Usage personnel"
-        : "Usage partagé"}</p>
+      <p><strong>${instance.nom}</strong> · ${
+        instance.mode === "personal" ? "Usage personnel" : "Usage partagé"
+      }</p>
       <p>Identité de l'instance : <code>${instance.id}</code></p>
       <p>Le nom et les services autorisés sont configurés par l'opérateur. Renommer l'instance conserve ses documents et ses comptes.</p>
       <p><a href="/administration/domaines">Configurer les matières et les cours</a></p>
       <h2>Traitement des documents et des questions</h2>
       <p>Localisations déclarées par l'opérateur. Elles ne sont pas vérifiées par l'application.</p>
-      <dl>${traitements().map((f) =>
-        html`
+      <dl>${traitements().map(
+        (f) =>
+          html`
           <dt>${f.nom}</dt>
-          <dd>${!f.autorise
-            ? "Désactivé"
-            : f.disponible
-            ? "Configuré"
-            : "Clé absente"}. Localisation : ${f.localisation}.</dd>
-        `
+          <dd>${
+            !f.autorise ? "Désactivé" : f.disponible ? "Configuré" : "Clé absente"
+          }. Localisation : ${f.localisation}.</dd>
+        `,
       )}</dl>
       <p>Aucun traitement par un modèle local n'est proposé.</p>
       <a class="bouton" href="/prof">Gérer les documents</a>

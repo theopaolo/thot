@@ -7,39 +7,53 @@ import { texteDocument } from "../src/app/vues/document.ts";
 
 test("les vues partagent le bundle et gardent leurs contrats de fragments et d'échappement", async () => {
   const titre = "<script>alert(1)</script>";
-  const chapitre = await pageChapitre("Arts", [{
-    id: "source-1",
-    titre,
-    seance: "Architecture",
-    date: "1904",
-    quiz_reponse: "Antoni Gaudí",
-    image_id: "image-1",
-  }], []);
-  const conversation = await chat([{
-    id: "message-1",
-    question: titre,
-    etat: "answered",
-    avis: null,
-    resultat: JSON.stringify({
+  const chapitre = await pageChapitre(
+    "Arts",
+    [
+      {
+        id: "source-1",
+        titre,
+        seance: "Architecture",
+        date: "1904",
+        quiz_reponse: "Antoni Gaudí",
+        image_id: "image-1",
+      },
+    ],
+    [],
+  );
+  const conversation = await chat([
+    {
+      id: "message-1",
+      question: titre,
       etat: "answered",
-      affirmations: [{ texte: titre, titre, source_id: "source-1", citation: "Passage" }],
-    }),
-  }]);
-  const panneau = await panneauSource({ titre, citation: "Passage", source_id: "source-1" }, {
-    id: "message-1",
-    n: 0,
-    total: 2,
-  });
-  const legendes = await pageLegendes({
-    id: "image-1",
-    source_id: "source-1",
-    titre,
-    restantes: 1,
-    legende: titre,
-    legende_statut: "unreviewed",
-    legende_origine: "generated",
-    modele: "test",
-  }, []);
+      avis: null,
+      resultat: JSON.stringify({
+        etat: "answered",
+        affirmations: [{ texte: titre, titre, source_id: "source-1", citation: "Passage" }],
+      }),
+    },
+  ]);
+  const panneau = await panneauSource(
+    { titre, citation: "Passage", source_id: "source-1" },
+    {
+      id: "message-1",
+      n: 0,
+      total: 2,
+    },
+  );
+  const legendes = await pageLegendes(
+    {
+      id: "image-1",
+      source_id: "source-1",
+      titre,
+      restantes: 1,
+      legende: titre,
+      legende_statut: "unreviewed",
+      legende_origine: "generated",
+      modele: "test",
+    },
+    [],
+  );
   const rendus = await Promise.all([
     page("Chapitre", null, chapitre),
     page("Chat", null, conversation),
@@ -59,10 +73,10 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
   assertStringIncludes(String(panneau), 'data-reponse="message-1" data-citation="1"');
   assertStringIncludes(String(legendes), 'data-raccourci="v"');
   assertStringIncludes(String(conversation), "&lt;script&gt;alert(1)&lt;/script&gt;");
-  const blocs = texteDocument([{ id: "b1", texte: "🎨 Gaudí", section: "", debut: 0, fin: 7 }], [
-    2,
-    7,
-  ]);
+  const blocs = texteDocument(
+    [{ id: "b1", texte: "🎨 Gaudí", section: "", debut: 0, fin: 7 }],
+    [2, 7],
+  );
   assertStringIncludes(String(await blocs[0]), '<mark id="passage">Gaudí</mark>');
 });
 
@@ -92,20 +106,23 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
   assertStringIncludes(detail, 'hx-select="#traitement-source"');
   assertStringIncludes(detail, 'hx-disinherit="hx-select"');
   assert(
-    !String(await detailSource({ ...d, job: { ...d.job, etat: "awaiting_review" } }))
-      .includes('hx-trigger="every 3s"'),
+    !String(await detailSource({ ...d, job: { ...d.job, etat: "awaiting_review" } })).includes(
+      'hx-trigger="every 3s"',
+    ),
   );
   for (const grille of [false, true]) {
     const lignes = String(
       await lignesSources(
-        [{
-          ...source,
-          sequence: "Arts",
-          etat: "extracting",
-          erreur: null,
-          images_a_relire: 0,
-          image_id: null,
-        }],
+        [
+          {
+            ...source,
+            sequence: "Arts",
+            etat: "extracting",
+            erreur: null,
+            images_a_relire: 0,
+            image_id: null,
+          },
+        ],
         "",
         grille,
       ),

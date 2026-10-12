@@ -57,7 +57,10 @@ export const decoder = (s: string) =>
     return ENTITES[e] ?? tout;
   });
 
-const sansBalises = (s: string) => decoder(s.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+const sansBalises = (s: string) =>
+  decoder(s.replace(/<[^>]+>/g, ""))
+    .replace(/\s+/g, " ")
+    .trim();
 
 /**
  * Les synthèses Pearltrees marquent leurs parties en gras, sans balise de titre: un paragraphe
@@ -86,7 +89,8 @@ const RE_IMG = /src="data:image\/(jpeg|jpg|png|gif|webp)[^,"]*base64,\s*([A-Za-z
 export function extraireHtml(html: string, titreParDefaut: string): Extraction {
   const titre = sansBalises(
     html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
-      html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? titreParDefaut,
+      html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ??
+      titreParDefaut,
   );
   const images: Image[] = [];
   const img = html.match(RE_IMG);
