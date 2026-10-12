@@ -40,9 +40,16 @@ console.log(`Thot sur http://127.0.0.1:${config.port}`);
 const arreter = () => {
   for (const p of processus) p.kill("SIGTERM");
 };
-for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, arreter);
+// Un arrêt demandé sort en 0, même si un processus meurt du signal transmis.
+let demande = false;
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    demande = true;
+    arreter();
+  });
+}
 const fins = processus.map((p) => once(p, "exit"));
 const [code] = await Promise.race(fins);
 arreter();
 await Promise.allSettled(fins);
-process.exit(code === 0 ? 0 : 1);
+process.exit(demande || code === 0 ? 0 : 1);

@@ -270,7 +270,7 @@ test("deux déploiements et restauration indépendante, mêmes comptes et titres
   const arreter = async (p: ChildProcess) => {
     const fin = once(p, "exit");
     p.kill("SIGTERM");
-    await fin;
+    assertEquals((await fin)[0], 0, "un arrêt demandé sort en 0");
     processus.delete(p);
   };
   const requete = async (origine: string, path: string, cookie = "", body?: URLSearchParams) => {
