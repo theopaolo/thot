@@ -282,68 +282,108 @@ export const sources = (
   `;
 };
 
+export type Eleve = { id: string; identifiant: string; nom: string };
+
+const choixCours = (cat: Catalogue, aide: string) =>
+  cat.cours.length
+    ? html`
+      <fieldset>
+        <legend>Cours des nouveaux comptes</legend>
+        <p class="discret">${aide}</p>
+        ${cat.cours.map(
+          (c) =>
+            html`<label><input type="checkbox" name="cours" value="${c.id}" checked> ${
+              cat.matieres.find((m) => m.id === c.matiere_id)?.nom
+            } / ${c.nom}</label>`,
+        )}
+      </fieldset>
+    `
+    : "";
+
+const reinitialiser = (e: Eleve) =>
+  html`<form method="post" action="/prof/eleves/${e.id}/reinitialiser"><button aria-label="Réinitialiser le mot de passe de ${e.nom}">Réinitialiser le mot de passe</button></form>`;
+
+const tableEleves = (liste: Eleve[], action: (e: Eleve) => unknown) =>
+  html`
+    <table class="eleves">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Identifiant</th>
+          <th><span class="visuellement-cache">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>${liste.map(
+        (e) =>
+          html`<tr><td>${e.nom}</td><td>${e.identifiant}</td><td><div class="barre">${action(e)}</div></td></tr>`,
+      )}</tbody>
+    </table>
+  `;
+
+/**
+ * Les élèves de chaque cours de l'enseignant, et ceux sans cours pour un administrateur. Retirer
+ * un élève lui retire les ressources du cours sans supprimer son compte.
+ */
 export const eleves = (
-  liste: { id: string; identifiant: string; nom: string }[],
   cat: Catalogue,
+  groupes: { cours: Catalogue["cours"][number]; eleves: Eleve[] }[],
+  sansCours: Eleve[] | undefined,
   erreur?: string,
 ) =>
   html`
     <h1>Élèves</h1>
-    <p>Importer une classe avec un CSV UTF-8 contenant les colonnes <code>identifiant,nom</code>. Les identifiants doivent être uniques.</p>
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+    <h2>Ajouter un élève</h2>
+    <form method="post" action="/prof/eleves/ajouter">
+      ${choixCours(cat, "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.")}
+      <div class="champ">
+        <label for="identifiant">Identifiant</label>
+        <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas. Un élève qui a déjà un compte rejoint vos cours par un administrateur.</p>
+        <input id="identifiant" type="text" name="identifiant" required minlength="3" maxlength="40" pattern="[a-z0-9._\\-]+" autocomplete="off" spellcheck="false" aria-describedby="format-identifiant">
+      </div>
+      <div class="champ">
+        <label for="nom">Nom</label>
+        <input id="nom" type="text" name="nom" required maxlength="100" autocomplete="off">
+      </div>
+      <button class="principal">Créer et afficher le mot de passe</button>
+    </form>
+    <details>
+      <summary>Importer une classe depuis un CSV</summary>
+    <p>Un CSV UTF-8 avec les colonnes <code>identifiant,nom</code>. Les identifiants doivent être uniques.</p>
     <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data">
-      ${
-        cat.cours.length
-          ? html`
-          <fieldset>
-            <legend>Cours des nouveaux comptes</legend>
-            <p class="discret">Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.</p>
-            ${cat.cours.map(
-              (c) =>
-                html`<label><input type="checkbox" name="cours" value="${c.id}" checked> ${
-                  cat.matieres.find((m) => m.id === c.matiere_id)?.nom
-                } / ${c.nom}</label>`,
-            )}
-          </fieldset>
-        `
-          : ""
-      }
+      ${choixCours(cat, "Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.")}
       <div class="barre">
         <label for="fichier">Liste CSV</label>
         ${champFichier(".csv,text/csv")}
         <button class="principal">Importer et afficher les mots de passe</button>
       </div>
     </form>
+    </details>
+    ${groupes.map(
+      ({ cours, eleves }) => html`
+        <h2 id="cours-${cours.id}">${cat.matieres.find((m) => m.id === cours.matiere_id)?.nom} / ${cours.nom}</h2>
+        ${
+          eleves.length
+            ? tableEleves(
+                eleves,
+                (e) => html`${reinitialiser(e)}
+                  <form method="post" action="/prof/eleves/${e.id}/retirer">
+                    <input type="hidden" name="cours_id" value="${cours.id}">
+                    <button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? L'élève garde son compte, et seul un administrateur pourra l'inscrire de nouveau.">Retirer du cours</button>
+                  </form>`,
+              )
+            : html`<p class="discret">Aucun élève dans ce cours.</p>`
+        }
+      `,
+    )}
     ${
-      liste.length
+      sansCours
         ? html`
-        <table>
-          <thead>
-            <tr>
-              <th>Nom</th>
-              <th>Identifiant</th>
-              <th><span class="visuellement-cache">Action</span></th>
-            </tr>
-          </thead>
-          <tbody>
-          ${liste.map(
-            (c) =>
-              html`
-              <tr>
-                <td>${c.nom}</td>
-                <td>${c.identifiant}</td>
-                <td>
-                  <form method="post" action="/prof/eleves/${c.id}/reinitialiser">
-                    <button>Réinitialiser le mot de passe</button>
-                  </form>
-                </td>
-              </tr>
-            `,
-          )}
-          </tbody>
-        </table>
+        <h2>Sans cours</h2>
+        <p class="discret">Ces élèves ne lisent que les ressources sans cours. Seuls les administrateurs les voient et les gèrent.</p>
+        ${sansCours.length ? tableEleves(sansCours, reinitialiser) : html`<p class="discret">Aucun élève sans cours.</p>`}
       `
-        : html`<p>Aucun élève importé.</p>`
+        : ""
     }
   `;
 

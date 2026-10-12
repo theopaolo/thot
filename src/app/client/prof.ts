@@ -36,6 +36,8 @@ export function installerProf() {
     }
     const choix = event.target.closest<HTMLButtonElement>("[data-selection]");
     if (choix) cocherTout(choix.form, choix.dataset.selection === "tout");
+    const confirmer = event.target.closest<HTMLElement>("[data-confirmer]");
+    if (confirmer && !confirm(confirmer.dataset.confirmer ?? "")) event.preventDefault();
     const bouton = event.target.closest<HTMLButtonElement>("[data-rejeter-selection]");
     if (bouton?.form) {
       const n = bouton.form.querySelectorAll("[name=ids]:checked").length;

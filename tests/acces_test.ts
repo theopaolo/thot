@@ -1032,3 +1032,66 @@ test("modifier : cocher son cours garde les rattachements des autres cours", asy
     await rm(dir, { recursive: true });
   }
 });
+
+test("élèves : un enseignant ajoute un élève à ses cours et l'en retire, le compte reste", async () => {
+  const { db, dir, c1, c2, profA, profB, profC, eleveA, eleveB, publie, libre } = await deuxCours();
+  try {
+    const admin = await administrateur(db);
+    const comptes = () => db.prepare("SELECT count(*) n FROM comptes").get()!.n as number;
+    const ajouter = (qui: Qui, identifiant: string, cours: string[]) => {
+      const corps = new URLSearchParams({ identifiant, nom: "Léa Martin" });
+      for (const id of cours) corps.append("cours", id);
+      return qui.requete("/prof/eleves/ajouter", { method: "POST", body: corps });
+    };
+    const retirer = (qui: Qui, eleveId: string, coursId: string) =>
+      statut(envoyer(qui, `/prof/eleves/${eleveId}/retirer`, { cours_id: coursId }));
+
+    const avant = comptes();
+    const refus = await ajouter(profB, "lea.martin", [c1]);
+    assertEquals(refus.status, 400);
+    assertStringIncludes(await refus.text(), "pas le vôtre");
+    const pris = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(eleveA.id)!;
+    const doublon = await ajouter(profA, pris.identifiant as string, [c1]);
+    assertEquals(doublon.status, 400);
+    assertStringIncludes(await doublon.text(), "rejoint vos cours par un administrateur");
+    assertEquals((await ajouter(profA, "LÉA", [c1])).status, 400);
+    assertEquals(comptes(), avant);
+
+    // Le mot de passe s'affiche une fois. L'élève s'en sert pour lire les ressources du cours.
+    const feuille = await ajouter(profA, "lea.martin", [c1]);
+    assertEquals(feuille.status, 200);
+    assertEquals(feuille.headers.get("cache-control"), "no-store");
+    const motDePasse = (await feuille.text()).match(/Mot de passe : <strong>([0-9a-f]+)</)![1];
+    const lea = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea.martin'").get()!
+      .id as string;
+    const connexion = await profA.app.request("/connexion", {
+      method: "POST",
+      headers: { origin: "http://localhost" },
+      body: new URLSearchParams({ identifiant: "lea.martin", mot_de_passe: motDePasse }),
+    });
+    const cookie = connexion.headers.get("set-cookie")!.split(";")[0];
+    const lit = (id: string) =>
+      statut(profA.app.request(`/eleve/sources/${id}`, { headers: { cookie } }));
+    assertEquals(await lit(publie), 200);
+    assertStringIncludes(await texteDe(profA, "/prof/eleves"), "lea.martin");
+    assert(!(await texteDe(profB, "/prof/eleves")).includes("lea.martin"));
+
+    // Un enseignant ne retire que les élèves de ses cours.
+    assertEquals(await retirer(profB, lea, c1), 404);
+    assertEquals(await retirer(profA, eleveB.id, c2), 404);
+    assertEquals(await retirer(profA, profC.id, c1), 404);
+    assertEquals(await lit(publie), 200);
+
+    assertEquals(await retirer(profA, lea, c1), 303);
+    assertEquals(await lit(publie), 404);
+    assertEquals(await lit(libre), 200, "le compte retiré n'existe plus");
+    assert(!(await texteDe(profA, "/prof/eleves")).includes("lea.martin"));
+    assertEquals(await statut(envoyer(profA, `/prof/eleves/${lea}/reinitialiser`)), 404);
+    const page = await texteDe(admin, "/prof/eleves");
+    assert(page.indexOf("lea.martin") > page.indexOf("<h2>Sans cours</h2>"));
+    assertEquals(await statut(envoyer(admin, `/prof/eleves/${lea}/reinitialiser`)), 200);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});

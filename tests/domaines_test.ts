@@ -895,6 +895,15 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
     assertEquals(await effectif(), 1);
     await cli("retirer-membre", c, "lea");
     assertEquals(await effectif(), 0);
+    // `compte --cours` inscrit le compte qu'il crée. Un cours inconnu ne crée aucun compte.
+    await cli("compte", "noe", "Noé Petit", "eleve", `--cours=${c}`);
+    assertEquals(await effectif(), 1);
+    assert(lancer("compte", "max", "Max Roux", "eleve", "--cours=absent").status !== 0);
+    assert(
+      lancer("compte", "max", "Max Roux", "eleve").status === 0,
+      "le cours inconnu a créé max",
+    );
+    await cli("retirer-membre", c, "noe");
     const fichier = join(dir, "physique.html");
     await writeFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
     await cli(

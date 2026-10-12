@@ -26,6 +26,8 @@ import {
   choisirMotDePasse,
   type Compte,
   consommerProvisoire,
+  creerEleves,
+  eleveSaisi,
   filtreModification,
   importerEleves,
   lecteur,
@@ -377,35 +379,35 @@ export function creerApp(db: Db, modeles: Modeles) {
       JOIN membres_cours moi ON moi.cours_id = lui.cours_id
       WHERE lui.compte_id = comptes.id AND moi.compte_id = ?))`;
   const elevesGeres = (c: Context<Env>) => [lu(c).administrateur ? 1 : 0, lu(c).id];
-  const pageEleves = (c: Context<Env>, erreur?: string) =>
-    rendre(
-      c,
-      "Élèves",
-      Prof.eleves(
-        db
-          .prepare(`SELECT id, identifiant, nom FROM comptes WHERE ${ELEVES_GERES} ORDER BY nom`)
-          .all(...elevesGeres(c)) as { id: string; identifiant: string; nom: string }[],
-        Domaines.catalogueDe(db, c.get("compte")),
-        erreur,
-      ),
-    );
-  app.get("/prof/eleves", (c) => c.html(pageEleves(c)));
-  app.post("/prof/eleves/importer", async (c) => {
-    const b = await c.req.parseBody({ all: true });
-    const fichier = b.fichier;
-    if (!(fichier instanceof File) || fichier.size > 100_000) {
-      return c.text("Fichier CSV invalide (100 Ko maximum).", 400);
-    }
+  // Les élèves de chaque cours de l'enseignant. Ceux sans cours ne se montrent qu'aux
+  // administrateurs, seuls à les gérer.
+  const pageEleves = (c: Context<Env>, erreur?: string) => {
+    const cat = Domaines.catalogueDe(db, c.get("compte"));
+    const groupes = cat.cours.map((cours) => ({
+      cours,
+      eleves: Domaines.membres(db, cours.id).filter((m) => m.role === "eleve"),
+    }));
+    const sansCours = lu(c).administrateur
+      ? (db
+          .prepare(
+            `SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve'
+             AND NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = comptes.id) ORDER BY nom`,
+          )
+          .all() as Prof.Eleve[])
+      : undefined;
+    return rendre(c, "Élèves", Prof.eleves(cat, groupes, sansCours, erreur));
+  };
+  /** Les cours cochés, ou `undefined` si un enseignant coche un cours qui n'est pas le sien. */
+  const coursCoches = (c: Context<Env>, b: Record<string, unknown>) => {
     const cours = [...new Set([b.cours ?? []].flat().map(String))];
     const siens = Domaines.coursDuCompte(db, c.get("compte").id);
-    if (!c.get("compte").administrateur && cours.some((id) => !siens.has(id))) {
-      return c.html(
-        pageEleves(c, "Inscription refusée : un de ces cours n'est pas le vôtre."),
-        400,
-      );
-    }
+    return c.get("compte").administrateur || cours.every((id) => siens.has(id)) ? cours : undefined;
+  };
+  const REFUS_COURS = "Inscription refusée : un de ces cours n'est pas le vôtre.";
+  /** Crée les élèves et montre une seule fois leurs identifiants à remettre. */
+  const remettre = async (c: Context<Env>, creer: () => ReturnType<typeof creerEleves>) => {
     try {
-      const comptes = await importerEleves(db, await fichier.text(), cours);
+      const comptes = await creer();
       c.header("Cache-Control", "no-store");
       return c.html(
         rendre(
@@ -417,6 +419,48 @@ export function creerApp(db: Db, modeles: Modeles) {
     } catch (e) {
       return c.html(pageEleves(c, (e as Error).message), 400);
     }
+  };
+  app.get("/prof/eleves", (c) => c.html(pageEleves(c)));
+  app.post("/prof/eleves/importer", async (c) => {
+    const b = await c.req.parseBody({ all: true });
+    const fichier = b.fichier;
+    if (!(fichier instanceof File) || fichier.size > 100_000) {
+      return c.text("Fichier CSV invalide (100 Ko maximum).", 400);
+    }
+    const cours = coursCoches(c, b);
+    if (!cours) return c.html(pageEleves(c, REFUS_COURS), 400);
+    const csv = await fichier.text();
+    return remettre(c, () => importerEleves(db, csv, cours));
+  });
+  app.post("/prof/eleves/ajouter", async (c) => {
+    const b = await c.req.parseBody({ all: true });
+    const cours = coursCoches(c, b);
+    if (!cours) return c.html(pageEleves(c, REFUS_COURS), 400);
+    const eleve = eleveSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
+    if (!eleve) {
+      return c.html(
+        pageEleves(
+          c,
+          "Élève refusé : un identifiant de 3 à 40 caractères parmi a-z, 0-9, point, tiret et tiret bas, et un nom de 100 caractères au maximum.",
+        ),
+        400,
+      );
+    }
+    return remettre(c, () => creerEleves(db, [eleve], cours));
+  });
+  // Retirer d'un cours laisse le compte. Un enseignant ne retire que des élèves de ses cours.
+  app.post("/prof/eleves/:id/retirer", async (c) => {
+    const id = c.req.param("id");
+    const coursId = String((await c.req.parseBody()).cours_id ?? "");
+    const eleve = db
+      .prepare(
+        `SELECT 1 FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
+         WHERE m.cours_id = ? AND m.compte_id = ? AND a.role = 'eleve'`,
+      )
+      .get(coursId, id);
+    if (!eleve || !coursCoches(c, { cours: coursId })) return c.notFound();
+    Domaines.desinscrire(db, coursId, id);
+    return c.redirect(`/prof/eleves#cours-${coursId}`, 303);
   });
   app.post("/prof/eleves/:id/reinitialiser", async (c) => {
     const id = c.req.param("id");

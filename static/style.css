@@ -1543,10 +1543,10 @@ details summary {
 .barre + details {
   margin: calc(-1 * var(--s3)) 0 var(--s5);
 }
-.barre + details summary {
+details:not(.compte) > summary {
   gap: var(--s2);
 }
-.barre + details summary::after {
+details:not(.compte) > summary::after {
   content: "";
   width: 0.4em;
   height: 0.4em;
@@ -1555,18 +1555,37 @@ details summary {
   border-bottom: 1.5px solid;
   transform: rotate(45deg);
 }
-.barre + details[open] summary::after {
+details:not(.compte)[open] > summary::after {
   margin-top: 0.2em;
   transform: rotate(-135deg);
 }
-details table {
+details table,
+table.eleves {
   margin-bottom: var(--s3);
 }
-details td {
+details td,
+table.eleves td {
   vertical-align: middle;
 }
-details td:last-child {
+details td:last-child,
+table.eleves td:last-child {
   width: 1%;
+}
+table.eleves .barre {
+  flex-wrap: nowrap;
+  margin: 0;
+}
+table.eleves button {
+  white-space: nowrap;
+}
+/* Sur téléphone, les boutons passent à la ligne plutôt que de sortir de l'écran. */
+@media (max-width: 640px) {
+  table.eleves .barre {
+    flex-wrap: wrap;
+  }
+  table.eleves button {
+    white-space: normal;
+  }
 }
 
 @media print {

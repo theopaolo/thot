@@ -41,17 +41,33 @@ async function deriver(motDePasse: string, sel: string) {
   return hex(bits);
 }
 
-/** Crée un compte avec un mot de passe tiré au hasard. Le mot de passe n'est rendu qu'ici. */
-export async function creerCompte(db: Db, identifiant: string, nom: string, role: Role) {
+/**
+ * Crée un compte avec un mot de passe tiré au hasard et l'inscrit aux cours donnés. Un cours
+ * inconnu empêche la création. Le mot de passe n'est rendu qu'ici.
+ */
+export async function creerCompte(
+  db: Db,
+  identifiant: string,
+  nom: string,
+  role: Role,
+  cours: string[] = [],
+) {
   if (!identifiant.trim() || !nom.trim() || identifiant.length > 100 || nom.length > 100) {
     throw new Error("Identifiant et nom requis, 100 caractères au maximum.");
   }
+  // Vérifiés avant l'insertion : creerAdministrateur appelle cette fonction dans sa transaction.
+  for (const coursId of cours) {
+    if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
+      throw new Error(`Cours inconnu : ${coursId}.`);
+    }
+  }
   const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  const id = crypto.randomUUID();
   db.prepare(
     "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?)",
   ).run(
-    crypto.randomUUID(),
+    id,
     identifiant.trim().toLowerCase(),
     nom.trim(),
     role,
@@ -59,7 +75,16 @@ export async function creerCompte(db: Db, identifiant: string, nom: string, role
     await deriver(motDePasse, sel),
     maintenant(),
   );
+  for (const coursId of cours) inscrire(db, coursId, id);
   return motDePasse;
+}
+
+/** Un élève saisi par un enseignant, au format du CSV, ou `undefined` s'il est invalide. */
+export function eleveSaisi(identifiant = "", nom = "") {
+  identifiant = identifiant.trim().toLowerCase();
+  nom = nom.trim();
+  if (!/^[a-z0-9._-]{3,40}$/.test(identifiant) || !nom || nom.length > 100) return undefined;
+  return { identifiant, nom };
 }
 
 /** CSV UTF-8 avec colonnes identifiant,nom. Les guillemets et retours de ligne sont permis. */
@@ -113,17 +138,9 @@ export function lireListe(csv: string): { identifiant: string; nom: string }[] {
     throw new Error("Le CSV doit contenir de 1 à 100 élèves.");
   }
   const comptes = lignes.map(([identifiant, nom], i) => {
-    identifiant = identifiant?.trim().toLowerCase();
-    nom = nom?.trim();
-    if (
-      lignes[i].length !== 2 ||
-      !/^[a-z0-9._-]{3,40}$/.test(identifiant) ||
-      !nom ||
-      nom.length > 100
-    ) {
-      throw new Error(`Ligne ${i + 2}: identifiant ou nom invalide.`);
-    }
-    return { identifiant, nom };
+    const eleve = lignes[i].length === 2 ? eleveSaisi(identifiant, nom) : undefined;
+    if (!eleve) throw new Error(`Ligne ${i + 2}: identifiant ou nom invalide.`);
+    return eleve;
   });
   if (new Set(comptes.map((c) => c.identifiant)).size !== comptes.length) {
     throw new Error("Le CSV contient un identifiant en double.");
@@ -131,13 +148,25 @@ export function lireListe(csv: string): { identifiant: string; nom: string }[] {
   return comptes;
 }
 
-/** Crée les comptes élèves et les inscrit aux cours donnés, dans la même transaction. */
-export async function importerEleves(db: Db, csv: string, cours: string[] = []) {
-  const comptes = lireListe(csv);
+export const importerEleves = (db: Db, csv: string, cours: string[] = []) =>
+  creerEleves(db, lireListe(csv), cours);
+
+/**
+ * Crée les comptes élèves et les inscrit aux cours donnés, dans la même transaction. Un compte
+ * existant ne s'inscrit pas par son identifiant : les enseignants d'un cours réinitialisent le mot
+ * de passe de ses élèves, et inscrire un compte existant leur ouvrirait ce compte.
+ */
+export async function creerEleves(
+  db: Db,
+  comptes: { identifiant: string; nom: string }[],
+  cours: string[] = [],
+) {
   const existants = db.prepare("SELECT identifiant FROM comptes WHERE identifiant = ?");
   for (const c of comptes) {
     if (existants.get(c.identifiant)) {
-      throw new Error(`Identifiant déjà utilisé : ${c.identifiant}.`);
+      throw new Error(
+        `Identifiant déjà utilisé : ${c.identifiant}. Un élève qui a déjà un compte rejoint vos cours par un administrateur.`,
+      );
     }
   }
   const resultats: ((typeof comptes)[number] & {

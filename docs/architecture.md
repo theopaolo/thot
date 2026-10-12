@@ -117,7 +117,9 @@ suggérées et le fait de l'accueil suivent le lecteur. Un cours ne se nomme qu'
 élève ne pose une question dans un cours que s'il en est membre. `/prof/questions` montre à un
 enseignant les échanges de ses cours. Un échange sans cours va aux enseignants qui partagent un
 cours avec l'élève, ou à tous s'il n'en a aucun. Un enseignant ne voit et ne réinitialise que les
-élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Les
+élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Un
+enseignant crée les élèves de ses cours et les en retire, il n'y inscrit pas un compte existant :
+l'inscription lui donnerait la réinitialisation de son mot de passe, donc le compte. Les
 administrateurs lisent tout. Une image se revalide à chaque affichage : un accès retiré s'applique
 aussitôt.
 

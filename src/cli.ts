@@ -35,8 +35,9 @@ const AIDE = `thot <commande>
   instance [--nom="Nom affiché"] [--mode=shared|personal]
                                             configure l'instance et affiche les services autorisés
   administrateur <identifiant> <nom>        provisionne l'administrateur, code à usage unique
-  compte <identifiant> <nom> <enseignant|eleve>
-                                            crée un compte et affiche son mot de passe
+  compte <identifiant> <nom> <enseignant|eleve> [--cours=<id>]...
+                                            crée un compte, l'inscrit aux cours, affiche son
+                                            mot de passe
   reinitialiser <identifiant>               renouvelle le mot de passe enseignant
   domaines                                 affiche le catalogue et le nombre de membres par cours
   matiere <nom> [--profil=general|arts-appliques]
@@ -95,6 +96,7 @@ const { values: args, positionals } = parseArgs({
     profil: texte,
     "matiere-id": texte,
     "cours-id": texte,
+    cours: { type: "string", multiple: true },
     "theme-id": texte,
     langue: texte,
     auteur: texte,
@@ -702,12 +704,11 @@ switch (commande) {
   case "compte": {
     const [identifiant, nom, role] = reste;
     if (!identifiant || !nom || !["enseignant", "eleve"].includes(role)) {
-      console.error("usage: thot compte <identifiant> <nom> <enseignant|eleve>");
+      console.error("usage: thot compte <identifiant> <nom> <enseignant|eleve> [--cours=<id>]...");
       process.exit(2);
     }
-    console.log(
-      `Mot de passe de ${identifiant}: ${await creerCompte(db, identifiant, nom, role as Role)}`,
-    );
+    const motDePasse = await creerCompte(db, identifiant, nom, role as Role, args.cours);
+    console.log(`Mot de passe de ${identifiant}: ${motDePasse}`);
     break;
   }
   case "reinitialiser": {
