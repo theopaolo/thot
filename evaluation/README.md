@@ -7,10 +7,10 @@ vérité terrain. `python3 evaluation/exporter.py` les convertit en JSON pour `t
 identifiants ni aux cibles.
 
 ```bash
-deno task thot eval recherche --img-order=../mesures/thot-real/img_order.json \
+pnpm thot eval recherche --img-order=../mesures/thot-real/img_order.json \
   --docs=../mesures/thot-real/docs.json [--sans-reclasseur]
-deno task thot eval generation
-deno task thot ask "Pourquoi les cubistes ont-ils abandonné la perspective ?"
+pnpm thot eval generation
+pnpm thot ask "Pourquoi les cubistes ont-ils abandonné la perspective ?"
 ```
 
 ## Soutien des citations
@@ -19,8 +19,8 @@ deno task thot ask "Pourquoi les cubistes ont-ils abandonné la perspective ?"
 repère une citation réelle qui ne prouve pas la phrase qu'elle accompagne.
 
 ```bash
-deno task thot eval generation --paires=../mesures/thot-real/paires-soutien.json
-deno task thot eval soutien --paires=../mesures/thot-real/paires-soutien.json
+pnpm thot eval generation --paires=../mesures/thot-real/paires-soutien.json
+pnpm thot eval soutien --paires=../mesures/thot-real/paires-soutien.json
 ```
 
 Le fichier de paires contient des citations du corpus : il reste dans le dépôt de recherche.
@@ -64,14 +64,14 @@ citations, légendes et traces complètes restent dans `data/benchmark-ml4/`, ig
 Les rapports publiés dans `resultats/ml4-*.json` gardent les mesures et les identifiants.
 
 ```bash
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts ml4 1
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts ml4-json 1
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek-ml4judge 1
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1 followup
-deno run -RWNE --env-file=.env evaluation/bench_generation.ts deepseek 1 suggestions
+node --env-file=.env evaluation/bench_generation.ts deepseek 1
+node --env-file=.env evaluation/bench_generation.ts ml4 1
+node --env-file=.env evaluation/bench_generation.ts ml4-json 1
+node --env-file=.env evaluation/bench_generation.ts deepseek-ml4judge 1
+node --env-file=.env evaluation/bench_generation.ts deepseek 1 followup
+node --env-file=.env evaluation/bench_generation.ts deepseek 1 suggestions
 python3 evaluation/bench_soutien.py --profiles ml4-none glm-low
-deno run -RWNE --env-file=.env evaluation/bench_vision.ts run
+node --env-file=.env evaluation/bench_vision.ts run
 python3 evaluation/bench_tps.py
 ```
 

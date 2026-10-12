@@ -11,7 +11,7 @@ ne dit pas : une règle du produit, une raison, une contrainte extérieure.
   commit et `git blame`. Seules les ADR de `docs/decisions/` sont datées, parce qu'elles
   enregistrent une décision à un moment donné.
 - Un document décrit le code tel qu'il est. Une cible pas encore construite devient une tâche.
-- Le suivi des tâches vit dans `tasks/`, un fichier par tâche (board kandepo : `deno task board`).
+- Le suivi des tâches vit dans `tasks/`, un fichier par tâche (board kandepo : `pnpm board`).
   Une question ouverte, un risque ou un écart entre la doc et le code devient une tâche, pas un
   backlog ou un plan en Markdown.
 - Court et à jour vaut mieux que complet. Un changement de code qui contredit `README.md` ou
