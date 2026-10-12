@@ -71,7 +71,7 @@ function intertitreGras(morceau: string) {
   if (!m) return undefined;
   const gras = sansBalises(m[2]);
   const reste = sansBalises(m[3]);
-  const seul = !reste && gras.split(" ").length <= 12 && !/:$/.test(gras);
+  const seul = !reste && gras.split(" ").length <= 12 && !gras.endsWith(":");
   return gras && (seul || /^[—–] /.test(reste)) ? gras : undefined;
 }
 

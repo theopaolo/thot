@@ -30,5 +30,14 @@ export default defineConfig({
   lint: {
     ignorePatterns: ignores,
     options: { typeAware: true, typeCheck: true },
+    rules: {
+      // parseBody type chaque champ string | File. Un fichier dans un champ texte devient
+      // "[object File]", un texte que la validation traite comme les autres.
+      "typescript/no-base-to-string": "off",
+      // URLSearchParams et les valeurs facultatives s'écrivent dans les gabarits à dessein.
+      "typescript/restrict-template-expressions": "off",
+      // Les tests gardent une méthode pour la remettre après l'avoir remplacée.
+      "typescript/unbound-method": "off",
+    },
   },
 });

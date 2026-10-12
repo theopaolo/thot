@@ -169,6 +169,7 @@ async function ingest(chemin: string) {
       const rubriques = rubriquesSommaire(s);
       // Le sommaire range la page qui présente une fiche PDF, pas la fiche: elle hérite de sa
       // rubrique.
+      // oxlint-disable-next-line unicorn/no-useless-spread -- la boucle ajoute des entrées.
       for (const [href, rubrique] of [...rubriques]) {
         const page = await readFile(join(dossier, href), "utf8").catch(() => "");
         const lie = page && pageVide(page)?.fichier;

@@ -67,7 +67,7 @@ export async function session(db: Db, modeles: Modeles, role: Role, inscrit = tr
   const requete = (chemin: string, init: RequestInit = {}) =>
     app.request(chemin, {
       ...init,
-      headers: { cookie, origin: ORIGINE, ...(init.headers ?? {}) },
+      headers: { cookie, origin: ORIGINE, ...(init.headers as Record<string, string> | undefined) },
     });
   return { app, requete };
 }

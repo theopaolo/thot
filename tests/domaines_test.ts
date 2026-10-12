@@ -793,7 +793,7 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
         },
       });
     const cli = async (...args: string[]) => {
-      const r = await lancer(...args);
+      const r = lancer(...args);
       assert(r.status === 0, r.stderr);
       return r.stdout.trim();
     };
