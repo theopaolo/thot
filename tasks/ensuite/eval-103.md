@@ -51,7 +51,7 @@ the linked implementation tasks rather than claiming generality from the arts be
 
 [Evaluation guidance](../../evaluation/README.md), [test helpers](../../tests/outils.ts),
 [application tests](../../tests/app_test.ts), [view tests](../../tests/vues_test.ts),
-[extraction tests](../../tests/extraction_test.ts), [project checks](../../deno.json).
+[extraction tests](../../tests/extraction_test.ts), [project checks](../../package.json).
 
 ## Acceptance
 

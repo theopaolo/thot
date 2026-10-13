@@ -12,7 +12,7 @@ export default defineConfig({
       output: { entryFileNames: "app.js" },
     },
   },
-  // Deno n'imposait pas de délai par test. Les tests de déploiement lancent des processus.
+  // Les tests de déploiement lancent des processus et dépassent le délai de 5 s par défaut.
   test: { include: ["tests/**/*_test.ts"], testTimeout: 60_000 },
   fmt: {
     printWidth: 100,
