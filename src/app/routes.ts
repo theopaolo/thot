@@ -397,13 +397,17 @@ export function creerApp(db: Db, modeles: Modeles) {
       : undefined;
     return rendre(c, "Élèves", Prof.eleves(cat, groupes, sansCours, erreur));
   };
-  /** Les cours cochés, ou `undefined` si un enseignant coche un cours qui n'est pas le sien. */
+  /**
+   * Les cours cochés, ou `undefined` si un enseignant n'en coche aucun ou coche un cours qui n'est
+   * pas le sien. Un élève sans cours échappe à l'enseignant qui l'a créé.
+   */
   const coursCoches = (c: Context<Env>, b: Record<string, unknown>) => {
     const cours = [...new Set([b.cours ?? []].flat().map(String))];
+    if (c.get("compte").administrateur) return cours;
     const siens = Domaines.coursDuCompte(db, c.get("compte").id);
-    return c.get("compte").administrateur || cours.every((id) => siens.has(id)) ? cours : undefined;
+    return cours.length && cours.every((id) => siens.has(id)) ? cours : undefined;
   };
-  const REFUS_COURS = "Inscription refusée : un de ces cours n'est pas le vôtre.";
+  const REFUS_COURS = "Inscription refusée : cochez un ou plusieurs de vos cours.";
   /** Crée les élèves et montre une seule fois leurs identifiants à remettre. */
   const remettre = async (c: Context<Env>, creer: () => ReturnType<typeof creerEleves>) => {
     try {

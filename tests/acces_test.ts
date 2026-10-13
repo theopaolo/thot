@@ -1049,7 +1049,8 @@ test("élèves : un enseignant ajoute un élève à ses cours et l'en retire, le
     const avant = comptes();
     const refus = await ajouter(profB, "lea.martin", [c1]);
     assertEquals(refus.status, 400);
-    assertStringIncludes(await refus.text(), "pas le vôtre");
+    assertStringIncludes(await refus.text(), "vos cours");
+    assertEquals((await ajouter(profA, "lea.martin", [])).status, 400);
     const pris = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(eleveA.id)!;
     const doublon = await ajouter(profA, pris.identifiant as string, [c1]);
     assertEquals(doublon.status, 400);

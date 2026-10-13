@@ -1038,7 +1038,7 @@ test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais c
       body: classe("lea,Léa Martin", [optique, mecanique]),
     });
     assertEquals(refus.status, 400);
-    assertStringIncludes(await refus.text(), "pas le vôtre");
+    assertStringIncludes(await refus.text(), "vos cours");
     assertEquals(eleves(), 0);
 
     const bon = await prof.requete("/prof/eleves/importer", {
@@ -1049,13 +1049,13 @@ test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais c
     const lea = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea'").get()!.id as string;
     assertEquals([...coursDuCompte(db, lea)], [optique]);
 
+    // Sans cours coché, l'élève échapperait à l'enseignant qui l'a créé.
     const sans = await prof.requete("/prof/eleves/importer", {
       method: "POST",
       body: classe("max,Max Roux", []),
     });
-    assertEquals(sans.status, 200);
-    const max = db.prepare("SELECT id FROM comptes WHERE identifiant = 'max'").get()!.id as string;
-    assertEquals(coursDuCompte(db, max).size, 0);
+    assertEquals(sans.status, 400);
+    assertEquals(eleves(), 2);
 
     // Un administrateur choisit parmi tous les cours, un cours inconnu annule l'import.
     const admin = await administrateur(db);
@@ -1082,16 +1082,23 @@ test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais c
   }
 });
 
-test("CSV élèves : sans cours dans l'instance, pas de liste de cours", async () => {
+test("élèves : un enseignant sans cours ne crée pas d'élève, un administrateur si", async () => {
   const { db, dir } = await environnement();
   try {
     const prof = await session(db, fauxModeles().modeles, "enseignant");
     const page = await (await prof.requete("/prof/eleves")).text();
-    assert(!page.includes("Cours des nouveaux comptes"));
+    assertStringIncludes(page, "Vous n'avez pas encore de cours");
+    assert(!page.includes("/prof/eleves/importer"));
     const f = new FormData();
     f.append("fichier", new File(["identifiant,nom\nlea,Léa Martin\n"], "classe.csv"));
     assertEquals(
       (await prof.requete("/prof/eleves/importer", { method: "POST", body: f })).status,
+      400,
+    );
+    const admin = await administrateur(db);
+    assert(!(await (await admin.requete("/prof/eleves")).text()).includes("Cours des nouveaux"));
+    assertEquals(
+      (await admin.requete("/prof/eleves/importer", { method: "POST", body: f })).status,
       200,
     );
   } finally {

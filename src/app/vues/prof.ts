@@ -333,6 +333,12 @@ export const eleves = (
   html`
     <h1>Élèves</h1>
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+    ${
+      // Un enseignant inscrit chaque élève qu'il crée à un de ses cours. Un administrateur peut
+      // créer un élève sans cours.
+      !cat.cours.length && !sansCours
+        ? html`<p>Vous n'avez pas encore de cours. Un administrateur vous inscrit à un cours, puis vous y ajoutez vos élèves.</p>`
+        : html`
     <h2>Ajouter un élève</h2>
     <form method="post" action="/prof/eleves/ajouter">
       ${choixCours(cat, "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.")}
@@ -359,6 +365,8 @@ export const eleves = (
       </div>
     </form>
     </details>
+    `
+    }
     ${groupes.map(
       ({ cours, eleves }) => html`
         <h2 id="cours-${cours.id}">${cat.matieres.find((m) => m.id === cours.matiere_id)?.nom} / ${cours.nom}</h2>
