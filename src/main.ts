@@ -12,7 +12,10 @@ db.close();
 if (faites.length) console.log(`migrations appliquées: ${faites.join(", ")}`);
 
 const dev = process.argv.includes("--watch");
-const surveiller = dev ? ["--watch-path=src/", "--watch-path=static/"] : [];
+// --watch relance le script dans un processus enfant, que --permission refuse sans ce droit.
+const surveiller = dev
+  ? ["--watch-path=src/", "--watch-path=static/", "--allow-child-process"]
+  : [];
 // Lecture du code et des données, écriture des données seules. Le worker lance pdftotext.
 const droits = [
   "--permission",
