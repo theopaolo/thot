@@ -36,6 +36,8 @@ export type LigneSource = {
   etat: string;
   erreur: string | null;
   images_a_relire: number;
+  images: number;
+  legendes: number;
   image_id: string | null;
   audience?: Audience;
   /** 0 quand le compte lit la source sans pouvoir la modifier */
@@ -48,7 +50,9 @@ const statutLigne = (l: LigneSource) =>
   l.etat === "failed"
     ? html`<span class="statut failed">échec du traitement</span>`
     : JOBS_ACTIFS.includes(l.etat)
-      ? html`<span class="statut en-cours">${ETATS_JOB[l.etat]}…</span>`
+      ? html`<span class="statut en-cours">${ETATS_JOB[l.etat]}${
+          l.etat === "enriching" && l.images ? ` ${l.legendes}/${l.images}` : ""
+        }…</span>`
       : html`<span class="statut ${l.statut}">${STATUTS[l.statut] ?? l.statut}</span>`;
 // Seul l'écart à la publication aux élèves est signalé.
 const lecteursLigne = (l: LigneSource) =>

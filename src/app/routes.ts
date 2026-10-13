@@ -325,6 +325,8 @@ export function creerApp(db: Db, modeles: Modeles) {
          s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
+         (SELECT count(*) FROM images i WHERE i.source_id = s.id) AS images,
+         (SELECT count(legende) FROM images i WHERE i.source_id = s.id) AS legendes,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND ${FILTRE_ACCES} AND (? = '' OR s.statut = ?)

@@ -263,6 +263,37 @@ test("une génération en cours conserve les légendes relues par un enseignant"
   }
 });
 
+test("pendant les légendes, la liste des sources compte les images déjà légendées", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+    await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+    const job = revendiquer(db)!;
+    // Une page HTML ne garde que sa première image. La seconde est ajoutée à la main.
+    db.prepare(
+      `INSERT INTO images (id, source_id, position, fichier, mime, checksum)
+       VALUES (?, ?, 1, 'image-0.jpg', 'image/jpeg', '')`,
+    ).run(`${job.source_id}-1`, job.source_id);
+    const enAttente = Promise.withResolvers<void>();
+    const termine = Promise.withResolvers<{ texte: string; modele: string }>();
+    const { modeles } = fauxModeles();
+    let appels = 0;
+    modeles.legender = () => {
+      if (++appels === 1) return Promise.resolve({ texte: "Une image.", modele: "faux-vl" });
+      enAttente.resolve();
+      return termine.promise;
+    };
+    const travail = traiter(db, job, modeles);
+    await enAttente.promise;
+    assertStringIncludes(await (await requete("/prof/lignes")).text(), "légendes 1/2…");
+    termine.resolve({ texte: "Une autre image.", modele: "faux-vl" });
+    await travail;
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("une certification prématurée ne publie rien après le passage du worker", async () => {
   const { db, dir } = await environnement();
   try {
