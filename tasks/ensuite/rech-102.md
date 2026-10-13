@@ -23,7 +23,7 @@ type: [feature]
   or decomposition only where it improves measured cross-subject recall.
 - [ ] Evaluate vocabulary mismatches such as industrialisation/industrial labour and colour/light.
   If lexical retrieval misses relevant material, qualify the existing embedding proposal in
-  [RET-201](ret-201.md) and its measurement in [RET-203](ret-203.md) before adding infrastructure.
+  [RET-201](ret-201.md) and its exact-search measurement before adding infrastructure.
 - [ ] Preserve author positions, disciplinary differences, jurisdiction and applicable dates.
   Treat contradictory sources as something to explain rather than merge into one answer.
 - [ ] Add optional teacher-entered teaching periods, objectives and links to progression documents
