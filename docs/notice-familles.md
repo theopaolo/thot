@@ -6,7 +6,7 @@
 
 ## Données utilisées
 
-L'établissement crée un compte avec le nom et l'identifiant de chaque élève. Thot conserve les questions, les réponses, les passages cités, les avis « utile », « peu claire » ou « fausse », ainsi que les dates de ces échanges. Les élèves doivent éviter d'écrire des informations personnelles dans leurs questions.
+Chaque élève a un compte avec son nom et son identifiant. L'établissement crée ce compte, ou l'élève le crée lui-même à partir d'un lien d'inscription partagé par un enseignant. Dans ce cas, l'élève saisit son nom, son identifiant et son mot de passe. Les enseignants du cours voient les comptes inscrits et retirent ceux qui n'appartiennent pas à la classe. Thot conserve les questions, les réponses, les passages cités, les avis « utile », « peu claire » ou « fausse », ainsi que les dates de ces échanges. Les élèves doivent éviter d'écrire des informations personnelles dans leurs questions.
 
 Pour chercher et produire une réponse, Thot transmet la question, parfois la question précédente, et des extraits du cours à OpenRouter et au fournisseur du modèle choisi. Le nom et l'identifiant du compte ne sont pas ajoutés à ces requêtes. Une question peut toutefois contenir des données personnelles si l'élève en saisit lui-même.
 

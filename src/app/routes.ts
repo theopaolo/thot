@@ -26,10 +26,13 @@ import {
   choisirMotDePasse,
   type Compte,
   consommerProvisoire,
+  coursDuLien,
   creerEleves,
+  creerLien,
   eleveSaisi,
   filtreModification,
   importerEleves,
+  inscrireParLien,
   lecteur,
   lireCompte,
   parametresModification,
@@ -44,7 +47,13 @@ import { type Db, maintenant } from "./db.ts";
 import { audience, controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
 import { chunksSource, lireDocument, relireLegende, statuer } from "./ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
-import { administration, connexion as formulaireConnexion, motDePasse, page } from "./vues/page.ts";
+import {
+  administration,
+  connexion as formulaireConnexion,
+  inscription,
+  motDePasse,
+  page,
+} from "./vues/page.ts";
 import * as Prof from "./vues/prof.ts";
 import * as Eleve from "./vues/eleve.ts";
 import * as Domaines from "./domaines.ts";
@@ -99,7 +108,9 @@ export function creerApp(db: Db, modeles: Modeles) {
     if (!p.startsWith("/static/") && !p.startsWith("/media/")) {
       c.header("Cache-Control", "no-store");
     }
-    if (p === "/connexion" || p.startsWith("/static/")) return next();
+    if (p === "/connexion" || p.startsWith("/static/") || p.startsWith("/inscription/")) {
+      return next();
+    }
     if (!compte) return c.redirect("/connexion");
     if (compte.renouveler_mdp && p !== "/mot-de-passe" && p !== "/deconnexion") {
       return c.redirect("/mot-de-passe");
@@ -136,28 +147,8 @@ export function creerApp(db: Db, modeles: Modeles) {
     "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.";
 
   // ------------------------------------------------------------ connexion
-  app.get("/connexion", (c) => c.html(rendre(c, "Connexion", formulaireConnexion())));
-  app.post("/connexion", async (c) => {
-    const b = await c.req.parseBody();
-    const compte = await authentifier(
-      db,
-      String(b.identifiant ?? ""),
-      String(b.mot_de_passe ?? ""),
-    );
-    if (!compte || (compte.renouveler_mdp && !consommerProvisoire(db, compte))) {
-      return c.html(
-        rendre(
-          c,
-          "Connexion",
-          formulaireConnexion(
-            "Identifiant ou mot de passe incorrect.",
-            String(b.identifiant ?? ""),
-          ),
-        ),
-        401,
-      );
-    }
-    await setSignedCookie(
+  const ouvrirSession = (c: Context<Env>, compte: Compte) =>
+    setSignedCookie(
       c,
       SESSION,
       `${compte.id}:${compte.session_version}:${instance.id}:${Date.now() + SESSION_MS}`,
@@ -174,7 +165,37 @@ export function creerApp(db: Db, modeles: Modeles) {
           c.req.header("x-forwarded-proto") === "https",
       },
     );
-    return c.redirect(compte.renouveler_mdp ? "/mot-de-passe" : "/");
+  /** L'adresse où revenir après la connexion : un lien d'inscription, sinon rien. */
+  const retour = (r: unknown) =>
+    typeof r === "string" && /^\/inscription\/[\w-]+$/.test(r) ? r : "";
+  app.get("/connexion", (c) =>
+    c.html(
+      rendre(c, "Connexion", formulaireConnexion(undefined, "", retour(c.req.query("retour")))),
+    ),
+  );
+  app.post("/connexion", async (c) => {
+    const b = await c.req.parseBody();
+    const compte = await authentifier(
+      db,
+      String(b.identifiant ?? ""),
+      String(b.mot_de_passe ?? ""),
+    );
+    if (!compte || (compte.renouveler_mdp && !consommerProvisoire(db, compte))) {
+      return c.html(
+        rendre(
+          c,
+          "Connexion",
+          formulaireConnexion(
+            "Identifiant ou mot de passe incorrect.",
+            String(b.identifiant ?? ""),
+            retour(b.retour),
+          ),
+        ),
+        401,
+      );
+    }
+    await ouvrirSession(c, compte);
+    return c.redirect(compte.renouveler_mdp ? "/mot-de-passe" : retour(b.retour) || "/");
   });
   app.post("/deconnexion", (c) => {
     // Invalide aussi les cookies copiés ou restés sur un autre appareil.
@@ -204,6 +225,48 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/administration", (c) =>
     c.html(rendre(c, "Administration", administration(lireInstance(db)))),
   );
+
+  // ------------------------------------------------------------ inscription par lien
+  // Le lien inscrit des élèves seulement. Un enseignant ou un administrateur qui l'ouvre lit une
+  // explication. Une instance personnelle n'en crée pas.
+  const pageInscription = (
+    c: Context<Env>,
+    statut: 200 | 400 | 403 = 200,
+    erreur?: string,
+    saisie = {},
+  ) => {
+    const jeton = c.req.param("jeton")!;
+    const cours = coursDuLien(db, jeton);
+    return c.html(
+      rendre(c, "Rejoindre un cours", inscription(jeton, cours, c.get("compte"), erreur, saisie)),
+      cours.length ? statut : 404,
+    );
+  };
+  app.get("/inscription/:jeton", (c) => pageInscription(c));
+  app.post("/inscription/:jeton", async (c) => {
+    const compte = c.get("compte") as Compte | undefined;
+    if (compte?.role === "enseignant") return pageInscription(c, 403);
+    const b = await c.req.parseBody();
+    let id;
+    try {
+      if (compte) id = await inscrireParLien(db, c.req.param("jeton"), compte.id);
+      else {
+        const eleve = eleveSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
+        if (!eleve) {
+          throw new Error(
+            "Choisis un identifiant de 3 à 40 caractères parmi a-z, 0-9, point, tiret et tiret bas, et un nom de 100 caractères au maximum.",
+          );
+        }
+        const motDePasse = String(b.mot_de_passe ?? "");
+        id = await inscrireParLien(db, c.req.param("jeton"), { ...eleve, motDePasse });
+      }
+    } catch (e) {
+      return pageInscription(c, 400, (e as Error).message, b);
+    }
+    if (!id) return pageInscription(c);
+    if (!compte) await ouvrirSession(c, lireCompte(db, id)!);
+    return c.redirect("/eleve", 303);
+  });
 
   const scope = (c: Context<Env>) => Domaines.lireScope(c.req.query());
   const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
@@ -381,6 +444,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       JOIN membres_cours moi ON moi.cours_id = lui.cours_id
       WHERE lui.compte_id = comptes.id AND moi.compte_id = ?))`;
   const elevesGeres = (c: Context<Env>) => [lu(c).administrateur ? 1 : 0, lu(c).id];
+  // Un enseignant voit et révoque les liens qui ouvrent un de ses cours.
+  const LIENS_GERES = `(? OR EXISTS (SELECT 1 FROM liens_cours x
+      JOIN membres_cours m ON m.cours_id = x.cours_id
+      WHERE x.jeton = liens.jeton AND m.compte_id = ?))`;
   // Les élèves de chaque cours de l'enseignant. Ceux sans cours ne se montrent qu'aux
   // administrateurs, seuls à les gérer.
   const pageEleves = (c: Context<Env>, erreur?: string) => {
@@ -397,7 +464,28 @@ export function creerApp(db: Db, modeles: Modeles) {
           )
           .all() as Prof.Eleve[])
       : undefined;
-    return rendre(c, "Élèves", Prof.eleves(cat, groupes, sansCours, erreur));
+    const liens =
+      lireInstance(db).mode === "personal"
+        ? undefined
+        : (
+            db
+              .prepare(
+                `SELECT liens.jeton, places, expire_le, a.nom AS createur,
+                   json_group_array(lc.cours_id) AS cours
+                 FROM liens JOIN comptes a ON a.id = liens.createur_id
+                 JOIN liens_cours lc ON lc.jeton = liens.jeton
+                 WHERE revoque_le IS NULL AND expire_le > ? AND ${LIENS_GERES}
+                 GROUP BY liens.jeton ORDER BY liens.cree_le DESC`,
+              )
+              .all(maintenant(), ...elevesGeres(c)) as (Omit<Prof.Lien, "cours"> & {
+              cours: string;
+            })[]
+          ).map((l) => ({ ...l, cours: JSON.parse(l.cours) as string[] }));
+    return rendre(
+      c,
+      "Élèves",
+      Prof.eleves(cat, groupes, sansCours, liens, new URL(c.req.url).origin, erreur),
+    );
   };
   /**
    * Les cours cochés, ou `undefined` si un enseignant n'en coche aucun ou coche un cours qui n'est
@@ -453,6 +541,27 @@ export function creerApp(db: Db, modeles: Modeles) {
       );
     }
     return remettre(c, () => creerEleves(db, [eleve], cours));
+  });
+  app.post("/prof/eleves/liens", async (c) => {
+    if (lireInstance(db).mode === "personal") return c.notFound();
+    const b = await c.req.parseBody({ all: true });
+    const cours = coursCoches(c, b);
+    if (!cours?.length) return c.html(pageEleves(c, REFUS_COURS), 400);
+    try {
+      creerLien(db, c.get("compte").id, cours, Number(b.jours), Number(b.places));
+    } catch (e) {
+      return c.html(pageEleves(c, (e as Error).message), 400);
+    }
+    return c.redirect("/prof/eleves#liens", 303);
+  });
+  // Révoquer garde les élèves que le lien a inscrits.
+  app.post("/prof/eleves/liens/:jeton/revoquer", (c) => {
+    const { changes } = db
+      .prepare(
+        `UPDATE liens SET revoque_le = ? WHERE jeton = ? AND revoque_le IS NULL AND ${LIENS_GERES}`,
+      )
+      .run(maintenant(), c.req.param("jeton"), ...elevesGeres(c));
+    return changes ? c.redirect("/prof/eleves#liens", 303) : c.notFound();
   });
   // Retirer d'un cours laisse le compte. Un enseignant ne retire que des élèves de ses cours.
   app.post("/prof/eleves/:id/retirer", async (c) => {

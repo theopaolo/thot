@@ -17,8 +17,17 @@ import {
   suggestionsDuPerimetre,
   suggestionsParChapitre,
 } from "../src/app/suggestions.ts";
-import { affiliations, cours, desinscrire, inscrire, matiere, theme } from "../src/app/domaines.ts";
-import { environnement, fauxModeles, session } from "./outils.ts";
+import { creerCompte } from "../src/app/comptes.ts";
+import {
+  affiliations,
+  cours,
+  coursDuCompte,
+  desinscrire,
+  inscrire,
+  matiere,
+  theme,
+} from "../src/app/domaines.ts";
+import { environnement, fauxModeles, ORIGINE, session } from "./outils.ts";
 
 const TEXTE =
   "La façade de la Casa Batlló est couverte de céramique irisée. " +
@@ -362,6 +371,10 @@ test("instance personnelle : le propriétaire étudie ses ressources privées", 
     const id = await source(db, "Mes notes", "prive", moi.id);
     assertStringIncludes(await (await moi.requete("/eleve")).text(), "Mes notes");
     assertEquals(await statut(moi.requete(`/eleve/sources/${id}`)), 200);
+    // Sans élèves à inscrire, l'instance ne crée pas de lien d'inscription.
+    const lecture = cours(db, matiere(db, "Notes"), "Lecture");
+    const corps = { cours: lecture, jours: "14", places: "40" };
+    assertEquals(await statut(envoyer(moi, "/prof/eleves/liens", corps)), 404);
   } finally {
     db.close();
     await rm(dir, { recursive: true });
@@ -402,7 +415,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, ?, 'fixture')`,
       ).run(String(i), JSON.stringify({ sequence: "Lumière", publics }), enseignant);
     }
-    assertEquals(migrer(db), ["0008_acces.sql", "0009_membres.sql"]);
+    assertEquals(migrer(db), ["0008_acces.sql", "0009_membres.sql", "0010_liens.sql"]);
     assertEquals(
       db
         .prepare("SELECT audience, reponses, proprietaire_id, metadonnees FROM sources ORDER BY id")
@@ -589,7 +602,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       INSERT INTO cours (id, matiere_id, nom) VALUES ('c1', 'm', 'Design'), ('c2', 'm', 'Histoire');
       INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le)
         VALUES ('p', 'p', 'Prof', 'enseignant', '', '', 'x'), ('e', 'e', 'Élève', 'eleve', '', '', 'x');`);
-    assertEquals(migrer(db), ["0009_membres.sql"]);
+    assertEquals(migrer(db), ["0009_membres.sql", "0010_liens.sql"]);
     assertEquals(
       db
         .prepare("SELECT cours_id || compte_id AS m FROM membres_cours ORDER BY m")
@@ -1054,7 +1067,7 @@ test("élèves : un enseignant ajoute un élève à ses cours et l'en retire, le
     const pris = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(eleveA.id)!;
     const doublon = await ajouter(profA, pris.identifiant as string, [c1]);
     assertEquals(doublon.status, 400);
-    assertStringIncludes(await doublon.text(), "rejoint vos cours par un administrateur");
+    assertStringIncludes(await doublon.text(), "rejoint vos cours par un lien d");
     assertEquals((await ajouter(profA, "LÉA", [c1])).status, 400);
     assertEquals(comptes(), avant);
 
@@ -1091,6 +1104,181 @@ test("élèves : un enseignant ajoute un élève à ses cours et l'en retire, le
     const page = await texteDe(admin, "/prof/eleves");
     assert(page.indexOf("lea.martin") > page.indexOf("<h2>Sans cours</h2>"));
     assertEquals(await statut(envoyer(admin, `/prof/eleves/${lea}/reinitialiser`)), 200);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+/** Un lien d'inscription demandé par `qui` pour ces cours. */
+const lienDe = (qui: Qui, cours: string[], places = "40") => {
+  const corps = new URLSearchParams({ jours: "14", places });
+  for (const id of cours) corps.append("cours", id);
+  return qui.requete("/prof/eleves/liens", { method: "POST", body: corps });
+};
+const dernierJeton = (db: Db) =>
+  db.prepare("SELECT jeton FROM liens ORDER BY rowid DESC LIMIT 1").get()!.jeton as string;
+/** Une requête sans session, en GET, ou en POST avec un corps. */
+const visiteur = (qui: Qui, chemin: string, corps?: Record<string, string>) =>
+  qui.app.request(
+    chemin,
+    corps ? { method: "POST", headers: { origin: ORIGINE }, body: new URLSearchParams(corps) } : {},
+  );
+const LEA = { nom: "Léa Martin", identifiant: "lea.martin", mot_de_passe: "un mot de passe sûr" };
+
+test("lien d'inscription : un visiteur crée son compte, un élève d'un autre cours rejoint d'un clic", async () => {
+  const { db, dir, c1, c2, profA, profB, eleveB, publie } = await deuxCours();
+  try {
+    db.prepare("UPDATE comptes SET nom = 'M. Detienne' WHERE id = ?").run(profA.id);
+    // Un enseignant ne crée de lien que pour ses cours.
+    assertEquals(await statut(lienDe(profA, [c2])), 400);
+    assertEquals(await statut(lienDe(profA, [])), 400);
+    assertEquals(await statut(lienDe(profA, [c1], "0")), 400);
+    assertEquals(db.prepare("SELECT count(*) n FROM liens").get()!.n, 0);
+    assertEquals(await statut(lienDe(profA, [c1])), 303);
+    const jeton = dernierJeton(db);
+    assertEquals(Buffer.from(jeton, "base64url").length, 16);
+    assertStringIncludes(await texteDe(profA, "/prof/eleves"), `/inscription/${jeton}`);
+    assert(!(await texteDe(profB, "/prof/eleves")).includes(jeton));
+
+    const page = await (await visiteur(profA, `/inscription/${jeton}`)).text();
+    assertStringIncludes(page, "M. Detienne");
+    assertStringIncludes(page, "Design");
+    const places = () => db.prepare("SELECT places FROM liens WHERE jeton = ?").get(jeton)!.places;
+    const comptes = () => db.prepare("SELECT count(*) n FROM comptes").get()!.n;
+    const avant = comptes();
+    const pris = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(eleveB.id)!;
+    for (const refus of [
+      { ...LEA, mot_de_passe: "court" },
+      { ...LEA, identifiant: pris.identifiant as string },
+      { ...LEA, identifiant: "LÉA" },
+    ]) {
+      assertEquals(await statut(visiteur(profA, `/inscription/${jeton}`, refus)), 400);
+    }
+    assertEquals([comptes(), places()], [avant, 40]);
+
+    // Le compte créé ouvre sa session sur /eleve et lit les ressources publiées du cours.
+    const r = await visiteur(profA, `/inscription/${jeton}`, LEA);
+    assertEquals(r.status, 303);
+    assertEquals(r.headers.get("location"), "/eleve");
+    const cookie = r.headers.get("set-cookie")!.split(";")[0];
+    const commeLea = (chemin: string) => profA.app.request(chemin, { headers: { cookie } });
+    assertEquals(await statut(commeLea("/eleve")), 200);
+    assertEquals(await statut(commeLea(`/eleve/sources/${publie}`)), 200);
+    assertEquals(places(), 39);
+    assertStringIncludes(await texteDe(profA, "/prof/eleves"), "lea.martin");
+    // Le mot de passe choisi reste le sien : la connexion n'en demande pas un autre.
+    const connexion = await visiteur(profA, "/connexion", {
+      identifiant: LEA.identifiant,
+      mot_de_passe: LEA.mot_de_passe,
+    });
+    assertEquals(connexion.headers.get("location"), "/");
+
+    // Un élève d'un autre cours rejoint d'un clic et garde ses cours. Un second clic est sans effet.
+    assertStringIncludes(await texteDe(eleveB, `/inscription/${jeton}`), "Rejoindre</button>");
+    assertEquals(await statut(envoyer(eleveB, `/inscription/${jeton}`)), 303);
+    assertEquals(coursDuCompte(db, eleveB.id), new Set([c2, c1]));
+    assertEquals(await statut(eleveB.requete(`/eleve/sources/${publie}`)), 200);
+    assertEquals(await statut(envoyer(eleveB, `/inscription/${jeton}`)), 303);
+    assertEquals(places(), 38);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lien d'inscription : expiré, révoqué ou complet, il n'inscrit personne", async () => {
+  const { db, dir, c1, profA, profB, eleveB } = await deuxCours();
+  try {
+    const comptes = () => db.prepare("SELECT count(*) n FROM comptes").get()!.n;
+    const inutile = async (jeton: string) => {
+      const avant = comptes();
+      assertEquals(await statut(visiteur(profA, `/inscription/${jeton}`)), 404);
+      const noe = { ...LEA, identifiant: "noe.petit" };
+      assertEquals(await statut(visiteur(profA, `/inscription/${jeton}`, noe)), 404);
+      assertEquals(await statut(envoyer(eleveB, `/inscription/${jeton}`)), 404);
+      assertEquals(comptes(), avant);
+      assert(!coursDuCompte(db, eleveB.id).has(c1));
+    };
+
+    await lienDe(profA, [c1], "1");
+    const complet = dernierJeton(db);
+    assertEquals(await statut(visiteur(profA, `/inscription/${complet}`, LEA)), 303);
+    await inutile(complet);
+
+    await lienDe(profA, [c1]);
+    const expire = dernierJeton(db);
+    db.prepare("UPDATE liens SET expire_le = '2000-01-01T00:00:00Z' WHERE jeton = ?").run(expire);
+    await inutile(expire);
+
+    // Seul un enseignant de ses cours révoque un lien. Les élèves qu'il a inscrits restent.
+    await lienDe(profA, [c1]);
+    const revoque = dernierJeton(db);
+    const max = { ...LEA, identifiant: "max.roux" };
+    assertEquals(await statut(visiteur(profA, `/inscription/${revoque}`, max)), 303);
+    assertEquals(await statut(envoyer(profB, `/prof/eleves/liens/${revoque}/revoquer`)), 404);
+    assertEquals(await statut(envoyer(profA, `/prof/eleves/liens/${revoque}/revoquer`)), 303);
+    assert(!(await texteDe(profA, "/prof/eleves")).includes(revoque));
+    await inutile(revoque);
+    const maxId = db.prepare("SELECT id FROM comptes WHERE identifiant = 'max.roux'").get()!;
+    assert(coursDuCompte(db, maxId.id as string).has(c1), "la révocation a retiré l'élève");
+
+    // Un enseignant retiré du cours : son lien n'y inscrit plus.
+    await lienDe(profA, [c1]);
+    const orphelin = dernierJeton(db);
+    desinscrire(db, c1, profA.id);
+    await inutile(orphelin);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lien d'inscription : une session enseignant n'est pas inscrite, la connexion revient au lien", async () => {
+  const { db, dir, c1, profA, profB } = await deuxCours();
+  try {
+    const admin = await administrateur(db);
+    await lienDe(profA, [c1]);
+    const jeton = dernierJeton(db);
+    for (const qui of [profB, admin]) {
+      const avant = coursDuCompte(db, qui.id);
+      assertStringIncludes(
+        await texteDe(qui, `/inscription/${jeton}`),
+        "Ce lien inscrit des élèves",
+      );
+      assertEquals(await statut(envoyer(qui, `/inscription/${jeton}`)), 403);
+      assertEquals(coursDuCompte(db, qui.id), avant);
+    }
+    assertEquals(db.prepare("SELECT places FROM liens").get()!.places, 40);
+
+    // Un élève qui a un compte se connecte, puis revient au lien. Aucune autre adresse de retour.
+    const page = await (await visiteur(profA, `/inscription/${jeton}`)).text();
+    assertStringIncludes(page, `/connexion?retour=/inscription/${jeton}`);
+    const formulaire = await visiteur(profA, `/connexion?retour=/inscription/${jeton}`);
+    assertStringIncludes(await formulaire.text(), `value="/inscription/${jeton}"`);
+    const ailleurs = await (await visiteur(profA, "/connexion?retour=/prof")).text();
+    assert(!ailleurs.includes('name="retour"'));
+    const motDePasse = await creerCompte(db, "noe.petit", "Noé Petit", "eleve");
+    const retour = async (adresse: string) =>
+      (
+        await visiteur(profA, "/connexion", {
+          identifiant: "noe.petit",
+          mot_de_passe: motDePasse,
+          retour: adresse,
+        })
+      ).headers.get("location");
+    assertEquals(await retour(`/inscription/${jeton}`), `/inscription/${jeton}`);
+    for (const adresse of [
+      "https://exemple.org/inscription/x",
+      "//exemple.org/inscription/x",
+      "/\\exemple.org/inscription/x",
+      "/prof",
+      "/inscription/",
+      "/inscription/../prof",
+      "/inscription/x?y=1",
+    ]) {
+      assertEquals(await retour(adresse), "/", adresse);
+    }
   } finally {
     db.close();
     await rm(dir, { recursive: true });

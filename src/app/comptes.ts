@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
-import { inscrire } from "./domaines.ts";
+import { coursDuCompte, inscrire } from "./domaines.ts";
 
 export type Role = "enseignant" | "eleve";
 export type Compte = {
@@ -165,7 +165,7 @@ export async function creerEleves(
   for (const c of comptes) {
     if (existants.get(c.identifiant)) {
       throw new Error(
-        `Identifiant déjà utilisé : ${c.identifiant}. Un élève qui a déjà un compte rejoint vos cours par un administrateur.`,
+        `Identifiant déjà utilisé : ${c.identifiant}. Un élève qui a déjà un compte rejoint vos cours par un lien d'inscription.`,
       );
     }
   }
@@ -196,6 +196,97 @@ export async function creerEleves(
     }
   });
   return resultats.map(({ identifiant, nom, motDePasse }) => ({ identifiant, nom, motDePasse }));
+}
+
+/**
+ * Crée un lien d'inscription aux cours donnés et rend son jeton, 128 bits tirés au hasard. La route
+ * vérifie que ces cours sont ceux du créateur.
+ */
+export function creerLien(
+  db: Db,
+  createurId: string,
+  cours: string[],
+  jours: number,
+  places: number,
+) {
+  if (
+    ![jours, places].every(Number.isInteger) ||
+    jours < 1 ||
+    jours > 365 ||
+    places < 1 ||
+    places > 1000
+  ) {
+    throw new Error("Lien refusé : de 1 à 365 jours et de 1 à 1000 places.");
+  }
+  const jeton = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  const expire = new Date(Date.now() + jours * 86_400_000).toISOString().slice(0, 19) + "Z";
+  transaction(db, () => {
+    db.prepare(
+      "INSERT INTO liens (jeton, createur_id, places, expire_le, cree_le) VALUES (?, ?, ?, ?, ?)",
+    ).run(jeton, createurId, places, expire, maintenant());
+    for (const id of cours) db.prepare("INSERT INTO liens_cours VALUES (?, ?)").run(jeton, id);
+  });
+  return jeton;
+}
+
+/**
+ * Les cours où un lien inscrit encore, avec le nom de son créateur. Un cours dont le créateur
+ * n'est plus membre en sort, sauf s'il est administrateur. Aucun cours si le lien a expiré, a été
+ * révoqué ou n'a plus de place.
+ */
+export const coursDuLien = (db: Db, jeton: string) =>
+  db
+    .prepare(
+      `SELECT c.id, c.nom, m.nom AS matiere, a.nom AS createur FROM liens l
+       JOIN comptes a ON a.id = l.createur_id
+       JOIN liens_cours lc ON lc.jeton = l.jeton
+       JOIN cours c ON c.id = lc.cours_id JOIN matieres m ON m.id = c.matiere_id
+       WHERE l.jeton = ? AND l.revoque_le IS NULL AND l.expire_le > ? AND l.places > 0
+         AND (a.administrateur = 1 OR EXISTS (SELECT 1 FROM membres_cours mc
+           WHERE mc.cours_id = c.id AND mc.compte_id = a.id))
+       ORDER BY m.nom, c.nom`,
+    )
+    .all(jeton, maintenant()) as { id: string; nom: string; matiere: string; createur: string }[];
+
+/**
+ * Inscrit un élève aux cours d'un lien et prend une place, dans une transaction. Un visiteur
+ * arrive avec l'identifiant, le nom et le mot de passe qu'il a choisis, et son compte est créé
+ * dans la même transaction. Un élève déjà membre de tous ces cours ne prend pas de place. Rend
+ * l'identifiant du compte, ou `undefined` si le lien n'inscrit plus.
+ */
+export async function inscrireParLien(
+  db: Db,
+  jeton: string,
+  eleve: string | { identifiant: string; nom: string; motDePasse: string },
+) {
+  const nouveau = typeof eleve === "string" ? undefined : eleve;
+  const id = typeof eleve === "string" ? eleve : crypto.randomUUID();
+  const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
+  if (nouveau) verifierMotDePasse(nouveau.motDePasse);
+  const empreinte = nouveau ? await deriver(nouveau.motDePasse, sel) : "";
+  return transaction(db, () => {
+    const cours = coursDuLien(db, jeton).map((c) => c.id);
+    if (!cours.length) return undefined;
+    if (
+      nouveau &&
+      db.prepare("SELECT 1 FROM comptes WHERE identifiant = ?").get(nouveau.identifiant)
+    ) {
+      throw new Error(
+        `Identifiant déjà utilisé : ${nouveau.identifiant}. Si c'est ton compte, connecte-toi.`,
+      );
+    }
+    const siens = coursDuCompte(db, id);
+    const manquants = cours.filter((c) => !siens.has(c));
+    if (!manquants.length) return id;
+    db.prepare("UPDATE liens SET places = places - 1 WHERE jeton = ?").run(jeton);
+    if (nouveau) {
+      db.prepare(
+        "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, 'eleve', ?, ?, ?)",
+      ).run(id, nouveau.identifiant, nouveau.nom, sel, empreinte, maintenant());
+    }
+    for (const c of manquants) inscrire(db, c, id);
+    return id;
+  });
 }
 
 export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "eleve") {
@@ -256,10 +347,14 @@ export function consommerProvisoire(db: Db, compte: Compte) {
   return !!changes;
 }
 
-export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: string) {
+function verifierMotDePasse(motDePasse: string) {
   if (motDePasse.length < 12 || motDePasse.length > 200) {
     throw new Error("Choisir un mot de passe de 12 à 200 caractères.");
   }
+}
+
+export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: string) {
+  verifierMotDePasse(motDePasse);
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   const { changes } = db
     .prepare(

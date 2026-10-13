@@ -107,7 +107,12 @@ Collection de ressources, avec un public et un objectif facultatifs. Une ressour
 **Membre d'un cours**
 Enseignant ou élève inscrit à un cours. Un membre lit les ressources que le cours partage ou
 publie. L'administrateur inscrit et retire les membres. Un enseignant ajoute de nouveaux élèves à
-ses cours et les en retire.
+ses cours et les en retire. Un élève peut aussi rejoindre un cours par un lien d'inscription.
+
+**Lien d'inscription**
+Adresse qu'un enseignant partage pour faire rejoindre ses cours à des élèves. L'élève qui l'ouvre
+crée son compte ou se connecte au sien. Le lien expire à une date choisie, compte des places, et un
+enseignant de ses cours peut le révoquer.
 
 **Thème**
 Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents

@@ -101,7 +101,12 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, 'Prof historique', 'fixture')`,
       ).run(String(i), JSON.stringify(m));
     }
-    assertEquals(migrer(db), ["0007_domaines.sql", "0008_acces.sql", "0009_membres.sql"]);
+    assertEquals(migrer(db), [
+      "0007_domaines.sql",
+      "0008_acces.sql",
+      "0009_membres.sql",
+      "0010_liens.sql",
+    ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
     assertEquals(

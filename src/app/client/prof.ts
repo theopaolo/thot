@@ -36,6 +36,15 @@ export function installerProf() {
     }
     const choix = event.target.closest<HTMLButtonElement>("[data-selection]");
     if (choix) cocherTout(choix.form, choix.dataset.selection === "tout");
+    // Hors HTTPS, le presse-papiers manque : l'adresse s'affiche pour une copie à la main.
+    const copier = event.target.closest<HTMLButtonElement>("[data-copier]");
+    if (copier) {
+      const adresse = copier.dataset.copier ?? "";
+      (navigator.clipboard?.writeText(adresse) ?? Promise.reject()).then(
+        () => (copier.textContent = "Lien copié"),
+        () => prompt("Copiez ce lien :", adresse),
+      );
+    }
     const confirmer = event.target.closest<HTMLElement>("[data-confirmer]");
     if (confirmer && !confirm(confirmer.dataset.confirmer ?? "")) event.preventDefault();
     const bouton = event.target.closest<HTMLButtonElement>("[data-rejeter-selection]");

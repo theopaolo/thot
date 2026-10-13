@@ -288,11 +288,11 @@ export const sources = (
 
 export type Eleve = { id: string; identifiant: string; nom: string };
 
-const choixCours = (cat: Catalogue, aide: string) =>
+const choixCours = (cat: Catalogue, aide: string, legende = "Cours des nouveaux comptes") =>
   cat.cours.length
     ? html`
       <fieldset>
-        <legend>Cours des nouveaux comptes</legend>
+        <legend>${legende}</legend>
         <p class="discret">${aide}</p>
         ${cat.cours.map(
           (c) =>
@@ -324,14 +324,78 @@ const tableEleves = (liste: Eleve[], action: (e: Eleve) => unknown) =>
     </table>
   `;
 
+export type Lien = {
+  jeton: string;
+  places: number;
+  expire_le: string;
+  createur: string;
+  cours: string[];
+};
+
+/** Les liens d'inscription actifs. Un cours du lien ne se nomme qu'à ses enseignants. */
+const sectionLiens = (cat: Catalogue, liens: Lien[], adresse: string) =>
+  html`
+    <h2 id="liens">Lien d'inscription</h2>
+    <p>L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint les cours du lien. Vérifiez ensuite la liste de chaque cours et retirez les comptes qui ne sont pas ceux de vos élèves.</p>
+    <details>
+      <summary>Créer un lien</summary>
+      <form method="post" action="/prof/eleves/liens">
+        ${choixCours(cat, "Les élèves qui suivent le lien rejoignent ces cours.", "Cours du lien")}
+        <div class="deux">
+          <div class="champ">
+            <label for="jours">Jours de validité</label>
+            <input id="jours" type="number" name="jours" min="1" max="365" value="14" required>
+          </div>
+          <div class="champ">
+            <label for="places">Places</label>
+            <input id="places" type="number" name="places" min="1" max="1000" value="40" required>
+          </div>
+        </div>
+        <div class="barre"><button class="principal">Créer le lien</button></div>
+      </form>
+    </details>
+    ${
+      liens.length
+        ? html`
+          <table class="eleves">
+            <thead>
+              <tr>
+                <th>Cours</th>
+                <th><span class="visuellement-cache">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>${liens.map((l) => {
+              const noms = cat.cours
+                .filter((c) => l.cours.includes(c.id))
+                .map((c) => `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`)
+                .join(", ");
+              return html`<tr>
+                <td>${noms}<br><span class="discret">${l.places} place${l.places > 1 ? "s" : ""} restante${l.places > 1 ? "s" : ""}, expire le ${jour(l.expire_le)}. Créé par ${l.createur}.</span></td>
+                <td><div class="barre">
+                  <button type="button" data-copier="${adresse}/inscription/${l.jeton}" aria-label="Copier le lien pour ${noms}">Copier le lien</button>
+                  <form method="post" action="/prof/eleves/liens/${l.jeton}/revoquer">
+                    <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs cours.">Révoquer</button>
+                  </form>
+                </div></td>
+              </tr>`;
+            })}</tbody>
+          </table>
+        `
+        : html`<p class="discret">Aucun lien actif.</p>`
+    }
+  `;
+
 /**
  * Les élèves de chaque cours de l'enseignant, et ceux sans cours pour un administrateur. Retirer
- * un élève lui retire les ressources du cours sans supprimer son compte.
+ * un élève lui retire les ressources du cours sans supprimer son compte. Une instance personnelle
+ * n'a pas de liens d'inscription.
  */
 export const eleves = (
   cat: Catalogue,
   groupes: { cours: Catalogue["cours"][number]; eleves: Eleve[] }[],
   sansCours: Eleve[] | undefined,
+  liens: Lien[] | undefined,
+  adresse: string,
   erreur?: string,
 ) =>
   html`
@@ -348,7 +412,7 @@ export const eleves = (
       ${choixCours(cat, "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.")}
       <div class="champ">
         <label for="identifiant">Identifiant</label>
-        <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas. Un élève qui a déjà un compte rejoint vos cours par un administrateur.</p>
+        <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas. Un élève qui a déjà un compte rejoint vos cours par un <a href="#liens">lien d'inscription</a>.</p>
         <input id="identifiant" type="text" name="identifiant" required minlength="3" maxlength="40" pattern="[a-z0-9._\\-]+" autocomplete="off" spellcheck="false" aria-describedby="format-identifiant">
       </div>
       <div class="champ">
@@ -369,6 +433,7 @@ export const eleves = (
       </div>
     </form>
     </details>
+    ${liens && cat.cours.length ? sectionLiens(cat, liens, adresse) : ""}
     `
     }
     ${groupes.map(
@@ -381,7 +446,7 @@ export const eleves = (
                 (e) => html`${reinitialiser(e)}
                   <form method="post" action="/prof/eleves/${e.id}/retirer">
                     <input type="hidden" name="cours_id" value="${cours.id}">
-                    <button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? L'élève garde son compte, et seul un administrateur pourra l'inscrire de nouveau.">Retirer du cours</button>
+                    <button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? L'élève garde son compte. Un lien d'inscription encore actif lui permet de revenir.">Retirer du cours</button>
                   </form>`,
               )
             : html`<p class="discret">Aucun élève dans ce cours.</p>`

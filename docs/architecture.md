@@ -120,9 +120,12 @@ cours avec l'élève, ou à tous s'il n'en a aucun. Un enseignant ne voit et ne 
 élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Un
 enseignant crée les élèves de ses cours, chacun inscrit à au moins un, et les en retire. Il
 n'inscrit pas un compte existant :
-l'inscription lui donnerait la réinitialisation de son mot de passe, donc le compte. Les
-administrateurs lisent tout. Une image se revalide à chaque affichage : un accès retiré s'applique
-aussitôt.
+l'inscription lui donnerait la réinitialisation de son mot de passe, donc le compte. Un élève qui a
+déjà un compte rejoint un cours en ouvrant lui-même un lien d'inscription. Le lien inscrit des
+élèves seulement, aux cours dont son créateur est encore membre. Sa page nomme ces cours à
+quiconque détient le lien. Après la connexion, l'adresse de retour n'accepte qu'un lien
+d'inscription. Les administrateurs lisent tout. Une image se revalide à chaque affichage : un accès
+retiré s'applique aussitôt.
 
 Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
 enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.
