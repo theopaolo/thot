@@ -125,6 +125,11 @@ un thème, pas une séquence. Une adresse ou une page d'avant les thèmes qui no
 mène au thème où sont rangées le plus de sources de cette séquence, dans un cours du compte
 d'abord. Une question posée dans une séquence qu'aucun thème ne remplace est refusée.
 
+L'en-tête de recherche de chaque passage (`rappel`) porte les noms des thèmes de la source, tous,
+par ordre alphabétique. Une source sans thème garde sa séquence. Renommer un thème réindexe ses
+sources. L'en-tête sert à la recherche et au reclasseur. Il n'entre ni dans `preuve` ni dans le
+titre que voient le juge et l'élève.
+
 Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
 Son propriétaire, sa certification et ses lecteurs restent ceux de la source. Un rattachement
 ouvre la source aux membres du cours, dans la limite de ses lecteurs. Un enseignant ne rattache

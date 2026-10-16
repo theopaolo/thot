@@ -741,6 +741,45 @@ test("renommer : le cours pilote et un thème gardent leurs rattachements et les
   }
 });
 
+test("en-tête des passages : noms des thèmes, séquence sans thème, renommage réindexé, preuve intacte", async () => {
+  const { db, dir } = await environnement();
+  const chunk = (id: string) =>
+    db.prepare("SELECT titre, rappel, preuve FROM chunks WHERE source_id = ?").get(id)!;
+  const entete = (id: string) => (chunk(id).rappel as string).split("\n")[0];
+  try {
+    const m = matiere(db, "Physique");
+    const [c1, c2] = [cours(db, m, "Optique"), cours(db, m, "Couleurs")];
+    const [t1, t2] = [theme(db, c1, "Prisme"), theme(db, c2, "Arc-en-ciel")];
+    // Aucune séquence : le dépôt d'aujourd'hui ne la renseigne plus.
+    const id = await ressource(db, {}, [
+      { cours_id: c1, theme_id: t1 },
+      { cours_id: c2, theme_id: t2 },
+    ]);
+    assertEquals(entete(id), "Arc-en-ciel / Prisme");
+    const preuve = chunk(id).preuve as string;
+    assert(!preuve.includes("Prisme") && !(chunk(id).titre as string).includes("Prisme"));
+
+    const { poster } = await administrateur(db);
+    assertEquals(
+      (await poster("renommer", { genre: "theme", id: t1, nom: "Lentilles" })).status,
+      303,
+    );
+    assertEquals(entete(id), "Arc-en-ciel / Lentilles");
+    assertEquals(
+      chercherFts(db, "lentilles", { schoolId: lireInstance(db).school_id, lecteur: null }).length,
+      1,
+    );
+    assertEquals(chunk(id).preuve, preuve);
+
+    // Une ancienne source sans thème garde sa séquence.
+    const ancienne = await ressource(db, { sequence: "Optique ancienne" }, []);
+    assertEquals(entete(ancienne), "Optique ancienne");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("import CLI : un cours choisi sans thème range la source dans le thème du nom de son dossier", async () => {
   const { db, dir } = await environnement();
   try {

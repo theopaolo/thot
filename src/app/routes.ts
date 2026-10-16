@@ -59,6 +59,7 @@ import {
 import {
   chunksSource,
   ecarterRevision,
+  indexerTheme,
   lireDocument,
   relireLegende,
   revisionEnAttente,
@@ -448,6 +449,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           break;
         case "renommer":
           Domaines.renommer(db, String(b.genre ?? ""), String(b.id ?? ""), String(b.nom ?? ""));
+          if (b.genre === "theme") indexerTheme(db, String(b.id));
           break;
         case "supprimer":
           Domaines.supprimer(db, String(b.genre ?? ""), String(b.id ?? ""));

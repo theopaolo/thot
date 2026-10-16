@@ -270,6 +270,28 @@ export async function reextraire(db: Db, sourceId: string) {
 
 export type Meta = { sequence?: string; seance?: string };
 
+/**
+ * Ce qui range la source : les noms de ses thèmes, tous, par ordre alphabétique. Une source dans
+ * plusieurs cours a un thème par cours, et chaque nom donne un mot de plus à la recherche. Une
+ * source sans thème garde l'ancienne séquence.
+ */
+function regroupement(db: Db, s: Source) {
+  const noms = db
+    .prepare(
+      `SELECT DISTINCT t.nom FROM source_cours sc JOIN themes t ON t.id = sc.theme_id
+       WHERE sc.source_id = ? ORDER BY t.nom`,
+    )
+    .all(s.id)
+    .map((t) => t.nom as string);
+  return noms.length ? noms.join(" / ") : (JSON.parse(s.metadonnees) as Meta).sequence;
+}
+
+/** Réindexe les sources d'un thème : l'en-tête de leurs passages porte son nom. */
+export function indexerTheme(db: Db, themeId: string) {
+  const ids = db.prepare("SELECT source_id FROM source_cours WHERE theme_id = ?").all(themeId);
+  for (const { source_id } of ids) indexer(db, source_id as string);
+}
+
 export function lireDocument(sourceId: string, revision: number): Document {
   const dossier = dossierRevision(sourceId, revision);
   const texte = readFileSync(`${dossier}/document.txt`, "utf8");
@@ -289,7 +311,7 @@ export function chunksSource(db: Db, sourceId: string, revision?: number): Chunk
   const n = revision ?? s.revision;
   const meta = JSON.parse(s.metadonnees) as Meta;
   const contexte = [
-    s.profil === "arts-appliques" ? meta.sequence?.replace(/^ATC /, "") : meta.sequence,
+    s.profil === "arts-appliques" ? regroupement(db, s)?.replace(/^ATC /, "") : regroupement(db, s),
     meta.seance,
   ]
     .filter(Boolean)
@@ -395,7 +417,7 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
   const fiche = [
     `Titre : ${s.titre}`,
     `Fichier : ${s.fichier}`,
-    `Séquence : ${meta.sequence ?? ""}`,
+    `Séquence : ${regroupement(db, s) ?? ""}`,
     `Séance : ${meta.seance ?? ""}`,
     `Texte : ${lireDocument(sourceId, s.revision).texte.slice(0, 2000)}`,
   ].join("\n");

@@ -20,6 +20,7 @@ import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, sha256 } from "./app/depot.ts";
 import {
   indexer,
+  indexerTheme,
   lireDocument,
   reextraire,
   revendiquer,
@@ -768,6 +769,7 @@ switch (commande) {
     break;
   case "renommer":
     Domaines.renommer(db, reste[0], reste[1], reste.slice(2).join(" "));
+    if (reste[0] === "theme") indexerTheme(db, reste[1]);
     break;
   case "supprimer":
     if (reste[0] === "source") {
@@ -791,6 +793,7 @@ switch (commande) {
         },
       ]);
     });
+    indexer(db, sourceId);
     break;
   }
   case "membre":
