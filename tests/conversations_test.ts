@@ -90,19 +90,44 @@ test("conversation : un autre compte reçoit le même 404 qu'un identifiant inco
     const mid = idDe((await poser(proprietaire, { texte: "Question privée sur la façade" })).texte);
     assertStringIncludes(await texteDe(proprietaire, `/eleve/messages/${mid}/flux`), "Gaudí");
     const conv = conversationDe(db, mid);
-    for (const id of [conv, "inconnue"]) {
-      assertEquals((await autre.requete(`/eleve/chat/${id}`)).status, 404);
-      for (const action of ["renommer", "archiver", "desarchiver", "perimetre"]) {
-        const r = await envoyer(autre, `/eleve/chat/${id}/${action}`, { titre: "Volé" });
-        assertEquals(r.status, 404, action);
+    // Chaque route qui prend un identifiant de conversation ou d'échange.
+    const routes = (c: string, m: string): [string, string, Record<string, string>?][] => [
+      ["GET", `/eleve/chat/${c}`],
+      ["GET", `/eleve/conversations/${c}/etat`],
+      ["POST", `/eleve/chat/${c}/renommer`, { titre: "Volé" }],
+      ["POST", `/eleve/chat/${c}/archiver`, {}],
+      ["POST", `/eleve/chat/${c}/desarchiver`, {}],
+      ["POST", `/eleve/chat/${c}/perimetre`, { matiere_id: "", cours_id: "", theme_id: "" }],
+      ["POST", "/eleve/questions", { texte: "Intrus", conversation: c }],
+      ["POST", `/eleve/messages/${m}/relancer`, {}],
+      ["POST", `/eleve/messages/${m}/arreter`, {}],
+      ["POST", `/eleve/messages/${m}/avis`, { avis: "faux" }],
+      ["GET", `/eleve/messages/${m}/flux`],
+      ["GET", `/eleve/messages/${m}/citations/0`],
+    ];
+    for (const [c, m] of [
+      [conv, mid],
+      ["inconnue", "inconnu"],
+    ]) {
+      for (const [methode, chemin, corps] of routes(c, m)) {
+        const r = await autre.requete(chemin, {
+          method: methode,
+          ...(corps && { body: new URLSearchParams(corps) }),
+        });
+        assertEquals(r.status, 404, `${methode} ${chemin}`);
       }
-      assertEquals((await poser(autre, { texte: "Intrus", conversation: id })).statut, 404);
+    }
+    // Les lectures du propriétaire répondent, elles.
+    for (const [, chemin] of routes(conv, mid).filter(([methode]) => methode === "GET")) {
+      assertEquals((await proprietaire.requete(chemin)).status, 200, chemin);
     }
     assert(!(await texteDe(autre, "/eleve/chat")).includes("Question privée sur la façade"));
-    assert(!(await texteDe(autre, `/eleve/messages/${mid}/flux`)).includes("Gaudí"));
-    assert(!(await texteDe(autre, `/eleve/messages/${mid}/citations/0`)).includes("façade"));
     const ligne = db.prepare("SELECT titre, archivee_le FROM conversations").get()!;
     assertEquals({ ...ligne }, { titre: "Question privée sur la façade", archivee_le: null });
+    assertEquals(
+      { ...db.prepare("SELECT etat, avis FROM messages").get() },
+      { etat: "answered", avis: null },
+    );
     assertEquals(db.prepare("SELECT count(*) AS n FROM messages").get()!.n, 1);
   } finally {
     db.close();
@@ -187,6 +212,57 @@ test("titre : la question coupée sur une fin de mot, puis le dernier titre enre
     assertEquals((await renommer("Gaudí et la mer")).status, 303);
     assertEquals(titre(), "Gaudí et la mer");
     assertStringIncludes(await texteDe(eleve, `/eleve/chat/${conv}`), "Gaudí et la mer</h1>");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("recherche : titre et questions, jokers LIKE littéraux, archivées seulement dans leur vue", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const f = fauxModeles();
+    const eleve = await session(db, f.modeles, "eleve");
+    const autre = await session(db, f.modeles, "eleve");
+    const ouvrir = async (texte: string) =>
+      (await envoyer(eleve, "/eleve/questions", { texte })).headers
+        .get("location")!
+        .split("/")
+        .pop()!;
+    await ouvrir("Gaudí et la façade");
+    const b = await ouvrir("Bauhaus à 100% pur");
+    const c = await ouvrir("Céramique irisée");
+    await envoyer(eleve, `/eleve/chat/${c}/renommer`, { titre: "Divers" });
+    const trouve = async (q: string, chemin = "/eleve/conversations") => {
+      const page = await texteDe(eleve, `${chemin}?${new URLSearchParams({ q })}`);
+      return [...page.matchAll(/conversation-titre">([^<]+)</g)].map((m) => m[1]);
+    };
+    assertEquals(await trouve("façade"), ["Gaudí et la façade"]);
+    assertEquals(await trouve("irisée"), ["Divers"], "la question d'une conversation renommée");
+    assertEquals(await trouve("%"), ["Bauhaus à 100% pur"], "le % est cherché tel quel");
+    assertEquals(await trouve("_"), []);
+    assertEquals(await trouve("Ba%pur"), []);
+    assertStringIncludes(
+      await texteDe(eleve, "/eleve/conversations?q=zzz"),
+      "Aucune conversation ne correspond à « zzz ».",
+    );
+    assertStringIncludes(await texteDe(eleve, "/eleve/conversations?q=%3Cb%3E"), "« &lt;b&gt; »");
+    assert(!(await texteDe(autre, "/eleve/conversations?q=façade")).includes("Gaudí"));
+    // HTMX ne reçoit que les résultats, la page entière arrive sans lui.
+    const fragment = await (
+      await eleve.requete("/eleve/conversations?q=façade", { headers: { "HX-Request": "true" } })
+    ).text();
+    assertStringIncludes(fragment, 'id="resultats-conversations"');
+    assert(!fragment.includes("<form") && !fragment.includes("<html"));
+    const ouverte = await texteDe(eleve, `/eleve/chat/${c}`);
+    assertStringIncludes(ouverte, 'role="search"');
+    assertStringIncludes(ouverte, `name="courante" value="${c}"`);
+    assertStringIncludes(ouverte, `data-memoire="`);
+    // Archivée, B ne sort que de la vue des archives.
+    await envoyer(eleve, `/eleve/chat/${b}/archiver`, {});
+    assertEquals(await trouve("Bauhaus"), []);
+    assertEquals(await trouve("Bauhaus", "/eleve/conversations/archivees"), ["Bauhaus à 100% pur"]);
+    assertEquals(await trouve("façade", "/eleve/conversations/archivees"), []);
   } finally {
     db.close();
     await rm(dir, { recursive: true });

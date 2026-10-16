@@ -1824,17 +1824,27 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   // L'état du dernier échange, et une réponse terminée que l'élève n'a pas encore ouverte.
   const ETAT_CONVERSATION = `(SELECT etat FROM messages WHERE conversation_id = v.id ORDER BY rang DESC LIMIT 1) AS etat,
     EXISTS (SELECT 1 FROM messages WHERE conversation_id = v.id AND nouvelle) AS nouvelle`;
-  const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean) => {
+  const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean, q = "") => {
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = libelleTheme();
+    // Le titre ou l'une des questions contient le texte cherché, ses jokers LIKE neutralisés.
+    const motif = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
     const lignes = db
       .prepare(
         `SELECT id, titre, matiere_id, cours_id, theme_id, matieres, active_le, ${ETAT_CONVERSATION}
          FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
+         AND (? = '' OR titre LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM messages m
+           WHERE m.conversation_id = v.id AND m.question LIKE ? ESCAPE '\\'))
          ORDER BY active_le DESC, rowid DESC LIMIT ?`,
       )
-      .all(c.get("compte").id, archivees ? 1 : 0, toutes ? -1 : 51) as (Eleve.ConversationVue &
-      Perimetre)[];
+      .all(
+        c.get("compte").id,
+        archivees ? 1 : 0,
+        q,
+        motif,
+        motif,
+        toutes ? -1 : 51,
+      ) as (Eleve.ConversationVue & Perimetre)[];
     return {
       liste: (toutes ? lignes : lignes.slice(0, 50)).map((l) => ({
         ...l,
@@ -1928,17 +1938,22 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
   app.on("GET", ["/eleve/conversations", "/eleve/conversations/archivees"], (c) => {
     const archive = c.req.path.endsWith("/archivees");
-    const { liste, plus } = conversations(c, archive, c.req.query("toutes") === "1");
+    const q = (c.req.query("q") ?? "").trim().slice(0, 100);
+    const { liste, plus } = conversations(c, archive, c.req.query("toutes") === "1", q);
+    const suite = plus
+      ? `${c.req.path}?${new URLSearchParams({ toutes: "1", ...(q ? { q } : {}) })}`
+      : "";
+    const archivees = archive ? 0 : nombreArchivees(c);
+    // La recherche HTMX ne remplace que les résultats : la page sans JavaScript se recharge.
+    if (c.req.header("HX-Request") && !c.req.header("HX-Boosted")) {
+      const courante = c.req.query("courante") ?? "";
+      return c.html(Eleve.resultatsConversations(liste, courante, archivees, suite, q));
+    }
     return c.html(
       rendre(
         c,
         archive ? "Conversations archivées" : "Conversations",
-        Eleve.pageConversations(
-          archive,
-          liste,
-          archive ? 0 : nombreArchivees(c),
-          plus ? `${c.req.path}?toutes=1` : "",
-        ),
+        Eleve.pageConversations(archive, liste, archivees, suite, q),
       ),
     );
   });
@@ -2158,6 +2173,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   app.get("/eleve/messages/:id/flux", (c) => {
     const id = c.req.param("id");
     const compte = c.get("compte");
+    if (!db.prepare("SELECT 1 FROM messages WHERE id = ? AND compte_id = ?").get(id, compte.id)) {
+      return c.notFound();
+    }
     return streamSSE(c, async (flux) => {
       let annoncee = "";
       // Au bout de dix minutes, le flux se ferme et le navigateur se reconnecte.
@@ -2208,7 +2226,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const m = db
       .prepare("SELECT resultat FROM messages WHERE id = ? AND compte_id = ?")
       .get(c.req.param("id"), c.get("compte").id) as { resultat: string | null } | undefined;
-    const r = m?.resultat ? resultatActuel(m.resultat, lu(c)) : undefined;
+    if (!m) return c.notFound();
+    const r = m.resultat ? resultatActuel(m.resultat, lu(c)) : undefined;
     const a: Affirmation | undefined =
       r?.etat === "answered" ? r.affirmations[Number(c.req.param("n"))] : undefined;
     const source = a && sourceCertifiee(a.source_id, lu(c));

@@ -665,7 +665,7 @@ export const reponse = (
         aria-pressed="${String(auto && n === 0)}"
         aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"
         hx-get="/eleve/messages/${id}/citations/${n}"
-        hx-trigger="${auto && n === 0 ? "click, load" : "click"}"
+        hx-trigger="${auto && n === 0 ? "click, load, restaurer" : "click, restaurer"}"
         hx-target="#source"
         hx-swap="outerHTML"
         hx-sync="#source:replace"
@@ -970,31 +970,69 @@ export const statutConversation = (
     : html`<span class="statut ${classe}">${mot}</span>`;
 };
 
-const listeConversations = (liste: ConversationVue[], courante = "", archivees = 0, suite = "") =>
+/** Les résultats seuls : la recherche HTMX remplace ce bloc, pas le champ. */
+export const resultatsConversations = (
+  liste: ConversationVue[],
+  courante = "",
+  archivees = 0,
+  suite = "",
+  q = "",
+) =>
   html`
+    <div id="resultats-conversations" aria-live="polite">
+      ${
+        liste.length
+          ? html`<ul class="conversations">${liste.map(
+              (c) =>
+                html`<li><a href="/eleve/chat/${c.id}" aria-current="${
+                  c.id === courante ? "page" : "false"
+                }"><span class="conversation-titre">${c.titre}</span><span class="discret">${
+                  c.perimetre || "Toutes tes ressources"
+                }</span><span class="discret">${quand(c.active_le)} ${statutConversation(
+                  c,
+                  c.id === courante,
+                )}</span></a></li>`,
+            )}</ul>`
+          : html`<p class="discret">${
+              q
+                ? html`Aucune conversation ne correspond à « ${q} ».`
+                : html`Aucune conversation pour l'instant.`
+            }</p>`
+      }
+      ${suite ? html`<p><a href="${suite}">Afficher les conversations précédentes</a></p>` : ""}
+      ${
+        archivees
+          ? html`<p><a href="/eleve/conversations/archivees">Conversations archivées (${archivees})</a></p>`
+          : ""
+      }
+    </div>
+  `;
+
+const listeConversations = (
+  liste: ConversationVue[],
+  courante = "",
+  archivees = 0,
+  suite = "",
+  q = "",
+  archive = false,
+) => {
+  const action = archive ? "/eleve/conversations/archivees" : "/eleve/conversations";
+  return html`
     <a class="bouton" href="/eleve/chat/nouvelle">Nouvelle conversation</a>
     ${
-      liste.length
-        ? html`<ul class="conversations">${liste.map(
-            (c) =>
-              html`<li><a href="/eleve/chat/${c.id}" aria-current="${
-                c.id === courante ? "page" : "false"
-              }"><span class="conversation-titre">${c.titre}</span><span class="discret">${
-                c.perimetre || "Toutes tes ressources"
-              }</span><span class="discret">${quand(c.active_le)} ${statutConversation(
-                c,
-                c.id === courante,
-              )}</span></a></li>`,
-          )}</ul>`
-        : html`<p class="discret">Aucune conversation pour l'instant.</p>`
-    }
-    ${suite ? html`<p><a href="${suite}">Afficher les conversations précédentes</a></p>` : ""}
-    ${
-      archivees
-        ? html`<p><a href="/eleve/conversations/archivees">Conversations archivées (${archivees})</a></p>`
+      liste.length || q
+        ? html`<form class="recherche-conversations" role="search" method="get" action="${action}"
+            hx-get="${action}" hx-trigger="input changed delay:300ms, submit"
+            hx-target="#resultats-conversations" hx-swap="outerHTML transition:false">
+            ${courante ? html`<input type="hidden" name="courante" value="${courante}">` : ""}
+            <input type="search" name="q" value="${q}" maxlength="100"
+              aria-label="Chercher dans tes conversations" placeholder="Chercher une conversation">
+          </form>`
         : ""
     }
+    ${resultatsConversations(liste, courante, archivees, suite, q)}
   `;
+};
 
 /** La liste seule, sous 1400 px, et celle des conversations archivées. */
 export const pageConversations = (
@@ -1002,12 +1040,13 @@ export const pageConversations = (
   liste: ConversationVue[],
   archivees: number,
   suite: string,
+  q = "",
 ) =>
   html`
     <section class="page-conversations">
       ${archive ? html`<p><a href="/eleve/conversations">Conversations</a></p>` : ""}
       <h1>${archive ? "Conversations archivées" : "Conversations"}</h1>
-      ${listeConversations(liste, "", archivees, suite)}
+      ${listeConversations(liste, "", archivees, suite, q, archive)}
     </section>
   `;
 
@@ -1117,6 +1156,7 @@ export const chat = (f: Fil) => {
         </div>
         <div
           id="conversation"
+          ${conv ? html`data-memoire="${f.compte}:${conv.id}"` : ""}
           aria-live="polite"
           aria-relevant="additions"
         >

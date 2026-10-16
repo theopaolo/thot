@@ -147,7 +147,7 @@ défaut que l'administrateur a choisis pour l'instance.
 Suite de questions d'un élève, avec un titre et un périmètre. Le titre reprend la première
 question, et l'élève peut le renommer. Une conversation archivée se relit sans recevoir de
 question. Libellés : « Nouvelle conversation », « Renommer », « Archiver », « Désarchiver »,
-« Conversations archivées ». Les échanges posés avant les conversations sont rangés sous
+« Conversations archivées », « Chercher une conversation ». Les échanges posés avant les conversations sont rangés sous
 « Anciennes questions », une conversation par périmètre.
 
 **Réponse vérifiée**

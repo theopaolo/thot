@@ -74,8 +74,29 @@ function etatEnvoi() {
   bouton.lastElementChild!.textContent = enCours ? "Réponse en cours…" : "Envoyer";
 }
 
+// sessionStorage peut manquer ou refuser (stockage bloqué) : la page marche alors sans mémoire.
+const lire = (cle: string) => {
+  try {
+    return sessionStorage.getItem(cle);
+  } catch {
+    return null;
+  }
+};
+const ecrire = (cle: string, valeur: string | null) => {
+  try {
+    if (valeur === null) sessionStorage.removeItem(cle);
+    else sessionStorage.setItem(cle, valeur);
+  } catch {
+    // Pas de mémoire : rien à garder.
+  }
+};
 // Un brouillon par compte et par conversation, le temps de l'onglet.
 const brouillon = (form: HTMLFormElement) => `thot:brouillon:${form.dataset.brouillon}`;
+// Le défilement et le passage ouvert de la conversation affichée, par compte et par conversation.
+const memoire = (nom: string) => {
+  const id = document.getElementById("conversation")?.dataset.memoire;
+  return id ? `thot:${nom}:${id}` : "";
+};
 // L'élément que le formulaire envoyé désigne pour le focus, une fois la page rechargée.
 const FOCUS = "thot:focus";
 
@@ -84,9 +105,21 @@ function ouvrirConversation(racine: Element) {
   if (!titre) return;
   const form = racine.querySelector<HTMLFormElement>("form[data-brouillon]");
   const champ = form?.querySelector("textarea");
-  if (form && champ) champ.value = sessionStorage.getItem(brouillon(form)) ?? "";
-  const cible = sessionStorage.getItem(FOCUS);
-  sessionStorage.removeItem(FOCUS);
+  if (form && champ) champ.value = lire(brouillon(form)) ?? "";
+  const cible = lire(FOCUS);
+  ecrire(FOCUS, null);
+  // Le passage ouvert en dernier revient dans la colonne source, sans ouvrir la feuille mobile.
+  const passage = lire(memoire("citation"));
+  if (passage) {
+    for (const bouton of racine.querySelectorAll(".citation")) {
+      if (
+        bouton.getAttribute("hx-get") === passage &&
+        bouton.getAttribute("aria-pressed") !== "true"
+      ) {
+        bouton.dispatchEvent(new Event("restaurer"));
+      }
+    }
+  }
   // Une nouvelle conversation ne focalise la saisie qu'à partir de 1180 px : un téléphone
   // n'ouvre pas son clavier sans qu'on le demande.
   const nouvelle = form?.dataset.brouillon?.endsWith(":nouvelle") && innerWidth >= 1180;
@@ -126,8 +159,18 @@ export function installerEleve() {
   addEventListener("load", () => {
     if (!document.getElementById("conversation")) return;
     auBout = true;
-    // Une adresse qui désigne un échange garde sa position.
-    if (!location.hash) suivreConversation();
+    // Une adresse qui désigne un échange garde sa position. Sinon la conversation reprend là où
+    // l'élève l'a quittée, ou sur sa fin s'il y était.
+    if (location.hash) return;
+    const cle = memoire("defilement");
+    const vu = cle ? lire(cle) : null;
+    if (vu !== null && Number(vu) >= 0) scrollTo(0, Number(vu));
+    else suivreConversation();
+  });
+  // -1 : l'élève était au bout, la fin d'une conversation qui a grandi depuis reste sa place.
+  addEventListener("pagehide", () => {
+    const cle = memoire("defilement");
+    if (cle) ecrire(cle, String(presDeLaFin() ? -1 : Math.round(scrollY)));
   });
   for (const nom of ["htmx:beforeSwap", "htmx:sseBeforeMessage"]) {
     document.addEventListener(nom, () => (auBout = presDeLaFin()));
@@ -147,17 +190,21 @@ export function installerEleve() {
   document.addEventListener("input", (event) => {
     const champ = event.target;
     if (champ instanceof HTMLTextAreaElement && champ.form?.dataset.brouillon) {
-      sessionStorage.setItem(brouillon(champ.form), champ.value);
+      ecrire(brouillon(champ.form), champ.value);
     }
   });
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement)) return;
-    if (form.dataset.focus) sessionStorage.setItem(FOCUS, form.dataset.focus);
-    // Un poste partagé ne garde aucun brouillon après la déconnexion.
+    if (form.dataset.focus) ecrire(FOCUS, form.dataset.focus);
+    // Un poste partagé ne garde aucune mémoire après la déconnexion.
     if (form.action.endsWith("/deconnexion")) {
-      for (const cle of Object.keys(sessionStorage)) {
-        if (cle.startsWith("thot:")) sessionStorage.removeItem(cle);
+      try {
+        for (const cle of Object.keys(sessionStorage)) {
+          if (cle.startsWith("thot:")) sessionStorage.removeItem(cle);
+        }
+      } catch {
+        // Pas de mémoire : rien à effacer.
       }
     }
   });
@@ -168,7 +215,7 @@ export function installerEleve() {
     ).detail;
     const elt = requestConfig.elt;
     if (!isError && elt instanceof HTMLFormElement && elt.dataset.brouillon) {
-      sessionStorage.removeItem(brouillon(elt));
+      ecrire(brouillon(elt), null);
     }
   });
   document.addEventListener(
@@ -263,6 +310,8 @@ export function installerEleve() {
       });
     }
     if (elt.matches(".citation")) {
+      const cle = memoire("citation");
+      if (cle) ecrire(cle, elt.getAttribute("hx-get"));
       document.querySelectorAll(".citation").forEach((citation) => {
         citation.setAttribute("aria-pressed", String(citation === elt));
       });

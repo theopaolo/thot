@@ -24,9 +24,10 @@ type: [feature]
   permissions or system instructions.
 - [x] Store the scope used for each turn. Changing scope affects later turns and rechecks access
   to carried context. Earlier restricted content cannot leak into a broader conversation.
-- [ ] Make create, rename, archive, delete, retry and citation endpoints owner-aware. Apply course
-  review permissions only to the intended learner exchanges. Delete remains, with SRC-002. The
-  other endpoints answer 404 to another account.
+- [x] Make create, rename, archive, retry, stop, stream and citation endpoints owner-aware. Apply
+  course review permissions only to the intended learner exchanges (`/prof/questions`). The
+  endpoints answer 404 to another account, walked by one table in `tests/conversations_test.ts`.
+  Delete is left to SRC-002.
 - [x] Support an idempotent send and a clear policy of one active response per conversation at
   first. Different conversations may run concurrently once JOB-103 ships.
 
@@ -169,8 +170,8 @@ The labels above use tu. With vous set in CFG-101 they become « Votre question 
 un autre » and so on. `/prof/questions` keeps listing exchanges one by one, and conversation titles
 stay private to the learner.
 
-Later, in this order: search in the list once learners pass 50 conversations, then optional
-side-by-side viewing of two conversations with separate composers, scopes and source panels, which
+Search in the list is shipped: a field above the list filters by title and question text, server
+side (`?q=`), archived conversations only in their own view. Later: optional side-by-side viewing of two conversations with separate composers, scopes and source panels, which
 collapses to one pane with a switch below 1180 px. Deleting a conversation follows the deletion
 rules of [SRC-002](src-002.md).
 

@@ -295,8 +295,15 @@ pour lui-même, et la page dit que personne d'autre ne l'a relu.
 ## Conversations
 
 Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, son adresse, ses
-actions et ses échanges répondent 404, comme un identifiant inconnu. Son titre reste privé :
-`/prof/questions` liste les échanges un par un.
+actions et ses échanges répondent 404, comme un identifiant inconnu : afficher, renommer,
+archiver, désarchiver, changer de périmètre, envoyer, relancer, arrêter, donner un avis, suivre le
+flux et ouvrir une citation. Son titre reste privé : `/prof/questions` liste les échanges un par
+un, selon les cours de l'enseignant, sans passer par la conversation.
+
+La liste se filtre par le titre ou le texte d'une question (`?q=`, LIKE sans joker). Les
+conversations archivées ne sortent que de leur propre vue. Le navigateur garde, par compte et par
+conversation et le temps de l'onglet, le brouillon, la position de lecture et le passage ouvert.
+Sans `sessionStorage`, la page marche sans cette mémoire.
 
 Chaque échange garde le périmètre qu'il a utilisé. Changer le périmètre d'une conversation vaut
 pour les questions suivantes, et chaque envoi revérifie que l'élève peut encore interroger ce
