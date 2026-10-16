@@ -2,7 +2,7 @@ import { test } from "vite-plus/test";
 import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { lireVerdict, probabiliteOui } from "../src/core/modeles.ts";
 import { assembler, decouper } from "../src/core/document.ts";
-import { racines } from "../src/core/recherche.ts";
+import { type Candidat, documentsProches, racines, type Recherche } from "../src/core/recherche.ts";
 import { contexte, longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
 
 test("les offsets comptent des points de code, pas des unités UTF-16", () => {
@@ -167,4 +167,16 @@ test("le verdict du juge se lit après le raisonnement, ou à défaut dans le te
   for (const content of ["ouistiti", "nonobstant", "ouié", "oui_non"]) {
     assertEquals(lireVerdict({ message: { content } }), undefined);
   }
+});
+
+test("la liste élève garde un passage par source au-dessus du ratio et du seuil", () => {
+  const c = (source_id: string, score: number) => ({ source_id, score }) as Candidat;
+  const candidats = [c("a", 0.8), c("b", 0.3), c("a", 0.7), c("c", 0.1), c("d", 0.01)];
+  const r = { candidats, score: 0.8 } as Recherche;
+  const ids = (x: Recherche, ratio?: number) =>
+    documentsProches(x, 0.023, ratio).map((d) => d.source_id);
+  assertEquals(ids(r), ["a", "b"]);
+  assertEquals(ids(r, 0.1), ["a", "b", "c"]);
+  // Sans reclasseur, l'ordre de FTS5 reste tel quel.
+  assertEquals(ids({ ...r, panneReclasseur: "panne" }), ["a", "b", "c", "d"]);
 });

@@ -6,7 +6,7 @@ import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
-import { chercher, chercherFts, transaction } from "./core/recherche.ts";
+import { chercher, chercherFts, documentsProches, transaction } from "./core/recherche.ts";
 import {
   creerAdministrateur,
   creerCompte,
@@ -77,7 +77,9 @@ const AIDE = `thot <commande>
                                             serveur et worker peuvent tourner
   ask "<question>" [--json]                 pose une question sur le corpus certifié
   eval recherche --img-order=<img_order.json> [--docs=<docs.json>] [--sans-reclasseur]
-                                            rejoue les 59 requêtes annotées
+                                            [--ratios=0.1,0.25,0.5]
+                                            rejoue les 59 requêtes annotées, --ratios mesure
+                                            la liste de /eleve/recherche à chaque ratio
   eval recherche --requetes=<requetes.json> [--sans-reclasseur]
                                             rejoue un autre jeu, cibles en nom de fichier
                                             (« cours/fichier.md#section »)
@@ -101,6 +103,7 @@ const { values: args, positionals } = parseArgs({
     type: texte,
     "img-order": texte,
     docs: texte,
+    ratios: texte,
     requetes: texte,
     enseignant: texte,
     par: texte,
@@ -383,9 +386,11 @@ async function evalRecherche() {
       (a) => a.source === c.source_id && (!a.rubrique || c.titre.endsWith(`: ${a.rubrique}`)),
     );
   const lignes: Record<string, unknown>[] = [];
+  const ratios = args["sans-reclasseur"] ? [] : (args.ratios?.split(",") ?? []).map(Number);
   for (const r of requetes) {
     const attendus = r.gold.flatMap(cibles);
     let trouves;
+    let affichage;
     if (args["sans-reclasseur"]) {
       trouves = chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(
         0,
@@ -403,6 +408,20 @@ async function evalRecherche() {
       if (recherche.panneReclasseur) throw new Error(recherche.panneReclasseur);
       // Sous le seuil, l'élève reçoit un refus : aucun passage n'est montré.
       trouves = recherche.horsCorpus ? [] : recherche.retenus;
+      // Dans la liste de /eleve/recherche: rang de l'œuvre attendue, cibles montrées, documents.
+      affichage = Object.fromEntries(
+        ratios.map((ratio) => {
+          const docs = documentsProches(recherche, config.seuil, ratio);
+          return [
+            ratio,
+            {
+              rang: docs.findIndex((c) => touche(c, attendus)) + 1,
+              vues: docs.filter((c) => touche(c, attendus)).length,
+              n: docs.length,
+            },
+          ];
+        }),
+      );
     }
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({
@@ -411,6 +430,7 @@ async function evalRecherche() {
       rang,
       cibles: attendus.length,
       trouves: trouves.map((c) => c.titre),
+      ...(ratios.length ? { affichage } : {}),
     });
   }
   // Un piège (cible vide) n'a pas de rang: il sort des taux et se compte à part.
@@ -433,6 +453,40 @@ async function evalRecherche() {
     ),
     sans_cible: valides.filter((l) => !l.cibles).map((l) => l.qid),
     echecs: valides.filter((l) => !l.rang).map((l) => l.qid),
+    ...(ratios.length
+      ? {
+          affichage: Object.fromEntries(
+            ["tous", ...familles].map((f) => [
+              f,
+              Object.fromEntries(
+                ratios.map((ratio) => {
+                  const lf = valides.filter((l) => f === "tous" || l.type === f);
+                  const mesures = lf.map(
+                    (l) =>
+                      (l.affichage as Record<number, { rang: number; vues: number; n: number }>)[
+                        ratio
+                      ],
+                  );
+                  const moy = (x: number[]) =>
+                    +(x.reduce((a, b) => a + b, 0) / x.length).toFixed(2);
+                  return [
+                    ratio,
+                    {
+                      succes: moy(mesures.map((m) => +(m.rang > 0))),
+                      mrr: moy(mesures.map((m) => (m.rang ? 1 / m.rang : 0))),
+                      rappel: +(
+                        mesures.reduce((a, m) => a + m.vues, 0) /
+                        lf.reduce((a, l) => a + (l.cibles as number), 0)
+                      ).toFixed(2),
+                      documents: moy(mesures.map((m) => m.n)),
+                    },
+                  ];
+                }),
+              ),
+            ]),
+          ),
+        }
+      : {}),
     ...(pieges.size
       ? {
           hors_corpus: {

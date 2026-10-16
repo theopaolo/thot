@@ -281,3 +281,20 @@ export async function chercher(
     sansPassage: comparaison.noms.filter((m) => !admis.some((c) => c.matieres!.includes(m))),
   };
 }
+
+/** Part du meilleur score que garde un document de la recherche élève. Voir `eval recherche --ratios`. */
+export const RATIO_AFFICHAGE = 0.25;
+
+/**
+ * Documents de la recherche élève: un passage par source, du meilleur score au pire, ceux qui
+ * atteignent `ratio` fois le meilleur score et au moins `seuil`. Sans reclasseur, l'ordre de FTS5.
+ */
+export function documentsProches(r: Recherche, seuil: number, ratio = RATIO_AFFICHAGE) {
+  const gardes = r.panneReclasseur
+    ? r.candidats
+    : r.candidats
+        .filter((c) => c.score! >= Math.max(seuil, r.score * ratio))
+        .sort((a, b) => b.score! - a.score!);
+  const vues = new Set<string>();
+  return gardes.filter((c) => !vues.has(c.source_id) && vues.add(c.source_id)).slice(0, 12);
+}

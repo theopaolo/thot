@@ -9,9 +9,16 @@ identifiants ni aux cibles.
 ```bash
 pnpm thot eval recherche --img-order=../mesures/thot-real/img_order.json \
   --docs=../mesures/thot-real/docs.json [--sans-reclasseur]
+pnpm thot eval recherche --img-order=../mesures/thot-real/img_order.json \
+  --docs=../mesures/thot-real/docs.json --ratios=0.1,0.25,0.5
 pnpm thot eval generation
 pnpm thot ask "Pourquoi les cubistes ont-ils abandonné la perspective ?"
 ```
+
+`--ratios` ajoute au rapport, par famille et par ratio, le succès, le MRR, le rappel des cibles et
+le nombre moyen de documents de la liste de `/eleve/recherche`
+([`resultats/recherche-affichage.json`](resultats/recherche-affichage.json)). Une réingestion
+régénère les légendes: deux requêtes sur 59 suffisent à bouger le succès@5 de 0,03.
 
 ## Soutien des citations
 

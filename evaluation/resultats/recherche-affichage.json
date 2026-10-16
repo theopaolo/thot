@@ -1,0 +1,2975 @@
+{
+ "date": "2026-10-16T19:32:55.556Z",
+ "moteur": "fts5 + qwen/qwen3-reranker-8b",
+ "tous": {
+  "n": 59,
+  "succes_5": 0.9,
+  "mrr": 0.86
+ },
+ "familles": {
+  "A": {
+   "n": 10,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "B": {
+   "n": 8,
+   "succes_5": 0.88,
+   "mrr": 0.88
+  },
+  "C": {
+   "n": 6,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "D": {
+   "n": 7,
+   "succes_5": 0.86,
+   "mrr": 0.79
+  },
+  "E": {
+   "n": 14,
+   "succes_5": 0.93,
+   "mrr": 0.85
+  },
+  "F": {
+   "n": 14,
+   "succes_5": 0.79,
+   "mrr": 0.74
+  }
+ },
+ "sans_cible": [],
+ "echecs": [
+  "B03",
+  "D07",
+  "E13",
+  "F06",
+  "F11",
+  "F13"
+ ],
+ "affichage": {
+  "tous": {
+   "0": {
+    "succes": 0.9,
+    "mrr": 0.86,
+    "rappel": 0.72,
+    "documents": 6.59
+   },
+   "0.1": {
+    "succes": 0.9,
+    "mrr": 0.86,
+    "rappel": 0.72,
+    "documents": 4.81
+   },
+   "0.25": {
+    "succes": 0.9,
+    "mrr": 0.86,
+    "rappel": 0.69,
+    "documents": 3.75
+   },
+   "0.35": {
+    "succes": 0.9,
+    "mrr": 0.86,
+    "rappel": 0.67,
+    "documents": 3.31
+   },
+   "0.5": {
+    "succes": 0.9,
+    "mrr": 0.86,
+    "rappel": 0.64,
+    "documents": 2.93
+   },
+   "0.75": {
+    "succes": 0.88,
+    "mrr": 0.85,
+    "rappel": 0.6,
+    "documents": 2.31
+   }
+  },
+  "A": {
+   "0": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 1,
+    "documents": 6.9
+   },
+   "0.1": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 1,
+    "documents": 5.4
+   },
+   "0.25": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 1,
+    "documents": 4
+   },
+   "0.35": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 1,
+    "documents": 3.5
+   },
+   "0.5": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.94,
+    "documents": 3.1
+   },
+   "0.75": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.94,
+    "documents": 2.2
+   }
+  },
+  "B": {
+   "0": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 5.25
+   },
+   "0.1": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 4
+   },
+   "0.25": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 3.75
+   },
+   "0.35": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 3.38
+   },
+   "0.5": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 2.88
+   },
+   "0.75": {
+    "succes": 0.88,
+    "mrr": 0.88,
+    "rappel": 0.71,
+    "documents": 2.25
+   }
+  },
+  "C": {
+   "0": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.72,
+    "documents": 9.67
+   },
+   "0.1": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.72,
+    "documents": 9
+   },
+   "0.25": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.63,
+    "documents": 7
+   },
+   "0.35": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.59,
+    "documents": 6
+   },
+   "0.5": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.52,
+    "documents": 5.33
+   },
+   "0.75": {
+    "succes": 1,
+    "mrr": 1,
+    "rappel": 0.43,
+    "documents": 4.5
+   }
+  },
+  "D": {
+   "0": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 4.86
+   },
+   "0.1": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 3
+   },
+   "0.25": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 2.71
+   },
+   "0.35": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 2.29
+   },
+   "0.5": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 2.29
+   },
+   "0.75": {
+    "succes": 0.86,
+    "mrr": 0.74,
+    "rappel": 0.41,
+    "documents": 2.29
+   }
+  },
+  "E": {
+   "0": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 6.93
+   },
+   "0.1": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 4.36
+   },
+   "0.25": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 2.86
+   },
+   "0.35": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 2.64
+   },
+   "0.5": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 2.43
+   },
+   "0.75": {
+    "succes": 0.93,
+    "mrr": 0.86,
+    "rappel": 0.76,
+    "documents": 1.93
+   }
+  },
+  "F": {
+   "0": {
+    "succes": 0.79,
+    "mrr": 0.75,
+    "rappel": 0.71,
+    "documents": 6.36
+   },
+   "0.1": {
+    "succes": 0.79,
+    "mrr": 0.75,
+    "rappel": 0.71,
+    "documents": 4.43
+   },
+   "0.25": {
+    "succes": 0.79,
+    "mrr": 0.75,
+    "rappel": 0.71,
+    "documents": 3.57
+   },
+   "0.35": {
+    "succes": 0.79,
+    "mrr": 0.75,
+    "rappel": 0.71,
+    "documents": 3.14
+   },
+   "0.5": {
+    "succes": 0.79,
+    "mrr": 0.75,
+    "rappel": 0.71,
+    "documents": 2.64
+   },
+   "0.75": {
+    "succes": 0.71,
+    "mrr": 0.71,
+    "rappel": 0.62,
+    "documents": 1.86
+   }
+  }
+ },
+ "lignes": [
+  {
+   "qid": "A01",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "025 - Suprématisme - Carré blanc sur fond blanc, Kazimir Malevitch, 1918",
+    "022 - Suprématisme - Carré noir sur fond blanc, Kazimir Malevitch, 1915",
+    "ATC Fiche Suprematisme : Comment ?",
+    "ATC Fiche Suprematisme : Où et Quand ?",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Le Suprématisme"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 10
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 9
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 9
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    }
+   }
+  },
+  {
+   "qid": "A02",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "ATC Fiche Cubisme : Qui ?",
+    "ATC Fiche Cubisme : Influences formelles",
+    "ATC Fiche Cubisme : Où et Quand ?",
+    "ATC Fiche Cubisme : Sources"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "A03",
+   "type": "A",
+   "rang": 1,
+   "cibles": 4,
+   "trouves": [
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "ATC Art Nouveau : Où et Quand ?"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 4,
+     "n": 10
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 4,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 4,
+     "n": 6
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 4,
+     "n": 5
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 4,
+     "n": 5
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    }
+   }
+  },
+  {
+   "qid": "A04",
+   "type": "A",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Victor Horta, Hotel Tassel (1892)",
+    "Victor Horta, Hotel Tassel (1892) Interieur",
+    "Victor Horta, Maison Horta (1898)",
+    "Victor Horta, Maison Horta (1898) Interieur",
+    "Victor Horta (panorama) vidéo 17mn"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 5
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 5
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "A05",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "030 - Néoplasticisme - Chaise rouge bleu, Gerrit Rietveld, 1917-1923",
+    "ATC Fiche Neoplasticisme : Qui ?",
+    "ATC Fiche Neoplasticisme : Comment ?",
+    "032 - Néoplasticisme - Maison Schröder à Utrecht, Gerrit Rietveld, 1924 intérieur",
+    "ATC Fiche Neoplasticisme : Retombées"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "A06",
+   "type": "A",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
+    "William Morris, Tapisserie \"The Strawberry Thief\" (1883)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Edward Burne-Jones & William Morris - Vitrail de la Chapelle de Jesus College (1875)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 8
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "A07",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "037 Constructivisme - Contre-reliefs, Vladimir Tatline, 1914-1915",
+    "Synthèse séance 3 - L'art qui veut être utile : L'artiste devient ingénieur",
+    "Alexandre Rodtchenko et le graphisme pour l’industrie",
+    "ATC Fiche Neoplasticisme : Retombées"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "A08",
+   "type": "A",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Charles Rennie Mackintosh, Hill House (1903)",
+    "Charles Rennie Mackintosh, Hill House (1903) intereur",
+    "Charles Rennie Mackintosh – Chaise à dossier haut de la Hill House (1903)",
+    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901)",
+    "Charles Rennie Mackintosh, Glasgow School of Art (1897-1909)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 11
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 5
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "A09",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Futurisme - États d'âme I, Les adieux, Umberto Boccioni, 1911",
+    "Futurisme - États d'âme III, Ceux qui restent, Umberto Boccioni, 1911",
+    "Futurisme - États d'âme II, Les marcheurs, Umberto Boccioni, 1911",
+    "La Charge des lanciers, Umberto Boccioni, 1915",
+    "La ville se lève, Umberto Boccioni, 1910"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "A10",
+   "type": "A",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032)",
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Antoni Gaudi, Casa Batllo (1906) patio"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "B01",
+   "type": "B",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "022 - Suprématisme - Carré noir sur fond blanc, Kazimir Malevitch, 1915",
+    "023 - Suprématisme - Exposition, Kazimir Malevitch",
+    "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930",
+    "033 - Néoplasticisme - Contra-Compositie V, Theo Van Doesburg, 1924",
+    "024 - Suprématisme - Composition suprématiste, Kazimir Malevitch, 1916"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 10
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "B02",
+   "type": "B",
+   "rang": 1,
+   "cibles": 4,
+   "trouves": [
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Analyse du plan",
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Mise en contexte",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Red House (1859) : Philip Webb, William Morris, Photographie"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 4,
+     "n": 10
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 4,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 4,
+     "n": 8
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 4,
+     "n": 7
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 4,
+     "n": 7
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 4,
+     "n": 7
+    }
+   }
+  },
+  {
+   "qid": "B03",
+   "type": "B",
+   "rang": 0,
+   "cibles": 3,
+   "trouves": [
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "ATC Art Nouveau : Où et Quand ?",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Le Castel béranger (1898) interieur"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "B04",
+   "type": "B",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Fauvisme - La Danse, Henri Matisse, 1910",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "Peter Behrens, Salon de musique (1901)",
+    "005 Expressionnisme - Scène de rue à Berlin, Ernst Ludwig Kirchner, 1913",
+    "bildleiste blog"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "B05",
+   "type": "B",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "007 Expressionnisme - Tour Einstein à Potsdam, Erich Mendelsohn, 1921",
+    "La Città Nuova, Dessin d'architecture futuriste, Antonio Sant'Elia, 1914.",
+    "René Binet, Porte Monumentale de l'Exposition universelle, 1900",
+    "Charles Rennie Mackintosh, Chambre de l'artiste (1900)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "B06",
+   "type": "B",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Fauvisme : Henri Matisse, Portrait de Madame Matisse (La Raie verte) (1905)",
+    "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
+    "Gustav Klimt, Ce baiser au monde entier (1902)",
+    "Gustav Klimt, Le Baiser (1908-1909)",
+    "Affiche de théâtre, Gismonda, Alfons Mucha, 1894"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "B07",
+   "type": "B",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "008 Expressionnisme, Affiche du film, Le Cabinet du Dr Caligari (1920)",
+    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
+    "ATC Fiche Exressionnisme : Retombées",
+    "Ditha Moser, MCMXI (1910)",
+    "Affiche, Joseph Maria Olbrich, 1907"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "B08",
+   "type": "B",
+   "rang": 1,
+   "cibles": 4,
+   "trouves": [
+    "Ernst Haeckel, Formes artistique de la nature (1904)",
+    "Illustration Clade des Cyrtoidea, Formes artistiques de la nature, Ernst Haeckel, 1904",
+    "Illustration Anémones de mer, Formes artistiques de la nature, Ernst Haeckel, 1904",
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Une maison vivante"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 3,
+     "n": 6
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 3,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 3,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "C01",
+   "type": "C",
+   "rang": 1,
+   "cibles": 5,
+   "trouves": [
+    "Victor Horta, Hotel Tassel (1892)",
+    "ATC Art Nouveau : Conclusion",
+    "Victor Horta, Maison Horta (1898)",
+    "ATC Art Nouveau : Comment ?",
+    "Victor Horta, Hotel Tassel (1892) Interieur"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 4,
+     "n": 8
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 4,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 4,
+     "n": 5
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 4,
+     "n": 5
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "C02",
+   "type": "C",
+   "rang": 1,
+   "cibles": 5,
+   "trouves": [
+    "051 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport unisex, Varvara Stepanova, 1923",
+    "048 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile, Varvara Stepanova, 1923",
+    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
+    "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
+    "047 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile 2, Varvara Stepanova"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 5,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 5,
+     "n": 11
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 5,
+     "n": 7
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 5,
+     "n": 5
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 5,
+     "n": 5
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 5,
+     "n": 5
+    }
+   }
+  },
+  {
+   "qid": "C03",
+   "type": "C",
+   "rang": 1,
+   "cibles": 9,
+   "trouves": [
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Red House - Morris and Co (1859-1866)",
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Une maison vivante",
+    "Red House (1859) : Philip Webb, William Morris, Photographie"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 7,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 7,
+     "n": 12
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 7,
+     "n": 12
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 7,
+     "n": 12
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 7,
+     "n": 12
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 7,
+     "n": 11
+    }
+   }
+  },
+  {
+   "qid": "C04",
+   "type": "C",
+   "rang": 1,
+   "cibles": 4,
+   "trouves": [
+    "ATC Fiche Futurisme : Quoi ?",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Futurisme · Suprématisme · Néoplasticisme",
+    "ATC Fiche Suprematisme : Où et Quand ?",
+    "ATC Fiche Neoplasticisme : Conclusion",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Le Néoplasticisme"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    }
+   }
+  },
+  {
+   "qid": "C05",
+   "type": "C",
+   "rang": 1,
+   "cibles": 14,
+   "trouves": [
+    "Charles Rennie Mackintosh, Glasgow School of Art (1897-1909)",
+    "Affiche, Royal Glasgow Institute of the Fine Arts, James Herbert MacNair, Margaret et Frances MacDonald, 1895",
+    "Charles Rennie Mackintosh, Scotland Street School (1906)",
+    "Charles Rennie Mackintosh, Scotland Street School (1906) details",
+    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 10,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 10,
+     "n": 12
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 6,
+     "n": 8
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 4,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 3,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "C06",
+   "type": "C",
+   "rang": 1,
+   "cibles": 9,
+   "trouves": [
+    "Joseph Maria Olbrich, Palais de la Secession (1897) 2",
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "ATC Art Nouveau : Conclusion",
+    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
+    "Gustav Klimt, Ce baiser au monde entier (1902)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 3,
+     "n": 10
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 3,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 3,
+     "n": 6
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 3,
+     "n": 6
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    }
+   }
+  },
+  {
+   "qid": "D01",
+   "type": "D",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "ATC Fiche Cubisme : Comment ?",
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Le Cubisme",
+    "ATC Fiche Cubisme : Quoi ?",
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Fauvisme · Expressionnisme · Cubisme",
+    "ATC Fiche Cubisme : Où et Quand ?"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "D02",
+   "type": "D",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "ATC Fiche Cubisme : Influences formelles",
+    "ATC Fiche Exressionnisme : Influences formelles",
+    "ATC Fiche Fauvisme : Influences formelles",
+    "ATC Fiche Cubisme : Sources",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "D03",
+   "type": "D",
+   "rang": 1,
+   "cibles": 4,
+   "trouves": [
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Les Fauves",
+    "ATC Fiche Fauvisme : Quoi ?",
+    "ATC Fiche Fauvisme : Retombées",
+    "ATC Fiche Fauvisme : Comment ?",
+    "ATC Fiche Fauvisme : Sujet (Thèmes)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "D04",
+   "type": "D",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "ATC Fiche Cubisme : Où et Quand ?",
+    "ATC Fiche Cubisme : Influences formelles",
+    "ATC Fiche Exressionnisme : Conclusion",
+    "ATC Fiche Exressionnisme : Influences formelles",
+    "Synthèse séance 2 - Jusqu'où peut-on aller ? : Les Futuristes"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "D05",
+   "type": "D",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "ATC Arts and Crafts : Qui ?",
+    "ATC Arts and Crafts : Pourquoi ?",
+    "John Ruskin (1819-1900)",
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Analyse du plan",
+    "William Morris (1834-1896)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "D06",
+   "type": "D",
+   "rang": 2,
+   "cibles": 2,
+   "trouves": [
+    "ATC Fiche Suprematisme : Sujet (genres)",
+    "ATC Fiche Suprematisme : Retombées",
+    "ATC Fiche Neoplasticisme : Comment ?",
+    "ATC Fiche Suprematisme : Comment ?",
+    "ATC Fiche Neoplasticisme : Conclusion"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 6
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 5
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "D07",
+   "type": "D",
+   "rang": 0,
+   "cibles": 3,
+   "trouves": [
+    "Synthèse séance 3 - L'art qui veut être utile : Le moment où tout se noue",
+    "ATC Fiche Neoplasticisme : Conclusion",
+    "ATC Fiche Futurisme : Retombées",
+    "ATC Fiche Cubisme : Qui ?",
+    "ATC Fiche Cubisme : Qui ?"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 5,
+     "vues": 1,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 5,
+     "vues": 1,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 5,
+     "vues": 1,
+     "n": 7
+    },
+    "0.35": {
+     "rang": 5,
+     "vues": 1,
+     "n": 7
+    },
+    "0.5": {
+     "rang": 5,
+     "vues": 1,
+     "n": 7
+    },
+    "0.75": {
+     "rang": 5,
+     "vues": 1,
+     "n": 7
+    }
+   }
+  },
+  {
+   "qid": "E01",
+   "type": "E",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
+    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "E02",
+   "type": "E",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Antoni Gaudi (panorama) vidéo 21mn",
+    "Antoni Gaudi, Casa Batllo (1906)",
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
+    "Hector Guimard, Le Castel béranger (1898)",
+    "Victor Horta, Maison Horta (1898)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 7
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 7
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 6
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 4
+    }
+   }
+  },
+  {
+   "qid": "E03",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Charles Rennie Mackintosh – Chaise à dossier haut de la Hill House (1903)",
+    "Charles Rennie Mackintosh – Chaise (1904)",
+    "Charles Rennie Mackintosh – Chaises et table",
+    "Quennell_Voysey, Chaise haute (1857-1941)",
+    "Mackmurdo et Arthur Heygate, Chaise (1883)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E04",
+   "type": "E",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Nature morte à la nappe à carreaux, Juan Gris, 1915",
+    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "011 Cubisme - Le Petit Déjeuner, Juan Gris, 1914"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E05",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Victoria cruziana",
+    "Darwin - Tu mourras moins bête - ARTE",
+    "Fauvisme : Henri Matisse, Luxe, calme et volupté (1904)",
+    "William Morris (1834-1896)",
+    "William Morris (1834-1896)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "E06",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "041 Constructivisme - Publicité pour la maison d’édition Knigi, à partir du portrait de Lili Brik, Alexandre Rodtchenko, 1924",
+    "Franz Von Stuck, Affiche pour la VII Secession de Munich (1897)",
+    "Affiche de théâtre, Gismonda, Alfons Mucha, 1894",
+    "Affiche, Royal Glasgow Institute of the Fine Arts, James Herbert MacNair, Margaret et Frances MacDonald, 1895",
+    "008 Expressionnisme, Affiche du film, Le Cabinet du Dr Caligari (1920)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "E07",
+   "type": "E",
+   "rang": 3,
+   "cibles": 1,
+   "trouves": [
+    "ATC Fiche Futurisme : Influences formelles",
+    "ATC Fiche Futurisme : Sujet (Thèmes)",
+    "Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
+    "ATC Fiche Futurisme : Qui ?",
+    "Fauvisme : Henri Matisse, La Joie de vivre (1905-1906)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 2,
+     "vues": 1,
+     "n": 5
+    },
+    "0.1": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E08",
+   "type": "E",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "027 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (2)",
+    "ATC Fiche Suprematisme : Comment ?",
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "ATC Fiche Suprematisme : Où et Quand ?",
+    "Joseph Maria Olbrich, Palais de la Secession (1897)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E09",
+   "type": "E",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Video Gaudí, le génie visionnaire de Barcelone | Educ'ARTE",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Antoni Gaudi, Casa Batllo (1906) Salon premier étage",
+    "Otto Wagner, La Caisse d'Épargne de Vienne, 1912, vidéo 26mn"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 2,
+     "vues": 1,
+     "n": 3
+    },
+    "0.1": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E10",
+   "type": "E",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
+    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
+    "051 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport unisex, Varvara Stepanova, 1923",
+    "046 Constructivisme - Vêtement de travail pour acteur n°7, Lioubov Popova, 1921",
+    "044 Constructivisme - Vêtement de travail pour acteur n°1, Lioubov Popova, 1921"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 6
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "E11",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Victor Horta, Hotel Tassel (1892) Interieur",
+    "Victor Horta, Maison Horta (1898) Interieur",
+    "Antoni Gaudi, Casa Batllo (1906) patio",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Otto Wagner, Maison aux majoliques (1898-1899)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 10
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "E12",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "026 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (1)",
+    "039 Constructivisme - Maquette pour le Monument à la Troisième-Internationale, Vladimir Tatline, 1919",
+    "Nature morte au plat de fruits et à la mandoline, Juan Gris, 1919",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "E13",
+   "type": "E",
+   "rang": 0,
+   "cibles": 2,
+   "trouves": [
+    "Victor Horta, Hotel Tassel (1892)",
+    "Red House (1859) : Philip Webb, William Morris, Internet Source : Analyse du plan",
+    "Antoni Gaudi (panorama) vidéo 21mn",
+    "Charles Rennie Mackintosh, Scotland Street School (1906) details",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 11
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 5
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "E14",
+   "type": "E",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Fauvisme : Henri Matisse, Portrait de Madame Matisse (La Raie verte) (1905)",
+    "009 Cubisme - Les Demoiselles d'Avignon, Pablo Picasso, 1907",
+    "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
+    "ATC Fiche Fauvisme : Comment ?",
+    "ATC Fiche Fauvisme : Pour résumer :"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "F01",
+   "type": "F",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Otto Wagner, Maison aux majoliques (1898-1899)",
+    "Joseph Maria Olbrich, Palais de la Secession (1897) 2",
+    "William de Morgan - Carrelage _Rose and Trellis_ (1839-1917)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)",
+    "Hector Guimard, Le Castel béranger (1898) interieur"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 9
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 8
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 6
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    }
+   }
+  },
+  {
+   "qid": "F02",
+   "type": "F",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Antoni Gaudi (panorama) vidéo 21mn",
+    "Victor Horta, Maison Horta (1898)",
+    "Hector Guimard, Le Castel béranger (1898)",
+    "Antoni Gaudi, Casa Batllo (1906)",
+    "Victor Horta, Hotel Tassel (1892)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 8
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 8
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 8
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 8
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 5
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "F03",
+   "type": "F",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Charles Rennie Mackintosh – Chaise à dossier haut de la Hill House (1903)",
+    "Charles Rennie Mackintosh – Chaise (1904)",
+    "Quennell_Voysey, Chaise haute (1857-1941)",
+    "Mackmurdo et Arthur Heygate, Chaise (1883)",
+    "030 - Néoplasticisme - Chaise rouge bleu, Gerrit Rietveld, 1917-1923"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "F04",
+   "type": "F",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Néoclassicisme exemple : Robert Adam, Apsley House (1778)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Nature morte à la nappe à carreaux, Juan Gris, 1915",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F05",
+   "type": "F",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Victoria cruziana",
+    "Fauvisme : Henri Matisse, Luxe, calme et volupté (1904)",
+    "Illustration Anémones de mer, Formes artistiques de la nature, Ernst Haeckel, 1904",
+    "Fauvisme : Henri Matisse, La Joie de vivre (1905-1906)",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F06",
+   "type": "F",
+   "rang": 0,
+   "cibles": 1,
+   "trouves": [
+    "Alexandre Rodtchenko et le graphisme pour l’industrie",
+    "043 Constructivisme - Affiche, Alexandre Rodtchenko",
+    "034 Futurisme Russe - Cycliste, Natalia Gontcharova, 1913",
+    "Alexandre Rodtchenko et le graphisme pour l’industrie",
+    "Alexandre Rodtchenko et le graphisme pour l’industrie"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F07",
+   "type": "F",
+   "rang": 3,
+   "cibles": 1,
+   "trouves": [
+    "ATC Fiche Futurisme : Sujet (Thèmes)",
+    "ATC Fiche Futurisme : Influences formelles",
+    "Futurisme - Dynamisme d'un chien en laisse, Giacomo Balla, 1912",
+    "ATC Fiche Futurisme : Qui ?",
+    "Synthèse séance 1 - Quand la peinture arrête de faire semblant : Le Cubisme"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.1": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 2,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F08",
+   "type": "F",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "027 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (2)",
+    "026 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (1)",
+    "028 - Suprématisme, Architectones, Kazimir Malevitch, 1928 (3)",
+    "052 Constructivisme - Club des Travailleurs de Zouïev, Ilya Golossov, 1927",
+    "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 3,
+     "n": 9
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 3,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 3,
+     "n": 6
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 3,
+     "n": 4
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 3,
+     "n": 3
+    }
+   }
+  },
+  {
+   "qid": "F09",
+   "type": "F",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) interieur",
+    "Victor Horta, Hotel Tassel (1892) Interieur",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
+    "Eugène Viollet-le-Duc, Illustration",
+    "Antoni Gaudi (panorama) vidéo 21mn"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F10",
+   "type": "F",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "050 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport uniform, Varvara Stepanova, 1923",
+    "049 Constructivisme - Varvara Stepanova, Constructivisme, Tenue sport féminin, Varvara Stepanova, 1923",
+    "Illustration Clade des Cyrtoidea, Formes artistiques de la nature, Ernst Haeckel, 1904",
+    "048 Constructivisme - Varvara Stepanova, Constructivisme, Motif textile, Varvara Stepanova, 1923",
+    "029 - Néoplasticisme - Composition II en rouge, bleu et jaune, Piet Mondrian, 1930"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 2,
+     "n": 7
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 2,
+     "n": 5
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 2,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "F11",
+   "type": "F",
+   "rang": 0,
+   "cibles": 1,
+   "trouves": [
+    "Victor Horta, Maison Horta (1898) Interieur",
+    "Antoni Gaudi, Casa Batllo (1906) patio",
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "Hector Guimard, Entrée Métro, Paris (1900-1913)"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 11
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 7
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 6
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 5
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 3
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "F12",
+   "type": "F",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Joseph Maria Olbrich, Palais de la Secession (1897)",
+    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901)",
+    "Sagrada Familia, Antoni Gaudi, (1882-2032) Vitraux",
+    "Parc Güell, Antoni Gaudi, 1914",
+    "007 Expressionnisme - Tour Einstein à Potsdam, Erich Mendelsohn, 1921"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 7
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 5
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  },
+  {
+   "qid": "F13",
+   "type": "F",
+   "rang": 0,
+   "cibles": 2,
+   "trouves": [
+    "Red House, Philip Webb, Commode (1860-1865)",
+    "Red House - Philip Webb, Commode (1860-1865)",
+    "Red House (1859) : Philip Webb, William Morris, Photographie",
+    "Charles Rennie Mackintosh et Margaret Macdonald, Salon de musique de la House for an Art Lover (1901) salle à manger",
+    "Red House (1859) : Philip Webb, dessins"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 0,
+     "vues": 0,
+     "n": 7
+    },
+    "0.1": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.25": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 0,
+     "vues": 0,
+     "n": 2
+    }
+   }
+  },
+  {
+   "qid": "F14",
+   "type": "F",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Fauvisme : Henri Matisse, Portrait de Madame Matisse (La Raie verte) (1905)",
+    "Fauvisme : Henri Matisse, La Femme au chapeau (1905)",
+    "041 Constructivisme - Publicité pour la maison d’édition Knigi, à partir du portrait de Lili Brik, Alexandre Rodtchenko, 1924",
+    "ATC Fiche Exressionnisme : Sujet (Genres)",
+    "Margaret Macdonald, Motifs de textile géométriques (1900-1905) 003"
+   ],
+   "affichage": {
+    "0": {
+     "rang": 1,
+     "vues": 1,
+     "n": 12
+    },
+    "0.1": {
+     "rang": 1,
+     "vues": 1,
+     "n": 4
+    },
+    "0.25": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.35": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.5": {
+     "rang": 1,
+     "vues": 1,
+     "n": 2
+    },
+    "0.75": {
+     "rang": 1,
+     "vues": 1,
+     "n": 1
+    }
+   }
+  }
+ ]
+}
