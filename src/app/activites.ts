@@ -2,8 +2,10 @@ import {
   ancrer,
   type Champ,
   champs,
+  citationsDe,
   type Contenu,
   CRITERES,
+  type Explication,
   genererActivite,
   jugerChamps,
   MAX_TEXTE,
@@ -16,7 +18,9 @@ import {
   revisionCitable,
   transaction,
 } from "../core/recherche.ts";
+import { demander } from "../core/reponse.ts";
 import { type Compte, lecteur, lireCompte } from "./comptes.ts";
+import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { catalogueDe } from "./domaines.ts";
 import { lireInstance } from "./instance.ts";
@@ -29,8 +33,10 @@ export type Activite = {
   /** `cours` : les élèves du cours. `prive` : son auteur seul, en mode personnel. */
   audience: "cours" | "prive";
   etat: "brouillon" | "relue" | "publiee" | "a_revoir";
+  /** Une explication se lit, sans tentative ni corrigé. */
+  type: "exercice" | "explication";
   revision: number;
-  /** JSON de `Contenu` */
+  /** JSON de `Contenu` pour un exercice, d'`Explication` pour une explication */
   contenu: string;
   /** JSON des motifs des champs rejetés à la génération */
   rejets: string;
@@ -66,8 +72,7 @@ export const perimetre = (db: Db, a: Cible): Perimetre => ({
   lecteur: a.audience === "prive" ? lecteur(lireCompte(db, a.auteur_id)!) : null,
 });
 
-const citations = (contenu: string) =>
-  champs(JSON.parse(contenu) as Contenu).flatMap((ch) => ch.citations);
+const citations = (contenu: string) => citationsDe(JSON.parse(contenu));
 
 /** La révision que sert aujourd'hui chaque source citée, `undefined` si elle n'est plus citable. */
 export function servies(db: Db, a: Cible & Pick<Activite, "contenu">) {
@@ -184,6 +189,7 @@ const texte = (v: unknown, nom: string, max: number, requis = true) => {
 };
 
 export type Preparation = {
+  type: Activite["type"];
   coursId: string;
   /** vide : un nouvel objectif, `intitule` et `reference` */
   objectifId: string;
@@ -193,9 +199,9 @@ export type Preparation = {
 };
 
 /**
- * Rédige le brouillon d'un exercice sur l'objectif, d'après les sources choisies. Un nouvel
- * objectif n'est enregistré qu'avec l'exercice. Une saisie invalide lève une erreur. Rend
- * l'identifiant de l'exercice, ou ce qui a manqué à la génération.
+ * Rédige le brouillon d'un exercice ou d'une explication sur l'objectif, d'après les sources
+ * choisies. Un nouvel objectif n'est enregistré qu'avec l'activité. Une saisie invalide lève une
+ * erreur. Rend l'identifiant de l'activité, ou ce qui a manqué à la génération.
  */
 export async function preparer(
   db: Db,
@@ -225,12 +231,17 @@ export async function preparer(
   if (!ids.length || ids.length > MAX_SOURCES || ids.some((id) => !citables.has(id))) {
     throw new Error(`Choisissez de 1 à ${MAX_SOURCES} sources certifiées de ce cours.`);
   }
-  const g = await genererActivite(modeles, intitule, passages(db, cible, intitule, ids));
+  const g =
+    s.type === "explication"
+      ? await expliquer(db, modeles, intitule, { ...perimetre(db, cible), sources: ids })
+      : await genererActivite(modeles, intitule, passages(db, cible, intitule, ids));
+  if ("erreur" in g) return { erreur: g.erreur, rejets: [] };
   if (!g.contenu) {
     return {
-      erreur: g.refus
-        ? "Thot ne trouve pas dans ces sources de quoi rédiger un exercice sur cet objectif."
-        : `Thot n'a pas pu ancrer l'exercice. Il faut une consigne, une réponse attendue, ${CRITERES.min} critères et un retour, chacun cité mot pour mot.`,
+      erreur:
+        "refus" in g
+          ? "Thot ne trouve pas dans ces sources de quoi rédiger un exercice sur cet objectif."
+          : `Thot n'a pas pu ancrer l'exercice. Il faut une consigne, une réponse attendue, ${CRITERES.min} critères et un retour, chacun cité mot pour mot.`,
       rejets: g.rejets,
     };
   }
@@ -251,8 +262,8 @@ export async function preparer(
     }
     // Une source a pu changer pendant la génération : le brouillon naît alors à revoir.
     db.prepare(
-      `INSERT INTO activites (id, cours_id, objectif_id, auteur_id, audience, etat, contenu,
-       rejets, modele, cree_le, maj_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO activites (id, cours_id, objectif_id, auteur_id, audience, etat, type, contenu,
+       rejets, modele, cree_le, maj_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       s.coursId,
@@ -260,6 +271,7 @@ export async function preparer(
       compte.id,
       cible.audience,
       preuvesValides(db, { ...cible, contenu }) ? "brouillon" : "a_revoir",
+      s.type,
       contenu,
       JSON.stringify(g.rejets),
       g.modele,
@@ -268,6 +280,28 @@ export async function preparer(
     );
   });
   return { id };
+}
+
+/**
+ * Une explication est la réponse vérifiée de `demander()` à l'objectif, posé comme une question
+ * dans les sources choisies : mêmes citations, même juge, mêmes blocs.
+ */
+async function expliquer(
+  db: Db,
+  modeles: Modeles,
+  objectif: string,
+  p: Perimetre,
+): Promise<{ erreur: string } | { contenu: Explication; rejets: string[]; modele: string }> {
+  const { resultat, journal } = await demander(db, modeles, objectif, p, config.seuil);
+  if (resultat.etat === "out_of_corpus") {
+    return { erreur: "Thot ne trouve pas dans ces sources de quoi expliquer cet objectif." };
+  }
+  if (resultat.etat === "failed") {
+    return { erreur: `Thot n'a pas pu rédiger l'explication : ${resultat.message}` };
+  }
+  const { affirmations, blocs, partielle, juge_indisponible } = resultat;
+  const contenu: Explication = { affirmations, blocs, partielle, juge_indisponible };
+  return { contenu, rejets: [], modele: String(journal.modele ?? "") };
 }
 
 export const nomChamp = (i: number, n: number) =>
@@ -291,6 +325,9 @@ export async function modifier(
   a: Activite,
   b: Record<string, unknown>,
 ) {
+  if (a.type === "explication") {
+    throw new Error("Une explication ne se modifie pas. Préparez-en une autre.");
+  }
   if (Number(b.revision) !== a.revision) return "conflit";
   const liste = champs(JSON.parse(a.contenu) as Contenu);
   const p = perimetre(db, a);
@@ -398,8 +435,9 @@ export function revoirActivites(db: Db, sourceId: string) {
 }
 
 /**
- * Retire des exercices ce qui vient d'une source supprimée : ses passages, et le texte des champs
- * qui les citaient, rédigé d'après elle. L'exercice est à revoir. Les tentatives des élèves
+ * Retire des activités ce qui vient d'une source supprimée : ses passages, et le texte des champs
+ * qui les citaient, rédigé d'après elle. Une explication perd les phrases qui la citaient et ses
+ * blocs, dont les titres ont pu la nommer. L'activité est à revoir. Les tentatives des élèves
  * gardent leur réponse et la version à laquelle elles répondaient.
  */
 export function oublierSource(db: Db, sourceId: string) {
@@ -411,13 +449,16 @@ export function oublierSource(db: Db, sourceId: string) {
       ? { texte: "", citations: ch.citations.filter((c) => c.source_id !== sourceId) }
       : ch;
   for (const a of liste) {
-    const c = JSON.parse(a.contenu) as Contenu;
-    const contenu: Contenu = {
-      consigne: sans(c.consigne),
-      attendu: sans(c.attendu),
-      criteres: c.criteres.map(sans),
-      retour: sans(c.retour),
-    };
+    const c = JSON.parse(a.contenu) as Contenu | Explication;
+    const contenu: Contenu | Explication =
+      "affirmations" in c
+        ? { affirmations: c.affirmations.filter((x) => x.source_id !== sourceId) }
+        : {
+            consigne: sans(c.consigne),
+            attendu: sans(c.attendu),
+            criteres: c.criteres.map(sans),
+            retour: sans(c.retour),
+          };
     db.prepare("UPDATE activites SET contenu = ? WHERE id = ?").run(JSON.stringify(contenu), a.id);
     if (a.etat !== "a_revoir") signaler(db, a);
   }

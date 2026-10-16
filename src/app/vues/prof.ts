@@ -168,11 +168,11 @@ type Filtres = {
 const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
   `/prof?${new URLSearchParams({ ...f, ...change })}`;
 
-/** La bibliothèque range les ressources et les exercices préparés d'après elles. */
+/** La bibliothèque range les ressources et les activités préparées d'après elles. */
 export const ongletsBibliotheque = (chemin: string) =>
   html`<nav class="onglets" aria-label="Bibliothèque">${[
     ["/prof", "Ressources"],
-    ["/prof/activites", "Exercices"],
+    ["/prof/activites", "Activités"],
   ].map(
     ([href, libelle]) =>
       html`<a href="${href}" ${chemin === href ? html`aria-current="page"` : ""}>${libelle}</a>`,

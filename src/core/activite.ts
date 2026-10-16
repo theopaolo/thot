@@ -1,6 +1,6 @@
 import type { Message, Modeles } from "./modeles.ts";
 import type { ChunkIndexe } from "./recherche.ts";
-import { type Affirmation, juger, lire, verifier } from "./reponse.ts";
+import { type Affirmation, type BlocReponse, juger, lire, verifier } from "./reponse.ts";
 
 /** Un passage cité : la révision de la source et ses offsets dans son `document.txt`. */
 export type Citation = {
@@ -22,8 +22,32 @@ export type Contenu = { consigne: Champ; attendu: Champ; criteres: Champ[]; reto
 export const CRITERES = { min: 2, max: 5 };
 export const MAX_TEXTE = 2000;
 
+/**
+ * Une explication d'étude : la réponse vérifiée de `demander()` à l'objectif, affirmations et
+ * blocs, chacune avec la révision de sa source.
+ */
+export type Explication = {
+  affirmations: Affirmation[];
+  blocs?: BlocReponse[];
+  /** des phrases dont la citation ne tenait pas ont été retirées */
+  partielle?: boolean;
+  juge_indisponible?: boolean;
+};
+
 /** Les champs dans l'ordre de lecture : consigne, réponse attendue, critères, retour. */
 export const champs = (c: Contenu) => [c.consigne, c.attendu, ...c.criteres, c.retour];
+
+/** Les passages qu'une activité cite : sa source, sa révision et son titre. */
+export const citationsDe = (
+  c: Contenu | Explication,
+): Pick<Citation, "source_id" | "revision" | "titre">[] =>
+  "affirmations" in c
+    ? c.affirmations.map((a) => ({
+        source_id: a.source_id,
+        revision: a.revision ?? 1,
+        titre: a.titre,
+      }))
+    : champs(c).flatMap((ch) => ch.citations);
 
 // Pas encore mesurée : ni jeu d'exercices annoté ni évaluation (`evaluation/`).
 export const CONSIGNE_ACTIVITE = `Tu prepares un exercice a reponse courte pour une personne qui apprend, a partir

@@ -1,9 +1,17 @@
 import { html } from "hono/html";
-import { type Champ, type Citation, champs, type Contenu } from "../../core/activite.ts";
+import {
+  type Champ,
+  type Citation,
+  champs,
+  citationsDe,
+  type Contenu,
+  type Explication,
+} from "../../core/activite.ts";
 import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
 import { type Activite, MAX_SOURCES, nomChamp, type Tentative } from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
 import { icone } from "../icones.ts";
+import { panneauSource, reponse } from "./eleve.ts";
 import { jour, ongletsBibliotheque } from "./prof.ts";
 
 const ETATS: Record<Activite["etat"], [string, string]> = {
@@ -21,12 +29,18 @@ const ACTIONS: Record<string, string> = {
 const etat = (a: Activite) =>
   html`<span class="statut ${ETATS[a.etat][1]}">${ETATS[a.etat][0]}</span>`;
 
+/** Un passage cité. Sans offsets, il vient d'une légende d'image relue. */
+type Cite = Pick<Citation, "source_id" | "revision" | "titre" | "citation"> &
+  Partial<Pick<Citation, "debut" | "fin">>;
+
 /** Le lecteur de source existant, ouvert sur le passage, dans la révision citée. */
-const lien = (c: Citation) =>
-  `/eleve/sources/${c.source_id}?debut=${c.debut}&fin=${c.fin}&revision=${c.revision}#passage`;
+const lien = (c: Cite) =>
+  c.debut === undefined
+    ? `/eleve/sources/${c.source_id}`
+    : `/eleve/sources/${c.source_id}?debut=${c.debut}&fin=${c.fin}&revision=${c.revision}#passage`;
 
 /** Les passages d'un champ. Avec `servies`, une citation qui ne tient plus le dit. */
-const passages = (ch: Champ, servies?: Map<string, number | undefined>) =>
+const passages = (ch: { citations: Cite[] }, servies?: Map<string, number | undefined>) =>
   ch.citations.length
     ? html`<ul class="discret">${ch.citations.map((c) => {
         const servie = servies?.get(c.source_id);
@@ -50,22 +64,27 @@ const avis = (ch: Champ) =>
       ? html`<p><span class="statut failed">À vérifier</span> <span class="discret">Selon le juge de soutien, les passages cités n'établissent pas tout ce que dit ce champ.</span></p>`
       : "";
 
+const TYPES: Record<Activite["type"], string> = {
+  exercice: "Exercice",
+  explication: "Explication",
+};
+
 export const listeProf = (liste: Activite[]) => html`
   <h1>Bibliothèque</h1>
   ${ongletsBibliotheque("/prof/activites")}
-  <p><a class="bouton principal" href="/prof/activites/nouvelle">Préparer un exercice</a></p>
+  <p><a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a></p>
   ${
     liste.length
       ? html`<table>
-        <thead><tr><th>Objectif</th><th>Cours</th><th>État</th><th>Version</th></tr></thead>
+        <thead><tr><th>Objectif</th><th>Type</th><th>Cours</th><th>État</th><th>Version</th></tr></thead>
         <tbody>${liste.map(
           (a) => html`<tr>
             <td><a href="/prof/activites/${a.id}">${a.intitule}</a></td>
-            <td>${a.cours}</td><td>${etat(a)}</td><td>${a.revision}</td>
+            <td>${TYPES[a.type]}</td><td>${a.cours}</td><td>${etat(a)}</td><td>${a.revision}</td>
           </tr>`,
         )}</tbody>
       </table>`
-      : html`<p>Aucun exercice. Un exercice part d'un objectif et de sources certifiées d'un cours.</p>`
+      : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
   }
 `;
 
@@ -80,15 +99,16 @@ export type Preparation = {
   rejets?: string[];
 };
 
-/** Choisir le cours, l'objectif et les sources, puis faire rédiger le brouillon. */
+/** Choisir le type, le cours, l'objectif et les sources, puis faire rédiger le brouillon. */
 export const preparation = (p: Preparation) => {
   const s = (nom: string) => String(p.saisie[nom] ?? "");
   const choisies = new Set([p.saisie.sources ?? []].flat().map(String));
+  const explication = s("type") === "explication";
   const nomCours = (c: Catalogue["cours"][number]) =>
     `${p.catalogue.matieres.find((m) => m.id === c.matiere_id)?.nom ?? ""} / ${c.nom}`;
   return html`
-    <p><a href="/prof/activites">Exercices</a></p>
-    <h1>Préparer un exercice</h1>
+    <p><a href="/prof/activites">Activités</a></p>
+    <h1>Préparer une activité</h1>
     ${p.erreur ? html`<p role="alert">${p.erreur}</p>` : ""}
     ${
       p.rejets?.length
@@ -115,6 +135,13 @@ export const preparation = (p: Preparation) => {
       </form>
       <form method="post" action="/prof/activites" class="etroit">
         <input type="hidden" name="cours_id" value="${p.coursId}">
+        <fieldset>
+          <legend><strong>Activité</strong></legend>
+          <label><input type="radio" name="type" value="exercice" ${explication ? "" : "checked"}> Exercice à réponse courte</label>
+          <p class="aide">Thot rédige une consigne, une réponse attendue, 2 à 5 critères et un retour. Chaque champ cite des passages retrouvés mot pour mot. Un champ sans passage retrouvé est rejeté. Le juge de soutien signale ce que les passages d'un champ n'établissent pas.</p>
+          <label><input type="radio" name="type" value="explication" ${explication ? "checked" : ""}> Explication d'étude</label>
+          <p class="aide">Thot répond à l'objectif comme à une question, dans les sources choisies seulement. Chaque phrase cite son passage et passe le juge de soutien. L'élève la lit, sans réponse à envoyer.</p>
+        </fieldset>
         <fieldset>
           <legend><strong>Objectif</strong></legend>
           ${
@@ -163,7 +190,6 @@ export const preparation = (p: Preparation) => {
                 }.</p>`
           }
         </fieldset>
-        <p class="aide">Thot rédige une consigne, une réponse attendue, 2 à 5 critères et un retour. Chaque champ cite des passages retrouvés mot pour mot. Un champ sans passage retrouvé est rejeté.</p>
         <button class="principal" ${p.sources.length ? "" : "disabled"}>Rédiger le brouillon</button>
       </form>
     `
@@ -173,7 +199,7 @@ export const preparation = (p: Preparation) => {
 
 export type DetailProf = {
   a: Activite;
-  contenu: Contenu;
+  contenu: Contenu | Explication;
   relectures: { revision: number; action: string; le: string; nom: string | null }[];
   servies: Map<string, number | undefined>;
   /** le titre de chaque source citée */
@@ -181,31 +207,103 @@ export type DetailProf = {
   erreur?: string;
 };
 
-/** Inspecter les preuves, modifier, relire, publier, avec l'historique de relecture. */
-export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: DetailProf) => {
-  const liste = champs(contenu);
-  const rejets = JSON.parse(a.rejets) as string[];
-  const sources = [
-    ...new Map(
-      liste.flatMap((ch) => ch.citations).map((c) => [`${c.source_id}/${c.revision}`, c]),
-    ).values(),
-  ];
-  const personnel = a.audience === "prive";
+type Servies = DetailProf["servies"];
+
+/** Les champs d'un exercice, leurs preuves et l'avis du juge. */
+const champsExercice = (contenu: Contenu, servies: Servies) => {
   const champ = (ch: Champ) =>
     html`<p>${ch.texte || html`<span class="discret">Vide : sa source a été supprimée.</span>`}</p>${avis(ch)}${passages(ch, servies)}`;
   return html`
-    <p><a href="/prof/activites">Exercices</a></p>
+    <h2>Consigne</h2>
+    ${champ(contenu.consigne)}
+    <h2>Réponse attendue</h2>
+    ${champ(contenu.attendu)}
+    <h2>Critères</h2>
+    <ol>${contenu.criteres.map((ch) => html`<li>${champ(ch)}</li>`)}</ol>
+    <h2>Retour</h2>
+    ${champ(contenu.retour)}
+  `;
+};
+
+const modification = (a: Activite, contenu: Contenu, erreur?: string) => {
+  const liste = champs(contenu);
+  return html`
+    <details ${erreur ? "open" : ""}>
+      <summary>Modifier</summary>
+      <form method="post" action="/prof/activites/${a.id}/modifier" class="etroit">
+        <input type="hidden" name="revision" value="${a.revision}">
+        <p class="aide">Enregistrer une modification crée la version ${a.revision + 1}, à relire avant publication. Chaque passage est recherché mot pour mot dans la version actuelle de sa source. Un critère ou un passage vidé disparaît.</p>
+        ${liste.map(
+          (ch, i) => html`
+            <div class="champ">
+              <label for="texte-${i}">${nomChamp(i, liste.length)}</label>
+              <textarea id="texte-${i}" name="texte_${i}" rows="3">${ch.texte}</textarea>
+            </div>
+            ${ch.citations.map(
+              (c, j) => html`<div class="champ">
+                <label for="citation-${i}-${j}">Passage cité de « ${c.titre} »</label>
+                <textarea id="citation-${i}-${j}" name="citation_${i}_${j}" rows="2">${c.citation}</textarea>
+              </div>`,
+            )}
+          `,
+        )}
+        <button class="principal">Enregistrer une nouvelle version</button>
+      </form>
+    </details>
+  `;
+};
+
+/** Les phrases d'une explication et leurs preuves. L'aperçu élève les montre rangées en blocs. */
+const corpsExplication = (e: Explication, servies: Servies) => html`
+  ${
+    e.juge_indisponible
+      ? html`<p><span class="statut a_relire">Juge indisponible</span> <span class="discret">Une phrase au moins est passée sans l'avis du juge de soutien.</span></p>`
+      : ""
+  }
+  ${
+    e.partielle
+      ? html`<p class="discret">Explication partielle : Thot a retiré les phrases dont la citation ne tenait pas.</p>`
+      : ""
+  }
+  <h2>Phrases</h2>
+  ${
+    e.affirmations.length
+      ? html`<ol>${e.affirmations.map(
+          (x) =>
+            html`<li><p>${x.texte}</p>${passages({ citations: [{ ...x, revision: x.revision ?? 1 }] }, servies)}</li>`,
+        )}</ol>`
+      : html`<p class="discret">Vide : ses sources ont été supprimées.</p>`
+  }
+  <p class="discret">L'aperçu élève montre les titres et le rangement en blocs, qui viennent du modèle sans preuve.</p>
+`;
+
+/** Inspecter les preuves, modifier, relire, publier, avec l'historique de relecture. */
+export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: DetailProf) => {
+  const rejets = JSON.parse(a.rejets) as string[];
+  const sources = [
+    ...new Map(citationsDe(contenu).map((c) => [`${c.source_id}/${c.revision}`, c])).values(),
+  ];
+  const personnel = a.audience === "prive";
+  const explication = a.type === "explication";
+  return html`
+    <p><a href="/prof/activites">Activités</a></p>
     <h1>${a.intitule}</h1>
-    <p class="discret">${a.cours}${a.reference ? ` · ${a.reference}` : ""} · version ${a.revision} · ${etat(a)}</p>
+    <p class="discret">${TYPES[a.type]} · ${a.cours}${a.reference ? ` · ${a.reference}` : ""} · version ${a.revision} · ${etat(a)}</p>
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
     ${
       personnel
-        ? html`<p class="note">Exercice privé, généré par Thot. Votre relecture ne vaut pas relecture indépendante.</p>`
+        ? html`<p class="note">${
+            explication ? "Explication privée, générée" : "Exercice privé, généré"
+          } par Thot. Votre relecture ne vaut pas relecture indépendante.</p>`
         : ""
     }
     ${
       a.etat === "a_revoir"
-        ? html`<p role="alert">Une source citée a une nouvelle version, n'est plus citable dans ce cours ou a été supprimée. Les élèves ne reçoivent plus cet exercice. Enregistrez-le de nouveau pour rechercher ses passages dans la version actuelle, ou préparez-en un autre.</p>`
+        ? html`<p role="alert">Une source citée a une nouvelle version, n'est plus citable dans ce cours ou a été supprimée. ${
+            explication
+              ? "Les élèves ne reçoivent plus cette explication. Préparez-en une autre."
+              : "Les élèves ne reçoivent plus cet exercice. Enregistrez-le de nouveau pour rechercher ses passages dans la version actuelle, ou préparez-en un autre."
+          }</p>`
         : ""
     }
     ${
@@ -234,14 +332,7 @@ export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: 
       }
       <a class="bouton" href="/prof/activites/${a.id}/apercu">Aperçu élève</a>
     </div>
-    <h2>Consigne</h2>
-    ${champ(contenu.consigne)}
-    <h2>Réponse attendue</h2>
-    ${champ(contenu.attendu)}
-    <h2>Critères</h2>
-    <ol>${contenu.criteres.map((ch) => html`<li>${champ(ch)}</li>`)}</ol>
-    <h2>Retour</h2>
-    ${champ(contenu.retour)}
+    ${"affirmations" in contenu ? corpsExplication(contenu, servies) : champsExercice(contenu, servies)}
     <h2>Sources citées</h2>
     <ul>${sources.map(
       (c) => html`<li>${titres.get(c.source_id) ?? c.titre}, version ${c.revision}</li>`,
@@ -260,28 +351,7 @@ export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: 
         </table>`
         : html`<p class="discret">Pas encore relu.</p>`
     }
-    <details ${erreur ? "open" : ""}>
-      <summary>Modifier</summary>
-      <form method="post" action="/prof/activites/${a.id}/modifier" class="etroit">
-        <input type="hidden" name="revision" value="${a.revision}">
-        <p class="aide">Enregistrer une modification crée la version ${a.revision + 1}, à relire avant publication. Chaque passage est recherché mot pour mot dans la version actuelle de sa source. Un critère ou un passage vidé disparaît.</p>
-        ${liste.map(
-          (ch, i) => html`
-            <div class="champ">
-              <label for="texte-${i}">${nomChamp(i, liste.length)}</label>
-              <textarea id="texte-${i}" name="texte_${i}" rows="3">${ch.texte}</textarea>
-            </div>
-            ${ch.citations.map(
-              (c, j) => html`<div class="champ">
-                <label for="citation-${i}-${j}">Passage cité de « ${c.titre} »</label>
-                <textarea id="citation-${i}-${j}" name="citation_${i}_${j}" rows="2">${c.citation}</textarea>
-              </div>`,
-            )}
-          `,
-        )}
-        <button class="principal">Enregistrer une nouvelle version</button>
-      </form>
-    </details>
+    ${"affirmations" in contenu ? "" : modification(a, contenu, erreur)}
   `;
 };
 
@@ -294,6 +364,29 @@ export type Pratique = {
   apercu?: boolean;
 };
 
+/** Le haut de la page élève : retour, objectif, cours, et qui a préparé et relu l'activité. */
+const entete = (a: Activite, relecteur?: string, apercu?: boolean) => {
+  const e = a.type === "explication" ? "e" : "";
+  return html`
+    ${
+      apercu
+        ? html`<p><a href="/prof/activites/${a.id}">Retour à l'activité</a></p>
+          <p class="note">Aperçu de la page élève.${
+            e
+              ? ""
+              : " La réponse attendue, les critères et le retour n'apparaissent qu'après la réponse de l'élève."
+          }</p>`
+        : html`<a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>`
+    }
+    <h1>${a.intitule}</h1>
+    <p class="discret">${a.cours}. ${
+      a.audience === "prive"
+        ? `${TYPES[a.type]} généré${e} par Thot à partir de tes documents. Personne d'autre que toi ne l'a relu${e}.`
+        : `${TYPES[a.type]} préparé${e} par ${a.auteur}${relecteur ? `, relu${e} par ${relecteur}` : ""}.`
+    }</p>
+  `;
+};
+
 /**
  * La page de l'élève. Avant une tentative sur la version actuelle, elle ne contient que l'objectif
  * et la consigne : ni réponse attendue, ni critère, ni retour, ni passage cité.
@@ -301,18 +394,7 @@ export type Pratique = {
 export const pratique = ({ a, contenu, tentative, relecteur, apercu }: Pratique) => {
   const coches = tentative ? (JSON.parse(tentative.criteres) as number[]) : [];
   return html`
-    ${
-      apercu
-        ? html`<p><a href="/prof/activites/${a.id}">Retour à l'exercice</a></p>
-          <p class="note">Aperçu de la page élève. La réponse attendue, les critères et le retour n'apparaissent qu'après la réponse de l'élève.</p>`
-        : html`<a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>`
-    }
-    <h1>${a.intitule}</h1>
-    <p class="discret">${a.cours}. ${
-      a.audience === "prive"
-        ? "Exercice généré par Thot à partir de tes documents. Personne d'autre que toi ne l'a relu."
-        : `Exercice préparé par ${a.auteur}${relecteur ? `, relu par ${relecteur}` : ""}.`
-    }</p>
+    ${entete(a, relecteur, apercu)}
     <h2>Consigne</h2>
     <p>${contenu.consigne.texte}</p>
     ${
@@ -366,14 +448,40 @@ export const pratique = ({ a, contenu, tentative, relecteur, apercu }: Pratique)
   `;
 };
 
-/** Les exercices publiés de l'élève, dans la page de ses ressources. */
+/**
+ * Une explication se lit comme une réponse : ses blocs, ses numéros de citation, et la feuille du
+ * passage cité. Ni tentative ni corrigé.
+ */
+export const explication = ({
+  a,
+  contenu,
+  relecteur,
+  apercu,
+}: Omit<Pratique, "contenu" | "tentative"> & { contenu: Explication }) => html`
+  <div class="mur-lecteur" data-feuille>
+    <div>
+      ${entete(a, relecteur, apercu)}
+      ${reponse(
+        a.id,
+        { etat: "answered", affirmations: contenu.affirmations, blocs: contenu.blocs },
+        null,
+        [],
+        false,
+        `/${apercu ? "prof" : "eleve"}/activites/${a.id}/citations`,
+      )}
+    </div>
+    <div class="colonne-source">${panneauSource()}</div>
+  </div>
+`;
+
+/** Les activités publiées de l'élève, dans la page de ses ressources. */
 export const exercices = (liste: Activite[]) =>
   liste.length
     ? html`<section aria-labelledby="exercices">
-      <h2 id="exercices">Exercices</h2>
+      <h2 id="exercices">Exercices et explications</h2>
       <ul>${liste.map(
         (a) =>
-          html`<li><a href="/eleve/activites/${a.id}">${a.intitule}</a> <span class="discret">${a.cours}</span></li>`,
+          html`<li><a href="/eleve/activites/${a.id}">${a.intitule}</a> <span class="discret">${TYPES[a.type]}, ${a.cours}</span></li>`,
       )}</ul>
     </section>`
     : "";

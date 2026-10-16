@@ -644,6 +644,8 @@ export const reponse = (
   choix: string | null = null,
   idees: string[] = [],
   auto = false,
+  /** hors d'une conversation, une explication publiée : l'adresse de ses passages, sans avis */
+  citations = "",
 ) => {
   if (r.etat === "answered") {
     // Une ligne par intertitre cité: deux sections d'un même document restent distinctes.
@@ -664,7 +666,7 @@ export const reponse = (
         class="citation"
         aria-pressed="${String(auto && n === 0)}"
         aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"
-        hx-get="/eleve/messages/${id}/citations/${n}"
+        hx-get="${citations || `/eleve/messages/${id}/citations`}/${n}"
         hx-trigger="${auto && n === 0 ? "click, load, restaurer" : "click, restaurer"}"
         hx-target="#source"
         hx-swap="outerHTML"
@@ -725,7 +727,7 @@ export const reponse = (
           ([titre, sourceId], n) =>
             html`${n ? ", " : ""}<a href="/eleve/sources/${sourceId}">${titre}</a>`,
         )}</p>
-        ${avis(id, choix)}
+        ${citations ? "" : avis(id, choix)}
         ${
           idees.length
             ? html`<div class="idees-reponse"><strong>Pour continuer</strong>${idees.map((q) =>

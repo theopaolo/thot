@@ -20,7 +20,7 @@ import {
   parametresAcces,
   transaction,
 } from "../core/recherche.ts";
-import { champs, type Contenu } from "../core/activite.ts";
+import { citationsDe, type Explication } from "../core/activite.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
@@ -1170,10 +1170,10 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     return c.html(Prof.legende(aLegender(c), fileLegendes(c)));
   });
 
-  // ------------------------------------------------------------ exercices
+  // ------------------------------------------------------------ activités
   app.get("/prof/activites", (c) =>
     c.html(
-      rendre(c, "Exercices", ActiviteVue.listeProf(Activites.activitesProf(db, c.get("compte")))),
+      rendre(c, "Activités", ActiviteVue.listeProf(Activites.activitesProf(db, c.get("compte")))),
     ),
   );
   const pagePreparation = (
@@ -1194,7 +1194,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     };
     return rendre(
       c,
-      "Préparer un exercice",
+      "Préparer une activité",
       ActiviteVue.preparation({
         catalogue: cat,
         coursId: cible.cours_id,
@@ -1208,12 +1208,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     );
   };
   app.get("/prof/activites/nouvelle", (c) => c.html(pagePreparation(c)));
-  // La génération tient la requête : un appel de modèle, sans file de travaux.
+  // La génération tient la requête : les appels de modèle, sans file de travaux.
   app.post("/prof/activites", async (c) => {
     const b = await c.req.parseBody({ all: true });
     let r;
     try {
       r = await Activites.preparer(db, modeles, c.get("compte"), {
+        type: b.type === "explication" ? "explication" : "exercice",
         coursId: String(b.cours_id ?? ""),
         objectifId: String(b.objectif_id ?? ""),
         intitule: String(b.intitule ?? ""),
@@ -1233,7 +1234,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   const activiteProf = (c: Context<Env>) =>
     Activites.activiteProf(db, c.get("compte"), c.req.param("id")!);
   const detailActivite = (c: Context<Env>, a: Activites.Activite, erreur?: string) => {
-    const contenu: Contenu = JSON.parse(a.contenu);
+    const contenu = JSON.parse(a.contenu);
     const titre = db.prepare("SELECT titre FROM sources WHERE id = ?");
     return rendre(
       c,
@@ -1244,9 +1245,10 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         relectures: Activites.relectures(db, a.id),
         servies: Activites.servies(db, a),
         titres: new Map(
-          champs(contenu).flatMap((ch) =>
-            ch.citations.map((x) => [x.source_id, String(titre.get(x.source_id)?.titre ?? "")]),
-          ),
+          citationsDe(contenu).map((x) => [
+            x.source_id,
+            String(titre.get(x.source_id)?.titre ?? ""),
+          ]),
         ),
         erreur,
       }),
@@ -1256,20 +1258,30 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const a = activiteProf(c);
     return a ? c.html(detailActivite(c, a)) : c.notFound();
   });
-  // La page de l'élève avant sa réponse : la consigne, sans corrigé.
+  /** La page de l'élève, ou son aperçu : la consigne d'un exercice sans corrigé avant la réponse. */
+  const pageActivite = (c: Context<Env>, a: Activites.Activite, apercu = false) => {
+    const vue = {
+      a,
+      contenu: JSON.parse(a.contenu),
+      relecteur: Activites.relecteur(db, a),
+      apercu,
+    };
+    return rendre(
+      c,
+      a.intitule,
+      a.type === "explication"
+        ? ActiviteVue.explication(vue)
+        : ActiviteVue.pratique({
+            ...vue,
+            tentative: apercu ? undefined : Activites.tentative(db, c.get("compte"), a),
+          }),
+    );
+  };
   app.get("/prof/activites/:id/apercu", (c) => {
     const a = activiteProf(c);
-    if (!a) return c.notFound();
-    const vue = { a, contenu: JSON.parse(a.contenu), apercu: true };
-    return c.html(
-      rendre(
-        c,
-        a.intitule,
-        ActiviteVue.pratique({ ...vue, relecteur: Activites.relecteur(db, a) }),
-      ),
-    );
+    return a ? c.html(pageActivite(c, a, true)) : c.notFound();
   });
-  const CONFLIT = "Cet exercice a changé pendant votre saisie. Relisez sa version actuelle.";
+  const CONFLIT = "Cette activité a changé pendant votre saisie. Relisez sa version actuelle.";
   app.post("/prof/activites/:id/:action{(?:modifier|relire|publier)}", async (c) => {
     const a = activiteProf(c);
     if (!a) return c.notFound();
@@ -1284,8 +1296,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         if (!Activites.relire(db, compte, a, Number(b.revision))) refus = CONFLIT;
       } else {
         const r = Activites.publier(db, compte, a.id, Number(b.revision));
-        if (r === "refus") refus = "Seule la version relue d'un exercice se publie.";
-        if (r === "preuves") refus = "Une source citée ne tient plus : l'exercice est à revoir.";
+        if (r === "refus") refus = "Seule la version relue d'une activité se publie.";
+        if (r === "preuves") refus = "Une source citée ne tient plus : l'activité est à revoir.";
       }
     } catch (e) {
       if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
@@ -1315,6 +1327,25 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       .get(...Domaines.mesCours(l), id, instance.school_id, ...parametresAcces(l)) as
       | Eleve.SourceLue
       | undefined;
+  /** La feuille du passage `:n` d'une réponse ou d'une explication `id`, s'il est lisible. */
+  const feuilleCitation = (c: Context<Env>, affirmations: Affirmation[], id: string) => {
+    const n = Number(c.req.param("n"));
+    const a = affirmations[n];
+    const source = a && sourceCertifiee(a.source_id, lu(c));
+    if (!a || !source) return c.html(Eleve.panneauSource());
+    const suite = { id, n, total: affirmations.length };
+    if (a.debut === undefined || a.fin === undefined) {
+      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
+    }
+    const revision = a.revision ?? 1;
+    const texte = lireDocument(a.source_id, revision).texte;
+    return c.html(
+      Eleve.panneauSource(
+        { ...a, revision, enseignant: source.enseignant, ...contexte(texte, a.debut, a.fin) },
+        suite,
+      ),
+    );
+  };
 
   app.get("/eleve", (c) => {
     const rangs = db
@@ -1526,28 +1557,28 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     };
   };
 
-  // Un exercice se pratique publié, dans un cours du compte, tant que ses preuves tiennent. Le
-  // corrigé n'est rendu qu'avec une tentative sur sa version actuelle.
+  // Une activité se lit publiée, dans un cours du compte, tant que ses preuves tiennent. Le corrigé
+  // d'un exercice n'est rendu qu'avec une tentative sur sa version actuelle. Une explication n'a ni
+  // tentative ni corrigé.
   const activiteEleve = (c: Context<Env>) =>
     Activites.activiteEleve(db, c.get("compte"), c.req.param("id")!);
+  const exerciceEleve = (c: Context<Env>) => {
+    const a = activiteEleve(c);
+    return a?.type === "exercice" ? a : undefined;
+  };
   app.get("/eleve/activites/:id", (c) => {
     const a = activiteEleve(c);
-    if (!a) return c.notFound();
-    return c.html(
-      rendre(
-        c,
-        a.intitule,
-        ActiviteVue.pratique({
-          a,
-          contenu: JSON.parse(a.contenu),
-          tentative: Activites.tentative(db, c.get("compte"), a),
-          relecteur: Activites.relecteur(db, a),
-        }),
-      ),
-    );
+    return a ? c.html(pageActivite(c, a)) : c.notFound();
   });
+  // Les passages d'une explication, pour l'élève ou dans l'aperçu de l'enseignant.
+  const passagesExplication = (c: Context<Env>, a?: Activites.Activite) =>
+    a?.type === "explication"
+      ? feuilleCitation(c, (JSON.parse(a.contenu) as Explication).affirmations, a.id)
+      : c.notFound();
+  app.get("/eleve/activites/:id/citations/:n", (c) => passagesExplication(c, activiteEleve(c)));
+  app.get("/prof/activites/:id/citations/:n", (c) => passagesExplication(c, activiteProf(c)));
   app.post("/eleve/activites/:id/tentatives", async (c) => {
-    const a = activiteEleve(c);
+    const a = exerciceEleve(c);
     if (!a) return c.notFound();
     const reponse = String((await c.req.parseBody()).reponse ?? "").trim();
     if (!reponse || reponse.length > 4000) return c.text("Ta réponse : 1 à 4000 caractères.", 400);
@@ -1555,7 +1586,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     return c.redirect(`/eleve/activites/${a.id}#corrige`, 303);
   });
   app.post("/eleve/activites/:id/tentatives/:tentative/criteres", async (c) => {
-    const a = activiteEleve(c);
+    const a = exerciceEleve(c);
     if (!a) return c.notFound();
     const b = await c.req.parseBody({ all: true });
     const coches = [b.criteres ?? []].flat().map(Number);
@@ -2230,31 +2261,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       .get(c.req.param("id"), c.get("compte").id) as { resultat: string | null } | undefined;
     if (!m) return c.notFound();
     const r = m.resultat ? resultatActuel(m.resultat, lu(c)) : undefined;
-    const a: Affirmation | undefined =
-      r?.etat === "answered" ? r.affirmations[Number(c.req.param("n"))] : undefined;
-    const source = a && sourceCertifiee(a.source_id, lu(c));
-    if (!a || !source) return c.html(Eleve.panneauSource());
-    const suite = {
-      id: c.req.param("id"),
-      n: Number(c.req.param("n")),
-      total: r?.etat === "answered" ? r.affirmations.length : 0,
-    };
-    if (a.debut === undefined || a.fin === undefined) {
-      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
-    }
-    const revision = a.revision ?? 1;
-    const texte = lireDocument(a.source_id, revision).texte;
-    return c.html(
-      Eleve.panneauSource(
-        {
-          ...a,
-          revision,
-          enseignant: source.enseignant,
-          ...contexte(texte, a.debut, a.fin),
-        },
-        suite,
-      ),
-    );
+    return feuilleCitation(c, r?.etat === "answered" ? r.affirmations : [], c.req.param("id"));
   });
 
   app.onError((e, c) => {

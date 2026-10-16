@@ -6,10 +6,10 @@ import type { Db } from "../src/app/db.ts";
 import { cours, matiere, supprimer } from "../src/app/domaines.ts";
 import { lireDocument, reextraire, statuer, supprimerSource } from "../src/app/ingestion.ts";
 import { configurerInstance } from "../src/app/instance.ts";
-import type { Contenu } from "../src/core/activite.ts";
+import type { Contenu, Explication } from "../src/core/activite.ts";
 import type { Modeles } from "../src/core/modeles.ts";
 import { tranche } from "../src/core/texte.ts";
-import { environnement, fauxModeles, publier, session } from "./outils.ts";
+import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
 
 const cite = (texte: string, citation: string) => ({
   texte,
@@ -100,6 +100,22 @@ function formulaire(db: Db, id: string, change: Record<string, string> = {}) {
     ch.citations.forEach((c, j) => (corps[`citation_${i}_${j}`] = c.citation));
   });
   return { ...corps, ...change };
+}
+
+/** Une phrase de plus avant le passage cité déplace ses offsets dans une révision 2, à relire. */
+async function reviser(db: Db, source: string) {
+  const { fichier } = db.prepare("SELECT fichier FROM sources WHERE id = ?").get(source) as {
+    fichier: string;
+  };
+  const original = chemin(source, "original", fichier);
+  await writeFile(
+    original,
+    (await readFile(original, "utf8")).replace(
+      "<p>La façade",
+      "<p>Une phrase ajoutée.</p><p>La façade",
+    ),
+  );
+  assertEquals(await reextraire(db, source), "revision");
 }
 
 async function relirePublier(prof: Session, db: Db, id: string) {
@@ -308,19 +324,7 @@ test("exercice : nouvelle version, lecteurs retirés, rejet et suppression de la
     await relirePublier(prof, db, id);
     await envoyer(eleve, `/eleve/activites/${id}/tentatives`, { reponse: "Ma réponse." });
 
-    // Une phrase de plus avant le passage cité déplace ses offsets dans la révision 2.
-    const { fichier } = db.prepare("SELECT fichier FROM sources WHERE id = ?").get(source) as {
-      fichier: string;
-    };
-    const original = chemin(source, "original", fichier);
-    await writeFile(
-      original,
-      (await readFile(original, "utf8")).replace(
-        "<p>La façade",
-        "<p>Une phrase ajoutée.</p><p>La façade",
-      ),
-    );
-    assertEquals(await reextraire(db, source), "revision");
+    await reviser(db, source);
     assertEquals(ligne(db, id).etat, "publiee", "une révision en attente ne sert pas encore");
     statuer(db, source, "certifiee", "Prof", 2);
     assertEquals(ligne(db, id).etat, "a_revoir");
@@ -453,6 +457,78 @@ test("exercice : un juge en panne laisse le brouillon et le dit", async () => {
     assertStringIncludes(detail, "Juge indisponible");
     assert(!detail.includes("À vérifier"));
     await relirePublier(prof, db, id);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("explication : la réponse vérifiée à l'objectif, dans les sources choisies seulement, lue sans tentative et signalée à revoir", async () => {
+  const { db, dir, coursId, source, prof, eleve, vus } = await cadre(false, undefined, [BONNE]);
+  try {
+    const ecartee = await publier(db, "Source écartée", coursId);
+    const r = await envoyer(prof, "/prof/activites", {
+      type: "explication",
+      cours_id: coursId,
+      intitule: "Gaudí et la ligne droite",
+      sources: source,
+    });
+    assertEquals(r.status, 303, await r.text());
+    const id = r.headers.get("location")!.split("/").at(-1)!;
+    assertEquals(vus.length, 1);
+    assertStringIncludes(vus[0][1].content, "Question de l'eleve : Gaudí et la ligne droite");
+    assertStringIncludes(vus[0][1].content, "Casa Batlló");
+    assert(!vus[0][1].content.includes("Source écartée"), "une source non choisie");
+
+    const a = db.prepare("SELECT type, etat, contenu FROM activites WHERE id = ?").get(id)!;
+    assertEquals([a.type, a.etat], ["explication", "brouillon"]);
+    const contenu = JSON.parse(String(a.contenu)) as Explication;
+    assertEquals(
+      contenu.affirmations.map((x) => [x.texte, x.source_id, x.revision]),
+      [["Gaudí refuse la ligne droite.", source, 1]],
+    );
+    const detail = await page(prof, `/prof/activites/${id}`);
+    assertStringIncludes(detail, "« Gaudí refuse la ligne droite dans toute la façade »");
+    assert(!detail.includes("Modifier"), "une explication ne se modifie pas");
+    assertStringIncludes(
+      await page(prof, `/prof/activites/${id}/apercu`),
+      `/prof/activites/${id}/citations/0`,
+    );
+    assertStringIncludes(await page(prof, `/prof/activites/${id}/citations/0`), "<mark>");
+    await relirePublier(prof, db, id);
+
+    const lue = await page(eleve, `/eleve/activites/${id}`);
+    assertStringIncludes(lue, "Gaudí refuse la ligne droite.");
+    assertStringIncludes(lue, `hx-get="/eleve/activites/${id}/citations/0"`);
+    assertStringIncludes(lue, "Explication préparée par Compte enseignant, relue par");
+    for (const absent of ["Ta réponse", "/avis", "/eleve/messages/"]) {
+      assert(!lue.includes(absent), absent);
+    }
+    assertStringIncludes(await page(eleve, `/eleve/activites/${id}/citations/0`), "<mark>");
+    assertEquals(await statut(eleve.requete(`/eleve/activites/${id}/citations/0`)), 200);
+    assertEquals(
+      await statut(envoyer(eleve, `/eleve/activites/${id}/tentatives`, { reponse: "x" })),
+      404,
+    );
+    const dehors = await compte(db, "eleve", undefined, false);
+    assertEquals(await statut(dehors.requete(`/eleve/activites/${id}/citations/0`)), 404);
+
+    // Une nouvelle révision servie de la source citée retire l'explication aux élèves.
+    await reviser(db, source);
+    statuer(db, source, "certifiee", "Prof", 2);
+    assertEquals(db.prepare("SELECT etat FROM activites WHERE id = ?").get(id)!.etat, "a_revoir");
+    assertEquals(await statut(eleve.requete(`/eleve/activites/${id}`)), 404);
+    assertStringIncludes(await page(prof, `/prof/activites/${id}`), "Préparez-en une autre.");
+
+    // Supprimer la source retire ses phrases, l'autre source n'y change rien.
+    await supprimerSource(db, ecartee);
+    assertEquals((JSON.parse(ligne(db, id).contenu) as Explication).affirmations.length, 1);
+    await supprimerSource(db, source);
+    assert(!/ligne droite|Batlló|façade/.test(ligne(db, id).contenu), "texte de la source");
+    assertStringIncludes(
+      await page(prof, `/prof/activites/${id}`),
+      "Vide : ses sources ont été supprimées.",
+    );
   } finally {
     db.close();
     await rm(dir, { recursive: true });

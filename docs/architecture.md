@@ -255,9 +255,10 @@ ou pour une image qu'une réextraction a remplacée, reste dans `cache_modeles`.
 les rapports d'évaluation de `data/evaluation/` ne sont pas touchés
 ([exploitation](exploitation.md#données-personnelles)).
 
-## Exercices sourcés
+## Activités sourcées
 
-Un objectif d'apprentissage appartient à un cours. Sa référence (référentiel ou programme,
+Une activité est un exercice à réponse courte ou une explication d'étude. Un objectif
+d'apprentissage appartient à un cours. Sa référence (référentiel ou programme,
 compétence et version) reste un texte libre que Thot n'interprète pas : rien ne déduit qu'un
 document couvre un objectif.
 
@@ -279,8 +280,15 @@ dans le champ, avec la version : afficher la page ne rappelle pas le juge. Une m
 juger les champs dont le texte ou les passages changent, et ceux restés sans avis. Publier ne
 demande pas l'avis du juge : la relecture de l'enseignant reste la barrière.
 
-Un exercice est brouillon, relu, publié ou à revoir. Une relecture vaut pour une version de
-l'exercice. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut
+Une explication part du même choix de cours, d'objectif et de sources. Thot pose l'objectif comme
+une question à `demander()`, dans les sources choisies seulement (`Perimetre.sources`). L'explication
+garde la réponse vérifiée : affirmations, citations avec la révision de leur source, blocs, et l'avis
+du juge que `demander()` applique déjà à chaque phrase. Hors corpus ou en panne, rien n'est
+enregistré. L'élève la lit comme une réponse, avec la feuille du passage cité, sans tentative ni
+corrigé. Elle ne se modifie pas : l'enseignant en prépare une autre.
+
+Une activité est brouillon, relue, publiée ou à revoir. Une relecture vaut pour une version de
+l'activité. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut
 plus pour elle. Une relecture, une publication ou une modification partie d'une version périmée est
 refusée. Publier demande une version relue et des preuves qui tiennent encore. L'historique garde
 qui a relu, publié ou modifié chaque version, et quand.
@@ -293,17 +301,19 @@ aucun texte.
 
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
 publiée à ses élèves et utilisée par Thot. `statuer()`, `supprimerSource()` et les changements de
-lecteurs ou de cours d'une source signalent à revoir les exercices dont une citation ne tient plus.
-La page de l'élève revérifie les citations à chaque affichage. Un exercice à revoir n'est plus servi.
-L'enseignant l'enregistre de nouveau, ce qui recherche chaque passage dans la révision servie, puis
-le relit. Une tentative garde la version de l'exercice à laquelle elle répondait.
+lecteurs ou de cours d'une source signalent à revoir les activités dont une citation ne tient plus.
+La page de l'élève revérifie les citations à chaque affichage. Une activité à revoir n'est plus
+servie. L'enseignant enregistre de nouveau un exercice, ce qui recherche chaque passage dans la
+révision servie, puis le relit. Une tentative garde la version de l'exercice à laquelle elle
+répondait.
 
 Supprimer une source retire de chaque exercice ses passages et le texte des champs qui les citaient,
-rédigés d'après elle. L'exercice devient à revoir. Les réponses des élèves restent : elles viennent
+rédigés d'après elle. Une explication perd les phrases qui la citaient, et ses blocs, dont les titres
+ont pu nommer la source. L'activité devient à revoir. Les réponses des élèves restent : elles viennent
 d'eux, et suivent la purge de `THOT_RETENTION_JOURS`.
 
-En mode personnel, un exercice reste privé à son auteur, cours compris. Il le relit et le publie
-pour lui-même, et la page dit que personne d'autre ne l'a relu.
+En mode personnel, une activité reste privée à son auteur, cours compris. Il la relit et la publie
+pour lui-même, et la page dit que personne d'autre ne l'a relue.
 
 ## Conversations
 

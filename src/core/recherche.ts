@@ -37,6 +37,8 @@ export type Perimetre = {
   coursId?: string;
   themeId?: string;
   sourceId?: string;
+  /** explication d'une activité : les sources choisies, qui remplacent `sourceId` */
+  sources?: string[];
   /** recherche de la bibliothèque: toute source lisible, même hors des preuves de réponse */
   bibliotheque?: boolean;
   /** null : vue système des sources publiées, tous cours confondus */
@@ -76,6 +78,14 @@ export const parametresDomaine = (p: Perimetre) => {
     c = p.coursId ?? "",
     t = p.themeId ?? "";
   return [m, c, t, m, c, t, m, m, m, c, c, t, t];
+};
+
+/** `sourceId` ou `sources`, en liste JSON. Vide : toutes les sources. */
+const FILTRE_SOURCES = "(? = '' OR s.id IN (SELECT value FROM json_each(?)))";
+const parametresSources = (p: Perimetre) => {
+  const ids = p.sources ?? (p.sourceId ? [p.sourceId] : []);
+  const j = ids.length ? JSON.stringify(ids) : "";
+  return [j, j];
 };
 
 export type Recherche = {
@@ -132,7 +142,7 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
        AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-       AND (? = '' OR s.id = ?)
+       AND ${FILTRE_SOURCES}
        AND ${FILTRE_DOMAINE}
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
     )
@@ -141,8 +151,7 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
       p.schoolId,
       ...parametresAcces(p.lecteur),
       p.bibliotheque ? 1 : 0,
-      p.sourceId ?? "",
-      p.sourceId ?? "",
+      ...parametresSources(p),
       ...parametresDomaine(p),
       k,
     );
@@ -151,13 +160,12 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
 
 /** Une source que le périmètre peut citer: certifiée, lisible par son lecteur, dans son domaine. */
 const CITABLE = `s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-  AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`;
+  AND ${FILTRE_SOURCES} AND ${FILTRE_DOMAINE}`;
 const parametresCitable = (p: Perimetre) => [
   p.schoolId,
   ...parametresAcces(p.lecteur),
   p.bibliotheque ? 1 : 0,
-  p.sourceId ?? "",
-  p.sourceId ?? "",
+  ...parametresSources(p),
   ...parametresDomaine(p),
 ];
 

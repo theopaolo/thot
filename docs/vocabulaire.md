@@ -174,12 +174,20 @@ Ce qu'une personne doit savoir ou savoir faire, dans un cours. Sa « Référence
 un référentiel ou un programme, une compétence et leur version. Thot ne déduit pas qu'un document
 couvre un objectif.
 
+**Activité**
+Exercice ou explication préparé dans un cours, depuis un objectif et des sources certifiées. La
+bibliothèque les range sous l'onglet « Activités ». « Préparer une activité », le choix du type,
+puis « Rédiger le brouillon ». L'élève trouve les activités publiées dans ses ressources.
+
 **Exercice**
-Exercice à réponse courte préparé dans un cours, depuis un objectif et des sources certifiées :
-consigne, réponse attendue, critères et retour, chacun avec les passages qu'il cite. La
-bibliothèque les range sous l'onglet « Exercices ». « Préparer un exercice », puis « Rédiger le
-brouillon ». Un champ dont un passage ne se retrouve pas mot pour mot est un « champ rejeté », et
-la page de l'exercice les compte. L'élève trouve les exercices publiés dans ses ressources.
+Exercice à réponse courte : consigne, réponse attendue, critères et retour, chacun avec les
+passages qu'il cite. Un champ dont un passage ne se retrouve pas mot pour mot est un « champ
+rejeté », et la page de l'exercice les compte.
+
+**Explication d'étude**
+La réponse vérifiée de Thot à l'objectif, posé comme une question dans les sources choisies.
+Chaque phrase porte son numéro de citation, comme dans le chat. L'élève la lit, sans réponse à
+envoyer. Une explication ne se modifie pas : à revoir, l'enseignant en prépare une autre.
 
 **À vérifier, juge indisponible**
 Avis du juge de soutien sur un champ d'exercice, dans la page de l'enseignant. « À vérifier » : les
@@ -187,11 +195,12 @@ passages cités n'établissent pas tout ce que dit le champ. « Juge indisponibl
 sont retrouvés mot pour mot, mais le juge n'a pas répondu. Aucun des deux n'empêche de publier.
 
 **Brouillon, relu, publié, à revoir**
-États d'un exercice. Thot rédige un « Brouillon ». « Marquer la version relue » le rend « Relu »,
+États d'une activité. Thot rédige un « Brouillon ». « Marquer la version relue » le rend « Relu »,
 « Publier aux élèves du cours » le rend « Publié ». « Enregistrer une nouvelle version » remet un
-brouillon à relire. « À revoir » : une source citée a une nouvelle version, n'est plus citable dans
-le cours ou a été supprimée, et les élèves ne reçoivent plus l'exercice. « Aperçu élève » montre la
-page de l'élève avant sa réponse. En mode personnel, « Publier pour m'entraîner ».
+exercice en brouillon à relire. « À revoir » : une source citée a une nouvelle version, n'est plus
+citable dans le cours ou a été supprimée, et les élèves ne reçoivent plus l'activité. « Aperçu
+élève » montre la page de l'élève, avant sa réponse pour un exercice. En mode personnel, « Publier
+pour m'entraîner ».
 
 **Réponse attendue, critères, retour**
 Le corrigé d'un exercice. L'élève le lit après avoir envoyé sa réponse, qui s'affiche à côté. Il
