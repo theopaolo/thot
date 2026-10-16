@@ -23,6 +23,8 @@ export type Affirmation = {
   fin?: number;
   /** révision citée, absente des réponses antérieures aux révisions: elles citent la révision 1 */
   revision?: number;
+  /** comparaison : la ou les matières de l'extrait cité */
+  matiere?: string;
 };
 
 /**
@@ -48,7 +50,12 @@ type Repondue = {
 };
 
 export type Resultat =
-  | ({ etat: "answered"; partielle?: boolean } & Repondue)
+  | ({
+      etat: "answered";
+      partielle?: boolean;
+      /** comparaison : les matières où aucun passage n'a passé le seuil */
+      sans_passage?: string[];
+    } & Repondue)
   | { etat: "out_of_corpus"; raison: "seuil" | "refus_modele" }
   | { etat: "failed"; code: string; message: string };
 
@@ -108,6 +115,9 @@ const SYSTEME: Record<Profil, string> = {
    Pour une question simple, n'ajoute pas de blocs.`,
     ),
 };
+// Ajoutée au profil général pour une comparaison seulement : la consigne ordinaire ne change pas.
+const COMPARAISON =
+  "8. Les extraits nomment leur matiere : dans un tableau, une colonne par matiere.";
 
 /** Les consignes d'arts appliqués servent quand toutes les sources citables en viennent. */
 export function profilSources(db: DatabaseSync, ids: string[]): Profil {
@@ -120,8 +130,14 @@ export function profilSources(db: DatabaseSync, ids: string[]): Profil {
   return arts ? "arts-appliques" : "general";
 }
 
+// En comparaison seulement, l'extrait nomme sa matière : le format mesuré ne change pas.
 const bloc = (retenus: Candidat[]) =>
-  retenus.map((c, i) => `[${i + 1}] ${c.titre}\n${c.preuve}`).join("\n\n");
+  retenus
+    .map(
+      (c, i) =>
+        `[${i + 1}] ${c.titre}${c.matieres ? ` (matière : ${c.matieres.join(", ")})` : ""}\n${c.preuve}`,
+    )
+    .join("\n\n");
 
 // Le modèle peut rendre n'importe quelle forme: chaque champ est vérifié avant usage.
 type Brute = { refus?: unknown; affirmations?: unknown; blocs?: unknown };
@@ -142,7 +158,10 @@ function lire(sortie: string): Brute | null {
 }
 
 /** Contrôles déterministes: chaque citation existe mot pour mot dans l'extrait qu'elle désigne. */
-export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
+export function verifier(
+  brute: Brute | null,
+  retenus: (ChunkIndexe & Pick<Candidat, "matieres">)[],
+) {
   const erreurs: string[] = [];
   // Suit la liste du modèle, que ses blocs désignent par rang : une affirmation refusée y laisse
   // un trou.
@@ -161,7 +180,14 @@ export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
     if (citation.split(/\s+/).length < 3) {
       return erreurs.push(`Affirmation ${i + 1}: citation trop courte.`);
     }
-    const base = { texte, citation, source_id: c.source_id, chunk_id: c.id, revision: c.revision };
+    const base = {
+      texte,
+      citation,
+      source_id: c.source_id,
+      chunk_id: c.id,
+      revision: c.revision,
+      ...(c.matieres && { matiere: c.matieres.join(", ") }),
+    };
     const dansTexte = trouverFragments(c.texte, citation);
     if (dansTexte) {
       parRang[i] = {
@@ -356,6 +382,7 @@ export async function demander(
 ): Promise<{ resultat: Resultat; journal: Journal }> {
   const journal: Journal = { seuil };
   let gardees: Repondue = { affirmations: [] };
+  let sansPassage: string[] = [];
   const repondre = (reponse: Repondue, partielle = false) => {
     for (const a of reponse.affirmations) {
       const images = db
@@ -382,6 +409,7 @@ export async function demander(
           etat: "answered",
           ...reponse,
           ...(partielle && { partielle }),
+          ...(sansPassage.length > 0 && { sans_passage: sansPassage }),
         },
         p,
       ),
@@ -409,7 +437,10 @@ export async function demander(
       source_id: c.source_id,
       rang_fts: c.rang_fts,
       score: c.score,
+      matieres: c.matieres,
     }));
+    sansPassage = r.sansPassage ?? [];
+    if (sansPassage.length) journal.sans_passage = sansPassage;
     if (r.horsCorpus) return { resultat: { etat: "out_of_corpus", raison: "seuil" }, journal };
 
     etape("Rédaction à partir des passages trouvés");
@@ -417,8 +448,10 @@ export async function demander(
       db,
       r.retenus.map((c) => c.source_id),
     );
+    // `sansPassage` n'existe qu'en comparaison, même vide.
+    const comparaison = r.sansPassage && profil === "general" ? `\n${COMPARAISON}` : "";
     const messages: Message[] = [
-      { role: "system", content: SYSTEME[profil] },
+      { role: "system", content: SYSTEME[profil] + comparaison },
       {
         role: "user",
         content: `Extraits du corpus :\n\n${bloc(r.retenus)}\n\n${

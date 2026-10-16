@@ -16,6 +16,7 @@ import {
   filtreAcces,
   indexerSource,
   type Lecteur,
+  MAX_MATIERES,
   parametresAcces,
   transaction,
 } from "../core/recherche.ts";
@@ -314,7 +315,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     return c.redirect("/eleve", 303);
   });
 
-  const scope = (c: Context<Env>) => Domaines.lireScope(c.req.query());
+  const scope = (c: Context<Env>) =>
+    Domaines.lireScope({ ...c.req.query(), matieres: c.req.queries("matieres") });
   const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
   const optionsDepot = (
     c: Context<Env>,
@@ -726,6 +728,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
            ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = ?)
          WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
            ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = ?)
+         WHEN m.matieres != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE instr(',' || m.matieres || ',', ',' || co.matiere_id || ',')
+           AND mc.compte_id = ?)
          ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
            OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
              ON lui.cours_id = moi.cours_id WHERE moi.compte_id = ? AND lui.compte_id = m.compte_id)
@@ -737,6 +742,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         ...parametresAcces(l),
         ...parametresAcces(l),
         l.administrateur ? 1 : 0,
+        l.id,
         l.id,
         l.id,
         l.id,
@@ -1484,7 +1490,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
     const lignes = db
       .prepare(
-        `SELECT id, question, etat, etape, resultat, avis, chapitre, matiere_id, cours_id, theme_id
+        `SELECT id, question, etat, etape, resultat, avis, chapitre, matiere_id, cours_id, theme_id, matieres
          FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
       )
       .all(conversationId, compte.id) as (Eleve.MessageVue & Perimetre)[];
@@ -1502,7 +1508,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   const ideesPour = (l: Lecteur, r: Resultat, question = "", messageId = "") => {
     const m = messageId
       ? db
-          .prepare("SELECT matiere_id, cours_id, theme_id FROM messages WHERE id = ?")
+          .prepare("SELECT matiere_id, cours_id, theme_id, matieres FROM messages WHERE id = ?")
           .get(messageId)
       : undefined;
     if (m && Object.values(m).some(Boolean)) {
@@ -1568,15 +1574,21 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
   const perimetreRefuse = (c: Context<Env>, { chapitre, ...reste }: Perimetre) => {
     const p = Domaines.lireScope(reste);
+    const comparees = Domaines.idsMatieres(p.matieres);
+    if (comparees.length > MAX_MATIERES) return `Compare ${MAX_MATIERES} matières au plus.`;
     if (Object.values(p).some(Boolean)) {
-      const disponibles = Domaines.sourcesPerimetre(db, p);
-      const visible = db
+      const lisibles = db
         .prepare(
           `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
         )
-        .all(instance.school_id, ...parametresAcces(lu(c)))
-        .some((s) => disponibles.has(s.id as string));
-      if (!visible) return "Périmètre indisponible.";
+        .all(instance.school_id, ...parametresAcces(lu(c)));
+      const visible = (q: Domaines.Scope) => {
+        const disponibles = Domaines.sourcesPerimetre(db, q);
+        return lisibles.some((s) => disponibles.has(s.id as string));
+      };
+      // Chaque matière comparée offre une source lisible, comme une matière seule.
+      const matieres = comparees.map((m) => ({ matiere_id: m, cours_id: "", theme_id: "" }));
+      if (![p, ...matieres].every(visible)) return "Périmètre indisponible.";
       // Un élève ne pose une question dans un cours que s'il en est membre.
       const coursId =
         p.cours_id ||
@@ -1611,7 +1623,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const theme = libelleTheme();
     const lignes = db
       .prepare(
-        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, active_le, ${ETAT_CONVERSATION}
+        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, matieres, active_le, ${ETAT_CONVERSATION}
          FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
          ORDER BY active_le DESC, rowid DESC LIMIT ?`,
       )
@@ -1639,11 +1651,11 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const theme = libelleTheme();
     // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
     const p: Perimetre = conv ??
-      (Object.hasOwn(c.req.query(), "matiere_id")
+      (Object.hasOwn(c.req.query(), "matiere_id") || Object.hasOwn(c.req.query(), "matieres")
         ? { ...scope(c), chapitre: "" }
         : (db
             .prepare(
-              `SELECT chapitre, matiere_id, cours_id, theme_id FROM conversations
+              `SELECT chapitre, matiere_id, cours_id, theme_id, matieres FROM conversations
                WHERE compte_id = ? ORDER BY active_le DESC, rowid DESC LIMIT 1`,
             )
             .get(compte.id) as Perimetre | undefined)) ?? {
@@ -1682,6 +1694,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             matiere_id: p.matiere_id,
             cours_id: p.cours_id,
             theme_id: p.theme_id,
+            matieres: p.matieres ?? "",
           },
           catalogue: cat,
           theme,
@@ -1764,12 +1777,17 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const conv = conversationDe(c, c.req.param("id"));
     if (!conv) return c.notFound();
     if (conv.archivee_le) return c.text("Cette conversation est archivée.", 409);
-    const p = { ...Domaines.lireScope(await c.req.parseBody()), chapitre: "" };
+    const b = await c.req.parseBody({ all: true });
+    // Le formulaire de comparaison n'envoie que ses cases : vide, il ne vaut pas « tout ».
+    if (!Object.hasOwn(b, "matiere_id") && !Object.hasOwn(b, "matieres")) {
+      return c.text("Coche les matières à comparer.", 400);
+    }
+    const p = { ...Domaines.lireScope(b), chapitre: "" };
     const refus = perimetreRefuse(c, p);
     if (refus) return c.text(refus, 400);
     db.prepare(
-      "UPDATE conversations SET chapitre = '', matiere_id = ?, cours_id = ?, theme_id = ? WHERE id = ?",
-    ).run(p.matiere_id, p.cours_id, p.theme_id, conv.id);
+      "UPDATE conversations SET chapitre = '', matiere_id = ?, cours_id = ?, theme_id = ?, matieres = ? WHERE id = ?",
+    ).run(p.matiere_id, p.cours_id, p.theme_id, p.matieres ?? "", conv.id);
     return c.redirect(`/eleve/chat/${conv.id}`, 303);
   });
 
@@ -1838,7 +1856,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             : ligne;
         db.prepare(
           `INSERT INTO conversations (id, compte_id, titre, chapitre, matiere_id, cours_id, theme_id,
-           active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           matieres, active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           conversationId,
           compte.id,
@@ -1847,6 +1865,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           p.matiere_id,
           p.cours_id,
           p.theme_id,
+          p.matieres ?? "",
           t,
           t,
         );
@@ -1854,9 +1873,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       // Le journal garde l'heure de la demande : la boucle en tire le temps d'attente.
       db.prepare(
         `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question, chapitre,
-         matiere_id, cours_id, theme_id, etat, journal, cree_le, maj_le)
+         matiere_id, cours_id, theme_id, matieres, etat, journal, cree_le, maj_le)
          VALUES (?, ?, ?, (SELECT coalesce(max(rang), 0) + 1 FROM messages WHERE conversation_id = ?),
-         ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
+         ?, ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
       ).run(
         id,
         compte.id,
@@ -1868,6 +1887,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         p.matiere_id,
         p.cours_id,
         p.theme_id,
+        p.matieres ?? "",
         Date.now(),
         t,
         t,

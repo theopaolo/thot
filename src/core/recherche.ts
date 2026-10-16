@@ -26,12 +26,15 @@ export type ChunkIndexe = {
   revision: number;
 };
 
-export type Candidat = ChunkIndexe & { rang_fts: number; score?: number };
+/** `matieres` : en comparaison, les noms des matières où le chunk a été trouvé. */
+export type Candidat = ChunkIndexe & { rang_fts: number; score?: number; matieres?: string[] };
 
 export type Perimetre = {
   schoolId: string;
   chapitre?: string;
   matiereId?: string;
+  /** comparaison : deux matières ou plus, qui remplacent `matiereId` */
+  matieres?: string[];
   coursId?: string;
   themeId?: string;
   sourceId?: string;
@@ -62,13 +65,15 @@ export const parametresAcces = (l: Lecteur | null) => [
   l?.id ?? "",
 ];
 
+/** Les matières passent en liste JSON : une seule, ou celles d'une comparaison. */
 export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')
-  OR (? != '' AND ? = '' AND ? = '' AND s.matiere_id = ?)
+  OR (? != '' AND ? = '' AND ? = '' AND s.matiere_id IN (SELECT value FROM json_each(?)))
   OR EXISTS (SELECT 1 FROM source_cours sc JOIN cours co ON co.id = sc.cours_id
-    WHERE sc.source_id = s.id AND (? = '' OR co.matiere_id = ?)
+    WHERE sc.source_id = s.id AND (? = '' OR co.matiere_id IN (SELECT value FROM json_each(?)))
       AND (? = '' OR sc.cours_id = ?) AND (? = '' OR sc.theme_id = ?)))`;
 export const parametresDomaine = (p: Perimetre) => {
-  const m = p.matiereId ?? "",
+  const ids = p.matieres?.length ? p.matieres : p.matiereId ? [p.matiereId] : [];
+  const m = ids.length ? JSON.stringify(ids) : "",
     c = p.coursId ?? "",
     t = p.themeId ?? "";
   return [m, c, t, m, c, t, m, m, m, c, c, t, t];
@@ -81,6 +86,8 @@ export type Recherche = {
   horsCorpus: boolean;
   /** message de la panne du reclasseur: `retenus` suit alors l'ordre de FTS5 et `score` vaut 0 */
   panneReclasseur?: string;
+  /** comparaison : les matières sans extrait au-dessus du seuil */
+  sansPassage?: string[];
 };
 
 export function transaction<T>(db: DatabaseSync, f: () => T): T {
@@ -175,6 +182,39 @@ export const revisionCitable = (db: DatabaseSync, sourceId: string, p: Perimetre
     .prepare(`SELECT s.revision FROM sources s WHERE s.id = ? AND ${CITABLE}`)
     .get(sourceId, ...parametresCitable(p))?.revision as number | undefined;
 
+/** Matières comparées au plus : une colonne de tableau et un des cinq extraits chacune. */
+export const MAX_MATIERES = 4;
+
+/**
+ * Comparaison : les 20 candidats FTS5 se partagent entre les matières, puis s'entrelacent par rang.
+ * Un chunk trouvé dans deux matières garde les deux noms.
+ */
+function chercherMatieres(db: DatabaseSync, question: string, p: Perimetre) {
+  const matieres = db
+    .prepare(
+      "SELECT id, nom FROM matieres WHERE id IN (SELECT value FROM json_each(?)) ORDER BY nom",
+    )
+    .all(JSON.stringify(p.matieres)) as { id: string; nom: string }[];
+  const parChunk = new Map<string, Candidat>();
+  for (const m of matieres) {
+    for (const c of chercherFts(
+      db,
+      question,
+      { ...p, matieres: [m.id] },
+      Math.floor(20 / matieres.length),
+    )) {
+      const cle = `${c.source_id}/${c.id}`;
+      const deja = parChunk.get(cle);
+      if (deja) deja.matieres!.push(m.nom);
+      else parChunk.set(cle, { ...c, matieres: [m.nom] });
+    }
+  }
+  return {
+    noms: matieres.map((m) => m.nom),
+    candidats: [...parChunk.values()].sort((a, b) => a.rang_fts - b.rang_fts),
+  };
+}
+
 /**
  * FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. Si le reclasseur
  * est en panne, l'ordre de FTS5 le remplace.
@@ -187,7 +227,8 @@ export async function chercher(
   seuil: number,
   signal?: AbortSignal,
 ): Promise<Recherche> {
-  const candidats = chercherFts(db, question, p);
+  const comparaison = (p.matieres?.length ?? 0) > 1 ? chercherMatieres(db, question, p) : undefined;
+  const candidats = comparaison?.candidats ?? chercherFts(db, question, p);
   if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
   let ordre: { index: number; score: number }[];
   let panneReclasseur: string | undefined;
@@ -217,7 +258,7 @@ export async function chercher(
       );
     });
   const score = classes[0]?.score ?? 0;
-  return {
+  const recherche = {
     candidats: classes,
     retenus: classes.slice(0, 5),
     score,
@@ -225,5 +266,18 @@ export async function chercher(
     // refus du générateur et le juge décident.
     horsCorpus: !classes.length || (!panneReclasseur && score < seuil),
     panneReclasseur,
+  };
+  if (!comparaison) return recherche;
+  // Seuls les extraits au-dessus du seuil servent. Le meilleur de chaque matière a sa place, les
+  // meilleurs restants complètent les cinq. Une matière sans extrait est signalée, pas complétée.
+  const admis = classes.filter((c) => panneReclasseur || c.score! >= seuil);
+  const garantis = new Set(
+    comparaison.noms.flatMap((m) => admis.find((c) => c.matieres!.includes(m)) ?? []),
+  );
+  const libres = admis.filter((c) => !garantis.has(c)).slice(0, Math.max(0, 5 - garantis.size));
+  return {
+    ...recherche,
+    retenus: admis.filter((c) => garantis.has(c) || libres.includes(c)),
+    sansPassage: comparaison.noms.filter((m) => !admis.some((c) => c.matieres!.includes(m))),
   };
 }

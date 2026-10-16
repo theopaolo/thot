@@ -1628,6 +1628,19 @@ form.question-form textarea {
 .perimetre form button {
   justify-self: start;
 }
+/* Comparer : une case par matière, à la suite, sous les trois listes. */
+.perimetre fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 0 var(--s4);
+  margin: 0;
+}
+.perimetre legend {
+  margin-bottom: var(--s1);
+  padding: 0;
+  font-weight: 700;
+}
 @media (min-width: 900px) {
   .perimetre form {
     grid-template-columns: repeat(3, minmax(0, 1fr));

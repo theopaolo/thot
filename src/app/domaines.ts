@@ -225,9 +225,10 @@ export function supprimer(db: Db, genre: string, id: string) {
     const questions = db
       .prepare(
         `SELECT count(*) AS n FROM messages
-       WHERE matiere_id ${dans} OR cours_id ${dans} OR theme_id ${dans}`,
+       WHERE matiere_id ${dans} OR cours_id ${dans} OR theme_id ${dans}
+         OR EXISTS (SELECT 1 FROM json_each(?) j WHERE instr(',' || matieres || ',', ',' || j.value || ','))`,
       )
-      .get(m, c, t)!.n as number;
+      .get(m, c, t, m)!.n as number;
     if (ressources || questions) {
       const emplois = [
         ressources && `${ressources} ressource(s)`,
@@ -412,12 +413,22 @@ export function rangerLegacy(
   affiliations(db, sourceId, par ? liensAutorises(db, par, lien, sourceId) : lien);
 }
 
-export type Scope = { matiere_id: string; cours_id: string; theme_id: string };
-export const lireScope = (champs: Record<string, unknown>): Scope => ({
-  matiere_id: String(champs.matiere_id ?? ""),
-  cours_id: String(champs.cours_id ?? ""),
-  theme_id: String(champs.theme_id ?? ""),
-});
+/** `matieres` : les matières d'une comparaison, identifiants triés et séparés par des virgules. */
+export type Scope = { matiere_id: string; cours_id: string; theme_id: string; matieres?: string };
+export const idsMatieres = (matieres = "") => matieres.split(",").filter(Boolean);
+/** Les matières arrivent en cases cochées ou en liste séparée par des virgules. */
+export const lireScope = (champs: Record<string, unknown>): Scope => {
+  const ids = [
+    ...new Set([champs.matieres ?? []].flat().flatMap((v) => idsMatieres(String(v)))),
+  ].sort();
+  return {
+    // Une seule matière cochée n'est pas une comparaison : c'est le périmètre de cette matière.
+    matiere_id: ids.length > 1 ? "" : (ids[0] ?? String(champs.matiere_id ?? "")),
+    cours_id: String(champs.cours_id ?? ""),
+    theme_id: String(champs.theme_id ?? ""),
+    ...(ids.length > 1 && { matieres: ids.join(",") }),
+  };
+};
 export function sourcesPerimetre(db: Db, p: Scope) {
   return new Set(
     db
@@ -427,6 +438,7 @@ export function sourcesPerimetre(db: Db, p: Scope) {
           schoolId: "",
           lecteur: null,
           matiereId: p.matiere_id,
+          matieres: idsMatieres(p.matieres),
           coursId: p.cours_id,
           themeId: p.theme_id,
         }),

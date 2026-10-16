@@ -191,7 +191,8 @@ Le propriétaire et les administrateurs modifient une source, la certifient et r
 légendes. Les enseignants de ses cours le font aussi quand elle n'est pas privée. Les questions
 suggérées et le fait de l'accueil suivent le lecteur. Un cours ne se nomme qu'à ses membres, et un
 élève ne pose une question dans un cours que s'il en est membre. `/prof/questions` montre à un
-enseignant les échanges de ses cours. Un échange sans cours va aux enseignants qui partagent un
+enseignant les échanges de ses cours. Une comparaison va aux enseignants des cours de ses
+matières. Un échange sans cours va aux enseignants qui partagent un
 cours avec l'élève, ou à tous s'il n'en a aucun. Un enseignant ne voit et ne réinitialise que les
 élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Un
 enseignant crée les élèves de ses cours, chacun inscrit à au moins un, et les en retire. Il
@@ -217,6 +218,11 @@ pour les questions suivantes, et chaque envoi revérifie que l'élève peut enco
 périmètre. La recherche d'une question ne reprend que la question précédente de la même
 conversation, si elle a été posée dans le même périmètre. Rien ne passe d'une conversation à une
 autre, ni d'un périmètre restreint à un périmètre plus large.
+
+Un périmètre peut aussi comparer deux à quatre matières entières, cochées dans le formulaire
+« Changer ». Une seule case cochée vaut le périmètre de cette matière. Chaque matière comparée doit
+offrir au lecteur une source lisible, sinon le périmètre est refusé. La conversation et chacun de
+ses échanges gardent la liste des matières comparées.
 
 Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. Un envoi pendant
 une réponse, ou dans une conversation archivée, reçoit 409 et l'élève garde sa saisie. Un envoi
@@ -332,6 +338,25 @@ affirmation avec sa propre citation. `ranger()` dans `src/core/reponse.ts` borne
 Une structure invalide donne un seul paragraphe, une affirmation refusée quitte son bloc. Une
 réponse sans blocs, comme toutes celles d'avant, se lit en un paragraphe. Les réponses d'arts
 appliqués restent plates : leur consigne mesurée ne demande pas de blocs.
+
+### Comparaison de matières
+
+Pour une comparaison, `chercher()` interroge chaque matière à part, avec le filtre d'accès du
+lecteur. Les 20 candidats FTS5 se partagent à parts égales entre les matières, et un seul
+reclassement ordonne leur union. Seuls les extraits au-dessus du seuil servent. Le meilleur extrait
+de chaque matière prend une des cinq places, les meilleurs restants complètent les autres : une
+grande matière ne prend pas toutes les places. Un chunk trouvé dans deux matières porte les deux
+noms.
+
+Le modèle ne complète pas une matière sans extrait au-dessus du seuil. La réponse affiche
+« Aucun passage trouvé en {matière}. » et le journal note la matière sous `sans_passage`. Sans
+extrait dans aucune matière, la question est `out_of_corpus`.
+
+Les extraits donnés au générateur nomment leur matière en comparaison seulement, et la consigne du
+profil général y gagne une règle : une colonne de tableau par matière. Les questions d'une seule
+matière gardent le format et les consignes mesurés. Chaque affirmation garde sa source, et la
+réponse affiche la matière de cette source à côté de sa citation. Le titre d'une colonne vient du
+modèle et ne prouve pas la matière.
 
 ## Règles de travail
 

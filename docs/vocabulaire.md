@@ -161,6 +161,12 @@ Matière, cours et thème où Thot cherche les passages d'une réponse. Le chat 
 la saisie : « Dans : Arts appliqués / STD2A / Bauhaus », ou « Dans : toutes tes ressources ».
 « Changer », puis « Appliquer aux prochaines questions », le modifie pour la suite seulement.
 
+**Comparaison de matières**
+Périmètre qui couvre deux à quatre matières entières : « Dans : Histoire de l'art et Physique ».
+« Changer », les cases de « Comparer des matières », puis « Comparer dans les prochaines
+questions ». Chaque phrase de la réponse porte la matière de sa source à côté de son numéro. La
+réponse nomme une matière sans passage assez proche : « Aucun passage trouvé en Philosophie. »
+
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 

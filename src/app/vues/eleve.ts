@@ -3,7 +3,7 @@ import type { Bloc } from "../../core/document.ts";
 import type { BlocReponse, Resultat } from "../../core/reponse.ts";
 import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
-import type { Catalogue, Scope } from "../domaines.ts";
+import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { texteDocument } from "./document.ts";
@@ -643,6 +643,8 @@ export const reponse = (
         ? "Vérification partielle : une étape de contrôle n'a pas pu être faite."
         : "",
     ].filter(Boolean);
+    // En comparaison, la matière de la source suit sa citation : le titre d'une colonne ne la
+    // prouve pas.
     const phrase = (n: number) =>
       html`<span>${r.affirmations[n].texte}</span><span class="marque">&nbsp;<button
         class="citation"
@@ -654,7 +656,11 @@ export const reponse = (
         hx-swap="outerHTML"
         hx-sync="#source:replace"
         data-ouvrir-feuille
-      >${icone("quotes")}${n + 1}</button></span>`;
+      >${icone("quotes")}${n + 1}</button></span>${
+        r.affirmations[n].matiere
+          ? html` <span class="discret">${r.affirmations[n].matiere}</span>`
+          : ""
+      }`;
     // Sans blocs, comme toute réponse antérieure, les affirmations forment un paragraphe. Un type
     // inconnu se lit aussi en paragraphe.
     const bloc = (b: BlocReponse, k: number) => {
@@ -687,6 +693,9 @@ export const reponse = (
         <div class="texte-reponse">${(
           r.blocs ?? [{ type: "paragraphe", affirmations: r.affirmations.map((_, n) => n) }]
         ).map(bloc)}</div>
+        ${(r.sans_passage ?? []).map(
+          (m) => html`<p class="reponse-note">Aucun passage trouvé en ${m}.</p>`,
+        )}
         ${[
           ...new Map(r.affirmations.filter((a) => a.image_id).map((a) => [a.image_id, a])).values(),
         ].map(
@@ -867,8 +876,19 @@ export type MessageVue = {
 
 export type Perimetre = Scope & { chapitre: string };
 
-/** « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. */
+const LISTE = new Intl.ListFormat("fr");
+/**
+ * « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. Une
+ * comparaison nomme ses matières : « Histoire de l'art et Physique ».
+ */
 export const nomPerimetre = (cat: Catalogue, p: Perimetre, theme = "Thème") => {
+  if (p.matieres) {
+    return LISTE.format(
+      idsMatieres(p.matieres)
+        .map((id) => cat.matieres.find((m) => m.id === id)?.nom ?? "Matière indisponible")
+        .sort((a, b) => a.localeCompare(b, "fr")),
+    );
+  }
   const t = cat.themes.find((x) => x.id === p.theme_id);
   const c = cat.cours.find((x) => x.id === (p.cours_id || t?.cours_id));
   const m = cat.matieres.find((x) => x.id === (p.matiere_id || c?.matiere_id));
@@ -1002,6 +1022,10 @@ export const chat = (f: Fil) => {
   const derniere = f.messages.findLastIndex((m) => m.etat === "answered");
   const enCours = f.messages.some((m) => !m.resultat);
   const nom = nomPerimetre(f.catalogue, f.perimetre, f.theme) || "toutes tes ressources";
+  const changer = conv
+    ? html`method="post" action="/eleve/chat/${conv.id}/perimetre"`
+    : html`method="get" action="/eleve/chat/nouvelle"`;
+  const comparees = idsMatieres(f.perimetre.matieres);
   const composer = html`
     <form
       id="envoi"
@@ -1121,12 +1145,28 @@ export const chat = (f: Fil) => {
                 <p id="perimetre" aria-live="polite">Dans : ${nom}</p>
                 <details ${f.indisponible ? "open" : ""}>
                   <summary>Changer</summary>
-                  <form method="${conv ? "post" : "get"}"
-                    action="${conv ? `/eleve/chat/${conv.id}/perimetre` : "/eleve/chat/nouvelle"}"
-                    data-focus=".perimetre summary">
+                  <form ${changer} data-focus=".perimetre summary">
                     ${selectsPerimetre(f.catalogue, f.perimetre, f.theme)}
                     <button>Appliquer aux prochaines questions</button>
                   </form>
+                  ${
+                    f.catalogue.matieres.length > 1
+                      ? html`
+                      <form ${changer} data-focus=".perimetre summary">
+                        <fieldset>
+                          <legend>Comparer des matières</legend>
+                          ${f.catalogue.matieres.map(
+                            (m) =>
+                              html`<label><input type="checkbox" name="matieres" value="${m.id}" ${
+                                comparees.includes(m.id) ? "checked" : ""
+                              }> ${m.nom}</label>`,
+                          )}
+                        </fieldset>
+                        <button>Comparer dans les prochaines questions</button>
+                      </form>
+                    `
+                      : ""
+                  }
                 </details>
               </div>
               <div class="composeur">
