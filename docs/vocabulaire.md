@@ -177,7 +177,8 @@ couvre un objectif.
 **Activité**
 Exercice ou explication préparé dans un cours, depuis un objectif et des sources certifiées. La
 bibliothèque les range sous l'onglet « Activités ». « Préparer une activité », le choix du type,
-puis « Rédiger le brouillon ». L'élève trouve les activités publiées dans ses ressources.
+puis « Rédiger le brouillon ». L'élève trouve les activités publiées dans ses ressources, sous leur
+cours, après « Exercices et explications ».
 
 **Exercice**
 Exercice à réponse courte : consigne, réponse attendue, critères et retour, chacun avec les

@@ -293,6 +293,10 @@ plus pour elle. Une relecture, une publication ou une modification partie d'une 
 refusée. Publier demande une version relue et des preuves qui tiennent encore. L'historique garde
 qui a relu, publié ou modifié chaque version, et quand.
 
+La liste des ressources de l'élève range les activités publiées sous le titre de leur cours. Un
+cours n'y figure que s'il a des ressources dans le périmètre choisi. L'accueil par chapitres, qui
+ne titre pas les cours, liste les activités après ses chapitres.
+
 Un élève pratique les exercices publiés des cours dont il est membre. Avant sa réponse, la page ne
 contient que l'objectif et la consigne. La réponse attendue, les critères, le retour et les passages
 cités ne sortent du serveur qu'avec une tentative de ce compte sur la version actuelle. L'élève

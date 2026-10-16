@@ -435,7 +435,7 @@ const entete = (a: Activite, relecteur?: string, apercu?: boolean) => {
         : html`<a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>`
     }
     <h1>${a.intitule}</h1>
-    <p class="discret">${a.cours}. ${
+    <p class="discret"><a href="/eleve?cours_id=${a.cours_id}">${a.cours}</a>. ${
       a.audience === "prive"
         ? `${TYPES[a.type]} généré${e} par Thot à partir de tes documents. Personne d'autre que toi ne l'a relu${e}.`
         : `${TYPES[a.type]} préparé${e} par ${a.auteur}${relecteur ? `, relu${e} par ${relecteur}` : ""}.`

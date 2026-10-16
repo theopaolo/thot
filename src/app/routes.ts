@@ -1421,9 +1421,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const generique =
       visibles.every((r) => r.profil === "general") || Object.values(scope(c)).some(Boolean);
     const mention = mentionLecteurs(c);
-    const exercices = ActiviteVue.exercices(
-      Activites.activitesEleve(db, c.get("compte"), scope(c).cours_id, scope(c).matiere_id),
+    const activites = Activites.activitesEleve(
+      db,
+      c.get("compte"),
+      scope(c).cours_id,
+      scope(c).matiere_id,
     );
+    // La liste rangée par cours met les activités sous leur cours. L'accueil par chapitres, sans
+    // titre de cours, les liste après ses chapitres.
     if (generique) {
       return c.html(
         rendre(
@@ -1436,9 +1441,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
           </form>
-          ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille")}
-          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}
-          ${exercices}`,
+          ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille", activites)}
+          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}`,
         ),
       );
     }
@@ -1466,7 +1470,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           lireInstance(db).mode === "personal",
           mention,
           libelles(db),
-        )}${exercices}`,
+        )}${ActiviteVue.exercices(activites)}`,
         "accueil",
       ),
     );

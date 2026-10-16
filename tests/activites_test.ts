@@ -583,6 +583,35 @@ test("tentatives : les enseignants du cours lisent les réponses de chaque versi
   }
 });
 
+test("accueil de l'élève : une activité publiée suit les ressources de son cours", async () => {
+  const { db, dir, coursId, source, prof, eleve } = await cadre();
+  try {
+    const histoire = cours(db, matiere(db, "Histoire"), "Histoire");
+    db.prepare("INSERT INTO membres_cours VALUES (?, ?)").run(histoire, eleve.id);
+    await publier(db, "Source d'histoire", histoire);
+    const id = await preparer(prof, coursId, source);
+    await relirePublier(prof, db, id);
+
+    const accueil = await page(eleve, "/eleve");
+    const [debut, fin] = [accueil.indexOf("<h2>Design</h2>"), accueil.indexOf("<h2>Histoire</h2>")];
+    assert(debut >= 0 && fin > debut, "deux cours, Design d'abord");
+    const design = accueil.slice(debut, fin);
+    assertStringIncludes(design, "Exercices et explications");
+    assertStringIncludes(design, `href="/eleve/activites/${id}"`);
+    assertEquals(accueil.split(`/eleve/activites/${id}`).length - 1, 1, "une seule fois");
+    assert(!accueil.includes('id="exercices"'), "plus de liste après toutes les ressources");
+    assertStringIncludes(
+      await page(eleve, `/eleve/activites/${id}`),
+      `<a href="/eleve?cours_id=${coursId}">Design</a>`,
+    );
+    // Le périmètre d'un autre cours ne montre pas l'activité.
+    assert(!(await page(eleve, `/eleve?cours_id=${histoire}`)).includes(`/eleve/activites/${id}`));
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("exercice personnel : privé à son auteur, publié sans relecture indépendante", async () => {
   const { db, dir, coursId, source, prof } = await cadre(true);
   try {

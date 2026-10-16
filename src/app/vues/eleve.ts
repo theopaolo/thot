@@ -178,9 +178,14 @@ export const accueilEleve = (
 
 /**
  * La liste des ressources, rangée par cours puis par thème. Les ressources d'un cours sans thème
- * viennent sous le nom du cours, celles sans cours sous « Autres documents ».
+ * viennent sous le nom du cours, celles sans cours sous « Autres documents ». Les activités
+ * publiées suivent les ressources de leur cours.
  */
-export const ressourcesParCours = (chapitres: ChapitreVue[], grille: boolean) =>
+export const ressourcesParCours = (
+  chapitres: ChapitreVue[],
+  grille: boolean,
+  activites: ActiviteListee[] = [],
+) =>
   [...Map.groupBy(chapitres, (ch) => ch.coursId ?? "").values()].map(
     (groupe) => html`
       <h2>${groupe[0].cours ?? "Autres documents"}</h2>
@@ -203,8 +208,21 @@ export const ressourcesParCours = (chapitres: ChapitreVue[], grille: boolean) =>
           )}</ul>
         `,
       )}
+      ${activitesDuCours(activites.filter((a) => a.cours_id === groupe[0].coursId))}
     `,
   );
+
+type ActiviteListee = { id: string; intitule: string; type: string; cours_id: string };
+const activitesDuCours = (liste: ActiviteListee[]) =>
+  liste.length
+    ? html`<h3>Exercices et explications</h3>
+      <ul>${liste.map(
+        (a) =>
+          html`<li><a href="/eleve/activites/${a.id}">${a.intitule}</a> <span class="discret">${
+            a.type === "explication" ? "Explication" : "Exercice"
+          }</span></li>`,
+      )}</ul>`
+    : "";
 
 const formRecherche = (q: string, p?: Scope) =>
   html`
