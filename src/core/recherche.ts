@@ -185,6 +185,7 @@ export async function chercher(
   question: string,
   p: Perimetre,
   seuil: number,
+  signal?: AbortSignal,
 ): Promise<Recherche> {
   const candidats = chercherFts(db, question, p);
   if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
@@ -194,6 +195,7 @@ export async function chercher(
     ordre = await modeles.reclasser(
       question,
       candidats.map((c) => c.rappel),
+      signal,
     );
   } catch (e) {
     if (!(e instanceof PanneModele)) throw e;

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { openrouter, PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { demander, ranger } from "../src/core/reponse.ts";
-import { cacheModeles, maintenant, migrer, purgerMessages } from "../src/app/db.ts";
+import { cacheModeles, migrer, purgerMessages } from "../src/app/db.ts";
 import {
   authentifier,
   creerCompte,
@@ -800,7 +800,6 @@ test("le chat: question, flux SSE, réponse citée, panneau source", async () =>
   const fragment = await q.text();
   const mid = fragment.match(/messages\/([\w-]+)\/flux/)![1];
   const flux = await (await requete(`/eleve/messages/${mid}/flux`)).text();
-  assertStringIncludes(flux, "event: etape");
   assertStringIncludes(flux, "event: reponse");
   assertStringIncludes(flux, "Gaudí refuse la ligne droite.");
   // Une reconnexion relit la réponse enregistrée sans rappeler le générateur, qui n'a plus de sortie.
@@ -1558,141 +1557,6 @@ test("une sortie vide du reclasseur déclenche le repli, celle du générateur r
     if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_EMPTY_RESPONSE");
   } finally {
     globalThis.fetch = fetch;
-    db.close();
-  }
-});
-
-test("une génération active renouvelle son bail et partage son résultat", async () => {
-  const { db } = await environnement();
-  const interval = globalThis.setInterval;
-  const termine = Promise.withResolvers<void>();
-  let premier: Promise<string> | undefined;
-  let second: Promise<string> | undefined;
-  try {
-    const id = await sourceTraitee(db);
-    statuer(db, id, "certifiee", "Prof");
-    let renouveler: (() => void) | undefined;
-    globalThis.setInterval = ((callback: () => void, delai?: number) => {
-      if (delai === 30_000) renouveler = callback;
-      return interval(callback, delai);
-    }) as typeof setInterval;
-    const commence = Promise.withResolvers<void>();
-    let appels = 0;
-    const fake = fauxModeles();
-    fake.modeles.generer = async () => {
-      appels++;
-      commence.resolve();
-      await termine.promise;
-      return { texte: REPONSE_CITEE, modele: "test" };
-    };
-    const eleve = await session(db, fake.modeles, "eleve");
-    const mid = await poserQuestion(eleve.requete);
-    premier = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
-    await commence.promise;
-    db.prepare("UPDATE messages SET maj_le = '2000-01-01T00:00:00Z' WHERE id = ?").run(mid);
-    assert(renouveler);
-    renouveler();
-    assertEquals(
-      db.prepare("SELECT maj_le FROM messages WHERE id = ?").get(mid)!.maj_le,
-      maintenant(),
-    );
-    second = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
-    assertEquals(appels, 1);
-    termine.resolve();
-    assertStringIncludes(await premier, "Gaudí refuse la ligne droite.");
-    assertStringIncludes(await second, "Gaudí refuse la ligne droite.");
-  } finally {
-    termine.resolve();
-    await Promise.all([premier, second]);
-    globalThis.setInterval = interval;
-    db.close();
-  }
-});
-
-test("un ancien propriétaire du message ne peut écraser son successeur", async () => {
-  const { db } = await environnement();
-  const termine = Promise.withResolvers<void>();
-  let premier: Promise<string> | undefined;
-  try {
-    const id = await sourceTraitee(db);
-    statuer(db, id, "certifiee", "Prof");
-    const commence = Promise.withResolvers<void>();
-    let appels = 0;
-    const fake = fauxModeles();
-    fake.modeles.generer = async () => {
-      const n = ++appels;
-      if (n === 1) {
-        commence.resolve();
-        await termine.promise;
-      }
-      return {
-        texte: REPONSE_CITEE.replace("Gaudí refuse la ligne droite.", `Réponse ${n}.`),
-        modele: "test",
-      };
-    };
-    const eleve = await session(db, fake.modeles, "eleve");
-    const mid = await poserQuestion(eleve.requete);
-    premier = (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
-    await commence.promise;
-    db.prepare("UPDATE messages SET maj_le = '2000-01-01T00:00:00Z' WHERE id = ?").run(mid);
-    assertStringIncludes(
-      await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text(),
-      "Réponse 2.",
-    );
-    termine.resolve();
-    assertStringIncludes(await premier, "Réponse 2.");
-    assertStringIncludes(
-      db.prepare("SELECT resultat FROM messages WHERE id = ?").get(mid)!.resultat as string,
-      "Réponse 2.",
-    );
-    assertEquals(appels, 2);
-  } finally {
-    termine.resolve();
-    await premier;
-    db.close();
-  }
-});
-
-test("une déconnexion arrête l'attente mais laisse la génération revendiquée se terminer", async () => {
-  const { db } = await environnement();
-  const termine = Promise.withResolvers<void>();
-  try {
-    const id = await sourceTraitee(db);
-    statuer(db, id, "certifiee", "Prof");
-    const commence = Promise.withResolvers<void>();
-    const fake = fauxModeles();
-    fake.modeles.generer = async () => {
-      commence.resolve();
-      await termine.promise;
-      return { texte: REPONSE_CITEE, modele: "test" };
-    };
-    const eleve = await session(db, fake.modeles, "eleve");
-    const mid = await poserQuestion(eleve.requete);
-    const proprietaire = await eleve.requete(`/eleve/messages/${mid}/flux`);
-    await commence.promise;
-    const prepare = db.prepare.bind(db);
-    let lectures = 0;
-    db.prepare = ((sql: string) => {
-      if (sql.includes("SELECT question, resultat FROM messages")) lectures++;
-      return prepare(sql);
-    }) as typeof db.prepare;
-    const abonne = await eleve.requete(`/eleve/messages/${mid}/flux`);
-    await abonne.body!.cancel();
-    const avant = lectures;
-    await new Promise((r) => setTimeout(r, 550));
-    assertEquals(lectures, avant);
-    await proprietaire.body!.cancel();
-    termine.resolve();
-    for (
-      let i = 0;
-      i < 100 && !prepare("SELECT resultat FROM messages WHERE id = ?").get(mid)!.resultat;
-      i++
-    ) {
-      await new Promise((r) => setTimeout(r, 10));
-    }
-    assertEquals(prepare("SELECT etat FROM messages WHERE id = ?").get(mid)!.etat, "answered");
-  } finally {
-    termine.resolve();
     db.close();
   }
 });

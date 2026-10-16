@@ -591,7 +591,7 @@ export const question = (texte: string) =>
   `;
 
 /** Réponse en attente: l'extension SSE la remplace par l'événement « reponse ». */
-export const attente = (id: string) =>
+export const attente = (id: string, etape: string | null = null) =>
   html`
     <article
       class="reponse"
@@ -600,7 +600,9 @@ export const attente = (id: string) =>
       sse-swap="reponse"
       hx-swap="outerHTML"
     >
-      <p class="etape" sse-swap="etape" hx-swap="innerHTML" role="status">Envoi de la question</p>
+      <p class="etape" sse-swap="etape" hx-swap="innerHTML" role="status">${etape ?? "En attente"}</p>
+      <button type="button" class="lien" hx-post="/eleve/messages/${id}/arreter"
+        hx-target="closest .reponse" hx-swap="outerHTML" data-arreter="${id}">Arrêter</button>
     </article>
   `;
 
@@ -734,14 +736,18 @@ export const reponse = (
           ? "Une source de cette réponse a été retirée ou modifiée."
           : r.code === "CITATION_UNVERIFIED"
             ? "Je n'ai pas pu vérifier les citations de cette réponse."
-            : "Thot n'a pas pu répondre, à cause d'une panne technique."
+            : r.code === "CANCELLED"
+              ? "Réponse arrêtée."
+              : "Thot n'a pas pu répondre, à cause d'une panne technique."
       }</strong></p>
       <p>${
         r.code === "EVIDENCE_WITHDRAWN"
           ? "Réessaie pour obtenir une réponse avec les sources disponibles."
           : r.code === "CITATION_UNVERIFIED"
             ? "Ta question est conservée. Réessaie ou demande à ton professeur."
-            : "Ce n'est pas une limite du cours. Ta question est conservée."
+            : r.code === "CANCELLED"
+              ? "Ta question est conservée."
+              : "Ce n'est pas une limite du cours. Ta question est conservée."
       }</p>
       <button
         hx-post="/eleve/messages/${id}/relancer"
@@ -849,6 +855,8 @@ export type MessageVue = {
   id: string;
   question: string;
   etat: string;
+  /** la dernière étape annoncée d'une réponse en cours */
+  etape?: string | null;
   resultat: string | null;
   avis: string | null;
   /** le périmètre de cet échange, quand il diffère de celui de l'échange précédent */
@@ -879,6 +887,8 @@ export type ConversationVue = {
   active_le: string;
   /** état du dernier échange */
   etat: string | null;
+  /** une réponse terminée que l'élève n'a pas encore ouverte */
+  nouvelle?: number;
 };
 
 const JOUR_ISO = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
@@ -907,21 +917,40 @@ const ETATS: Record<string, [string, string]> = {
   failed: ["Échec", "failed"],
 };
 
+/**
+ * Le statut d'une conversation dans la liste. Une réponse en file ou en cours se relit toutes les
+ * 3 s. La conversation ouverte affiche sa réponse elle-même : elle n'a pas de « Nouvelle réponse ».
+ */
+export const statutConversation = (
+  c: Pick<ConversationVue, "id" | "etat" | "nouvelle">,
+  ouverte: boolean,
+) => {
+  const [mot, classe] =
+    ETATS[c.etat ?? ""] ?? (c.nouvelle && !ouverte ? ["Nouvelle réponse", "nouvelle"] : []);
+  if (!mot) return "";
+  return classe === "en-cours"
+    ? html`<span class="statut en-cours" hx-get="/eleve/conversations/${c.id}/etat${
+        ouverte ? "?ouverte=1" : ""
+      }" hx-trigger="every 3s" hx-swap="outerHTML transition:false">${mot}</span>`
+    : html`<span class="statut ${classe}">${mot}</span>`;
+};
+
 const listeConversations = (liste: ConversationVue[], courante = "", archivees = 0, suite = "") =>
   html`
     <a class="bouton" href="/eleve/chat/nouvelle">Nouvelle conversation</a>
     ${
       liste.length
-        ? html`<ul class="conversations">${liste.map((c) => {
-            const etat = c.etat ? ETATS[c.etat] : undefined;
-            return html`<li><a href="/eleve/chat/${c.id}" aria-current="${
-              c.id === courante ? "page" : "false"
-            }"><span class="conversation-titre">${c.titre}</span><span class="discret">${
-              c.perimetre || "Toutes tes ressources"
-            }</span><span class="discret">${quand(c.active_le)}${
-              etat ? html` <span class="statut ${etat[1]}">${etat[0]}</span>` : ""
-            }</span></a></li>`;
-          })}</ul>`
+        ? html`<ul class="conversations">${liste.map(
+            (c) =>
+              html`<li><a href="/eleve/chat/${c.id}" aria-current="${
+                c.id === courante ? "page" : "false"
+              }"><span class="conversation-titre">${c.titre}</span><span class="discret">${
+                c.perimetre || "Toutes tes ressources"
+              }</span><span class="discret">${quand(c.active_le)} ${statutConversation(
+                c,
+                c.id === courante,
+              )}</span></a></li>`,
+          )}</ul>`
         : html`<p class="discret">Aucune conversation pour l'instant.</p>`
     }
     ${suite ? html`<p><a href="${suite}">Afficher les conversations précédentes</a></p>` : ""}
@@ -1071,7 +1100,7 @@ export const chat = (f: Fil) => {
                       i === f.messages.length - 1 ? f.idees : [],
                       i === derniere,
                     )
-                  : attente(m.id)
+                  : attente(m.id, m.etape)
               }
             `,
           )}

@@ -111,6 +111,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0011_revisions.sql",
       "0012_reglages.sql",
       "0013_conversations.sql",
+      "0014_reponses.sql",
       "0015_lots.sql",
     ]);
     assertEquals(migrer(db), []);

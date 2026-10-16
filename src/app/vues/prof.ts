@@ -547,7 +547,9 @@ const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
                         ? m.code === "CITATION_UNVERIFIED"
                           ? "Citation non vérifiée"
                           : "Panne"
-                        : "En cours"
+                        : m.etat === "annule"
+                          ? "Arrêtée"
+                          : "En cours"
                   }</td>
                   <td>${AVIS[m.avis ?? ""] ?? ""}</td>
                 `

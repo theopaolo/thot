@@ -40,10 +40,19 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
 
 ## Forme du système
 
-Un monolithe Node.js lance deux processus depuis le même code : le serveur Hono, qui rend les pages
-et calcule les réponses pendant le flux SSE de l'élève, et le worker, qui extrait les documents
-et génère légendes et questions suggérées. Ils partagent `state.sqlite3`. La file de travaux est
-une table SQLite avec un verrou expirable : un worker tué reprend le travail au redémarrage.
+Un monolithe Node.js lance deux processus depuis le même code. Le serveur Hono rend les pages et
+calcule les réponses aux élèves. Le worker extrait les documents et génère légendes et questions
+suggérées. Ils partagent `state.sqlite3`. Chaque file de travaux est une table SQLite avec un
+verrou expirable : un processus tué reprend son travail au redémarrage.
+
+Une question envoyée est un travail durable, porté par sa ligne de `messages`. La boucle de
+réponses du serveur (`src/app/reponses.ts`) la calcule hors de toute connexion, avec un nombre
+borné de réponses à la fois. Une longue extraction tourne dans le worker et ne retarde pas le chat.
+Chaque revendication donne à la tentative un nouveau `generation_id`, et seule la tentative qui le
+détient encore publie : une tentative expirée, arrêtée ou purgée n'écrit rien. Pendant le calcul,
+la tentative renouvelle son verrou. Un renouvellement refusé interrompt son appel de modèle par
+son `AbortSignal`. Avant de publier, la boucle revérifie les preuves avec les droits actuels de
+l'élève. Une réponse interrompue plusieurs fois échoue avec la cause `INTERRUPTED`.
 
 `src/core/` porte l'ingestion, la recherche et la réponse. Il n'importe rien de `src/app/`
 (`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
@@ -209,10 +218,18 @@ périmètre. La recherche d'une question ne reprend que la question précédente
 conversation, si elle a été posée dans le même périmètre. Rien ne passe d'une conversation à une
 autre, ni d'un périmètre restreint à un périmètre plus large.
 
-Une conversation porte une réponse à la fois. Un envoi pendant une réponse, ou dans une
-conversation archivée, reçoit 409 et l'élève garde sa saisie. Un envoi rejoué avec la même clé
-retrouve son premier échange. Une conversation vidée par la purge disparaît avec son titre, qui
-reprend souvent une question.
+Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. Un envoi pendant
+une réponse, ou dans une conversation archivée, reçoit 409 et l'élève garde sa saisie. Un envoi
+rejoué avec la même clé retrouve son premier échange. Une conversation vidée par la purge
+disparaît avec son titre, qui reprend souvent une question. Une réponse en cours perd alors sa
+ligne : sa tentative s'interrompt et ne recrée rien.
+
+La réponse continue quand l'élève ferme la page. Le flux SSE lit l'étape enregistrée, puis la
+réponse : le fermer n'arrête ni ne relance le calcul, et une reconnexion repart de l'état
+enregistré. « Arrêter » marque la réponse arrêtée et interrompt son appel de modèle. La question
+reste et se relance avec « Réessayer ». La liste relit le statut d'une réponse en file ou en cours
+sans déplacer le focus. Elle marque « Nouvelle réponse » une réponse terminée que l'élève n'a pas
+vue, jusqu'à l'ouverture de sa conversation.
 
 ## États
 
@@ -226,6 +243,23 @@ stateDiagram-v2
     enriching --> awaiting_review: légendes tentées
     extracting --> failed: erreur ou tentatives épuisées
     enriching --> failed
+  }
+```
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  state "Réponse" as Reponse {
+    [*] --> en_attente: envoi
+    en_attente --> en_cours: revendiquée
+    en_cours --> en_cours: verrou expiré, reprise
+    en_cours --> answered
+    en_cours --> out_of_corpus
+    en_cours --> failed: panne ou interruptions épuisées
+    en_attente --> annule: Arrêter
+    en_cours --> annule: Arrêter
+    failed --> en_attente: Réessayer
+    annule --> en_attente: Réessayer
   }
 ```
 

@@ -1,4 +1,6 @@
 let focaliserFeuille = false;
+/** L'échange dont l'élève vient d'arrêter la réponse. */
+let arretee = "";
 
 function ouvrirFeuille(declencheur: HTMLElement) {
   const conteneur = declencheur.closest("[data-feuille]");
@@ -182,6 +184,8 @@ export function installerEleve() {
     if (titre) {
       renommer(titre.closest(".tete-conversation")!.querySelector("form.renommer")!, true);
     }
+    const arret = event.target.closest<HTMLElement>("[data-arreter]");
+    if (arret) arretee = arret.dataset.arreter!;
     const annuler = event.target.closest("[data-annuler-renommer]");
     if (annuler) renommer(annuler.closest("form")!, false);
     const aller = event.target.closest<HTMLElement>("[data-aller-reponse]");
@@ -262,6 +266,14 @@ export function installerEleve() {
       if (conversation && !event.target.closest(".avis")) suivreConversation();
     }
     etatEnvoi();
+    // « Arrêter » disparaît avec la réponse en attente, remplacée par sa réponse ou par le flux :
+    // le focus passe au premier bouton de ce qui la remplace.
+    const remplacante =
+      arretee && document.querySelector<HTMLElement>(`#reponse-${arretee} button`);
+    if (remplacante) {
+      arretee = "";
+      remplacante.focus();
+    }
     if (!focaliserFeuille) return;
     const titre = document.querySelector<HTMLElement>('.feuille-ouverte .feuille [tabindex="-1"]');
     if (titre) {

@@ -8,7 +8,7 @@ import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/
 import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
 import type { Modeles } from "../core/modeles.ts";
-import { actualiserResultat, type Affirmation, demander, type Resultat } from "../core/reponse.ts";
+import { actualiserResultat, type Affirmation, type Resultat } from "../core/reponse.ts";
 import {
   type Candidat,
   chercher,
@@ -62,6 +62,7 @@ import {
   revisionEnAttente,
   statuer,
 } from "./ingestion.ts";
+import { ARRETEE, attendreChangement, boucleReponses, memePerimetre } from "./reponses.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import {
   administration,
@@ -79,12 +80,11 @@ import { validerInformations } from "../core/profils.ts";
 type Env = { Variables: { compte: Compte } };
 
 const SESSION_MS = 12 * 3600_000;
-const PERIMETRE_MS = 3 * 60_000;
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
 const QUIZ = `CASE WHEN s.profil = 'arts-appliques' THEN trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
   coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') ELSE '' END AS quiz_reponse`;
 
-export function creerApp(db: Db, modeles: Modeles) {
+export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
   const secret = secretSession();
   const instance = lireInstance(db);
@@ -1133,13 +1133,6 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   // ------------------------------------------------------------ élève
   type Perimetre = Eleve.Perimetre;
-  const memePerimetre = (a: Perimetre, b: Perimetre) =>
-    a.chapitre === b.chapitre &&
-    a.matiere_id === b.matiere_id &&
-    a.cours_id === b.cours_id &&
-    a.theme_id === b.theme_id;
-  /** Une génération sans nouvelles depuis PERIMETRE_MS est abandonnée : un flux peut la reprendre. */
-  const perime = () => new Date(Date.now() - PERIMETRE_MS).toISOString().slice(0, 19) + "Z";
   const sourceCertifiee = (id: string, l: Lecteur) =>
     db
       .prepare(
@@ -1491,7 +1484,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
     const lignes = db
       .prepare(
-        `SELECT id, question, etat, resultat, avis, chapitre, matiere_id, cours_id, theme_id
+        `SELECT id, question, etat, etape, resultat, avis, chapitre, matiere_id, cours_id, theme_id
          FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
       )
       .all(conversationId, compte.id) as (Eleve.MessageVue & Perimetre)[];
@@ -1563,14 +1556,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     db
       .prepare("SELECT * FROM conversations WHERE id = ? AND compte_id = ?")
       .get(id, c.get("compte").id) as Conversation | undefined;
-  /** Une question attend son flux, ou une génération tourne encore : une réponse à la fois. */
+  /** Une question attend la boucle de réponses, ou sa réponse tourne : une réponse à la fois. */
   const reponseEnCours = (conversationId: string) =>
     !!db
       .prepare(
-        `SELECT 1 FROM messages WHERE conversation_id = ?
-         AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le >= ?))`,
+        "SELECT 1 FROM messages WHERE conversation_id = ? AND etat IN ('en_attente', 'en_cours')",
       )
-      .get(conversationId, perime());
+      .get(conversationId);
   const libelleTheme = () => libelles(db).regroupement;
 
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
@@ -1611,13 +1603,15 @@ export function creerApp(db: Db, modeles: Modeles) {
       return "Séquence indisponible.";
   };
 
+  // L'état du dernier échange, et une réponse terminée que l'élève n'a pas encore ouverte.
+  const ETAT_CONVERSATION = `(SELECT etat FROM messages WHERE conversation_id = v.id ORDER BY rang DESC LIMIT 1) AS etat,
+    EXISTS (SELECT 1 FROM messages WHERE conversation_id = v.id AND nouvelle) AS nouvelle`;
   const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean) => {
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = libelleTheme();
     const lignes = db
       .prepare(
-        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, active_le,
-         (SELECT etat FROM messages WHERE conversation_id = v.id ORDER BY rang DESC LIMIT 1) AS etat
+        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, active_le, ${ETAT_CONVERSATION}
          FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
          ORDER BY active_le DESC, rowid DESC LIMIT ?`,
       )
@@ -1640,6 +1634,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   const pageChat = (c: Context<Env>, conv?: Conversation) => {
     const compte = c.get("compte");
+    if (conv) db.prepare("UPDATE messages SET nouvelle = 0 WHERE conversation_id = ?").run(conv.id);
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = libelleTheme();
     // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
@@ -1729,6 +1724,17 @@ export function creerApp(db: Db, modeles: Modeles) {
         ),
       ),
     );
+  });
+  // La liste suit une réponse qui tourne dans une autre conversation, sans toucher au focus.
+  app.get("/eleve/conversations/:id/etat", (c) => {
+    const conv = db
+      .prepare(
+        `SELECT id, ${ETAT_CONVERSATION} FROM conversations v WHERE id = ? AND compte_id = ?`,
+      )
+      .get(c.req.param("id"), c.get("compte").id) as Eleve.ConversationVue | undefined;
+    return conv
+      ? c.html(Eleve.statutConversation(conv, c.req.query("ouverte") === "1"))
+      : c.notFound();
   });
   // Le dernier titre enregistré l'emporte : un titre ne justifie pas un conflit.
   app.post("/eleve/chat/:id/renommer", async (c) => {
@@ -1845,11 +1851,12 @@ export function creerApp(db: Db, modeles: Modeles) {
           t,
         );
       }
+      // Le journal garde l'heure de la demande : la boucle en tire le temps d'attente.
       db.prepare(
         `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question, chapitre,
-         matiere_id, cours_id, theme_id, etat, cree_le, maj_le)
+         matiere_id, cours_id, theme_id, etat, journal, cree_le, maj_le)
          VALUES (?, ?, ?, (SELECT coalesce(max(rang), 0) + 1 FROM messages WHERE conversation_id = ?),
-         ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)`,
+         ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
       ).run(
         id,
         compte.id,
@@ -1861,10 +1868,12 @@ export function creerApp(db: Db, modeles: Modeles) {
         p.matiere_id,
         p.cours_id,
         p.theme_id,
+        Date.now(),
         t,
         t,
       );
     });
+    reponses.reveiller();
     return envoye(conversationId, id, texte);
   });
 
@@ -1887,97 +1896,56 @@ export function creerApp(db: Db, modeles: Modeles) {
     }
     const r = db
       .prepare(
-        "UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered')",
+        `UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL,
+         tentatives = 0, journal = json_object('demande_ms', ?), maj_le = ?
+         WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered', 'annule')`,
       )
-      .run(maintenant(), c.req.param("id"), c.get("compte").id);
-    return r.changes ? c.html(Eleve.attente(c.req.param("id"))) : c.notFound();
+      .run(Date.now(), maintenant(), c.req.param("id"), c.get("compte").id);
+    if (!r.changes) return c.notFound();
+    reponses.reveiller();
+    return c.html(Eleve.attente(c.req.param("id")));
+  });
+
+  // « Arrêter » : la question reste, sa réponse ne sera pas publiée et peut se relancer.
+  app.post("/eleve/messages/:id/arreter", (c) => {
+    const id = c.req.param("id");
+    const compte = c.get("compte");
+    const r = db
+      .prepare(
+        `UPDATE messages SET etat = 'annule', resultat = ?, etape = NULL, verrou_expire_le = NULL,
+         generation_id = NULL, maj_le = ?
+         WHERE id = ? AND compte_id = ? AND etat IN ('en_attente', 'en_cours')`,
+      )
+      .run(JSON.stringify(ARRETEE), maintenant(), id, compte.id);
+    if (r.changes) reponses.annuler(id);
+    // Une réponse publiée juste avant l'arrêt s'affiche telle quelle.
+    const m = db
+      .prepare("SELECT resultat, avis FROM messages WHERE id = ? AND compte_id = ?")
+      .get(id, compte.id) as { resultat: string | null; avis: string | null } | undefined;
+    return m?.resultat
+      ? c.html(Eleve.reponse(id, resultatActuel(m.resultat, lu(c)), m.avis))
+      : c.notFound();
   });
 
   /**
-   * Le flux calcule la réponse une seule fois. Une reconnexion SSE, ou un second onglet,
-   * attend le résultat enregistré au lieu de relancer la génération.
+   * Le flux lit l'état enregistré : l'étape annoncée, puis la réponse. Le fermer n'arrête ni ne
+   * relance le calcul, et une reconnexion repart de l'état actuel.
    */
   app.get("/eleve/messages/:id/flux", (c) => {
     const id = c.req.param("id");
     const compte = c.get("compte");
     return streamSSE(c, async (flux) => {
-      if (flux.aborted) return;
-      const generationId = crypto.randomUUID();
-      const pris = db
-        .prepare(
-          `UPDATE messages SET etat = 'en_cours', maj_le = ?, generation_id = ?
-         WHERE id = ? AND compte_id = ? AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le < ?))`,
-        )
-        .run(maintenant(), generationId, id, compte.id, perime()).changes;
-      if (pris) {
-        const renouveler = setInterval(() => {
-          try {
-            const r = db
-              .prepare(
-                "UPDATE messages SET maj_le = ? WHERE id = ? AND generation_id = ? AND etat = 'en_cours'",
-              )
-              .run(maintenant(), id, generationId);
-            if (!r.changes) clearInterval(renouveler);
-          } catch (e) {
-            console.error("Renouvellement de la génération impossible", e);
-          }
-        }, 30_000);
-        try {
-          const m = db
-            .prepare(
-              `SELECT question, conversation_id, rang, chapitre, matiere_id, cours_id, theme_id
-               FROM messages WHERE id = ?`,
-            )
-            .get(id) as Perimetre & { question: string; conversation_id: string; rang: number };
-          // Le contexte vient du tour précédent de la même conversation, posé dans le même
-          // périmètre. Un changement de périmètre repart de zéro.
-          const avant = db
-            .prepare(
-              `SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages
-               WHERE conversation_id = ? AND rang < ? ORDER BY rang DESC LIMIT 1`,
-            )
-            .get(m.conversation_id, m.rang) as (Perimetre & { question: string }) | undefined;
-          const precedente = avant && memePerimetre(avant, m) ? avant.question : undefined;
-          const p = {
-            schoolId: instance.school_id,
-            lecteur: lecteur(compte),
-            chapitre: m.chapitre || undefined,
-            matiereId: m.matiere_id,
-            coursId: m.cours_id,
-            themeId: m.theme_id,
-          };
-          const { resultat, journal } = await demander(
-            db,
-            modeles,
-            m.question,
-            p,
-            config.seuil,
-            (etape) => void flux.writeSSE({ event: "etape", data: etape }).catch(() => {}),
-            precedente,
-          );
-          transaction(db, () => {
-            const actuel = actualiserResultat(db, resultat, p);
-            db.prepare(
-              "UPDATE messages SET etat = ?, resultat = ?, journal = ?, maj_le = ?, generation_id = NULL WHERE id = ? AND generation_id = ? AND etat = 'en_cours'",
-            ).run(
-              actuel.etat,
-              JSON.stringify(actuel),
-              JSON.stringify(journal),
-              maintenant(),
-              id,
-              generationId,
-            );
-          });
-        } finally {
-          clearInterval(renouveler);
-        }
-      }
-      for (let i = 0; i < 240 && !flux.aborted; i++) {
+      let annoncee = "";
+      // Au bout de dix minutes, le flux se ferme et le navigateur se reconnecte.
+      for (let i = 0; i < 600 && !flux.aborted; i++) {
         const m = db
-          .prepare("SELECT question, resultat FROM messages WHERE id = ? AND compte_id = ?")
-          .get(id, compte.id) as { question: string; resultat: string | null } | undefined;
+          .prepare("SELECT question, etape, resultat FROM messages WHERE id = ? AND compte_id = ?")
+          .get(id, compte.id) as
+          | { question: string; etape: string | null; resultat: string | null }
+          | undefined;
         if (!m) return;
         if (m.resultat) {
+          db.prepare("UPDATE messages SET nouvelle = 0 WHERE id = ?").run(id);
           const r = resultatActuel(m.resultat, lecteur(compte));
           await flux.writeSSE({
             event: "reponse",
@@ -1987,7 +1955,12 @@ export function creerApp(db: Db, modeles: Modeles) {
           });
           return;
         }
-        await flux.sleep(500);
+        const etape = m.etape ?? "En attente";
+        if (etape !== annoncee) {
+          await flux.writeSSE({ event: "etape", data: etape });
+          annoncee = etape;
+        }
+        await attendreChangement(id, 1000);
       }
     });
   });

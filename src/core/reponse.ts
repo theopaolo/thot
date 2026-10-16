@@ -297,13 +297,20 @@ async function juger(
   affirmations: Affirmation[],
   journal: Journal,
   profil: Profil,
+  signal?: AbortSignal,
 ) {
   const verdicts = await Promise.allSettled(
     affirmations.map((a) => {
       const controle = new AbortController();
       let minuteur: ReturnType<typeof setTimeout> | undefined;
       return Promise.race([
-        modeles.soutenir(a.texte, a.citation, a.titre, controle.signal, profil),
+        modeles.soutenir(
+          a.texte,
+          a.citation,
+          a.titre,
+          AbortSignal.any([controle.signal, ...(signal ? [signal] : [])]),
+          profil,
+        ),
         new Promise<never>((_, non) => {
           minuteur = setTimeout(() => {
             const erreur = new Error("juge au-delà du délai");
@@ -333,7 +340,10 @@ async function juger(
   return { soutenues, erreurs, probabilites };
 }
 
-/** Recherche, génération, vérification. Aucune exception ne sort: une panne devient `failed`. */
+/**
+ * Recherche, génération, vérification. Aucune exception ne sort: une panne devient `failed`.
+ * `signal` interrompt l'appel de modèle en cours.
+ */
 export async function demander(
   db: DatabaseSync,
   modeles: Modeles,
@@ -342,6 +352,7 @@ export async function demander(
   seuil: number,
   etape: (nom: string) => void = () => {},
   questionPrecedente?: string,
+  signal?: AbortSignal,
 ): Promise<{ resultat: Resultat; journal: Journal }> {
   const journal: Journal = { seuil };
   let gardees: Repondue = { affirmations: [] };
@@ -382,7 +393,7 @@ export async function demander(
     if (questionPrecedente) {
       etape("Mise en contexte de la question");
       try {
-        const reformulee = await modeles.reformuler(questionPrecedente, question);
+        const reformulee = await modeles.reformuler(questionPrecedente, question, signal);
         if (reformulee && reformulee.length <= 1000) recherche = reformulee;
       } catch {
         /* Une reformulation indisponible ne bloque pas la question. */
@@ -390,7 +401,7 @@ export async function demander(
       journal.question_recherche = recherche;
     }
     etape("Recherche dans les documents du cours");
-    const r = await chercher(db, modeles, recherche, p, seuil);
+    const r = await chercher(db, modeles, recherche, p, seuil, signal);
     journal.score = r.score;
     if (r.panneReclasseur) journal.reclasseur_indisponible = r.panneReclasseur;
     journal.candidats = r.candidats.map((c) => ({
@@ -418,7 +429,7 @@ export async function demander(
     const tentatives: unknown[] = [];
     journal.tentatives = tentatives;
     for (let essai = 0; essai < 2; essai++) {
-      const { texte, modele } = await modeles.generer(messages);
+      const { texte, modele } = await modeles.generer(messages, signal);
       journal.modele = modele;
       etape("Vérification des citations");
       const brute = lire(texte);
@@ -435,7 +446,7 @@ export async function demander(
         }
         return { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       }
-      const j = await juger(modeles, v.affirmations, journal, profil);
+      const j = await juger(modeles, v.affirmations, journal, profil, signal);
       const erreurs = [...v.erreurs, ...j.erreurs];
       tentatives.push({ sortie: texte, erreurs, soutien: j.probabilites });
       // Les réponses d'arts appliqués restent plates, comme l'évaluation les a mesurées.

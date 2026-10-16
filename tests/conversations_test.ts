@@ -6,44 +6,9 @@ import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { config, RACINE } from "../src/app/config.ts";
 import { connexion, type Db, migrer, purgerMessages } from "../src/app/db.ts";
-import { deposer, valider } from "../src/app/depot.ts";
 import { cours, desinscrire, inscrire, matiere } from "../src/app/domaines.ts";
-import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
-import { lireInstance } from "../src/app/instance.ts";
 import { quand } from "../src/app/vues/eleve.ts";
-import { environnement, fauxModeles, session } from "./outils.ts";
-
-const BONNE = JSON.stringify({
-  affirmations: [
-    {
-      texte: "Gaudí refuse la ligne droite.",
-      extrait: 1,
-      citation: "Gaudí refuse la ligne droite dans toute la façade",
-    },
-  ],
-});
-
-/** Une source publiée aux élèves, rattachée au cours demandé. */
-async function publier(db: Db, titre: string, coursId?: string) {
-  const v = valider({ titre, type_document: "cours" });
-  assert("meta" in v);
-  const { source_id } = await deposer(db, {
-    meta: v.meta,
-    nomFichier: "cours.html",
-    format: "html",
-    schoolId: lireInstance(db).school_id,
-    enseignant: "Prof",
-    audience: "eleves",
-    reponses: true,
-    liens: coursId ? [{ cours_id: coursId, theme_id: null }] : undefined,
-    octets: new TextEncoder().encode(
-      `<html><h1>${titre}</h1><p>La façade de la Casa Batlló est couverte de céramique irisée. Gaudí refuse la ligne droite dans toute la façade.</p></html>`,
-    ),
-  });
-  await traiter(db, revendiquer(db)!, fauxModeles().modeles);
-  statuer(db, source_id, "certifiee", "Test");
-  return source_id;
-}
+import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
 
 type Session = Awaited<ReturnType<typeof session>>;
 const envoyer = (qui: Session, chemin: string, corps: Record<string, string>, htmx = false) =>
@@ -149,7 +114,13 @@ test("envoi : clé rejouée, une réponse à la fois, conversation archivée en 
   const { db, dir } = await environnement();
   try {
     await publier(db, "Casa Batlló");
-    const eleve = await session(db, fauxModeles({ sorties: [BONNE] }).modeles, "eleve");
+    const f = fauxModeles();
+    const libre = Promise.withResolvers<void>();
+    f.modeles.generer = async () => {
+      await libre.promise;
+      return { texte: BONNE, modele: "faux" };
+    };
+    const eleve = await session(db, f.modeles, "eleve");
     // La première question, renvoyée avec sa clé, n'ouvre qu'une conversation.
     const premiere = { texte: "Pourquoi pas de ligne droite ?", cle: "k1" };
     const [r1, r2] = [
@@ -160,13 +131,14 @@ test("envoi : clé rejouée, une réponse à la fois, conversation archivée en 
     assertEquals(r1.headers.get("location"), r2.headers.get("location"));
     const conv = r1.headers.get("location")!.split("/").pop()!;
     assertEquals(db.prepare("SELECT count(*) AS n FROM conversations").get()!.n, 1);
-    assertStringIncludes(await texteDe(eleve, "/eleve/conversations"), "En attente");
+    assertStringIncludes(await texteDe(eleve, "/eleve/conversations"), "Réponse en cours");
 
     const suite = { texte: "Et la façade ?", conversation: conv, cle: "k2" };
     const refus = await poser(eleve, suite);
     assertEquals(refus.statut, 409);
     assertEquals(refus.texte, "Une réponse est déjà en cours dans cette conversation.");
     const premier = db.prepare("SELECT id FROM messages").get()!.id as string;
+    libre.resolve();
     await texteDe(eleve, `/eleve/messages/${premier}/flux`);
     const envoi = await poser(eleve, suite);
     const renvoi = await poser(eleve, suite);
@@ -286,7 +258,7 @@ test("rétention : une conversation vidée par la purge disparaît avec son titr
   }
 });
 
-test("migration des conversations : une par compte et par périmètre, échanges intacts", async () => {
+test("migrations des conversations et des réponses : échanges intacts, génération orpheline en file", async () => {
   const dir = await mkdtemp(join(tmpdir(), "thot-"));
   config.donnees = dir;
   const db = connexion(join(dir, "state.sqlite3"));
@@ -311,7 +283,16 @@ test("migration des conversations : une par compte et par périmètre, échanges
     message.run("a1", "a", "Première", resultat, "", "2026-01-01T00:00:00Z", "x");
     message.run("a3", "a", "Dans la séquence", null, "Bauhaus", "2026-03-01T00:00:00Z", "x");
     message.run("b1", "b", "De B", null, "", "2026-01-01T00:00:00Z", "x");
-    assertEquals(migrer(db)[0], "0013_conversations.sql");
+    // Une génération que tenait le flux SSE d'un ancien serveur repart de la file.
+    db.exec("UPDATE messages SET etat = 'en_cours', generation_id = 'ancien' WHERE id = 'b1'");
+    assertEquals(migrer(db).slice(0, 2), ["0013_conversations.sql", "0014_reponses.sql"]);
+    assertEquals(
+      {
+        ...db.prepare("SELECT etat, generation_id, tentatives FROM messages WHERE id = 'b1'").get(),
+      },
+      { etat: "en_attente", generation_id: null, tentatives: 0 },
+    );
+    assertEquals(db.prepare("SELECT count(*) AS n FROM messages WHERE nouvelle").get()!.n, 0);
     const lignes = db
       .prepare(
         `SELECT m.id, m.compte_id, m.rang, m.resultat, v.compte_id AS proprietaire, v.titre,

@@ -7,7 +7,7 @@ import { initialiserInstance } from "./instance.ts";
 
 export type Db = DatabaseSync;
 
-export const maintenant = () => new Date().toISOString().slice(0, 19) + "Z";
+export const maintenant = (ms = Date.now()) => new Date(ms).toISOString().slice(0, 19) + "Z";
 
 export function purgerMessages(db: Db, jours: number, date = Date.now()) {
   if (!Number.isInteger(jours) || jours < 1) {

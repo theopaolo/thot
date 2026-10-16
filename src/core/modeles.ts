@@ -19,9 +19,13 @@ export interface Modeles {
     mime: string,
     profil?: Profil,
   ): Promise<{ texte: string; modele: string }>;
-  reclasser(question: string, documents: string[]): Promise<{ index: number; score: number }[]>;
-  generer(messages: Message[]): Promise<{ texte: string; modele: string }>;
-  reformuler(questionPrecedente: string, question: string): Promise<string>;
+  reclasser(
+    question: string,
+    documents: string[],
+    signal?: AbortSignal,
+  ): Promise<{ index: number; score: number }[]>;
+  generer(messages: Message[], signal?: AbortSignal): Promise<{ texte: string; modele: string }>;
+  reformuler(questionPrecedente: string, question: string, signal?: AbortSignal): Promise<string>;
   /** probabilité que `citation`, lue sous le titre de son extrait, suffise à établir `texte` */
   soutenir(
     texte: string,
@@ -216,6 +220,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     maxTokens: number,
     raisonnement: boolean | string = true,
     cacheable = false,
+    signal?: AbortSignal,
   ) {
     const corps: Record<string, unknown> = {
       model: modele,
@@ -227,7 +232,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     corps.provider = { sort: "throughput", zdr: true, data_collection: "deny" };
     if (raisonnement === false) corps.reasoning = { enabled: false };
     else if (typeof raisonnement === "string") corps.reasoning = { effort: raisonnement };
-    const json = await post("/chat/completions", corps, cacheable);
+    const json = await post("/chat/completions", corps, cacheable, signal);
     const choix = json.choices?.[0];
     return {
       texte: (choix?.message?.content ?? "") as string,
@@ -263,14 +268,19 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       return { texte: texte.trim(), modele: config.legende };
     },
 
-    async reclasser(question, documents) {
+    async reclasser(question, documents, signal) {
       if (!documents.length) return [];
-      const json = await post("/rerank", {
-        model: config.reclasseur,
-        query: question,
-        documents: documents.map((d) => d.slice(0, 8000)),
-        provider: { zdr: true, data_collection: "deny" },
-      });
+      const json = await post(
+        "/rerank",
+        {
+          model: config.reclasseur,
+          query: question,
+          documents: documents.map((d) => d.slice(0, 8000)),
+          provider: { zdr: true, data_collection: "deny" },
+        },
+        false,
+        signal,
+      );
       const resultats = json.results;
       if (
         !Array.isArray(resultats) ||
@@ -291,7 +301,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         .sort((a, b) => b.score - a.score);
     },
 
-    async generer(messages) {
+    async generer(messages, signal) {
       // Un générateur qui raisonne le fait sur le même budget de sortie. Une réponse vide à 2 400 tokens est
       // retentée à 6 000 avant d'être déclarée vide, comme dans le banc d'essai.
       for (const budget of [2400, 6000]) {
@@ -300,6 +310,8 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           messages,
           budget,
           config.effort ?? true,
+          false,
+          signal,
         );
         // Une sortie coupée au budget n'est pas un JSON complet: on la retente plus large.
         if (texte.trim() && (!coupe || budget === 6000)) {
@@ -309,7 +321,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
       throw new PanneModele("Le générateur a rendu une sortie vide.", "MODEL_EMPTY_RESPONSE");
     },
 
-    async reformuler(questionPrecedente, question) {
+    async reformuler(questionPrecedente, question, signal) {
       const { texte } = await chat(
         config.generation,
         [
@@ -326,6 +338,8 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
         // Le raisonnement compte dans le budget. Sans effort réglé, `low` borne la latence.
         600,
         config.effort ?? "low",
+        false,
+        signal,
       );
       return texte.trim();
     },
