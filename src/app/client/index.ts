@@ -6,6 +6,19 @@ installerEleve();
 installerDepot();
 installerProf();
 
+// Mermaid et KaTeX ne se chargent que pour un contenu qui a un schéma ou une formule : la page,
+// ou une réponse que htmx vient de poser.
+document.addEventListener("htmx:load", (event) => {
+  const racine = event.target;
+  if (!(racine instanceof Element)) return;
+  if (racine.querySelector("[data-mermaid]")) {
+    void import("./schemas.ts").then((m) => m.dessiner(racine));
+  }
+  if (racine.querySelector("[data-tex]")) {
+    void import("./formules.ts").then((m) => m.ecrire(racine));
+  }
+});
+
 document.addEventListener("keydown", (event) => {
   const saisie =
     event.target instanceof Element &&

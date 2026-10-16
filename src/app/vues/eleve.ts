@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { BlocReponse, Resultat } from "../../core/reponse.ts";
+import { formules, LIENS, texteMermaid } from "../../core/notation.ts";
 import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
@@ -678,9 +679,14 @@ export const reponse = (
         : "",
     ].filter(Boolean);
     // En comparaison, la matière de la source suit sa citation : le titre d'une colonne ne la
-    // prouve pas.
+    // prouve pas. Une formule que la citation écrit aussi garde sa source dans `data-tex`, et
+    // reste du texte jusqu'au rendu de KaTeX dans le navigateur.
     const phrase = (n: number) =>
-      html`<span>${r.affirmations[n].texte}</span><span class="marque">&nbsp;<button
+      html`<span>${formules(r.affirmations[n].texte, r.affirmations[n].citation).map((m) =>
+        typeof m === "string"
+          ? m
+          : html`<span class="${m.bloc ? "formule formule-bloc" : "formule"}" data-tex="${m.tex}">${m.source}</span>`,
+      )}</span><span class="marque">&nbsp;<button
         class="citation"
         aria-pressed="${String(auto && n === 0)}"
         aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"
@@ -712,6 +718,22 @@ export const reponse = (
               })}</tr>`,
           )}</tbody>
         </table></div></figure>`;
+      }
+      if (b.type === "schema") {
+        // La liste est l'équivalent texte du schéma, toujours affiché. Le navigateur dessine le
+        // schéma au-dessus quand Mermaid y parvient.
+        const nom = (i: number) => html`<strong>${b.noeuds[i].titre}</strong>`;
+        return html`<figure class="schema-reponse">
+          ${b.titre ? html`<figcaption>${b.titre}</figcaption>` : ""}
+          <ul data-mermaid="${texteMermaid(b)}">${b.noeuds.map((noeud, i) =>
+            noeud.affirmation === undefined
+              ? ""
+              : html`<li>${nom(i)} : ${phrase(noeud.affirmation)}</li>`,
+          )}${b.relations.map(
+            (l) =>
+              html`<li>${nom(l.de)} ${LIENS[l.lien]} ${nom(l.vers)} : ${phrase(l.affirmation)}</li>`,
+          )}</ul>
+        </figure>`;
       }
       const titre = b.titre ? html`<h2>${b.titre}</h2>` : "";
       const items = b.affirmations.map((n) => html`<li>${phrase(n)}</li>`);

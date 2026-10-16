@@ -10,6 +10,7 @@ import {
 } from "./recherche.ts";
 import { trouverFragments } from "./texte.ts";
 import type { Profil } from "./profils.ts";
+import { type Lien, LIENS, type Schema } from "./notation.ts";
 
 export type Affirmation = {
   texte: string;
@@ -29,7 +30,7 @@ export type Affirmation = {
 
 /**
  * Un bloc range des affirmations, désignées par leur indice dans la réponse. Il n'apporte aucun
- * fait : ses titres, colonnes et lignes viennent du modèle sans preuve.
+ * fait : ses titres, colonnes, lignes et noms de nœuds viennent du modèle sans preuve.
  */
 export type BlocReponse =
   | { type: "paragraphe" | "liste" | "etapes"; titre?: string; affirmations: number[] }
@@ -39,7 +40,8 @@ export type BlocReponse =
       colonnes: string[];
       /** une case par colonne, `null` pour une case vide */
       lignes: { titre: string; affirmations: (number | null)[] }[];
-    };
+    }
+  | Schema;
 
 type Repondue = {
   affirmations: Affirmation[];
@@ -93,6 +95,7 @@ const MAX_MOTS = 250;
 const MAX_BLOCS = 4;
 const MAX_COLONNES = 4;
 const MAX_TITRE = 60;
+const MAX_NOEUDS = 8;
 const SYSTEME: Record<Profil, string> = {
   "arts-appliques": SYSTEME_ARTS,
   general: SYSTEME_ARTS.replace(
@@ -106,17 +109,22 @@ const SYSTEME: Record<Profil, string> = {
    Ecris seulement ce que la question demande. Chaque affirmation apporte un fait nouveau :
    retire celle qui redit une affirmation precedente avec d'autres mots, meme si elle vient
    d'un autre extrait.
-7. Si la question demande une procedure, une comparaison ou une enumeration, ajoute a cote de
-   "affirmations" une cle "blocs" qui les range dans l'ordre de lecture :
+7. Si la question demande une procedure, une comparaison, une enumeration ou des liens entre
+   notions, ajoute a cote de "affirmations" une cle "blocs" qui les range dans l'ordre de lecture :
    "blocs": [{"type": "etapes", "titre": "...", "affirmations": [1, 2, 3]}]
    - "etapes" pour une procedure, une etape par affirmation, dans l'ordre ou on les fait.
      "liste" pour des elements sans ordre. "paragraphe" pour une explication.
    - Pour comparer, un bloc "tableau" : une colonne par element compare, une ligne par point
      de comparaison, une affirmation ou null par case :
      {"type": "tableau", "colonnes": ["A", "B"], "lignes": [{"titre": "...", "affirmations": [4, 5]}]}
-   - Les nombres designent tes affirmations, 1 pour la premiere. Chaque affirmation va dans un
-     seul bloc. ${MAX_BLOCS} blocs au maximum.
-   - Un titre, une colonne ou une ligne tient en quelques mots et n'apporte aucun fait.
+   - Pour des causes, un deroulement ou des notions liees, un bloc "schema" : des noeuds, et des
+     relations "cause", "suite" ou "theme" d'un noeud a un autre, designes par leur numero, 1 pour
+     le premier. Chaque relation est prouvee par une affirmation qui l'enonce. Un noeud peut
+     designer une autre affirmation, qui le decrit :
+     {"type": "schema", "noeuds": [{"titre": "A"}, {"titre": "B", "affirmation": 6}], "relations": [{"de": 1, "vers": 2, "lien": "cause", "affirmation": 7}]}
+   - Les nombres designent tes affirmations, 1 pour la premiere. Chaque affirmation sert une
+     seule fois, dans un seul bloc. ${MAX_BLOCS} blocs au maximum.
+   - Un titre, une colonne, une ligne ou un noeud tient en quelques mots et n'apporte aucun fait.
    Pour une question simple, n'ajoute pas de blocs.`,
     ),
 };
@@ -262,6 +270,54 @@ export function ranger(brutes: unknown, parRang: (Affirmation | undefined)[]): R
           })
           .filter((l) => l.affirmations.some((n) => n !== null));
         return lignes.length ? [{ type, ...avecTitre, colonnes, lignes }] : [];
+      }
+      if (type === "schema") {
+        const brutsNoeuds = liste(b?.noeuds);
+        const brutesRelations = liste(b?.relations);
+        if (brutsNoeuds.length < 2 || brutsNoeuds.length > MAX_NOEUDS) invalide();
+        if (!brutesRelations.length || brutesRelations.length > MAX_AFFIRMATIONS) invalide();
+        // Les preuves des nœuds se placent avant celles des relations : le texte les lit ainsi.
+        // Un nœud qui reprend la preuve d'une de ses relations la laisse à la relation et n'est
+        // plus qu'un nom. Le modèle le fait quand la question porte sur des liens.
+        const deRelations = new Set(brutesRelations.map((r) => (r as BruteBloc)?.affirmation));
+        const noeuds = brutsNoeuds.map((x) => {
+          const n = x as BruteBloc;
+          const nom = n?.affirmation == null || deRelations.has(n.affirmation);
+          return { titre: titre(n?.titre, true), affirmation: nom ? null : placer(n.affirmation) };
+        });
+        const noeud = (x: unknown) =>
+          Number.isInteger(x) && (x as number) >= 1 && (x as number) <= noeuds.length
+            ? (x as number) - 1
+            : invalide();
+        const relations = brutesRelations.flatMap((x) => {
+          const r = x as BruteBloc;
+          const [de, vers, lien] = [noeud(r?.de), noeud(r?.vers), r?.lien];
+          if (de === vers || typeof lien !== "string" || !Object.hasOwn(LIENS, lien)) invalide();
+          const affirmation = placer(r?.affirmation);
+          return affirmation === null ? [] : [{ de, vers, lien: lien as Lien, affirmation }];
+        });
+        // Un nœud sans preuve retenue ni relation retenue disparaît.
+        const gardes = noeuds.flatMap((n, i) =>
+          n.affirmation !== null || relations.some((r) => r.de === i || r.vers === i) ? [i] : [],
+        );
+        if (!gardes.length) return [];
+        return [
+          {
+            type,
+            ...avecTitre,
+            noeuds: gardes.map((i) => {
+              const n = noeuds[i];
+              return n.affirmation === null
+                ? { titre: n.titre }
+                : { titre: n.titre, affirmation: n.affirmation };
+            }),
+            relations: relations.map((r) => ({
+              ...r,
+              de: gardes.indexOf(r.de),
+              vers: gardes.indexOf(r.vers),
+            })),
+          },
+        ];
       }
       if (type !== "paragraphe" && type !== "liste" && type !== "etapes") return invalide();
       const indices = liste(b?.affirmations)

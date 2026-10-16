@@ -1368,18 +1368,20 @@ main.page-chat #erreur-reseau {
   margin: 0 0 var(--s3);
   padding-left: 1.5em;
 }
-/* Un tableau défile dans son cadre plutôt que d'écraser ses cases sur un téléphone. */
-.tableau-reponse {
+/* Un tableau ou un schéma défile dans son cadre plutôt que d'écraser son contenu sur un
+   téléphone. La liste d'un schéma le suit. */
+:is(.tableau-reponse, .schema-reponse) {
   margin: 0 0 var(--s3);
 }
-.cadre-tableau {
+.cadre-tableau,
+.schema {
   overflow-x: auto;
 }
 .tableau-reponse table {
   font-size: 1rem;
   line-height: 1.5;
 }
-.tableau-reponse figcaption {
+:is(.tableau-reponse, .schema-reponse) figcaption {
   max-width: none;
   margin: 0 0 var(--s2);
   color: inherit;
@@ -1388,6 +1390,18 @@ main.page-chat #erreur-reseau {
 }
 .tableau-reponse tbody td {
   min-width: 14rem;
+}
+.schema {
+  margin: var(--s4) 0 var(--s2);
+}
+.schema svg {
+  display: block;
+}
+/* Une longue formule défile dans sa ligne au lieu d'élargir la réponse. */
+.formule-bloc {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 /* L'espace et la marque ne se séparent pas : le dernier mot de la phrase les suit à la ligne. */
 .marque {

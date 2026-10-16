@@ -2,9 +2,16 @@ import { longueur } from "./texte.ts";
 
 /**
  * Un passage extrait, avant assemblage. `page` situe le passage dans l'original : page d'un PDF,
- * diapositive d'une présentation. `code` marque un bloc de code, rendu dans un `<pre>`.
+ * diapositive d'une présentation. `code` marque un bloc de code, rendu dans un `<pre>`, et
+ * `langage` le langage que nomme sa clôture Markdown. Les extractions antérieures n'en ont pas.
  */
-export type Partie = { texte: string; section: string; page?: number; code?: true };
+export type Partie = {
+  texte: string;
+  section: string;
+  page?: number;
+  code?: true;
+  langage?: string;
+};
 
 export type Bloc = Partie & { id: string; debut: number; fin: number };
 

@@ -791,6 +791,91 @@ test("les blocs rangent les affirmations retenues dans l'ordre de lecture, une s
   }
 });
 
+test("un schéma ne garde que des relations prouvées, une structure hors bornes donne un paragraphe", () => {
+  const [un, deux, trois, quatre] = ["Un", "Deux", "Trois", "Quatre"].map((texte) => ({
+    texte,
+    citation: texte,
+    source_id: "s",
+    chunk_id: "c",
+    titre: "T",
+  }));
+  // La troisième affirmation du modèle a été refusée.
+  const parRang = [un, deux, undefined, trois, quatre];
+  const noeuds = [{ titre: "A", affirmation: 1 }, { titre: "B" }, { titre: "C" }, { titre: "D" }];
+  // La relation de C à D cite l'affirmation refusée : elle part, et C et D avec elle.
+  const relations = [
+    { de: 1, vers: 2, lien: "cause", affirmation: 2 },
+    { de: 3, vers: 4, lien: "suite", affirmation: 3 },
+  ];
+  assertEquals(ranger([{ type: "schema", titre: "Chaîne", noeuds, relations }], parRang), {
+    affirmations: [un, deux, trois, quatre],
+    blocs: [
+      {
+        type: "schema",
+        titre: "Chaîne",
+        noeuds: [{ titre: "A", affirmation: 0 }, { titre: "B" }],
+        relations: [{ de: 0, vers: 1, lien: "cause", affirmation: 1 }],
+      },
+      { type: "paragraphe", affirmations: [2, 3] },
+    ],
+  });
+  // Un schéma dont aucune preuve ne reste disparaît.
+  assertEquals(
+    ranger(
+      [
+        {
+          type: "schema",
+          noeuds: noeuds.slice(1),
+          relations: [{ ...relations[1], de: 1, vers: 2 }],
+        },
+      ],
+      parRang,
+    ),
+    {
+      affirmations: [un, deux, trois, quatre],
+      blocs: [{ type: "paragraphe", affirmations: [0, 1, 2, 3] }],
+    },
+  );
+  // La preuve d'une relation que le modèle donne aussi à un nœud reste à la relation.
+  assertEquals(
+    ranger([{ type: "schema", noeuds, relations: [{ ...relations[0], affirmation: 1 }] }], parRang),
+    {
+      affirmations: [un, deux, trois, quatre],
+      blocs: [
+        {
+          type: "schema",
+          noeuds: [{ titre: "A" }, { titre: "B" }],
+          relations: [{ de: 0, vers: 1, lien: "cause", affirmation: 0 }],
+        },
+        { type: "paragraphe", affirmations: [1, 2, 3] },
+      ],
+    },
+  );
+  const avec = (modif: Record<string, unknown>) => [
+    { type: "schema", noeuds, relations, ...modif },
+  ];
+  for (const blocs of [
+    avec({ noeuds: noeuds.slice(0, 1), relations: [] }),
+    avec({ noeuds: Array(9).fill({ titre: "N" }) }),
+    avec({ noeuds: "A, B" }),
+    avec({ noeuds: [...noeuds.slice(0, 3), { titre: "x".repeat(61) }] }),
+    avec({ noeuds: [...noeuds.slice(0, 3), { titre: " " }] }),
+    avec({ relations: [] }),
+    avec({ relations: Array(9).fill(relations[0]) }),
+    avec({ relations: [{ ...relations[0], affirmation: undefined }] }),
+    avec({ relations: [{ ...relations[0], lien: "oppose" }] }),
+    avec({ relations: [{ ...relations[0], lien: "toString" }] }),
+    avec({ relations: [{ ...relations[0], vers: 1 }] }),
+    avec({ relations: [{ ...relations[0], vers: 5 }] }),
+    avec({ relations: [{ ...relations[0], de: "1" }] }),
+    // Une preuve sert une seule relation.
+    avec({ relations: [relations[0], { ...relations[1], affirmation: 2 }] }),
+    avec({ relations: [{ ...relations[0], affirmation: 6 }] }),
+  ]) {
+    assertEquals(ranger(blocs, parRang), { affirmations: [un, deux, trois, quatre] });
+  }
+});
+
 test("le chat: question, flux SSE, réponse citée, panneau source", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);

@@ -65,9 +65,11 @@ Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et
 vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou
 `.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur
 voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
-d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le front matter
-fournit le titre, ses autres clés sont ignorées. Les images liées ne sont pas jointes, un
-avertissement les nomme.
+d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le langage nommé
+par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `mermaid` au-dessus
+de son code, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Le
+front matter fournit le titre, ses autres clés sont ignorées. Les images liées ne sont pas
+jointes, un avertissement les nomme.
 
 Un zip est un document Word quand `[Content_Types].xml` déclare `word/document.xml` comme document
 principal, une présentation quand il déclare ainsi `ppt/presentation.xml`. Le dépôt refuse avec
@@ -88,9 +90,9 @@ avertissement.
 
 Une présentation se lit dans l'ordre de sa liste de diapositives (`p:sldIdLst`), pas dans celui
 des fichiers. Chaque diapositive ouvre la section « Diapositive n : titre », et le champ `page` de
-ses blocs porte son numéro. Ses formes se lisent dans l'ordre du fichier, qui est l'ordre de
-superposition et pas forcément l'ordre de lecture, titre en tête. Les groupes se lisent à leur
-place. Pied de page, date et numéro venus du masque sont écartés. Graphiques, SmartArt,
+ses blocs porte son numéro. Le titre se lit en tête. Quand toutes les formes d'un niveau ont une
+position, elles se lisent par lignes, de haut en bas puis de gauche à droite. Sinon elles gardent
+l'ordre du fichier, qui est celui de superposition. Les groupes se lisent à leur place. Pied de page, date et numéro venus du masque sont écartés. Graphiques, SmartArt,
 équations, objets, sons, vidéos et animations donnent un avertissement qui nomme leurs
 diapositives. Une diapositive masquée reste hors du texte et un avertissement la nomme. Sur la
 page de la source, « Les inclure » relance l'extraction : le texte changé devient une version à
@@ -517,6 +519,25 @@ affirmation avec sa propre citation. `ranger()` dans `src/core/reponse.ts` borne
 Une structure invalide donne un seul paragraphe, une affirmation refusée quitte son bloc. Une
 réponse sans blocs, comme toutes celles d'avant, se lit en un paragraphe. Les réponses d'arts
 appliqués restent plates : leur consigne mesurée ne demande pas de blocs.
+
+Un schéma relie des nœuds nommés par le modèle. Chaque relation, de cause, de suite ou de thème,
+cite une affirmation vérifiée. Un nœud peut citer une autre affirmation, qui le décrit. Les noms
+des nœuds et le type d'une relation viennent du modèle sans preuve : le fait est l'affirmation
+citée, que le texte du schéma affiche avec la relation. Une relation proposée sans preuve n'existe
+pas encore. Le texte Mermaid sort de `texteMermaid()` dans `src/core/notation.ts`, pas du modèle :
+un nom n'y garde que lettres, chiffres et espaces, le reste passe en entités. La liste des
+relations citées s'affiche toujours. Le navigateur dessine le schéma au-dessus, avec Mermaid en
+mode strict puis DOMPurify sur le SVG. Un échec laisse la liste.
+
+Une formule est un fait. Une phrase ne rend une formule `$…$` ou `$$…$$` avec KaTeX que si sa
+citation écrit la même expression, espaces mis à part. Sinon la formule reste du texte. KaTeX
+tourne sans confiance, avec des macros neuves à chaque formule et une expansion bornée
+(`optionsKatex()`). Rendre une formule ne vérifie ni son raisonnement, ni ses unités, ni son
+résultat.
+
+Mermaid et KaTeX sont des dépendances épinglées, regroupées par Vite+ dans `static/dist/` avec les
+polices de KaTeX. Le navigateur ne les charge que pour un contenu qui a un schéma ou une formule,
+et aucun service extérieur ne les rend.
 
 ### Comparaison de matières
 

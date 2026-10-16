@@ -81,6 +81,7 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
     else if (ouvre) {
       fermer();
       const [, retrait, cloture] = ouvre;
+      const langage = ligne.slice(ouvre[0].length).trim().split(/\s/)[0].toLowerCase();
       const code: string[] = [];
       const ferme = (l: string) => {
         const f = l.trim();
@@ -89,7 +90,7 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
       for (i++; i < brut.length && !ferme(brut[i]); i++) {
         code.push(brut[i].replace(new RegExp(`^ {0,${retrait.length}}`), ""));
       }
-      parties.push({ texte: code.join("\n"), section, code: true });
+      parties.push({ texte: code.join("\n"), section, code: true, ...(langage && { langage }) });
     } else if (titreLigne) {
       fermer();
       section = lisible(titreLigne[1], images);

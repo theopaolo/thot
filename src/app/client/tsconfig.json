@@ -1,6 +1,10 @@
 {
   "extends": "../../../tsconfig.json",
-  "compilerOptions": { "lib": ["esnext", "dom", "dom.iterable"], "types": [] },
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "types": [],
+    "noUncheckedSideEffectImports": false
+  },
   "include": ["."],
   "exclude": []
 }

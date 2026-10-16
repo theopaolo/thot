@@ -21,7 +21,10 @@
   "devDependencies": {
     "@std/assert": "jsr:^1.0.19",
     "@types/node": "^26.6.5",
+    "dompurify": "3.4.17",
     "jszip": "3.10.2",
+    "katex": "0.16.47",
+    "mermaid": "12.1.0",
     "vite-plus": "1.1.0"
   },
   "devEngines": {

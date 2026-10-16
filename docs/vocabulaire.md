@@ -153,7 +153,9 @@ question. Libellés : « Nouvelle conversation », « Renommer », « Archiver �
 **Réponse vérifiée**
 Réponse de Thot dont chaque phrase porte un numéro qui ouvre le passage du cours qui la prouve.
 Une réponse peut ranger ses phrases en étapes numérotées, en liste ou en tableau de comparaison.
-Chaque étape et chaque case garde son numéro. Trois mentions remplacent « Réponse vérifiée dans
+Chaque étape et chaque case garde son numéro. Un schéma relie des notions, et sa liste écrit
+chaque relation avec la phrase qui la prouve : « A entraîne B » pour une cause, « A précède B »
+pour une suite dans le temps, « A est lié à B » pour un thème commun. Trois mentions remplacent « Réponse vérifiée dans
 les cours validés » : « Réponse partielle » quand des phrases refusées ont été retirées,
 « Vérification partielle » quand une étape de contrôle n'a pas pu être faite, « Une source citée a
 été supprimée » quand les phrases qui la citaient ont été retirées.

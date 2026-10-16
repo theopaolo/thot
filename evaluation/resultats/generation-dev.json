@@ -1,5 +1,5 @@
 {
- "date": "2026-10-16T19:29:38.694Z",
+ "date": "2026-10-16T21:52:28.454Z",
  "modele": "deepseek/deepseek-v4.1-flash",
  "seuil": 0.023,
  "dans_le_corpus": {
@@ -8,7 +8,7 @@
   "bonne_source": 0.93,
   "faux_refus": 0.07,
   "panne": 0,
-  "reparee": 0.2,
+  "reparee": 0.33,
   "partielle": 0.07,
   "avec_blocs": 0.4
  },
@@ -32,7 +32,7 @@
    "panne": 0
   }
  },
- "latence_mediane_ms": 2618,
+ "latence_mediane_ms": 4410,
  "lignes": [
   {
    "qid": "G01",
@@ -41,14 +41,14 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.99609375,
-   "ms": 1800,
+   "ms": 4939,
    "essais": 1,
    "partielle": false,
    "reponse": [
-    "Dans un conteneur, localhost désigne le conteneur lui-même. [Docker : localhost]",
-    "Depuis l'API, localhost:5432 ne mène donc pas à PostgreSQL. [Docker : localhost]",
+    "Dans un conteneur, localhost designe le conteneur lui-meme. [Docker : localhost]",
+    "Depuis l'API, localhost:5432 ne mene donc pas a PostgreSQL. [Docker : localhost]",
     "L'API utilise le nom du service : db:5432. [Docker : localhost]",
-    "Depuis un conteneur, localhost désigne ce conteneur lui-même. [Docker Cheat-Sheet : Attention à localhost]",
+    "Depuis un conteneur, localhost designe ce conteneur lui-meme. [Docker Cheat-Sheet : Attention à localhost]",
     "Depuis api, on ne fait pas localhost:5432 mais on indique le service db:5432. [Docker Cheat-Sheet : Attention à localhost]"
    ]
   },
@@ -59,13 +59,13 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.9921875,
-   "ms": 2810,
-   "essais": 1,
+   "ms": 5083,
+   "essais": 2,
    "partielle": false,
    "reponse": [
     "docker compose down -v supprime aussi les volumes. [Docker Cheat-Sheet : Nettoyage]",
     "Pour PostgreSQL, supprimer les volumes peut signifier que la base de données est supprimée. [Docker Cheat-Sheet : Nettoyage]",
-    "Pour une base de développement, docker compose down -v veut dire base remise à zéro. [Docker : Volume nommé]"
+    "Pour une base de développement, cela veut dire base remise à zéro. [Docker : Volume nommé]"
    ]
   },
   {
@@ -75,20 +75,23 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 1,
-   "ms": 11261,
+   "ms": 12063,
    "essais": 2,
    "partielle": false,
    "blocs": [
     "paragraphe",
-    "paragraphe"
+    "liste",
+    "liste"
    ],
    "reponse": [
     "Un Dockerfile multi-stage sépare le développement, le build et la production dans un seul fichier. [Docker : Dockerfile multi-stage]",
     "L'image de production ne garde que le résultat du build, sans les outils de développement. [Docker : Dockerfile multi-stage]",
-    "Un Dockerfile multi-stage peut produire une image dev et une image production. [Docker Cheat-Sheet : Rappels mentaux]",
-    "La ligne COPY --from=build /app/dist ./dist copie seulement le résultat du stage build. [Dockerfile multi-stage : Stage production]",
+    "Dans l'exemple Node, la ligne COPY --from=build /app/dist ./dist copie seulement le résultat du stage build. [Dockerfile multi-stage : Stage production]",
     "L'image de production n'a donc pas besoin de contenir les tests, ESLint, Vite, TypeScript, les outils de build et les devDependencies. [Dockerfile multi-stage : Stage production]",
-    "Le résultat est des images plus petites. [Dockerfile multi-stage : Stage production]"
+    "Le résultat est des images plus petites. [Dockerfile multi-stage : Stage production]",
+    "Le résultat est moins de surface d'attaque. [Dockerfile multi-stage : Stage production]",
+    "Le résultat est des démarrages et transferts plus rapides. [Dockerfile multi-stage : Stage production]",
+    "Le résultat est une séparation claire entre build et runtime. [Dockerfile multi-stage : Stage production]"
    ]
   },
   {
@@ -98,17 +101,16 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.99609375,
-   "ms": 5545,
+   "ms": 4410,
    "essais": 1,
    "partielle": false,
    "reponse": [
     "Staging et production utilisent idéalement exactement la même image. [Docker Cheat-Sheet : Git → Registry → Deploy]",
-    "Ce qui change entre staging et production, ce n'est pas le code ni l'image. [Docker Cheat-Sheet : Git → Registry → Deploy]",
+    "Ce qui change entre les environnements, ce n'est pas le code ni l'image. [Docker Cheat-Sheet : Git → Registry → Deploy]",
+    "La CI construit l'image une seule fois, puis cette même image part dans chaque environnement. [Docker, Git et les environnements]",
+    "Les serveurs de staging et de production ne reconstruisent pas l'application, ils récupèrent une image déjà construite. [Docker, Git et les environnements : CI/CD]",
     "Staging et production devraient idéalement utiliser la même image. [Docker Cheat-Sheet : Rappels mentaux]",
-    "Les serveurs de staging et de production ne reconstruisent pas l'application. [Docker, Git et les environnements : CI/CD]",
-    "Les serveurs de staging et de production récupèrent une image déjà construite. [Docker, Git et les environnements : CI/CD]",
-    "Après validation, la production déploie la même image. [Docker, Git et les environnements : CI/CD]",
-    "Construire l'image de production une seule fois, puis déployer cette même image en staging et en production. [Docker : Écrire un bon Compose]"
+    "Staging n'a normalement pas besoin de son propre stage Docker. [Docker Cheat-Sheet : Multi-stage Dockerfile]"
    ]
   },
   {
@@ -118,13 +120,13 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.9921875,
-   "ms": 3133,
+   "ms": 4714,
    "essais": 1,
    "partielle": false,
    "reponse": [
     "Créer un compte revient à conclure un contrat. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]",
     "Les données strictement nécessaires à ce contrat n'ont pas besoin d'un consentement séparé. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]",
-    "Pour la création du compte, la base légale est le contrat et le consentement n'est pas nécessaire. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]"
+    "Pour la création du compte, la base légale est le contrat et le consentement n'est pas requis. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]"
    ]
   },
   {
@@ -134,7 +136,7 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.96875,
-   "ms": 1643,
+   "ms": 4469,
    "essais": 1,
    "partielle": false,
    "reponse": [
@@ -148,19 +150,19 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.96875,
-   "ms": 5992,
-   "essais": 1,
+   "ms": 9775,
+   "essais": 2,
    "partielle": false,
    "blocs": [
     "paragraphe"
    ],
    "reponse": [
     "L'annexe III, point 3, vise en éducation quatre usages : décider de l'admission, évaluer les acquis d'apprentissage, évaluer le niveau d'enseignement accessible et surveiller les examens. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
-    "L'assistant de révision n'en fait aucun et relève de la transparence. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
-    "Un quiz qui juge si l'élève a compris tombe dans le point 3 b. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "L'assistant n'en fait aucun. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "L'assistant relève de la transparence, avec mention IA et marquage des réponses. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "Un quiz qui juge si l'élève a compris, un parcours adapté à ses erreurs ou un score de maîtrise par élève tombent dans le point 3 b. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
     "Une détection de la frustration ou de l'ennui tomberait dans l'interdit. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
-    "Un système de l'annexe III peut sortir du haut risque s'il ne pèse pas sur la décision. [Repères AI Act et RGPD : L'essentiel en dix points]",
-    "Il y reste s'il profile des personnes, et le fournisseur doit documenter son analyse. [Repères AI Act et RGPD : L'essentiel en dix points]"
+    "Un système de l'annexe III peut sortir du haut risque s'il ne pèse pas sur la décision. [Repères AI Act et RGPD : L'essentiel en dix points]"
    ]
   },
   {
@@ -170,19 +172,19 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.95703125,
-   "ms": 5644,
+   "ms": 4525,
    "essais": 1,
    "partielle": false,
    "blocs": [
     "tableau"
    ],
    "reponse": [
-    "Avec le server-side rendering, un serveur reçoit une requête pour une URL et produit le HTML de la page à ce moment-là. [Frontend, backend et rendu : SSR : rendu côté serveur]",
-    "Avec la static site generation, les pages HTML sont produites pendant le build. [Frontend, backend et rendu : SSG : génération statique]",
+    "Avec le SSR, un serveur reçoit une requête pour une URL et produit le HTML de la page à ce moment-là. [Frontend, backend et rendu : SSR : rendu côté serveur]",
+    "Avec le SSG, les pages HTML sont produites pendant le build. [Frontend, backend et rendu : SSG : génération statique]",
     "Le SSR est adapté à une page publique dont le contenu varie souvent ou dépend de la requête. [Frontend, backend et rendu : SSR : rendu côté serveur]",
     "Le SSG convient à une documentation, un blog, un portfolio ou des pages de présentation dont le contenu change moins souvent que les consultations. [Frontend, backend et rendu : SSG : génération statique]",
-    "Pour le SSG, une modification demande une nouvelle génération. [Frontend, backend et rendu : SSG : génération statique]",
-    "Le SSR demande un environnement capable de produire les réponses qui ne sont pas déjà dans un cache. [Frontend, backend et rendu : SSR : rendu côté serveur]"
+    "Le SSR demande un environnement capable de produire les réponses qui ne sont pas déjà dans un cache. [Frontend, backend et rendu : SSR : rendu côté serveur]",
+    "Une modification en SSG demande une nouvelle génération. [Frontend, backend et rendu : SSG : génération statique]"
    ]
   },
   {
@@ -192,14 +194,15 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.98046875,
-   "ms": 1633,
+   "ms": 5663,
    "essais": 1,
    "partielle": false,
    "reponse": [
     "Un ADR doit lister au moins un coût, une limite ou un risque. [ADR : Nommer les conséquences négatives]",
     "Si aucune conséquence négative n'apparaît, la comparaison des options est probablement incomplète. [ADR : Nommer les conséquences négatives]",
-    "Dans les deux cas, il faut donner le contexte et au moins une conséquence négative. [ADR : Version minimale]",
-    "Une revue peut signaler qu'aucune conséquence négative n'est listée, or tout choix a un coût. [ADR : Rendre l'incertitude visible]"
+    "Dans un ADR, il faut donner le contexte et au moins une conséquence négative. [ADR : Version minimale]",
+    "Une revue peut signaler qu'aucune conséquence négative n'est listée, or tout choix a un coût. [ADR : Rendre l'incertitude visible]",
+    "Pour confirmer un choix existant, un ADR documente son contexte, les alternatives considérées, les preuves disponibles, les hypothèses et au moins une conséquence négative. [Exercice : justifier ses choix : 6. Rédiger deux ADR]"
    ]
   },
   {
@@ -209,7 +212,7 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 1,
-   "ms": 6368,
+   "ms": 4046,
    "essais": 1,
    "partielle": false,
    "blocs": [
@@ -234,7 +237,7 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 1,
-   "ms": 5654,
+   "ms": 11262,
    "essais": 2,
    "partielle": true,
    "blocs": [
@@ -242,12 +245,13 @@
     "paragraphe"
    ],
    "reponse": [
-    "Le calcul du montant s'écrit const montantCentimes = tarif.appliquer(atelier.prixCentimes); [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
-    "La classe TarifSolidaire applique Math.round(prixCentimes / 2). [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
-    "Une autre option fournit un objet de tarif à la réservation. [Mise en situation : Situation 1, des tarifs qui varient]",
-    "Chaque règle peut évoluer séparément dans sa classe, mais le choix de cet objet doit être organisé ailleurs. [Mise en situation : Situation 1, des tarifs qui varient]",
-    "Nous pouvons ajouter une classe de tarif sans modifier Reservation, qui l'utilise. [SOLID, comprendre les cinq principes : Après, la réservation reçoit la règle qui varie]",
-    "Le code qui choisit le tarif change toujours quelque part. [SOLID, comprendre les cinq principes : Après, la réservation reçoit la règle qui varie]"
+    "Le contrat Tarif prévoit que appliquer reçoit et renvoie des entiers en centimes, positifs ou nuls. [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "Le calcul du montant devient const montantCentimes = tarif.appliquer(atelier.prixCentimes). [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "La validation du résultat précède this.#prochainId++, l'enregistrement et la notification. [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "Une règle qui renvoie NaN, un montant négatif ou une fraction ne doit pas laisser une réservation partielle. [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "Une option garde dans la méthode reserver une condition sur le tarif, et les règles et leur sélection se lisent au même endroit. [Mise en situation : Situation 1, des tarifs qui varient]",
+    "Une autre option fournit un objet de tarif à la réservation, et chaque règle peut évoluer séparément dans sa classe. [Mise en situation : Situation 1, des tarifs qui varient]",
+    "Le principe ouvert-fermé décrit l'objectif de cette correction : ajouter une classe de tarif sans modifier Reservation, qui l'utilise. [SOLID, comprendre les cinq principes : Après, la réservation reçoit la règle qui varie]"
    ]
   },
   {
@@ -257,16 +261,16 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.9921875,
-   "ms": 2772,
-   "essais": 1,
+   "ms": 10226,
+   "essais": 2,
    "partielle": false,
    "reponse": [
-    "Avec un Observer, le faux courriel lance une exception synchrone. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
-    "#notifier conserve cette erreur et poursuit les autres réactions. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
-    "reserver renvoie ensuite la réservation. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "Le faux courriel lance une exception synchrone. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "#notifier conserve cette erreur, poursuit les autres réactions, puis reserver renvoie la réservation. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
     "L'appelant peut donc constater une réservation confirmée et une réaction en échec. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
     "L'échec du courriel ne doit pas annuler une réservation déjà confirmée. [Mise en situation : Situation 3, plusieurs réactions puis une interface]",
-    "L'interface conserve la réservation confirmée et signale séparément l'échec d'envoi. [Mise en situation : Situation 3, plusieurs réactions puis une interface]"
+    "L'interface conserve la réservation confirmée et signale séparément l'échec d'envoi. [Mise en situation : Situation 3, plusieurs réactions puis une interface]",
+    "Une erreur de courriel laisse la réservation enregistrée. [Faire réagir les vues avec Observer : Comparer au retour attendu]"
    ]
   },
   {
@@ -276,7 +280,7 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.9921875,
-   "ms": 3070,
+   "ms": 2485,
    "essais": 1,
    "partielle": false,
    "reponse": [
@@ -292,12 +296,11 @@
    "etat": "answered",
    "bonne_source": true,
    "score": 0.984375,
-   "ms": 5692,
-   "essais": 2,
+   "ms": 5504,
+   "essais": 1,
    "partielle": false,
    "blocs": [
-    "tableau",
-    "paragraphe"
+    "tableau"
    ],
    "reponse": [
     "Le modèle conceptuel des données (MCD) décrit les objets du métier et leurs liens, sans choisir comment les stocker. [Données et Merise : Distinguer les trois modèles]",
@@ -314,7 +317,7 @@
    "detail": "refus_modele",
    "bonne_source": false,
    "score": 0.8515625,
-   "ms": 650,
+   "ms": 714,
    "essais": 1,
    "partielle": false
   },
@@ -325,7 +328,7 @@
    "etat": "out_of_corpus",
    "detail": "seuil",
    "score": 0.0021820068359375,
-   "ms": 642,
+   "ms": 473,
    "essais": 0,
    "partielle": false
   },
@@ -336,7 +339,7 @@
    "etat": "out_of_corpus",
    "detail": "refus_modele",
    "score": 0.3203125,
-   "ms": 808,
+   "ms": 867,
    "essais": 1,
    "partielle": false
   },
@@ -346,8 +349,8 @@
    "question": "Comment écrire une boucle asynchrone en Python avec asyncio ?",
    "etat": "out_of_corpus",
    "detail": "seuil",
-   "score": 0.00023651123046875,
-   "ms": 1372,
+   "score": 0.00023365020751953125,
+   "ms": 473,
    "essais": 0,
    "partielle": false
   },
@@ -358,7 +361,7 @@
    "etat": "out_of_corpus",
    "detail": "seuil",
    "score": 0.0021209716796875,
-   "ms": 2618,
+   "ms": 512,
    "essais": 0,
    "partielle": false
   },
@@ -368,8 +371,8 @@
    "question": "Quelle amende a été infligée à Google en 2019 au titre du RGPD ?",
    "etat": "out_of_corpus",
    "detail": "refus_modele",
-   "score": 0.09521484375,
-   "ms": 780,
+   "score": 0.10693359375,
+   "ms": 816,
    "essais": 1,
    "partielle": false
   },
@@ -379,8 +382,8 @@
    "question": "Comment configurer un certificat Let's Encrypt derrière Nginx ?",
    "etat": "out_of_corpus",
    "detail": "seuil",
-   "score": 0.0001239776611328125,
-   "ms": 478,
+   "score": 0.00011444091796875,
+   "ms": 499,
    "essais": 0,
    "partielle": false
   },

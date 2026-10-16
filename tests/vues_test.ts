@@ -3,7 +3,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
 import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource, reponse } from "../src/app/vues/eleve.ts";
-import { texteDocument } from "../src/app/vues/document.ts";
+import { sansDirectives, texteDocument } from "../src/app/vues/document.ts";
 import type { BlocReponse } from "../src/core/reponse.ts";
 
 const LIBELLES = {
@@ -163,7 +163,7 @@ test("une réponse en blocs passe par les gabarits de l'application, chaque phra
           colonnes: ["SSR", piege],
           lignes: [{ titre: piege, affirmations: [null, 3] }],
         },
-        { type: "schema", affirmations: [4] } as unknown as BlocReponse,
+        { type: "frise", affirmations: [4] } as unknown as BlocReponse,
       ],
       juge_indisponible: true,
     }),
@@ -186,6 +186,83 @@ test("une réponse en blocs passe par les gabarits de l'application, chaque phra
   );
   assertStringIncludes(ancienne, "Réponse vérifiée dans les cours validés");
   assertStringIncludes(ancienne, "<p><span>Un</span>");
+});
+
+test("un schéma se lit toujours en liste citée, son texte Mermaid voyage échappé", async () => {
+  const piege = '<script>alert(1)</script>"';
+  const affirmation = (texte: string, citation = "Passage") => ({
+    texte,
+    titre: "Cours",
+    source_id: "source-1",
+    chunk_id: "c",
+    citation,
+  });
+  const rendu = String(
+    await reponse("m3", {
+      etat: "answered",
+      affirmations: [
+        affirmation("La pile décrit le conteneur."),
+        affirmation("La vitesse vaut $v = d/t$.", "on note $v=d/t$ la vitesse"),
+        affirmation("L'énergie vaut $E = mc^2$."),
+      ],
+      blocs: [
+        {
+          type: "schema",
+          titre: piege,
+          noeuds: [{ titre: piege, affirmation: 0 }, { titre: "%%{init}%%" }, { titre: "C" }],
+          relations: [
+            { de: 0, vers: 1, lien: "cause", affirmation: 1 },
+            { de: 1, vers: 2, lien: "suite", affirmation: 2 },
+          ],
+        },
+      ],
+    }),
+  );
+  assert(!rendu.includes("<script>"));
+  assertStringIncludes(rendu, "<figcaption>&lt;script&gt;");
+  assertStringIncludes(
+    rendu,
+    "<li><strong>&lt;script&gt;alert(1)&lt;/script&gt;&quot;</strong> : <span>La pile",
+  );
+  assertStringIncludes(rendu, "<li><strong>%%{init}%%</strong> précède <strong>C</strong> : ");
+  assertEquals(
+    [...rendu.matchAll(/citations\/(\d)/g)].map((m) => m[1]),
+    ["0", "1", "2"],
+  );
+  // L'attribut porte le texte écrit par `texteMermaid`, échappé une seconde fois pour le HTML.
+  const mermaid = rendu.match(/data-mermaid="([^"]*)"/)![1];
+  assertStringIncludes(mermaid, "flowchart TD;\nn0[&quot;#60;script#62;");
+  assertStringIncludes(mermaid, "n0 --&gt;|&quot;entraîne #40;2#41;&quot;| n1");
+  // Une formule que sa citation écrit se rend, l'autre reste du texte.
+  assertStringIncludes(
+    rendu,
+    '<span>La vitesse vaut <span class="formule" data-tex="v = d/t">$v = d/t$</span>.</span>',
+  );
+  assertStringIncludes(rendu, "<span>L&#39;énergie vaut $E = mc^2$.</span>");
+  assertEquals((rendu.match(/data-tex=/g) ?? []).length, 1);
+});
+
+test("un bloc mermaid du lecteur garde son code, sans front matter ni directive", async () => {
+  const code = [
+    "---",
+    "config:",
+    "  securityLevel: loose",
+    "---",
+    '%%{init: {"securityLevel": "loose"}}%%',
+    "graph TD",
+    '  A["<b>A</b>"] --> B',
+    "%%{init: sans fin",
+  ].join("\n");
+  assertEquals(sansDirectives(code), '\ngraph TD\n  A["<b>A</b>"] --> B\n');
+  const [schema, autre] = texteDocument([
+    { id: "b1", texte: code, section: "", debut: 0, fin: 1, code: true, langage: "mermaid" },
+    { id: "b2", texte: code, section: "", debut: 2, fin: 3, code: true, langage: "yaml" },
+  ]);
+  assertStringIncludes(
+    String(await schema),
+    '<pre id="b1" data-mermaid="\ngraph TD\n  A[&quot;&lt;b&gt;A&lt;/b&gt;&quot;] --&gt; B\n"><code>---\nconfig:',
+  );
+  assertStringIncludes(String(await autre), '<pre id="b2"><code>---');
 });
 
 test("le rafraîchissement enseignant exclut le formulaire et conserve les sélections", async () => {

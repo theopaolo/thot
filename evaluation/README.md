@@ -142,16 +142,21 @@ N03 passait sous le seuil dans la génération.
 | --- | --- |
 | questions répondables répondues | 14 sur 15 |
 | bonne source citée | 14 sur 15 |
-| réponses réparées (second appel) | 3 sur 15 |
+| réponses réparées (second appel) | 5 sur 15 |
 | réponses partielles | 1 sur 15 |
-| réponses en blocs | 6 sur 15 (deux tableaux, des étapes) |
+| réponses en blocs | 6 sur 15 (deux tableaux, des listes, des étapes) |
+| réponses avec un schéma | 0 sur 15 |
 | pièges refusés | 8 sur 8, 6 au seuil et 2 par le modèle |
-| latence médiane | 2,6 s |
+| latence médiane | 4,4 s |
 
 Le faux refus est G15 (« un conteneur C4, c'est la même chose qu'un conteneur Docker ? ») : le
-modèle refuse, aucun extrait ne compare les deux. Les réparations viennent toutes du juge, jamais
-d'une citation introuvable. Il refuse surtout des phrases qui citent du code. Deux sources qui
-disent la même chose donnent encore deux affirmations (G01, G04).
+modèle refuse, aucun extrait ne compare les deux. Deux sources qui disent la même chose donnent
+encore deux affirmations (G01, G04).
+
+Le jeu ne pose aucune question sur des liens entre notions, et aucune réponse n'a pris la forme
+d'un schéma. Hors du jeu, « Quels liens y a-t-il entre image, conteneur et volume dans Docker ? »
+en donne un valide. Le modèle y donne à un nœud la preuve de sa relation, et `ranger()` la laisse
+à la relation au lieu de refuser le schéma.
 
 ## Langues et profils
 

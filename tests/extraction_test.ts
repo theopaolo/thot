@@ -243,6 +243,13 @@ test("Markdown: titres en sections, marques réduites, code gardé tel quel", ()
     ext.parties.map((p) => !!p.code),
     [false, false, false, false, true, false, true],
   );
+  // Le langage de la clôture suit le bloc, hors du texte : `document.txt` ne change pas.
+  assertEquals(
+    ext.parties.map((p) => p.langage),
+    [undefined, undefined, undefined, undefined, "dockerfile", undefined, "mermaid"],
+  );
+  const sansLangage = ext.parties.map((p) => ({ texte: p.texte, section: p.section }));
+  assertEquals(assembler(ext.parties).texte, assembler(sansLangage).texte);
 });
 
 test("Markdown: une image relative est nommée dans un avertissement, son alt n'est pas du texte", () => {

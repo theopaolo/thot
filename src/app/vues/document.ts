@@ -13,6 +13,14 @@ const intertitre = (texte: string, niveau: 2 | 3, id?: string) => {
     : html`<h3${ancre}>${texte}</h3>`;
 };
 
+/**
+ * Le code Mermaid d'un auteur, sans front matter ni directive `%%{…}%%` : la configuration du
+ * rendu reste celle de l'application. Une directive sans fermeture court jusqu'à la fin du code,
+ * comme Mermaid la lirait.
+ */
+export const sansDirectives = (code: string) =>
+  code.replace(/^\s*---\n[\s\S]*?\n---[ \t]*(?:\n|$)/, "").replace(/%%\{[\s\S]*?(?:\}%%|$)/g, "");
+
 export const texteDocument = (blocs: Bloc[], marque?: [number, number], niveau: 2 | 3 = 3) => {
   let section = "";
   return blocs.map((b) => {
@@ -31,10 +39,12 @@ export const texteDocument = (blocs: Bloc[], marque?: [number, number], niveau: 
         .slice(a, z)
         .join("")}</mark>${t.slice(z).join("")}`;
     }
-    // Pas d'espace dans le <pre>: il s'afficherait.
+    // Pas d'espace dans le <pre>: il s'afficherait. Le code d'un schéma reste visible sous son
+    // dessin, et le remplace si le dessin échoue.
+    const schema = b.langage === "mermaid" ? html` data-mermaid="${sansDirectives(b.texte)}"` : "";
     return b.code
       ? html`
-      ${titre}<pre id="${b.id}"><code>${corps}</code></pre>
+      ${titre}<pre id="${b.id}"${schema}><code>${corps}</code></pre>
     `
       : html`
       ${titre}<p id="${b.id}">${corps}</p>
