@@ -20,6 +20,7 @@ import {
   parametresAcces,
   transaction,
 } from "../core/recherche.ts";
+import { champs, type Contenu } from "../core/activite.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
@@ -1229,18 +1230,26 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
   const activiteProf = (c: Context<Env>) =>
     Activites.activiteProf(db, c.get("compte"), c.req.param("id")!);
-  const detailActivite = (c: Context<Env>, a: Activites.Activite, erreur?: string) =>
-    rendre(
+  const detailActivite = (c: Context<Env>, a: Activites.Activite, erreur?: string) => {
+    const contenu: Contenu = JSON.parse(a.contenu);
+    const titre = db.prepare("SELECT titre FROM sources WHERE id = ?");
+    return rendre(
       c,
       a.intitule,
       ActiviteVue.detailProf({
         a,
-        contenu: JSON.parse(a.contenu),
+        contenu,
         relectures: Activites.relectures(db, a.id),
         servies: Activites.servies(db, a),
+        titres: new Map(
+          champs(contenu).flatMap((ch) =>
+            ch.citations.map((x) => [x.source_id, String(titre.get(x.source_id)?.titre ?? "")]),
+          ),
+        ),
         erreur,
       }),
     );
+  };
   app.get("/prof/activites/:id", (c) => {
     const a = activiteProf(c);
     return a ? c.html(detailActivite(c, a)) : c.notFound();

@@ -186,7 +186,13 @@ export const ressourcesParCours = (chapitres: ChapitreVue[], grille: boolean) =>
       <h2>${groupe[0].cours ?? "Autres documents"}</h2>
       ${groupe.map(
         (ch) => html`
-          ${ch.themeId ? html`<h3><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h3>` : ""}
+          ${
+            // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, ne
+            // répète pas le titre.
+            ch.themeId && ch.nom !== ch.cours
+              ? html`<h3><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h3>`
+              : ""
+          }
           <ul class="${grille ? "tuiles" : ""}">${ch.sources.map(
             (r) =>
               html`<li><a class="${grille ? "tuile" : ""}" href="/eleve/sources/${r.id}">${

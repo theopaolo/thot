@@ -683,6 +683,13 @@ fieldset label {
 form.etroit {
   max-width: 44rem;
 }
+/* Le corrigé d'un exercice : les deux colonnes s'empilent sur mobile. */
+#corrige .deux {
+  row-gap: var(--s4);
+}
+#corrige > form {
+  margin-block-end: var(--s5);
+}
 /* Réglages : un groupe titré par fieldset, chaque libellé au-dessus de son champ. */
 .reglages legend {
   margin-bottom: var(--s2);

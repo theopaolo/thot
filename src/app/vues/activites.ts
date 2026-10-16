@@ -167,11 +167,13 @@ export type DetailProf = {
   contenu: Contenu;
   relectures: { revision: number; action: string; le: string; nom: string | null }[];
   servies: Map<string, number | undefined>;
+  /** le titre de chaque source citée */
+  titres: Map<string, string>;
   erreur?: string;
 };
 
 /** Inspecter les preuves, modifier, relire, publier, avec l'historique de relecture. */
-export const detailProf = ({ a, contenu, relectures, servies, erreur }: DetailProf) => {
+export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: DetailProf) => {
   const liste = champs(contenu);
   const rejets = JSON.parse(a.rejets) as string[];
   const sources = [
@@ -232,7 +234,9 @@ export const detailProf = ({ a, contenu, relectures, servies, erreur }: DetailPr
     <h2>Retour</h2>
     ${champ(contenu.retour)}
     <h2>Sources citées</h2>
-    <ul>${sources.map((c) => html`<li>${c.titre}, version ${c.revision}</li>`)}</ul>
+    <ul>${sources.map(
+      (c) => html`<li>${titres.get(c.source_id) ?? c.titre}, version ${c.revision}</li>`,
+    )}</ul>
     <h2>Relectures</h2>
     ${
       relectures.length
