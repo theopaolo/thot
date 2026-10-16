@@ -115,10 +115,19 @@ function renommer(form: HTMLFormElement, ouvrir: boolean) {
 }
 
 export function installerEleve() {
+  // Le statut « Conversation archivée » vient de l'adresse : il ne revient pas à l'actualisation.
+  const adresse = new URL(location.href);
+  if (adresse.searchParams.has("archivee")) {
+    adresse.searchParams.delete("archivee");
+    history.replaceState(history.state, "", adresse);
+  }
+  // Une conversation s'ouvre sur sa fin, pas sur la position que le navigateur mémorise.
+  if (document.getElementById("conversation")) history.scrollRestoration = "manual";
   addEventListener("load", () => {
     if (!document.getElementById("conversation")) return;
     auBout = true;
-    suivreConversation();
+    // Une adresse qui désigne un échange garde sa position.
+    if (!location.hash) suivreConversation();
   });
   for (const nom of ["htmx:beforeSwap", "htmx:sseBeforeMessage"]) {
     document.addEventListener(nom, () => (auBout = presDeLaFin()));

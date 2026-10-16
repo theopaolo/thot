@@ -1334,19 +1334,27 @@ main.page-chat #erreur-reseau {
 /* Un tableau défile dans son cadre plutôt que d'écraser ses cases sur un téléphone. */
 .tableau-reponse {
   margin: 0 0 var(--s3);
+}
+.cadre-tableau {
   overflow-x: auto;
 }
 .tableau-reponse table {
   font-size: 1rem;
   line-height: 1.5;
 }
-.tableau-reponse caption {
-  padding-bottom: var(--s2);
+.tableau-reponse figcaption {
+  max-width: none;
+  margin: 0 0 var(--s2);
+  color: inherit;
+  font-size: 1rem;
   font-weight: 700;
-  text-align: left;
 }
 .tableau-reponse tbody td {
   min-width: 14rem;
+}
+/* L'espace et la marque ne se séparent pas : le dernier mot de la phrase les suit à la ligne. */
+.marque {
+  white-space: nowrap;
 }
 /* Marque de citation dans la phrase: petite à l'œil, 44 px au toucher. */
 .citation {
@@ -1416,6 +1424,16 @@ main.page-chat #erreur-reseau {
   border: 1px solid var(--line);
   background: var(--surface);
 }
+/* « Arrêter » prend la ligne de l'étape quand elle tient. */
+.reponse[sse-connect] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--s4);
+}
+.reponse[sse-connect] .lien {
+  min-height: 44px;
+}
 .reponse .etape {
   margin: 0;
   color: var(--ink-muted);
@@ -1447,24 +1465,41 @@ main.page-chat #erreur-reseau {
     animation: none;
   }
 }
+/* Un champ qui prend le focus ne se cache pas sous le composeur collé. */
+:root:has(.page-chat) {
+  scroll-padding-bottom: 7rem;
+}
+/* Seul le composeur reste collé en bas : le périmètre et la mention défilent avec la conversation. */
 .pied-chat {
+  display: contents;
+}
+.pied-chat > :first-child {
+  margin: var(--s5) 0 var(--s2);
+}
+.composeur:has(*:not([hidden])) {
   position: sticky;
   bottom: 0;
-  margin-top: var(--s5);
-  padding: var(--s3) 0 var(--s4);
+  padding: var(--s2) 0;
   border-top: 1px solid var(--line);
   background: var(--bg);
 }
-.pied-chat > [data-aller-reponse] {
+.composeur > [data-aller-reponse] {
   margin-bottom: var(--s2);
 }
+.pied-chat > :is(small, p) {
+  margin: var(--s2) 0 var(--s4);
+}
 .pied-chat .idees {
-  margin: var(--s4) 0 0;
+  margin: var(--s4) 0 var(--s4);
+}
+form.question-form label {
+  margin-bottom: 0;
 }
 form.question-form textarea {
+  max-height: 8rem;
   min-height: 3rem;
+  field-sizing: content;
 }
-form.question-form small,
 .question-rapide small {
   display: block;
   margin-top: var(--s2);
@@ -1505,10 +1540,12 @@ form.question-form small,
   padding: 0;
   list-style: none;
 }
+/* Le repère jaune se pose dans la gouttière : le texte reste aligné sur le titre. */
 .conversations a {
   display: flex;
   flex-direction: column;
-  padding: var(--s2) var(--s3);
+  margin-left: calc(-1 * (var(--s2) + 4px));
+  padding: var(--s2);
   border-left: 4px solid transparent;
   text-decoration: none;
 }

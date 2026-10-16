@@ -644,7 +644,7 @@ export const reponse = (
         : "",
     ].filter(Boolean);
     const phrase = (n: number) =>
-      html`<span>${r.affirmations[n].texte}</span>&nbsp;<button
+      html`<span>${r.affirmations[n].texte}</span><span class="marque">&nbsp;<button
         class="citation"
         aria-pressed="${String(auto && n === 0)}"
         aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"
@@ -654,13 +654,15 @@ export const reponse = (
         hx-swap="outerHTML"
         hx-sync="#source:replace"
         data-ouvrir-feuille
-      >${icone("quotes")}${n + 1}</button>`;
+      >${icone("quotes")}${n + 1}</button></span>`;
     // Sans blocs, comme toute réponse antérieure, les affirmations forment un paragraphe. Un type
     // inconnu se lit aussi en paragraphe.
-    const bloc = (b: BlocReponse) => {
+    const bloc = (b: BlocReponse, k: number) => {
       if (b.type === "tableau") {
-        return html`<div class="tableau-reponse"><table>
-          ${b.titre ? html`<caption>${b.titre}</caption>` : ""}
+        // La légende reste hors du cadre qui défile et nomme le tableau.
+        return html`<figure class="tableau-reponse">
+          ${b.titre ? html`<figcaption id="legende-${id}-${k}">${b.titre}</figcaption>` : ""}
+          <div class="cadre-tableau"><table${b.titre ? html` aria-labelledby="legende-${id}-${k}"` : ""}>
           <thead><tr><td></td>${b.colonnes.map((c) => html`<th scope="col">${c}</th>`)}</tr></thead>
           <tbody>${b.lignes.map(
             (l) =>
@@ -669,7 +671,7 @@ export const reponse = (
                 return html`<td>${typeof n === "number" ? phrase(n) : ""}</td>`;
               })}</tr>`,
           )}</tbody>
-        </table></div>`;
+        </table></div></figure>`;
       }
       const titre = b.titre ? html`<h2>${b.titre}</h2>` : "";
       const items = b.affirmations.map((n) => html`<li>${phrase(n)}</li>`);
@@ -1029,13 +1031,13 @@ export const chat = (f: Fil) => {
           enCours ? "Réponse en cours…" : "Envoyer"
         }</span></button>
       </div>
-      <small>${
-        f.personnel
-          ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
-          : "Thot répond seulement avec les documents publiés par tes enseignants."
-      } ${f.mention ?? ""}</small>
     </form>
   `;
+  const notice = html`<small>${
+    f.personnel
+      ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
+      : "Thot répond seulement avec les documents publiés par tes enseignants."
+  } ${f.mention ?? ""}</small>`;
   return html`
     <div class="chat" data-feuille>
       <nav class="liste-conversations" aria-label="Conversations"><div>${listeConversations(
@@ -1115,7 +1117,6 @@ export const chat = (f: Fil) => {
               </form>
             `
               : html`
-              <button type="button" class="lien" data-aller-reponse hidden>Aller à la nouvelle réponse</button>
               <div class="perimetre">
                 <p id="perimetre" aria-live="polite">Dans : ${nom}</p>
                 <details ${f.indisponible ? "open" : ""}>
@@ -1128,10 +1129,14 @@ export const chat = (f: Fil) => {
                   </form>
                 </details>
               </div>
+              <div class="composeur">
+                <button type="button" class="lien" data-aller-reponse hidden>Aller à la nouvelle réponse</button>
+                ${f.indisponible ? "" : composer}
+              </div>
               ${
                 f.indisponible
                   ? html`<p>Ce périmètre n'est plus disponible. Choisis-en un autre pour continuer.</p>`
-                  : composer
+                  : notice
               }
               ${
                 !conv && f.idees.length
