@@ -259,6 +259,7 @@ export async function demander(
     etape("Recherche dans les documents du cours");
     const r = await chercher(db, modeles, recherche, p, seuil);
     journal.score = r.score;
+    if (r.panneReclasseur) journal.reclasseur_indisponible = r.panneReclasseur;
     journal.candidats = r.candidats.map((c) => ({
       id: c.id,
       source_id: c.source_id,
@@ -290,9 +291,15 @@ export async function demander(
       const v = verifier(lire(texte), r.retenus);
       if (v.refus) {
         tentatives.push({ sortie: texte, erreurs: v.erreurs });
-        return gardees.length
-          ? repondre(gardees, true)
-          : { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
+        if (gardees.length) return repondre(gardees, true);
+        // Sans reclasseur, les extraits sont mal triés: leur refus ne prouve pas une limite du cours.
+        if (r.panneReclasseur) {
+          return {
+            resultat: { etat: "failed", code: "MODEL_UNAVAILABLE", message: r.panneReclasseur },
+            journal,
+          };
+        }
+        return { resultat: { etat: "out_of_corpus", raison: "refus_modele" }, journal };
       }
       const j = await juger(modeles, v.affirmations, journal, profil);
       const erreurs = [...v.erreurs, ...j.erreurs];

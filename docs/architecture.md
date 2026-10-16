@@ -176,6 +176,7 @@ flowchart TD
   F -- aucun résultat --> HC[out_of_corpus]
   F --> RR[Reclasseur]
   RR -- score sous le seuil --> HC
+  RR -- "panne : ordre FTS5, signalée au journal" --> G
   RR --> G[Génération sur 5 extraits<br/>JSON d'affirmations citées]
   G --> V{verifier<br/>puis juge}
   V -- tout vérifié et soutenu --> OK[answered]
@@ -183,8 +184,13 @@ flowchart TD
   V -- erreurs au 2e essai, refus ou panne --> P{affirmations<br/>déjà vérifiées ?}
   P -- oui --> PART[answered partielle]
   P -- "non, refus" --> HC
+  P -- "non, refus sans reclasseur" --> KO
   P -- "non, erreur ou panne" --> KO[failed]
 ```
+
+Le seuil d'abstention est une probabilité du reclasseur et ne s'applique pas aux rangs FTS5. En
+panne du reclasseur, le générateur et le juge décident seuls. Leur refus donne `failed`, car des
+extraits mal triés ne prouvent pas que le cours est muet.
 
 ## Règles de travail
 

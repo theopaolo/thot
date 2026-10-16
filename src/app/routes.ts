@@ -12,7 +12,6 @@ import { actualiserResultat, type Affirmation, demander, type Resultat } from ".
 import {
   type Candidat,
   chercher,
-  chercherFts,
   FILTRE_ACCES,
   filtreAcces,
   indexerSource,
@@ -1201,16 +1200,14 @@ export function creerApp(db: Db, modeles: Modeles) {
       coursId: scope(c).cours_id,
       themeId: scope(c).theme_id,
     };
-    let proches: Candidat[];
-    try {
-      const r = await chercher(db, modeles, q, p, config.seuil);
-      // ponytail: seuil relatif fixé à l'œil sur quatre recherches. À mesurer sur les familles E et F.
-      proches = r.candidats
-        .filter((x) => x.score! >= Math.max(config.seuil, r.score / 4))
-        .sort((a, b) => b.score! - a.score!);
-    } catch {
-      proches = chercherFts(db, q, p); // reclasseur indisponible: l'ordre de FTS5
-    }
+    const r = await chercher(db, modeles, q, p, config.seuil);
+    // ponytail: seuil relatif fixé à l'œil sur quatre recherches. À mesurer sur les familles E et F.
+    // Sans reclasseur, l'ordre de FTS5 reste tel quel.
+    const proches: Candidat[] = r.panneReclasseur
+      ? r.candidats
+      : r.candidats
+          .filter((x) => x.score! >= Math.max(config.seuil, r.score / 4))
+          .sort((a, b) => b.score! - a.score!);
     const ids = [...new Set(proches.map((x) => x.source_id))].slice(0, 12);
     const sources = new Map(
       db

@@ -358,17 +358,24 @@ async function evalRecherche() {
   const lignes: Record<string, unknown>[] = [];
   for (const r of requetes) {
     const attendus = r.gold.flatMap(cibles);
-    const trouves = args["sans-reclasseur"]
-      ? chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(0, 5)
-      : (
-          await chercher(
-            db,
-            modeles,
-            r.q,
-            { lecteur: null, schoolId: lireInstance(db).school_id },
-            config.seuil,
-          )
-        ).retenus;
+    let trouves;
+    if (args["sans-reclasseur"]) {
+      trouves = chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(
+        0,
+        5,
+      );
+    } else {
+      const recherche = await chercher(
+        db,
+        modeles,
+        r.q,
+        { lecteur: null, schoolId: lireInstance(db).school_id },
+        config.seuil,
+      );
+      // Un repli FTS5 mesuré sous l'étiquette du reclasseur fausserait le rapport.
+      if (recherche.panneReclasseur) throw new Error(recherche.panneReclasseur);
+      trouves = recherche.retenus;
+    }
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({
       qid: r.qid,
@@ -444,6 +451,7 @@ async function evalGeneration() {
   ]) {
     const t = Date.now();
     const { resultat, journal } = await demander(db, modeles, q.q, p, config.seuil);
+    if (journal.reclasseur_indisponible) throw new Error(String(journal.reclasseur_indisponible));
     const citees =
       resultat.etat === "answered"
         ? resultat.affirmations.map((a) => sources.get(a.source_id) ?? "")

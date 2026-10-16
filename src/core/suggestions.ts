@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { Modeles } from "./modeles.ts";
+import { type Modeles, PanneModele } from "./modeles.ts";
 import type { Perimetre } from "./recherche.ts";
 import { demander, profilSources } from "./reponse.ts";
 import type { Profil } from "./profils.ts";
@@ -53,7 +53,11 @@ export async function questionsVerifiees(
   for (const q of questions
     .filter((q): q is string => typeof q === "string" && q.trim().endsWith("?") && !RENVOI.test(q))
     .slice(0, 2)) {
-    const { resultat } = await demander(db, modeles, q.trim(), p, seuil);
+    const { resultat, journal } = await demander(db, modeles, q.trim(), p, seuil);
+    // Une réponse sans reclasseur n'a pas passé le même filtre: aucune suggestion n'en sort.
+    if (journal.reclasseur_indisponible) {
+      throw new PanneModele(String(journal.reclasseur_indisponible));
+    }
     if (
       resultat.etat === "answered" &&
       resultat.affirmations.some((a) => a.source_id === passage.source_id)

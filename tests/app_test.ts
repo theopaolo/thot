@@ -1,6 +1,12 @@
 import { readFile, writeFile, rm } from "node:fs/promises";
 import { test } from "vite-plus/test";
-import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertRejects,
+  assertStringIncludes,
+  assertThrows,
+} from "@std/assert";
 import { join } from "node:path";
 import { openrouter, PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
@@ -488,6 +494,68 @@ test("la recherche trouve une image par sa légende non relue sans la montrer", 
   // Sous le seuil, la page ne montre rien.
   const { requete: bas } = await session(db, fauxModeles({ score: 0.01 }).modeles, "eleve");
   assert(!(await (await bas("/eleve/recherche?q=dragon")).text()).includes(`/media/${id}-0`));
+  // Reclasseur en panne: les résultats suivent l'ordre de FTS5.
+  const sans = fauxModeles();
+  sans.modeles.reclasser = () => Promise.reject(new PanneModele("reclasseur 503"));
+  const { requete: repli } = await session(db, sans.modeles, "eleve");
+  assertStringIncludes(
+    await (await repli("/eleve/recherche?q=dragon%20turquoise")).text(),
+    `/media/${id}-0`,
+  );
+});
+
+test("sans reclasseur, la réponse suit l'ordre de FTS5 et le journal le dit", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db);
+  statuer(db, id, "certifiee", "test");
+  const q = "Pourquoi la façade de la Casa Batlló n'a pas de ligne droite ?";
+  const p = { lecteur: null, schoolId: "pilote" };
+  const panne = (f: ReturnType<typeof fauxModeles>, erreur: Error) => {
+    f.modeles.reclasser = () => Promise.reject(erreur);
+    return f.modeles;
+  };
+
+  const ok = await demander(
+    db,
+    panne(fauxModeles({ sorties: [REPONSE_CITEE] }), new PanneModele("reclasseur 503")),
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(ok.resultat.etat, "answered");
+  assertEquals(ok.journal.reclasseur_indisponible, "reclasseur 503");
+  assertEquals((ok.journal.candidats as { rang_fts: number }[])[0].rang_fts, 1);
+
+  const refus = await demander(
+    db,
+    panne(fauxModeles({ sorties: ['{"refus": true}'] }), new PanneModele("reclasseur 503")),
+    q,
+    p,
+    0.023,
+  );
+  assertEquals(
+    refus.resultat,
+    { etat: "failed", code: "MODEL_UNAVAILABLE", message: "reclasseur 503" },
+    "un refus sans reclasseur n'est pas une limite du cours",
+  );
+
+  const bug = await demander(db, panne(fauxModeles(), new TypeError("bug")), q, p, 0.023);
+  assertEquals(bug.resultat.etat === "failed" && bug.resultat.code, "INTERNAL_ERROR");
+
+  const questions = JSON.stringify({ questions: ["Pourquoi Gaudí refuse-t-il la ligne droite ?"] });
+  await assertRejects(
+    () =>
+      genererSuggestions(
+        db,
+        panne(
+          fauxModeles({ sorties: [questions, REPONSE_CITEE] }),
+          new PanneModele("reclasseur 503"),
+        ),
+        id,
+      ),
+    PanneModele,
+  );
+  assertEquals(db.prepare("SELECT count(*) n FROM suggestions").get()!.n, 0);
 });
 
 test("trois états de réponse distincts, et une citation fausse ne passe jamais", async () => {
@@ -1230,7 +1298,7 @@ test("la migration efface les jugements anciens et ne se rejoue pas", async () =
   }
 });
 
-test("une sortie vide du reclasseur reste une panne de fournisseur", async () => {
+test("une sortie vide du reclasseur déclenche le repli, celle du générateur reste une panne", async () => {
   const { db } = await environnement();
   const fetch = globalThis.fetch;
   try {
@@ -1238,7 +1306,7 @@ test("une sortie vide du reclasseur reste une panne de fournisseur", async () =>
     statuer(db, id, "certifiee", "Prof");
     globalThis.fetch = () => Promise.resolve(Response.json({ results: [] }));
     const modeles = openrouter({ ...config.modeles, cle: "test" });
-    const { resultat } = await demander(
+    const { resultat, journal } = await demander(
       db,
       modeles,
       "ligne droite",
@@ -1248,8 +1316,9 @@ test("une sortie vide du reclasseur reste une panne de fournisseur", async () =>
       },
       0.023,
     );
+    assertEquals(journal.reclasseur_indisponible, "Résultat du reclasseur invalide.");
     assertEquals(resultat.etat, "failed");
-    if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_INVALID_RESPONSE");
+    if (resultat.etat === "failed") assertEquals(resultat.code, "MODEL_EMPTY_RESPONSE");
   } finally {
     globalThis.fetch = fetch;
     db.close();

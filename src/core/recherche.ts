@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import snowball from "snowball";
-import type { Modeles } from "./modeles.ts";
+import { type Modeles, PanneModele } from "./modeles.ts";
 import { mots } from "./texte.ts";
 
 const stemmer = snowball.newStemmer("french");
@@ -77,6 +77,8 @@ export type Recherche = {
   retenus: Candidat[];
   score: number;
   horsCorpus: boolean;
+  /** message de la panne du reclasseur: `retenus` suit alors l'ordre de FTS5 et `score` vaut 0 */
+  panneReclasseur?: string;
 };
 
 export function transaction<T>(db: DatabaseSync, f: () => T): T {
@@ -165,7 +167,10 @@ export function lireChunk(db: DatabaseSync, sourceId: string, id: string, p: Per
     ) as ChunkIndexe | undefined;
 }
 
-/** FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. */
+/**
+ * FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. Si le reclasseur
+ * est en panne, l'ordre de FTS5 le remplace.
+ */
 export async function chercher(
   db: DatabaseSync,
   modeles: Modeles,
@@ -175,10 +180,18 @@ export async function chercher(
 ): Promise<Recherche> {
   const candidats = chercherFts(db, question, p);
   if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
-  const ordre = await modeles.reclasser(
-    question,
-    candidats.map((c) => c.rappel),
-  );
+  let ordre: { index: number; score: number }[];
+  let panneReclasseur: string | undefined;
+  try {
+    ordre = await modeles.reclasser(
+      question,
+      candidats.map((c) => c.rappel),
+    );
+  } catch (e) {
+    if (!(e instanceof PanneModele)) throw e;
+    panneReclasseur = e.message;
+    ordre = candidats.map((_, index) => ({ index, score: 0 }));
+  }
   for (const { index, score } of ordre) candidats[index].score = score;
   const classes = ordre
     .map(({ index }) => candidats[index])
@@ -198,6 +211,9 @@ export async function chercher(
     candidats: classes,
     retenus: classes.slice(0, 5),
     score,
-    horsCorpus: !classes.length || score < seuil,
+    // Le seuil est une probabilité du reclasseur: il ne dit rien des rangs FTS5. Sans lui, le
+    // refus du générateur et le juge décident.
+    horsCorpus: !classes.length || (!panneReclasseur && score < seuil),
+    panneReclasseur,
   };
 }
