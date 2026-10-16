@@ -10,10 +10,11 @@ import {
 } from "../core/document.ts";
 import { extraireHtml } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
-import type { Modeles } from "../core/modeles.ts";
+import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
-import { type ChunkIndexe, indexerSource, transaction } from "../core/recherche.ts";
-import { contenu } from "./config.ts";
+import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../core/recherche.ts";
+import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
+import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { sha256 } from "./depot.ts";
 import type { Profil } from "../core/profils.ts";
@@ -461,6 +462,77 @@ export function statuer(
     );
     indexerSource(db, sourceId, statut === "certifiee" ? chunksSource(db, sourceId) : []);
   });
+}
+
+/**
+ * Supprime une source pour de bon. La transaction retire sa ligne et tout ce qui en dérive en
+ * base : index, révisions, images, rattachements, suggestions, travail, légendes en cache, et ses
+ * citations dans les réponses conservées. Ses fichiers partent ensuite. Refusée pendant que le
+ * worker l'extrait : il réécrirait des fichiers et le cache après la suppression.
+ * `secure_delete` (connexion) et l'option de la migration 0017 effacent aussi son texte du
+ * fichier de la base.
+ */
+export async function supprimerSource(db: Db, sourceId: string) {
+  const s = lireSource(db, sourceId);
+  if (!s) throw new Error("Source introuvable.");
+  const images = db
+    .prepare("SELECT fichier, mime FROM images WHERE source_id = ?")
+    .all(sourceId) as { fichier: string; mime: string }[];
+  // ponytail: la clé suit le modèle de légende actuel. Une légende mise en cache sous un autre
+  // modèle, ou pour une image remplacée par une réextraction, reste dans le cache.
+  const cles: string[] = [];
+  for (const i of images) {
+    const octets = await readFile(contenu(sourceId, "assets", i.fichier)).catch(() => undefined);
+    if (octets) cles.push(await cleLegende(config.modeles.legende, octets, i.mime, s.profil));
+  }
+  transaction(db, () => {
+    const job = db
+      .prepare("SELECT etat, verrou_expire_le FROM ingestion_jobs WHERE source_id = ?")
+      .get(sourceId) as { etat: string; verrou_expire_le: string | null } | undefined;
+    if (
+      job &&
+      ["extracting", "enriching"].includes(job.etat) &&
+      (job.verrou_expire_le ?? "") > maintenant()
+    ) {
+      throw new Error("Extraction en cours : supprimer la source une fois le traitement terminé.");
+    }
+    retirerSource(db, sourceId);
+    for (const table of ["images", "suggestions", "ingestion_jobs"]) {
+      db.prepare(`DELETE FROM ${table} WHERE source_id = ?`).run(sourceId);
+    }
+    // Les révisions et les rattachements suivent par ON DELETE CASCADE.
+    db.prepare("DELETE FROM sources WHERE id = ?").run(sourceId);
+    db.prepare("DELETE FROM cache_modeles WHERE cle IN (SELECT value FROM json_each(?))").run(
+      JSON.stringify(cles),
+    );
+    const messages = db
+      .prepare(
+        "SELECT id, etat, resultat, journal FROM messages WHERE instr(resultat, ?) OR instr(journal, ?)",
+      )
+      .all(sourceId, sourceId) as {
+      id: string;
+      etat: string;
+      resultat: string | null;
+      journal: string | null;
+    }[];
+    const ecrire = db.prepare(
+      "UPDATE messages SET etat = ?, resultat = ?, journal = ? WHERE id = ?",
+    );
+    for (const m of messages) {
+      const avant = m.resultat ? (JSON.parse(m.resultat) as Resultat) : undefined;
+      const apres = avant && resultatSans(avant, sourceId);
+      ecrire.run(
+        apres === avant ? m.etat : apres!.etat,
+        apres ? JSON.stringify(apres) : null,
+        m.journal && JSON.stringify(journalSans(JSON.parse(m.journal), (id) => id === sourceId)),
+        m.id,
+      );
+    }
+  });
+  // Le WAL garde les anciennes pages jusqu'au point de contrôle. TRUNCATE le vide, sauf si une
+  // lecture en cours l'en empêche.
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  await rm(contenu(sourceId), { recursive: true, force: true });
 }
 
 export function relireLegende(

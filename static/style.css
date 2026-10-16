@@ -592,6 +592,15 @@ button.lien {
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
+/* Une action qui efface pour de bon. */
+button.danger,
+button.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button.danger:hover {
+  background: var(--rose-surface);
+}
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1780,6 +1789,11 @@ form.question-form textarea {
   margin: var(--s5) 0;
   padding: var(--s3) 0;
   border-block: 1px solid var(--line);
+}
+.suppression-source {
+  margin-top: var(--s6);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
 }
 .questions-prof {
   margin: var(--s6) 0;

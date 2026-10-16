@@ -161,6 +161,50 @@ const base64 = (octets: Uint8Array) => {
   return btoa(s);
 };
 
+function corpsChat(
+  modele: string,
+  messages: unknown[],
+  maxTokens: number,
+  raisonnement: boolean | string = true,
+) {
+  const corps: Record<string, unknown> = {
+    model: modele,
+    messages,
+    temperature: 0,
+    max_tokens: maxTokens,
+  };
+  // Même modèle, hébergeur le plus rapide: la latence d'une réponse élève en dépend.
+  corps.provider = { sort: "throughput", zdr: true, data_collection: "deny" };
+  if (raisonnement === false) corps.reasoning = { enabled: false };
+  else if (typeof raisonnement === "string") corps.reasoning = { effort: raisonnement };
+  return corps;
+}
+
+const messagesLegende = (image: Uint8Array, mime: string, profil: Profil) => [
+  {
+    role: "user",
+    content: [
+      {
+        type: "text",
+        text: profil === "arts-appliques" ? CONSIGNE_LEGENDE : CONSIGNE_LEGENDE_GENERALE,
+      },
+      { type: "image_url", image_url: { url: `data:${mime};base64,${base64(image)}` } },
+    ],
+  },
+];
+
+/** La clé de cache de la légende de ces octets : l'empreinte de la requête que `legender` envoie. */
+export const cleLegende = (
+  modele: string,
+  image: Uint8Array,
+  mime: string,
+  profil: Profil = "general",
+) =>
+  empreinte(
+    "/chat/completions" +
+      JSON.stringify(corpsChat(modele, messagesLegende(image, mime, profil), 400, false)),
+  );
+
 export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
   async function post(chemin: string, corps: unknown, cacheable = false, signal?: AbortSignal) {
     signal?.throwIfAborted();
@@ -222,16 +266,7 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
     cacheable = false,
     signal?: AbortSignal,
   ) {
-    const corps: Record<string, unknown> = {
-      model: modele,
-      messages,
-      temperature: 0,
-      max_tokens: maxTokens,
-    };
-    // Même modèle, hébergeur le plus rapide: la latence d'une réponse élève en dépend.
-    corps.provider = { sort: "throughput", zdr: true, data_collection: "deny" };
-    if (raisonnement === false) corps.reasoning = { enabled: false };
-    else if (typeof raisonnement === "string") corps.reasoning = { effort: raisonnement };
+    const corps = corpsChat(modele, messages, maxTokens, raisonnement);
     const json = await post("/chat/completions", corps, cacheable, signal);
     const choix = json.choices?.[0];
     return {
@@ -242,24 +277,9 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
 
   return {
     async legender(image, mime, profil = "general") {
-      const url = `data:${mime};base64,${base64(image)}`;
       const { texte } = await chat(
         config.legende,
-        [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: profil === "arts-appliques" ? CONSIGNE_LEGENDE : CONSIGNE_LEGENDE_GENERALE,
-              },
-              {
-                type: "image_url",
-                image_url: { url },
-              },
-            ],
-          },
-        ],
+        messagesLegende(image, mime, profil),
         400,
         false,
         true,

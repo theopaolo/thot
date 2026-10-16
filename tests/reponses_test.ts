@@ -3,7 +3,7 @@ import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { type Db, maintenant, purgerMessages } from "../src/app/db.ts";
 import { deposer, valider } from "../src/app/depot.ts";
-import { revendiquer, traiter } from "../src/app/ingestion.ts";
+import { revendiquer, supprimerSource, traiter } from "../src/app/ingestion.ts";
 import { lireInstance } from "../src/app/instance.ts";
 import { boucleReponses, revendiquerReponse, VERROU_MS } from "../src/app/reponses.ts";
 import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
@@ -144,6 +144,28 @@ test("« Arrêter » interrompt l'appel en cours, la question se relance, un aut
     assertStringIncludes(await arreter(eleve), "Gaudí refuse la ligne droite.");
     assertEquals(ligne(db, id).etat, "answered");
   } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("une source supprimée pendant le calcul ne publie ni sa citation ni ses extraits", async () => {
+  const { db, dir } = await environnement();
+  const g = bloque();
+  try {
+    const source = await publier(db, "Casa Batlló");
+    const eleve = await session(db, g.modeles, "eleve");
+    const id = await poser(eleve);
+    await attendre(() => g.signaux.length);
+    await supprimerSource(db, source);
+    g.libre.resolve();
+    await attendre(() => ligne(db, id).resultat);
+    const m = ligne(db, id);
+    assertEquals(JSON.parse(m.resultat as string).code, "EVIDENCE_WITHDRAWN");
+    assert(!`${m.resultat}${m.journal}`.includes("refuse la ligne droite"), "texte publié");
+    assertEquals(JSON.parse(m.journal as string).candidats, []);
+  } finally {
+    g.libre.resolve();
     db.close();
     await rm(dir, { recursive: true });
   }

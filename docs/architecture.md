@@ -207,6 +207,38 @@ retiré s'applique aussitôt.
 Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
 enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.
 
+## Rejeter et supprimer une source
+
+Rejeter retire la source de l'index et des élèves. Ses fichiers, ses images et les réponses qui la
+citent restent, et elle peut être certifiée de nouveau. Supprimer est définitif, pour un droit
+d'auteur, une erreur ou une demande RGPD. Seuls son propriétaire et les administrateurs la
+suppriment. Les enseignants de ses cours la modifient et la rejettent, mais ne suppriment pas un
+original qu'ils n'ont pas déposé. Le web et `thot supprimer source` passent par
+`supprimerSource()` dans `src/app/ingestion.ts`.
+
+Une transaction retire la ligne de la source et tout ce qui en dérive : révisions, chunks et index
+plein texte, images et légendes, rattachements, suggestions, travail d'ingestion et légendes en
+cache. Le dossier `data/content/{source}/` part ensuite. Une réponse conservée perd les
+affirmations qui citent la source. Sans affirmation, elle devient indisponible avec « Une source
+citée a été supprimée. », et l'élève peut la relancer. Une réponse à plusieurs sources garde les
+autres affirmations, chacune avec sa citation, en un paragraphe, et dit qu'une partie a été
+retirée. Ses blocs disparaissent : leurs titres viennent du modèle sans preuve et ont pu nommer la
+source. Le journal perd les candidats de la source et les sorties du modèle, qui recopient les
+extraits. Questions et titres de conversation restent : ils viennent de l'élève.
+
+Une réponse en cours qui a retrouvé la source ne publie rien d'elle. La revérification avant
+publication la rend indisponible, et la boucle retire du journal les sources supprimées pendant le
+calcul. Une suggestion en cours échoue sur la clé étrangère. La suppression est refusée tant que
+le worker extrait la source sous un verrou valide : il réécrirait ses fichiers et le cache.
+
+Le texte de la source quitte aussi le fichier de la base : `secure_delete` sur chaque connexion,
+l'option `secure-delete` de l'index plein texte (migration 0017), puis un point de contrôle qui
+vide le WAL. Une légende en cache se retrouve par l'empreinte de sa requête, calculée sur les
+octets de l'image et le modèle de légende actuel. Une légende mise en cache sous un autre modèle,
+ou pour une image qu'une réextraction a remplacée, reste dans `cache_modeles`. Les sauvegardes et
+les rapports d'évaluation de `data/evaluation/` ne sont pas touchés
+([exploitation](exploitation.md#données-personnelles)).
+
 ## Conversations
 
 Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, son adresse, ses

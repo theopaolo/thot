@@ -22,11 +22,16 @@ export function purgerMessages(db: Db, jours: number, date = Date.now()) {
   return n;
 }
 
-/** Une connexion par processus. WAL laisse lire pendant une écriture du worker. */
+/**
+ * Une connexion par processus. WAL laisse lire pendant une écriture du worker. `secure_delete`
+ * efface du fichier le contenu d'une ligne supprimée, au lieu de laisser sa place libre.
+ */
 export function connexion(chemin = join(config.donnees, "state.sqlite3")): Db {
   mkdirSync(config.donnees, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(chemin);
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
+  db.exec(
+    "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA secure_delete = ON;",
+  );
   return db;
 }
 

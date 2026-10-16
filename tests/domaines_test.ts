@@ -114,6 +114,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0014_reponses.sql",
       "0015_lots.sql",
       "0016_comparaison.sql",
+      "0017_suppression.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -1001,6 +1002,10 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
       assertEquals(db.prepare("SELECT enseignant FROM sources").get()!.enseignant, s.enseignant);
       assertEquals(JSON.parse(await cli("domaines")).matieres.length, 3);
       assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 1);
+      // Sans sa dernière ressource, la matière se supprime.
+      await cli("supprimer", "source", s.id as string);
+      assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
+      await cli("supprimer", "matiere", physique);
     } finally {
       db.close();
     }

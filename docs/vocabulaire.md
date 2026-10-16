@@ -152,9 +152,10 @@ question. Libellés : « Nouvelle conversation », « Renommer », « Archiver �
 **Réponse vérifiée**
 Réponse de Thot dont chaque phrase porte un numéro qui ouvre le passage du cours qui la prouve.
 Une réponse peut ranger ses phrases en étapes numérotées, en liste ou en tableau de comparaison.
-Chaque étape et chaque case garde son numéro. Deux mentions remplacent « Réponse vérifiée dans
+Chaque étape et chaque case garde son numéro. Trois mentions remplacent « Réponse vérifiée dans
 les cours validés » : « Réponse partielle » quand des phrases refusées ont été retirées,
-« Vérification partielle » quand une étape de contrôle n'a pas pu être faite.
+« Vérification partielle » quand une étape de contrôle n'a pas pu être faite, « Une source citée a
+été supprimée » quand les phrases qui la citaient ont été retirées.
 
 **Périmètre**
 Matière, cours et thème où Thot cherche les passages d'une réponse. Le chat l'affiche au-dessus de
@@ -176,6 +177,12 @@ devient une « nouvelle version à relire » : élèves et Thot lisent la versio
 qu'un enseignant certifie la nouvelle. Une réponse garde la version qu'elle cite, et l'élève la
 relit comme « version citée par une réponse précédente ». La bibliothèque marque ces sources
 « Nouvelle version à relire » et le filtre « À relire » les retrouve.
+
+**Rejeter, supprimer définitivement**
+« Rejeter » retire une ressource aux élèves et à Thot et la garde : elle peut être certifiée de
+nouveau. « Supprimer définitivement » l'efface avec ses versions, ses images et les passages que
+citaient les réponses. Seuls son propriétaire et les administrateurs la suppriment. Une réponse
+qui ne citait qu'elle devient « Une source citée a été supprimée. ».
 
 **Lot**
 Les fichiers d'un même dépôt web. Chaque fichier devient sa propre ressource, relue et certifiée

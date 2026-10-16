@@ -62,6 +62,7 @@ import {
   relireLegende,
   revisionEnAttente,
   statuer,
+  supprimerSource,
 } from "./ingestion.ts";
 import { ARRETEE, attendreChangement, boucleReponses, memePerimetre } from "./reponses.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
@@ -549,6 +550,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           repartition,
           libelles(db),
           ressources.some((s) => s.profil === "general"),
+          c.req.query("supprimee") !== undefined,
         )}`,
       ),
     );
@@ -933,7 +935,11 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const source = db
       .prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?")
       .get(id, instance.school_id) as
-      | (Prof.Detail["source"] & { metadonnees: string; revision: number })
+      | (Prof.Detail["source"] & {
+          metadonnees: string;
+          revision: number;
+          proprietaire_id: string | null;
+        })
       | undefined;
     if (!source || !peutLire(db, compte, id)) return undefined;
     const job = db
@@ -954,6 +960,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       },
       source,
       modifiable: peutModifier(db, compte, id),
+      // Supprimer efface l'original : les enseignants de ses cours ne le font pas.
+      supprimable: compte.administrateur === 1 || source.proprietaire_id === compte.id,
       catalogue: Domaines.catalogueDe(db, compte),
       affiliations: db
         .prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
@@ -1076,6 +1084,20 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
     return c.html(Prof.statutSource(detail(id, c.get("compte"))!.source));
+  });
+  app.post("/prof/sources/:id/supprimer", async (c) => {
+    const d = detail(c.req.param("id"), c.get("compte"));
+    if (!d) return c.notFound();
+    if (!d.supprimable) {
+      return c.text("Seuls son propriétaire et les administrateurs suppriment cette source.", 403);
+    }
+    try {
+      await supprimerSource(db, d.source.id);
+    } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+      return c.text((e as Error).message, 409);
+    }
+    return c.redirect("/prof?supprimee", 303);
   });
   // Certifier la version en attente la fait servir, la rejeter la supprime.
   app.post("/prof/sources/:id/revisions/:n{[0-9]+}/:statut{(?:certifiee|rejetee)}", async (c) => {

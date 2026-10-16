@@ -47,6 +47,8 @@ type Repondue = {
   blocs?: BlocReponse[];
   /** une affirmation au moins est passée sans l'avis du juge */
   juge_indisponible?: boolean;
+  /** des affirmations citaient une source supprimée depuis, et ont été retirées */
+  source_supprimee?: boolean;
 };
 
 export type Resultat =
@@ -306,6 +308,35 @@ export function actualiserResultat(
     }
   }
   return resultat;
+}
+
+/**
+ * Une réponse conservée sans les affirmations qui citent une source supprimée. Les autres
+ * restent, chacune prouvée par sa citation, en un paragraphe : les titres de blocs viennent du
+ * modèle sans preuve et ont pu nommer la source retirée. Sans affirmation, la réponse est
+ * indisponible.
+ */
+export function resultatSans(r: Resultat, sourceId: string): Resultat {
+  if (r.etat !== "answered" || !r.affirmations.some((a) => a.source_id === sourceId)) return r;
+  const affirmations = r.affirmations.filter((a) => a.source_id !== sourceId);
+  if (!affirmations.length) {
+    return { etat: "failed", code: "SOURCE_DELETED", message: "Une source citée a été supprimée." };
+  }
+  const reste = { ...r, affirmations, source_supprimee: true };
+  delete reste.blocs;
+  return reste;
+}
+
+/**
+ * Un journal sans les candidats des sources `retiree`. Les sorties du modèle partent avec eux :
+ * elles recopient les extraits.
+ */
+export function journalSans(journal: Journal, retiree: (sourceId: string) => boolean): Journal {
+  const candidats = (journal.candidats ?? []) as { source_id: string }[];
+  if (!candidats.some((c) => retiree(c.source_id))) return journal;
+  const reste: Journal = { ...journal, candidats: candidats.filter((c) => !retiree(c.source_id)) };
+  delete reste.tentatives;
+  return reste;
 }
 
 /** Probabilité de soutien sous laquelle une affirmation est refusée (`evaluation/resultats/soutien.json`). */

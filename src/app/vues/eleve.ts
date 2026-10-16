@@ -642,6 +642,9 @@ export const reponse = (
       r.juge_indisponible
         ? "Vérification partielle : une étape de contrôle n'a pas pu être faite."
         : "",
+      r.source_supprimee
+        ? "Une source citée a été supprimée : la partie de la réponse qui la citait est retirée."
+        : "",
     ].filter(Boolean);
     // En comparaison, la matière de la source suit sa citation : le titre d'une colonne ne la
     // prouve pas.
@@ -745,14 +748,16 @@ export const reponse = (
       <p><strong>${
         r.code === "EVIDENCE_WITHDRAWN"
           ? "Une source de cette réponse a été retirée ou modifiée."
-          : r.code === "CITATION_UNVERIFIED"
-            ? "Je n'ai pas pu vérifier les citations de cette réponse."
-            : r.code === "CANCELLED"
-              ? "Réponse arrêtée."
-              : "Thot n'a pas pu répondre, à cause d'une panne technique."
+          : r.code === "SOURCE_DELETED"
+            ? "Une source citée a été supprimée."
+            : r.code === "CITATION_UNVERIFIED"
+              ? "Je n'ai pas pu vérifier les citations de cette réponse."
+              : r.code === "CANCELLED"
+                ? "Réponse arrêtée."
+                : "Thot n'a pas pu répondre, à cause d'une panne technique."
       }</strong></p>
       <p>${
-        r.code === "EVIDENCE_WITHDRAWN"
+        r.code === "EVIDENCE_WITHDRAWN" || r.code === "SOURCE_DELETED"
           ? "Réessaie pour obtenir une réponse avec les sources disponibles."
           : r.code === "CITATION_UNVERIFIED"
             ? "Ta question est conservée. Réessaie ou demande à ton professeur."

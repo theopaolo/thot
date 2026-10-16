@@ -175,6 +175,7 @@ export const sources = (
   repartition: { sequence: string; statut: string; n: number }[],
   l: Libelles,
   general = false,
+  supprimee = false,
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
@@ -188,6 +189,11 @@ export const sources = (
   const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
+    ${
+      supprimee
+        ? html`<p role="status" tabindex="-1" autofocus>Source supprimée définitivement.</p>`
+        : ""
+    }
     ${
       f.lot
         ? html`<p>Lot déposé : ${nombre(
@@ -546,7 +552,9 @@ const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
                       : m.etat === "failed"
                         ? m.code === "CITATION_UNVERIFIED"
                           ? "Citation non vérifiée"
-                          : "Panne"
+                          : m.code === "SOURCE_DELETED"
+                            ? "Source supprimée"
+                            : "Panne"
                         : m.etat === "annule"
                           ? "Arrêtée"
                           : "En cours"
@@ -854,6 +862,8 @@ export type Detail = {
   };
   /** le propriétaire ou un administrateur */
   modifiable?: boolean;
+  /** le propriétaire ou un administrateur, pas les enseignants de ses cours */
+  supprimable?: boolean;
   meta: Record<string, unknown>;
   /** les champs du dépôt de sa matière */
   informations: Champ[];
@@ -1060,6 +1070,21 @@ export const detailSource = (d: Detail) => {
     <h2>${d.attente ? "Texte actuel" : "Texte extrait"}</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
     </div>
+    ${
+      d.supprimable
+        ? html`<form method="post" action="/prof/sources/${d.source.id}/supprimer"
+          class="etroit suppression-source">
+        <h2>Supprimer la source</h2>
+        <p class="discret">
+          Rejeter retire la source des élèves et de Thot, et la garde. Supprimer efface l'original,
+          ses versions, ses images et les passages cités dans les réponses des élèves.
+        </p>
+        <button class="danger" data-confirmer="Supprimer définitivement « ${d.source.titre} » ? L'original, ses versions, ses images et les passages cités dans les réponses des élèves seront effacés. Cette suppression ne s'annule pas.">
+          Supprimer définitivement
+        </button>
+      </form>`
+        : ""
+    }
   `;
 };
 

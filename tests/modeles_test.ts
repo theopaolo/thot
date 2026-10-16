@@ -1,6 +1,12 @@
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { type Cache, type ConfigModeles, openrouter, PanneModele } from "../src/core/modeles.ts";
+import {
+  type Cache,
+  cleLegende,
+  type ConfigModeles,
+  openrouter,
+  PanneModele,
+} from "../src/core/modeles.ts";
 
 const config: ConfigModeles = {
   cle: "test",
@@ -79,7 +85,11 @@ test("seules les légendes alimentent le cache, jamais les jugements", async () 
     assertEquals(appels, 2);
     assertEquals(valeurs.size, 0);
     await modeles.legender(new Uint8Array([0]), "image/png");
-    assertEquals(valeurs.size, 1);
+    // Supprimer une source retrouve la légende de ses images par cette clé.
+    assertEquals(
+      [...valeurs.keys()],
+      [await cleLegende("vision", new Uint8Array([0]), "image/png")],
+    );
   } finally {
     globalThis.fetch = fetch;
   }

@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
-import { mkdir, opendir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, opendir, readFile, stat, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
-import { chercher, chercherFts, retirerSource, transaction } from "./core/recherche.ts";
+import { chercher, chercherFts, transaction } from "./core/recherche.ts";
 import {
   creerAdministrateur,
   creerCompte,
@@ -23,6 +23,7 @@ import {
   reextraire,
   revendiquer,
   statuer,
+  supprimerSource,
   traiter,
 } from "./app/ingestion.ts";
 import { contexte } from "./core/texte.ts";
@@ -50,6 +51,8 @@ const AIDE = `thot <commande>
                                             garde l'identifiant et les rattachements
   supprimer <matiere|cours|theme> <id>      refusé si une ressource ou une question l'utilise,
                                             emporte les cours et thèmes d'une matière
+  supprimer source <source_id>              efface la source, ses fichiers et ses citations
+                                            dans les réponses, sans retour possible
   rattacher <source_id> <cours_id> [--theme-id=...]
                                             ajoute un rattachement : les membres du cours la lisent
   membre <cours_id> <identifiant>           inscrit un compte à un cours
@@ -271,22 +274,14 @@ async function nettoyer() {
          AND school_id = ?`,
         )
         .get(nomSur(vide.fichier), sequence, lireInstance(db).school_id)?.id as string | undefined);
-    transaction(db, () => {
-      if (fiche && seance) {
-        db.prepare(
-          `UPDATE sources SET metadonnees = json_set(metadonnees, '$.seance', ?)
-           WHERE id = ? AND json_extract(metadonnees, '$.seance') = ''`,
-        ).run(seance, fiche);
-      }
-      retirerSource(db, p.id);
-      for (const table of ["images", "suggestions", "ingestion_jobs", "sources"]) {
-        db.prepare(
-          `DELETE FROM ${table} WHERE ${table === "sources" ? "id" : "source_id"} = ?`,
-        ).run(p.id);
-      }
-    });
+    if (fiche && seance) {
+      db.prepare(
+        `UPDATE sources SET metadonnees = json_set(metadonnees, '$.seance', ?)
+         WHERE id = ? AND json_extract(metadonnees, '$.seance') = ''`,
+      ).run(seance, fiche);
+    }
+    await supprimerSource(db, p.id);
     if (fiche) indexer(db, fiche);
-    await rm(contenu(p.id), { recursive: true });
     console.log(`  ${p.fichier}${fiche ? ` → ${vide.fichier}` : ""}`);
     n++;
   }
@@ -699,7 +694,10 @@ switch (commande) {
     Domaines.renommer(db, reste[0], reste[1], reste.slice(2).join(" "));
     break;
   case "supprimer":
-    Domaines.supprimer(db, reste[0], reste[1]);
+    if (reste[0] === "source") {
+      await supprimerSource(db, reste[1]);
+      console.log(`Source ${reste[1]} supprimée.`);
+    } else Domaines.supprimer(db, reste[0], reste[1]);
     break;
   case "rattacher": {
     const [sourceId, coursId] = reste;

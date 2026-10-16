@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { Modeles } from "../core/modeles.ts";
-import { actualiserResultat, demander, type Resultat } from "../core/reponse.ts";
+import { actualiserResultat, demander, journalSans, type Resultat } from "../core/reponse.ts";
 import { transaction } from "../core/recherche.ts";
 import { lecteur, lireCompte } from "./comptes.ts";
 import { idsMatieres } from "./domaines.ts";
@@ -144,12 +144,14 @@ export function boucleReponses(db: Db, modeles: Modeles) {
       );
       // Seule la tentative propriétaire publie, avec les droits actuels de l'élève. Un échange
       // purgé ou supprimé n'a plus de ligne : rien ne le recrée, ni sa conversation, que la clé
-      // étrangère garde tant qu'elle a des échanges.
+      // étrangère garde tant qu'elle a des échanges. Une source supprimée pendant le calcul perd
+      // ses citations ici, et ses extraits quittent le journal.
       transaction(db, () => {
         const actuel = actualiserResultat(db, resultat, {
           ...p,
           lecteur: lecteur(lireCompte(db, t.compte_id)!),
         });
+        const supprimee = (id: string) => !db.prepare("SELECT 1 FROM sources WHERE id = ?").get(id);
         db.prepare(
           `UPDATE messages SET etat = ?, resultat = ?, journal = ?, etape = NULL,
              verrou_expire_le = NULL, generation_id = NULL, nouvelle = 1, maj_le = ?
@@ -158,7 +160,7 @@ export function boucleReponses(db: Db, modeles: Modeles) {
           actuel.etat,
           JSON.stringify(actuel),
           JSON.stringify({
-            ...journal,
+            ...journalSans(journal, supprimee),
             // `tentatives` y liste déjà les essais du générateur.
             revendications: t.tentatives,
             attente_ms: debut - JSON.parse(t.journal ?? "{}").demande_ms,
