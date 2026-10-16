@@ -4,9 +4,15 @@ import type { Perimetre } from "./recherche.ts";
 import { demander, profilSources } from "./reponse.ts";
 import type { Profil } from "./profils.ts";
 
-/** Une question qui renvoie à un support que l'élève n'a pas sous les yeux. */
+/** Un support que l'élève n'a pas sous les yeux: l'extrait, ou une image montrée par un démonstratif. */
 const RENVOI =
-  /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage|le motif|cette (œuvre|oeuvre|image)|l['’]image)\b/i;
+  /\b(extraits?|(selon|dans|d'après|d’après) (le|ce) (texte|document|passage)|(ce|du) (texte|document)|ce passage|(ce|cet|cette|ces) (motifs?|portraits?|tableaux?|photos?|peintures?|affiches?|dessins?|illustrations?|(?:œ|oe)uvres?|images?)|l['’]image)\b/i;
+/** « le motif » seul renvoie à une image, « le motif floral de William Morris » nomme son sujet. */
+const MOTIF = /\b(le|du|au) motif\b/i;
+
+/** Une question qui renvoie à un support que l'élève n'a pas sous les yeux. */
+export const renvoie = (q: string) =>
+  RENVOI.test(q) || (MOTIF.test(q) && !/\p{Lu}/u.test(q.slice(1)));
 
 // Le texte d'arts appliqués est celui que mesurent `evaluation/resultats/ml4-*`.
 const CONSIGNE_ARTS = `Voici un extrait d'un cours de lycee.
@@ -51,7 +57,7 @@ export async function questionsVerifiees(
   if (!Array.isArray(questions)) return [];
   const gardees = [];
   for (const q of questions
-    .filter((q): q is string => typeof q === "string" && q.trim().endsWith("?") && !RENVOI.test(q))
+    .filter((q): q is string => typeof q === "string" && q.trim().endsWith("?") && !renvoie(q))
     .slice(0, 2)) {
     const { resultat, journal } = await demander(db, modeles, q.trim(), p, seuil);
     // Une réponse sans reclasseur n'a pas passé le même filtre: aucune suggestion n'en sort.
