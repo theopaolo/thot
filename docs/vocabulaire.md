@@ -142,6 +142,18 @@ les élèves ». Les administrateurs lisent toutes les ressources. La case « Th
 répondre » décide à part si les réponses peuvent la citer. Le dépôt propose les lecteurs par
 défaut que l'administrateur a choisis pour l'instance.
 
+**Conversation**
+Suite de questions d'un élève, avec un titre et un périmètre. Le titre reprend la première
+question, et l'élève peut le renommer. Une conversation archivée se relit sans recevoir de
+question. Libellés : « Nouvelle conversation », « Renommer », « Archiver », « Désarchiver »,
+« Conversations archivées ». Les échanges posés avant les conversations sont rangés sous
+« Anciennes questions », une conversation par périmètre.
+
+**Périmètre**
+Matière, cours et thème où Thot cherche les passages d'une réponse. Le chat l'affiche au-dessus de
+la saisie : « Dans : Arts appliqués / STD2A / Bauhaus », ou « Dans : toutes tes ressources ».
+« Changer », puis « Appliquer aux prochaines questions », le modifie pour la suite seulement.
+
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 

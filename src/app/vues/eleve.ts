@@ -3,9 +3,9 @@ import type { Bloc } from "../../core/document.ts";
 import type { Affirmation, Resultat } from "../../core/reponse.ts";
 import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
-import type { Scope } from "../domaines.ts";
+import type { Catalogue, Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
-import { champsScope } from "./domaines.ts";
+import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 
 export type ChapitreVue = {
@@ -36,22 +36,36 @@ export type FaitVue = {
   fin: number;
 };
 
-/** Une question proposée: un bouton qui l'envoie telle quelle, sans passer par la saisie. */
-const idee = (q: string, htmx: boolean, libelle = q, chapitre = "", themeId = "") =>
+/** Rejoué avec la même clé, un envoi retrouve l'échange déjà créé au lieu d'en ouvrir un autre. */
+export const cleEnvoi = () => html`<input type="hidden" name="cle" value="${crypto.randomUUID()}">`;
+
+/**
+ * Une question proposée: un bouton qui l'envoie telle quelle, sans passer par la saisie. Dans le
+ * chat, elle continue la conversation ouverte. Ailleurs, elle en commence une.
+ */
+const idee = (
+  q: string,
+  htmx: boolean,
+  libelle = q,
+  chapitre = "",
+  themeId = "",
+  scope: Partial<Scope> = {},
+) =>
   htmx
     ? html`
       <button
         type="button"
         class="idee"
         hx-post="/eleve/questions"
-        hx-vals="${JSON.stringify({ texte: q, chapitre, theme_id: themeId })}"
+        hx-vals="${JSON.stringify({ texte: q, cle: crypto.randomUUID() })}"
+        hx-include="[name=conversation]"
         hx-target="#conversation"
         hx-swap="beforeend"
       >${icone("arrow-right")}${libelle}</button>
     `
     : html`
       <form method="post" action="/eleve/questions" class="idee-form">
-        <input type="hidden" name="theme_id" value="${themeId}"><input type="hidden" name="texte" value="${q}"><input type="hidden" name="chapitre" value="${chapitre}"><button class="idee">${icone(
+        ${champsScope({ ...scope, theme_id: themeId || scope.theme_id || "", texte: q, chapitre })}${cleEnvoi()}<button class="idee">${icone(
           "arrow-right",
         )}${libelle}</button>
       </form>
@@ -71,6 +85,7 @@ export const accueilEleve = (
   html`
     <h1>Bonjour ${prenom}</h1>
     <form method="post" action="/eleve/questions" class="question-rapide">
+      ${cleEnvoi()}
       <label for="texte">Qu'aimerais-tu comprendre aujourd'hui ?</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
@@ -360,6 +375,7 @@ export const lecteur = (d: Apercu | undefined, l: Libelles) =>
             "file-text",
           )}Lire le document</a>
           <form method="post" action="/eleve/questions">
+            ${cleEnvoi()}
             <input type="hidden" name="texte" value="Que dit le cours sur « ${d.titre} » ?">
             <input type="hidden" name="chapitre" value="${d.chapitre}">
             <button>${icone("chat-circle")}Poser une question dessus</button>
@@ -415,7 +431,7 @@ export const pageChapitre = (
         nom || "Ressources non classées"
       }</h1><p class="discret">${perimetre}</p>
           <form method="post" action="/eleve/questions"
-        class="question-rapide"><label for="texte">${surQuoi(nom)}</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
+        class="question-rapide">${cleEnvoi()}<label for="texte">${surQuoi(nom)}</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
           themeId ?? ""
         }"><input type="hidden" name="chapitre" value="${
           themeId ? "" : nom
@@ -440,6 +456,7 @@ export const pageChapitre = (
       sources.length
     } documents publiés par tes enseignants, rangés par séance.</p>
     <form method="post" action="/eleve/questions" class="question-rapide">
+      ${cleEnvoi()}
       <label for="texte">${surQuoi(themeId ? nom : nomChapitre(nom))}</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
@@ -543,6 +560,7 @@ export const lectureSource = (
       <div class="document-tete">
         ${cartel({ ...s, chapitre: s.sequence }, l)}
         <form method="post" action="/eleve/questions">
+          ${cleEnvoi()}
           <input type="hidden" name="texte" value="Que dit le cours sur « ${s.titre} » ?">
           <input type="hidden" name="chapitre" value="${s.sequence}">
           <button>${icone("chat-circle")}Poser une question dessus</button>
@@ -808,34 +826,224 @@ export type MessageVue = {
   etat: string;
   resultat: string | null;
   avis: string | null;
+  /** le périmètre de cet échange, quand il diffère de celui de l'échange précédent */
+  perimetre?: string;
 };
 
-export const chat = (
-  messages: MessageVue[],
-  idees: string[] = [],
-  personnel = false,
-  mention = "",
-) => {
-  const derniere = messages.findLastIndex((m) => m.etat === "answered");
+export type Perimetre = Scope & { chapitre: string };
+
+/** « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. */
+export const nomPerimetre = (cat: Catalogue, p: Perimetre, theme = "Thème") => {
+  const t = cat.themes.find((x) => x.id === p.theme_id);
+  const c = cat.cours.find((x) => x.id === (p.cours_id || t?.cours_id));
+  const m = cat.matieres.find((x) => x.id === (p.matiere_id || c?.matiere_id));
+  return [
+    m?.nom ?? (p.matiere_id ? "Matière indisponible" : ""),
+    c?.nom ?? (p.cours_id ? "Cours indisponible" : ""),
+    t?.nom ?? (p.theme_id ? `${theme} indisponible` : ""),
+    nomChapitre(p.chapitre),
+  ]
+    .filter(Boolean)
+    .join(" / ");
+};
+
+export type ConversationVue = {
+  id: string;
+  titre: string;
+  perimetre: string;
+  active_le: string;
+  /** état du dernier échange */
+  etat: string | null;
+};
+
+const JOUR_ISO = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" });
+const HEURE = new Intl.DateTimeFormat("fr-FR", {
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "Europe/Paris",
+});
+const DATE_COURTE = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "short",
+  timeZone: "Europe/Paris",
+});
+/** « 14 h 02 » le jour même, « hier » la veille, « 12 oct. » avant. */
+export const quand = (iso: string, maintenant = Date.now()) => {
+  const date = new Date(iso);
+  const jour = JOUR_ISO.format(date);
+  if (jour === JOUR_ISO.format(maintenant)) return HEURE.format(date).replace(":", " h ");
+  if (jour === JOUR_ISO.format(maintenant - 86_400_000)) return "hier";
+  return DATE_COURTE.format(date);
+};
+
+const ETATS: Record<string, [string, string]> = {
+  en_attente: ["En attente", "en-cours"],
+  en_cours: ["Réponse en cours", "en-cours"],
+  failed: ["Échec", "failed"],
+};
+
+const listeConversations = (liste: ConversationVue[], courante = "", archivees = 0, suite = "") =>
+  html`
+    <a class="bouton" href="/eleve/chat/nouvelle">Nouvelle conversation</a>
+    ${
+      liste.length
+        ? html`<ul class="conversations">${liste.map((c) => {
+            const etat = c.etat ? ETATS[c.etat] : undefined;
+            return html`<li><a href="/eleve/chat/${c.id}" aria-current="${
+              c.id === courante ? "page" : "false"
+            }"><span class="conversation-titre">${c.titre}</span><span class="discret">${
+              c.perimetre || "Toutes tes ressources"
+            }</span><span class="discret">${quand(c.active_le)}${
+              etat ? html` <span class="statut ${etat[1]}">${etat[0]}</span>` : ""
+            }</span></a></li>`;
+          })}</ul>`
+        : html`<p class="discret">Aucune conversation pour l'instant.</p>`
+    }
+    ${suite ? html`<p><a href="${suite}">Afficher les conversations précédentes</a></p>` : ""}
+    ${
+      archivees
+        ? html`<p><a href="/eleve/conversations/archivees">Conversations archivées (${archivees})</a></p>`
+        : ""
+    }
+  `;
+
+/** La liste seule, sous 1400 px, et celle des conversations archivées. */
+export const pageConversations = (
+  archive: boolean,
+  liste: ConversationVue[],
+  archivees: number,
+  suite: string,
+) =>
+  html`
+    <section class="page-conversations">
+      ${archive ? html`<p><a href="/eleve/conversations">Conversations</a></p>` : ""}
+      <h1>${archive ? "Conversations archivées" : "Conversations"}</h1>
+      ${listeConversations(liste, "", archivees, suite)}
+    </section>
+  `;
+
+export type Fil = {
+  /** compte qui écrit : ses brouillons ne se mêlent pas à ceux d'un autre compte du navigateur */
+  compte: string;
+  /** absente : nouvelle conversation, rien n'est enregistré avant la première question */
+  conversation?: { id: string; titre: string; archivee: boolean };
+  messages: MessageVue[];
+  idees: string[];
+  liste: ConversationVue[];
+  archivees: number;
+  suite: string;
+  perimetre: Perimetre;
+  catalogue: Catalogue;
+  theme: string;
+  indisponible: boolean;
+  statut?: string;
+  personnel?: boolean;
+  mention?: string;
+};
+
+export const chat = (f: Fil) => {
+  const conv = f.conversation;
+  const derniere = f.messages.findLastIndex((m) => m.etat === "answered");
+  const enCours = f.messages.some((m) => !m.resultat);
+  const nom = nomPerimetre(f.catalogue, f.perimetre, f.theme) || "toutes tes ressources";
+  const composer = html`
+    <form
+      id="envoi"
+      class="question-form"
+      method="post"
+      action="/eleve/questions"
+      ${
+        conv
+          ? html`hx-post="/eleve/questions" hx-target="#conversation" hx-swap="beforeend"
+            hx-disabled-elt="find button.principal"`
+          : html`hx-boost="true" hx-replace-url="true" data-focus="#texte"`
+      }
+      data-brouillon="${f.compte}:${conv?.id ?? "nouvelle"}"
+    >
+      ${conv ? "" : champsScope(f.perimetre)}${cleEnvoi()}
+      <label for="texte">Ta question</label>
+      <div class="saisie">
+        <textarea
+          id="texte"
+          name="texte"
+          required
+          maxlength="1000"
+          rows="2"
+          placeholder="${conv ? "Pose une autre question…" : "Pose ta question…"}"
+        ></textarea>
+        <button class="principal" ${enCours ? "disabled" : ""}>${icone("arrow-up")}<span>${
+          enCours ? "Réponse en cours…" : "Envoyer"
+        }</span></button>
+      </div>
+      <small>${
+        f.personnel
+          ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
+          : "Thot répond seulement avec les documents publiés par tes enseignants."
+      } ${f.mention ?? ""}</small>
+    </form>
+  `;
   return html`
     <div class="chat" data-feuille>
+      <nav class="liste-conversations" aria-label="Conversations"><div>${listeConversations(
+        f.liste,
+        conv?.id,
+        f.archivees,
+        f.suite,
+      )}</div></nav>
       <section class="chat-principal" aria-labelledby="titre-chat">
-        <h1 id="titre-chat">Poser une question</h1>
+        <div class="tete-conversation">
+          <p class="liens-conversations">
+            <a href="/eleve/conversations">Conversations</a>
+            <a href="/eleve/chat/nouvelle">Nouvelle</a>
+          </p>
+          ${f.statut ? html`<p role="status">${f.statut}</p>` : ""}
+          <h1 id="titre-chat" tabindex="-1">${conv?.titre ?? "Nouvelle conversation"}</h1>
+          ${
+            conv && !conv.archivee
+              ? html`
+              <form class="renommer" method="post" action="/eleve/chat/${conv.id}/renommer" hidden
+                data-focus="[data-renommer]">
+                <label for="titre-conversation">Titre de la conversation</label>
+                <div class="saisie">
+                  <input type="text" id="titre-conversation" name="titre" value="${conv.titre}"
+                    required maxlength="120">
+                  <button class="principal">Enregistrer</button>
+                  <button type="button" data-annuler-renommer>Annuler</button>
+                </div>
+              </form>
+              <div class="actions-conversation">
+                <button type="button" class="lien" data-renommer>Renommer</button>
+                <form method="post" action="/eleve/chat/${conv.id}/archiver">
+                  <button class="lien">Archiver</button>
+                </form>
+              </div>
+            `
+              : ""
+          }
+          ${conv ? html`<input type="hidden" name="conversation" value="${conv.id}" form="envoi">` : ""}
+        </div>
         <div
           id="conversation"
           aria-live="polite"
           aria-relevant="additions"
         >
-          ${messages.map(
+          ${f.messages.map(
             (m, i) =>
               html`
+              ${
+                m.perimetre === undefined
+                  ? ""
+                  : html`<p class="changement-perimetre">Périmètre changé : ${
+                      m.perimetre || "toutes tes ressources"
+                    }</p>`
+              }
               ${question(m.question)}${
                 m.resultat
                   ? reponse(
                       m.id,
                       JSON.parse(m.resultat),
                       m.avis,
-                      i === messages.length - 1 ? idees : [],
+                      i === f.messages.length - 1 ? f.idees : [],
                       i === derniere,
                     )
                   : attente(m.id)
@@ -843,31 +1051,44 @@ export const chat = (
             `,
           )}
         </div>
-        <form
-          class="question-form"
-          hx-post="/eleve/questions"
-          hx-target="#conversation"
-          hx-swap="beforeend"
-          hx-disabled-elt="find button"
-        >
-          <label for="texte">Ta question</label>
-          <div class="saisie">
-            <textarea
-              id="texte"
-              name="texte"
-              required
-              maxlength="1000"
-              rows="2"
-              placeholder="Pose une autre question…"
-            ></textarea>
-            <button class="principal">${icone("arrow-up")}Envoyer</button>
-          </div>
-          <small>${
-            personnel
-              ? "Thot répond seulement avec les documents que tu as relus et rendus disponibles pour l'étude."
-              : "Thot répond seulement avec les documents publiés par tes enseignants."
-          } ${mention}</small>
-        </form>
+        <div class="pied-chat">
+          ${
+            conv?.archivee
+              ? html`
+              <p>Cette conversation est archivée.</p>
+              <form method="post" action="/eleve/chat/${conv.id}/desarchiver">
+                <button>Désarchiver</button>
+              </form>
+            `
+              : html`
+              <button type="button" class="lien" data-aller-reponse hidden>Aller à la nouvelle réponse</button>
+              <div class="perimetre">
+                <p id="perimetre" aria-live="polite">Dans : ${nom}</p>
+                <details ${f.indisponible ? "open" : ""}>
+                  <summary>Changer</summary>
+                  <form method="${conv ? "post" : "get"}"
+                    action="${conv ? `/eleve/chat/${conv.id}/perimetre` : "/eleve/chat/nouvelle"}"
+                    data-focus=".perimetre summary">
+                    ${selectsPerimetre(f.catalogue, f.perimetre, f.theme)}
+                    <button>Appliquer aux prochaines questions</button>
+                  </form>
+                </details>
+              </div>
+              ${
+                f.indisponible
+                  ? html`<p>Ce périmètre n'est plus disponible. Choisis-en un autre pour continuer.</p>`
+                  : composer
+              }
+              ${
+                !conv && f.idees.length
+                  ? html`<div class="idees">${f.idees.map((q) =>
+                      idee(q, false, q, f.perimetre.chapitre, "", f.perimetre),
+                    )}</div>`
+                  : ""
+              }
+            `
+          }
+        </div>
       </section>
       <div class="colonne-source">${panneauSource()}</div>
     </div>

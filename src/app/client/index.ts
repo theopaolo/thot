@@ -24,9 +24,14 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// Un conflit (409) dit pourquoi en clair : conversation archivée ailleurs, réponse déjà en cours.
 for (const nom of ["htmx:beforeRequest", "htmx:responseError", "htmx:sendError"]) {
-  document.addEventListener(nom, () => {
+  document.addEventListener(nom, (event) => {
     const erreur = document.getElementById("erreur-reseau");
-    if (erreur) erreur.hidden = nom === "htmx:beforeRequest";
+    if (!erreur) return;
+    erreur.dataset.defaut ??= erreur.textContent ?? "";
+    const xhr = (event as CustomEvent<{ xhr?: XMLHttpRequest }>).detail.xhr;
+    erreur.textContent = xhr?.status === 409 ? xhr.responseText : erreur.dataset.defaut;
+    erreur.hidden = nom === "htmx:beforeRequest";
   });
 }

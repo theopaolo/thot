@@ -1051,6 +1051,14 @@ export function creerApp(db: Db, modeles: Modeles) {
   });
 
   // ------------------------------------------------------------ élève
+  type Perimetre = Eleve.Perimetre;
+  const memePerimetre = (a: Perimetre, b: Perimetre) =>
+    a.chapitre === b.chapitre &&
+    a.matiere_id === b.matiere_id &&
+    a.cours_id === b.cours_id &&
+    a.theme_id === b.theme_id;
+  /** Une génération sans nouvelles depuis PERIMETRE_MS est abandonnée : un flux peut la reprendre. */
+  const perime = () => new Date(Date.now() - PERIMETRE_MS).toISOString().slice(0, 19) + "Z";
   const sourceCertifiee = (id: string, l: Lecteur) =>
     db
       .prepare(
@@ -1129,7 +1137,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           "Ressources",
           html`<h1>Ressources</h1>${filtresDomaines}
           <form method="post" action="/eleve/questions" class="question-rapide">
-            ${DomaineVue.champsScope(scope(c))}
+            ${DomaineVue.champsScope(scope(c))}${Eleve.cleEnvoi()}
             <label for="texte">Une question dans ce périmètre ?</label>
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
@@ -1399,18 +1407,23 @@ export function creerApp(db: Db, modeles: Modeles) {
       (id, n) => chunksSource(db, id, n),
     );
 
-  const messagesDe = (compte: Compte) =>
-    (
-      db
-        .prepare(
-          "SELECT id, question, etat, resultat, avis FROM messages WHERE compte_id = ? ORDER BY cree_le, rowid",
-        )
-        .all(compte.id) as Eleve.MessageVue[]
-    ).map((m) => {
-      if (!m.resultat) return m;
+  const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
+    const lignes = db
+      .prepare(
+        `SELECT id, question, etat, resultat, avis, chapitre, matiere_id, cours_id, theme_id
+         FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
+      )
+      .all(conversationId, compte.id) as (Eleve.MessageVue & Perimetre)[];
+    return lignes.map((m, i): Eleve.MessageVue => {
+      const vue = {
+        ...m,
+        perimetre: i && !memePerimetre(lignes[i - 1], m) ? nomme(m) : undefined,
+      };
+      if (!m.resultat) return vue;
       const r = resultatActuel(m.resultat, lecteur(compte));
-      return { ...m, etat: r.etat, resultat: JSON.stringify(r) };
+      return { ...vue, etat: r.etat, resultat: JSON.stringify(r) };
     });
+  };
 
   const ideesPour = (l: Lecteur, r: Resultat, question = "", messageId = "") => {
     const m = messageId
@@ -1461,30 +1474,27 @@ export function creerApp(db: Db, modeles: Modeles) {
       : [];
   };
 
-  app.get("/eleve/chat", (c) => {
-    const messages = messagesDe(c.get("compte"));
-    const dernier = [...messages].reverse().find((m) => m.resultat);
-    const idees = dernier
-      ? ideesPour(lu(c), JSON.parse(dernier.resultat!), dernier.question, dernier.id)
-      : [];
-    return c.html(
-      rendre(
-        c,
-        "Question",
-        Eleve.chat(messages, idees, lireInstance(db).mode === "personal", mentionLecteurs(c)),
-        "page-chat",
-      ),
-    );
-  });
+  // ------------------------------------------------------------ conversations
+  // Une conversation appartient à son compte : un identifiant d'un autre compte reçoit le même 404
+  // qu'un identifiant inconnu.
+  type Conversation = Perimetre & { id: string; titre: string; archivee_le: string | null };
+  const conversationDe = (c: Context<Env>, id: string) =>
+    db
+      .prepare("SELECT * FROM conversations WHERE id = ? AND compte_id = ?")
+      .get(id, c.get("compte").id) as Conversation | undefined;
+  /** Une question attend son flux, ou une génération tourne encore : une réponse à la fois. */
+  const reponseEnCours = (conversationId: string) =>
+    !!db
+      .prepare(
+        `SELECT 1 FROM messages WHERE conversation_id = ?
+         AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le >= ?))`,
+      )
+      .get(conversationId, perime());
+  const libelleTheme = () => libelles(db).regroupement;
 
-  app.post("/eleve/questions", async (c) => {
-    const b = await c.req.parseBody();
-    const texte = String(b.texte ?? "")
-      .trim()
-      .slice(0, 1000);
-    if (!texte) return c.text("Question vide.", 400);
-    const chapitre = String(b.chapitre ?? "");
-    const p = Domaines.lireScope(b);
+  /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
+  const perimetreRefuse = (c: Context<Env>, { chapitre, ...reste }: Perimetre) => {
+    const p = Domaines.lireScope(reste);
     if (Object.values(p).some(Boolean)) {
       const disponibles = Domaines.sourcesPerimetre(db, p);
       const visible = db
@@ -1493,7 +1503,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         )
         .all(instance.school_id, ...parametresAcces(lu(c)))
         .some((s) => disponibles.has(s.id as string));
-      if (!visible) return c.text("Périmètre indisponible.", 400);
+      if (!visible) return "Périmètre indisponible.";
       // Un élève ne pose une question dans un cours que s'il en est membre.
       const coursId =
         p.cours_id ||
@@ -1505,7 +1515,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         !lu(c).administrateur &&
         !Domaines.coursDuCompte(db, lu(c).id).has(coursId)
       )
-        return c.text("Périmètre indisponible.", 400);
+        return "Périmètre indisponible.";
     }
     if (
       chapitre &&
@@ -1517,22 +1527,272 @@ export function creerApp(db: Db, modeles: Modeles) {
         )
         .get(instance.school_id, chapitre, ...parametresAcces(lu(c)))
     )
-      return c.text("Séquence indisponible.", 400);
-    const id = crypto.randomUUID();
-    const t = maintenant();
+      return "Séquence indisponible.";
+  };
+
+  const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean) => {
+    const cat = Domaines.catalogueVisible(db, lu(c));
+    const theme = libelleTheme();
+    const lignes = db
+      .prepare(
+        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, active_le,
+         (SELECT etat FROM messages WHERE conversation_id = v.id ORDER BY rang DESC LIMIT 1) AS etat
+         FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
+         ORDER BY active_le DESC, rowid DESC LIMIT ?`,
+      )
+      .all(c.get("compte").id, archivees ? 1 : 0, toutes ? -1 : 51) as (Eleve.ConversationVue &
+      Perimetre)[];
+    return {
+      liste: (toutes ? lignes : lignes.slice(0, 50)).map((l) => ({
+        ...l,
+        perimetre: Eleve.nomPerimetre(cat, l, theme),
+      })),
+      plus: !toutes && lignes.length > 50,
+    };
+  };
+  const nombreArchivees = (c: Context<Env>) =>
+    db
+      .prepare(
+        "SELECT count(*) AS n FROM conversations WHERE compte_id = ? AND archivee_le IS NOT NULL",
+      )
+      .get(c.get("compte").id)!.n as number;
+
+  const pageChat = (c: Context<Env>, conv?: Conversation) => {
+    const compte = c.get("compte");
+    const cat = Domaines.catalogueVisible(db, lu(c));
+    const theme = libelleTheme();
+    // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
+    const p: Perimetre = conv ??
+      (Object.hasOwn(c.req.query(), "matiere_id")
+        ? { ...scope(c), chapitre: "" }
+        : (db
+            .prepare(
+              `SELECT chapitre, matiere_id, cours_id, theme_id FROM conversations
+               WHERE compte_id = ? ORDER BY active_le DESC, rowid DESC LIMIT 1`,
+            )
+            .get(compte.id) as Perimetre | undefined)) ?? {
+        chapitre: "",
+        matiere_id: "",
+        cours_id: "",
+        theme_id: "",
+      };
+    const messages = conv
+      ? messagesDe(compte, conv.id, (m) => Eleve.nomPerimetre(cat, m, theme))
+      : [];
+    const dernier = messages.findLast((m) => m.resultat);
+    const { liste, plus } = conversations(c, false, false);
+    return c.html(
+      rendre(
+        c,
+        conv?.titre ?? "Nouvelle conversation",
+        Eleve.chat({
+          compte: compte.id,
+          conversation: conv && { id: conv.id, titre: conv.titre, archivee: !!conv.archivee_le },
+          messages,
+          idees: !conv
+            ? suggestionsDuPerimetre(
+                db,
+                lu(c),
+                Domaines.sourcesPerimetre(db, Domaines.lireScope(p)),
+              )
+            : dernier
+              ? ideesPour(lu(c), JSON.parse(dernier.resultat!), dernier.question, dernier.id)
+              : [],
+          liste,
+          archivees: nombreArchivees(c),
+          suite: plus ? "/eleve/conversations?toutes=1" : "",
+          perimetre: {
+            chapitre: p.chapitre,
+            matiere_id: p.matiere_id,
+            cours_id: p.cours_id,
+            theme_id: p.theme_id,
+          },
+          catalogue: cat,
+          theme,
+          indisponible: !!perimetreRefuse(c, p),
+          statut: c.req.query("archivee") ? "Conversation archivée." : undefined,
+          personnel: lireInstance(db).mode === "personal",
+          mention: mentionLecteurs(c),
+        }),
+        "page-chat",
+      ),
+    );
+  };
+
+  app.get("/eleve/chat", (c) => {
+    const id = db
+      .prepare(
+        `SELECT id FROM conversations WHERE compte_id = ? AND archivee_le IS NULL
+         ORDER BY active_le DESC, rowid DESC LIMIT 1`,
+      )
+      .get(c.get("compte").id)?.id as string | undefined;
+    return pageChat(c, id ? conversationDe(c, id) : undefined);
+  });
+  app.get("/eleve/chat/nouvelle", (c) => pageChat(c));
+  app.get("/eleve/chat/:id", (c) => {
+    const conv = conversationDe(c, c.req.param("id"));
+    return conv ? pageChat(c, conv) : c.notFound();
+  });
+  app.on("GET", ["/eleve/conversations", "/eleve/conversations/archivees"], (c) => {
+    const archive = c.req.path.endsWith("/archivees");
+    const { liste, plus } = conversations(c, archive, c.req.query("toutes") === "1");
+    return c.html(
+      rendre(
+        c,
+        archive ? "Conversations archivées" : "Conversations",
+        Eleve.pageConversations(
+          archive,
+          liste,
+          archive ? 0 : nombreArchivees(c),
+          plus ? `${c.req.path}?toutes=1` : "",
+        ),
+      ),
+    );
+  });
+  // Le dernier titre enregistré l'emporte : un titre ne justifie pas un conflit.
+  app.post("/eleve/chat/:id/renommer", async (c) => {
+    const titre = String((await c.req.parseBody()).titre ?? "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!titre || titre.length > 120) return c.text("Titre attendu : 1 à 120 caractères.", 400);
+    const r = db
+      .prepare("UPDATE conversations SET titre = ? WHERE id = ? AND compte_id = ?")
+      .run(titre, c.req.param("id"), c.get("compte").id);
+    return r.changes ? c.redirect(`/eleve/chat/${c.req.param("id")}`, 303) : c.notFound();
+  });
+  // Archiver ouvre la conversation la plus récente qui reste, ou une nouvelle.
+  app.post("/eleve/chat/:id/:action{(?:archiver|desarchiver)}", (c) => {
+    const archiver = c.req.param("action") === "archiver";
+    const r = db
+      .prepare("UPDATE conversations SET archivee_le = ? WHERE id = ? AND compte_id = ?")
+      .run(archiver ? maintenant() : null, c.req.param("id"), c.get("compte").id);
+    if (!r.changes) return c.notFound();
+    return c.redirect(
+      archiver ? "/eleve/chat?archivee=1" : `/eleve/chat/${c.req.param("id")}`,
+      303,
+    );
+  });
+  // Le nouveau périmètre vaut pour les questions suivantes. Les échanges passés gardent le leur.
+  app.post("/eleve/chat/:id/perimetre", async (c) => {
+    const conv = conversationDe(c, c.req.param("id"));
+    if (!conv) return c.notFound();
+    if (conv.archivee_le) return c.text("Cette conversation est archivée.", 409);
+    const p = { ...Domaines.lireScope(await c.req.parseBody()), chapitre: "" };
+    const refus = perimetreRefuse(c, p);
+    if (refus) return c.text(refus, 400);
     db.prepare(
-      "INSERT INTO messages (id, compte_id, question, chapitre, matiere_id, cours_id, theme_id, etat, cree_le, maj_le) VALUES (?, ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)",
-    ).run(id, c.get("compte").id, texte, chapitre, p.matiere_id, p.cours_id, p.theme_id, t, t);
-    // Hors HTMX (accueil, idée proposée), la conversation s'ouvre et le flux démarre là-bas.
-    if (!c.req.header("HX-Request")) return c.redirect("/eleve/chat", 303);
-    return c.html(html`
-      ${Eleve.question(texte)}${Eleve.attente(id)}
-    `);
+      "UPDATE conversations SET chapitre = '', matiere_id = ?, cours_id = ?, theme_id = ? WHERE id = ?",
+    ).run(p.matiere_id, p.cours_id, p.theme_id, conv.id);
+    return c.redirect(`/eleve/chat/${conv.id}`, 303);
+  });
+
+  /**
+   * Sans conversation, la question en ouvre une avec le périmètre de la page d'où elle part.
+   * Avec une conversation, elle prend son périmètre actuel, revérifié à chaque envoi.
+   */
+  app.post("/eleve/questions", async (c) => {
+    const b = await c.req.parseBody();
+    const texte = String(b.texte ?? "")
+      .trim()
+      .slice(0, 1000);
+    if (!texte) return c.text("Question vide.", 400);
+    const compte = c.get("compte");
+    const cle = String(b.cle ?? "").slice(0, 100) || null;
+    // Hors HTMX (accueil, idée proposée, première question), la conversation s'ouvre et le flux
+    // démarre là-bas.
+    const envoye = (conversationId: string, id: string, question: string) =>
+      !c.req.header("HX-Request") || c.req.header("HX-Boosted")
+        ? c.redirect(`/eleve/chat/${conversationId}`, 303)
+        : c.html(html`
+            ${Eleve.question(question)}${Eleve.attente(id)}
+          `);
+    const deja = cle
+      ? (db
+          .prepare(
+            "SELECT id, conversation_id, question FROM messages WHERE compte_id = ? AND cle = ?",
+          )
+          .get(compte.id, cle) as
+          | { id: string; conversation_id: string; question: string }
+          | undefined)
+      : undefined;
+    if (deja) return envoye(deja.conversation_id, deja.id, deja.question);
+    let conv: Conversation | undefined;
+    if (b.conversation) {
+      conv = conversationDe(c, String(b.conversation));
+      if (!conv) return c.notFound();
+      if (conv.archivee_le) {
+        return c.text(
+          "Cette conversation a été archivée dans un autre onglet. Ta question est conservée.",
+          409,
+        );
+      }
+      if (reponseEnCours(conv.id)) {
+        return c.text("Une réponse est déjà en cours dans cette conversation.", 409);
+      }
+    }
+    const p: Perimetre = conv ?? { ...Domaines.lireScope(b), chapitre: String(b.chapitre ?? "") };
+    const refus = perimetreRefuse(c, p);
+    if (refus) return c.text(refus, 400);
+    const id = crypto.randomUUID();
+    const conversationId = conv?.id ?? crypto.randomUUID();
+    const t = maintenant();
+    transaction(db, () => {
+      if (conv) {
+        db.prepare("UPDATE conversations SET active_le = ? WHERE id = ?").run(t, conv.id);
+      } else {
+        // Le titre reprend la question, coupée à 80 caractères sur une fin de mot.
+        const ligne = texte.replace(/\s+/g, " ");
+        const titre =
+          ligne.length > 80
+            ? ligne
+                .slice(0, 81)
+                .replace(/\s+\S*$/, "")
+                .slice(0, 80)
+            : ligne;
+        db.prepare(
+          `INSERT INTO conversations (id, compte_id, titre, chapitre, matiere_id, cours_id, theme_id,
+           active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(
+          conversationId,
+          compte.id,
+          titre,
+          p.chapitre,
+          p.matiere_id,
+          p.cours_id,
+          p.theme_id,
+          t,
+          t,
+        );
+      }
+      db.prepare(
+        `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question, chapitre,
+         matiere_id, cours_id, theme_id, etat, cree_le, maj_le)
+         VALUES (?, ?, ?, (SELECT coalesce(max(rang), 0) + 1 FROM messages WHERE conversation_id = ?),
+         ?, ?, ?, ?, ?, ?, 'en_attente', ?, ?)`,
+      ).run(
+        id,
+        compte.id,
+        conversationId,
+        conversationId,
+        cle,
+        texte,
+        p.chapitre,
+        p.matiere_id,
+        p.cours_id,
+        p.theme_id,
+        t,
+        t,
+      );
+    });
+    return envoye(conversationId, id, texte);
   });
 
   app.post("/eleve/messages/:id/relancer", (c) => {
     const m = db
-      .prepare("SELECT etat, resultat FROM messages WHERE id = ? AND compte_id = ?")
+      .prepare(
+        `SELECT m.etat, m.resultat, m.conversation_id, v.archivee_le FROM messages m
+         LEFT JOIN conversations v ON v.id = m.conversation_id WHERE m.id = ? AND m.compte_id = ?`,
+      )
       .get(c.req.param("id"), c.get("compte").id);
     if (
       !m ||
@@ -1540,6 +1800,10 @@ export function creerApp(db: Db, modeles: Modeles) {
         (!m.resultat || resultatActuel(m.resultat as string, lu(c)).etat !== "failed"))
     )
       return c.notFound();
+    if (m.archivee_le) return c.text("Cette conversation est archivée.", 409);
+    if (reponseEnCours(m.conversation_id as string)) {
+      return c.text("Une réponse est déjà en cours dans cette conversation.", 409);
+    }
     const r = db
       .prepare(
         "UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL, maj_le = ? WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered')",
@@ -1558,13 +1822,12 @@ export function creerApp(db: Db, modeles: Modeles) {
     return streamSSE(c, async (flux) => {
       if (flux.aborted) return;
       const generationId = crypto.randomUUID();
-      const perime = new Date(Date.now() - PERIMETRE_MS).toISOString().slice(0, 19) + "Z";
       const pris = db
         .prepare(
           `UPDATE messages SET etat = 'en_cours', maj_le = ?, generation_id = ?
          WHERE id = ? AND compte_id = ? AND (etat = 'en_attente' OR (etat = 'en_cours' AND maj_le < ?))`,
         )
-        .run(maintenant(), generationId, id, compte.id, perime).changes;
+        .run(maintenant(), generationId, id, compte.id, perime()).changes;
       if (pris) {
         const renouveler = setInterval(() => {
           try {
@@ -1581,23 +1844,19 @@ export function creerApp(db: Db, modeles: Modeles) {
         try {
           const m = db
             .prepare(
-              "SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages WHERE id = ?",
+              `SELECT question, conversation_id, rang, chapitre, matiere_id, cours_id, theme_id
+               FROM messages WHERE id = ?`,
             )
-            .get(id) as {
-            question: string;
-            chapitre: string;
-            matiere_id: string;
-            cours_id: string;
-            theme_id: string;
-          };
-          const precedente = db
+            .get(id) as Perimetre & { question: string; conversation_id: string; rang: number };
+          // Le contexte vient du tour précédent de la même conversation, posé dans le même
+          // périmètre. Un changement de périmètre repart de zéro.
+          const avant = db
             .prepare(
-              `SELECT question FROM messages WHERE compte_id = ? AND rowid < (SELECT rowid FROM messages WHERE id = ?)
-             AND chapitre = ? AND matiere_id = ? AND cours_id = ? AND theme_id = ? ORDER BY rowid DESC LIMIT 1`,
+              `SELECT question, chapitre, matiere_id, cours_id, theme_id FROM messages
+               WHERE conversation_id = ? AND rang < ? ORDER BY rang DESC LIMIT 1`,
             )
-            .get(compte.id, id, m.chapitre, m.matiere_id, m.cours_id, m.theme_id)?.question as
-            | string
-            | undefined;
+            .get(m.conversation_id, m.rang) as (Perimetre & { question: string }) | undefined;
+          const precedente = avant && memePerimetre(avant, m) ? avant.question : undefined;
           const p = {
             schoolId: instance.school_id,
             lecteur: lecteur(compte),

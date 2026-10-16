@@ -113,7 +113,7 @@ const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
         "/eleve/chat",
         html`<span class="libelle-long">Poser une question</span><span class="libelle-court">Question</span>`,
         "chat-circle",
-        chemin.startsWith("/eleve/chat"),
+        chemin.startsWith("/eleve/chat") || chemin.startsWith("/eleve/conversations"),
       )}
       ${
         c.role === "enseignant"

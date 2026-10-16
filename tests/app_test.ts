@@ -890,10 +890,12 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
     await (await eleve.requete(`/eleve/messages/${id1}/flux`)).text(),
     "Gaudí refuse",
   );
+  const conversation = db.prepare("SELECT conversation_id FROM messages WHERE id = ?").get(id1)!
+    .conversation_id as string;
   const second = await eleve.requete("/eleve/questions", {
     method: "POST",
     headers: { "HX-Request": "true" },
-    body: new URLSearchParams({ texte: "Et la façade ?", chapitre: "ATC Art Nouveau" }),
+    body: new URLSearchParams({ texte: "Et la façade ?", conversation }),
   });
   const id2 = (await second.text()).match(/messages\/([\w-]+)\/flux/)![1];
   assertStringIncludes(
@@ -911,17 +913,30 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
     "Casa Batlló façade ligne droite",
   );
   reformulation = "";
+  assertEquals(
+    (
+      await eleve.requete(`/eleve/chat/${conversation}/perimetre`, {
+        method: "POST",
+        body: new URLSearchParams({ matiere_id: "", cours_id: "", theme_id: "" }),
+      })
+    ).status,
+    303,
+  );
   const sansChapitre = await eleve.requete("/eleve/questions", {
     method: "POST",
     headers: { "HX-Request": "true" },
-    body: new URLSearchParams({ texte: "Et Gaudí ?" }),
+    body: new URLSearchParams({ texte: "Et Gaudí ?", conversation }),
   });
   const id3 = (await sansChapitre.text()).match(/messages\/([\w-]+)\/flux/)![1];
   await eleve.requete(`/eleve/messages/${id3}/flux`);
   assertEquals(
     reformulation,
     "",
-    "une question sans chapitre ne reprend pas le chapitre précédent",
+    "après un changement de périmètre, la question ne reprend pas la précédente",
+  );
+  assertStringIncludes(
+    await (await eleve.requete(`/eleve/chat/${conversation}`)).text(),
+    "Périmètre changé : toutes tes ressources",
   );
   assertEquals(
     (

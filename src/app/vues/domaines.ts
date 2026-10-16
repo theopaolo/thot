@@ -257,9 +257,9 @@ export const gestion = (
   `;
 };
 
-export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "") =>
+/** Les trois listes du périmètre, communes au filtre de la bibliothèque et à celui du chat. */
+export const selectsPerimetre = (cat: Catalogue, p: Scope, theme = "Thème") =>
   html`
-    <form method="get" action="${action}" class="biblio-outils" aria-label="Périmètre des ressources">
       <label>Matière <select name="matiere_id"><option value="">Toutes les matières</option>${options(
         cat.matieres,
         p.matiere_id,
@@ -271,7 +271,9 @@ export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "
         })),
         p.cours_id,
       )}</select></label>
-      <label>Thème <select name="theme_id"><option value="">Tous les thèmes</option>${options(
+      <label>${theme} <select name="theme_id"><option value="">${
+        TOUS[theme] ?? "Tous"
+      }</option>${options(
         cat.themes.map((t) => ({
           id: t.id,
           nom: `${
@@ -282,6 +284,16 @@ export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "
         })),
         p.theme_id,
       )}</select></label>
+  `;
+const TOUS: Record<string, string> = {
+  Thème: "Tous les thèmes",
+  Séquence: "Toutes les séquences",
+};
+
+export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "") =>
+  html`
+    <form method="get" action="${action}" class="biblio-outils" aria-label="Périmètre des ressources">
+      ${selectsPerimetre(cat, p)}
       ${
         action === "/eleve/recherche"
           ? html`<input type="text" name="q" value="${q}" aria-label="Recherche" maxlength="300">`
@@ -356,5 +368,5 @@ export const langue = (valeur = "fr") =>
     <label>Langue de la source <input type="text" name="langue" value="${valeur}" maxlength="30"></label><p
       class="aide">Français (fr) pris en charge. Anglais (en) et autres langues : recherche non prise en charge.</p>
   `;
-export const champsScope = (p: Scope) =>
+export const champsScope = (p: Record<string, string>) =>
   html`${Object.entries(p).map(([n, v]) => html`<input type="hidden" name="${n}" value="${v}">`)}`;

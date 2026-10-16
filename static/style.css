@@ -88,6 +88,10 @@ html:has(.feuille-ouverte) {
 main:focus {
   outline: none;
 }
+/* Un bouton ou une rangée en flex reste caché quand le script le cache. */
+[hidden] {
+  display: none !important;
+}
 
 * {
   box-sizing: border-box;
@@ -1221,6 +1225,13 @@ main.page-chat {
   max-width: none;
   padding: 0;
 }
+/* Un refus d'envoi reste visible au bas d'une longue conversation. */
+main.page-chat #erreur-reseau {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
+}
 .chat {
   display: grid;
 }
@@ -1362,13 +1373,19 @@ main.page-chat {
     animation: none;
   }
 }
-form.question-form {
+.pied-chat {
   position: sticky;
   bottom: 0;
   margin-top: var(--s5);
   padding: var(--s3) 0 var(--s4);
   border-top: 1px solid var(--line);
   background: var(--bg);
+}
+.pied-chat > [data-aller-reponse] {
+  margin-bottom: var(--s2);
+}
+.pied-chat .idees {
+  margin: var(--s4) 0 0;
 }
 form.question-form textarea {
   min-height: 3rem;
@@ -1377,6 +1394,136 @@ form.question-form small,
 .question-rapide small {
   display: block;
   margin-top: var(--s2);
+}
+
+/* ------------------------------------------------------------ conversations */
+
+/* La liste vit dans sa colonne à partir de 1400 px, sur sa propre page en dessous. */
+.liste-conversations {
+  display: none;
+}
+.liens-conversations {
+  display: flex;
+  gap: var(--s4);
+}
+@media (min-width: 1400px) {
+  .chat {
+    grid-template-columns: 16rem minmax(0, 1fr) minmax(24rem, 34%);
+  }
+  .liste-conversations {
+    display: block;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .liste-conversations > div {
+    position: sticky;
+    top: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: var(--s5) var(--s3);
+  }
+  .liens-conversations {
+    display: none;
+  }
+}
+.conversations {
+  margin: var(--s4) 0;
+  padding: 0;
+  list-style: none;
+}
+.conversations a {
+  display: flex;
+  flex-direction: column;
+  padding: var(--s2) var(--s3);
+  border-left: 4px solid transparent;
+  text-decoration: none;
+}
+.conversations a:hover {
+  background: var(--surface-tinted);
+}
+.conversations a[aria-current="page"] {
+  border-left-color: var(--yellow);
+}
+.conversation-titre {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.conversations .discret {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-conversations {
+  max-width: 44rem;
+}
+.tete-conversation {
+  margin-bottom: var(--s5);
+}
+#titre-chat {
+  overflow-wrap: anywhere;
+}
+#titre-chat:focus {
+  outline: none;
+}
+.actions-conversation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s4);
+}
+.actions-conversation form,
+.renommer {
+  margin: 0;
+}
+.changement-perimetre {
+  margin: 0;
+  padding-top: var(--s2);
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.perimetre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s3);
+  margin-bottom: var(--s2);
+  font-size: 0.875rem;
+}
+#perimetre {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.perimetre summary {
+  min-height: 32px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.perimetre details[open] {
+  flex-basis: 100%;
+}
+.perimetre form {
+  display: grid;
+  gap: var(--s2) var(--s3);
+  padding-bottom: var(--s3);
+}
+.perimetre form button {
+  justify-self: start;
+}
+@media (min-width: 900px) {
+  .perimetre form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .perimetre form button {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ------------------------------------------------------------ enseignant */

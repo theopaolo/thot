@@ -14,7 +14,12 @@ export function purgerMessages(db: Db, jours: number, date = Date.now()) {
     throw new Error("THOT_RETENTION_JOURS doit être un entier positif.");
   }
   const limite = new Date(date - jours * 86_400_000).toISOString().slice(0, 19) + "Z";
-  return db.prepare("DELETE FROM messages WHERE cree_le < ?").run(limite).changes;
+  const n = db.prepare("DELETE FROM messages WHERE cree_le < ?").run(limite).changes;
+  // Le titre reprend une question : une conversation vidée part avec ses échanges.
+  db.prepare(
+    "DELETE FROM conversations WHERE NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id = conversations.id)",
+  ).run();
+  return n;
 }
 
 /** Une connexion par processus. WAL laisse lire pendant une écriture du worker. */

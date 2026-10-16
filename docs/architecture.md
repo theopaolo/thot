@@ -176,6 +176,23 @@ retiré s'applique aussitôt.
 Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
 enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.
 
+## Conversations
+
+Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, son adresse, ses
+actions et ses échanges répondent 404, comme un identifiant inconnu. Son titre reste privé :
+`/prof/questions` liste les échanges un par un.
+
+Chaque échange garde le périmètre qu'il a utilisé. Changer le périmètre d'une conversation vaut
+pour les questions suivantes, et chaque envoi revérifie que l'élève peut encore interroger ce
+périmètre. La recherche d'une question ne reprend que la question précédente de la même
+conversation, si elle a été posée dans le même périmètre. Rien ne passe d'une conversation à une
+autre, ni d'un périmètre restreint à un périmètre plus large.
+
+Une conversation porte une réponse à la fois. Un envoi pendant une réponse, ou dans une
+conversation archivée, reçoit 409 et l'élève garde sa saisie. Un envoi rejoué avec la même clé
+retrouve son premier échange. Une conversation vidée par la purge disparaît avec son titre, qui
+reprend souvent une question.
+
 ## États
 
 ```mermaid

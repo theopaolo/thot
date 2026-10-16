@@ -1,6 +1,6 @@
 ---
 title: CHAT-101 Give conversations independent history and scope
-status: not_started
+status: in_progress
 scope: [chat, backend, frontend]
 type: [feature]
 ---
@@ -14,19 +14,20 @@ type: [feature]
 
 ## Backend
 
-- [ ] Add conversation identity, owner, title, selected course/subject scope, activity and archive
+- [x] Add conversation identity, owner, title, selected course/subject scope, activity and archive
   state. Associate each message with its conversation and preserve turn order explicitly.
-- [ ] Migrate old exchanges into clearly named legacy conversations per account and prior scope.
+- [x] Migrate old exchanges into clearly named legacy conversations per account and prior scope.
   Preserve message identifiers, existing citations and retention semantics. Do not invent earlier
   topic boundaries where the stored history provides none.
-- [ ] Restrict history, follow-up reformulation and any later summaries to the current conversation.
+- [x] Restrict history, follow-up reformulation and any later summaries to the current conversation.
   Bound model context. Give user text and retrieved documents data roles, not authority to change
   permissions or system instructions.
-- [ ] Store the scope used for each turn. Changing scope affects later turns and rechecks access
+- [x] Store the scope used for each turn. Changing scope affects later turns and rechecks access
   to carried context. Earlier restricted content cannot leak into a broader conversation.
 - [ ] Make create, rename, archive, delete, retry and citation endpoints owner-aware. Apply course
-  review permissions only to the intended learner exchanges.
-- [ ] Support an idempotent send and a clear policy of one active response per conversation at
+  review permissions only to the intended learner exchanges. Delete remains, with SRC-002. The
+  other endpoints answer 404 to another account.
+- [x] Support an idempotent send and a clear policy of one active response per conversation at
   first. Different conversations may run concurrently once JOB-103 ships.
 
 ## Interface
@@ -182,11 +183,11 @@ rules of [SRC-002](src-002.md).
 
 ## Acceptance
 
-- [ ] Alternating questions in two conversations cannot mix previous questions or selected sources.
-- [ ] Refresh, duplicate submission, rename and archive preserve the correct conversation.
-- [ ] Switching between two conversations and refreshing keeps each draft.
-- [ ] An answer arriving while the reader has scrolled up leaves the view in place.
-- [ ] A second account cannot read a guessed conversation, message or citation identifier.
-- [ ] Migration retains old source links and the original account ownership.
+- [x] Alternating questions in two conversations cannot mix previous questions or selected sources.
+- [x] Refresh, duplicate submission, rename and archive preserve the correct conversation.
+- [x] Switching between two conversations and refreshing keeps each draft.
+- [x] An answer arriving while the reader has scrolled up leaves the view in place.
+- [x] A second account cannot read a guessed conversation, message or citation identifier.
+- [x] Migration retains old source links and the original account ownership.
 - [ ] Side-by-side mode is accepted only after keyboard focus, scoped DOM identifiers and mobile
   collapse work without cross-pane updates.

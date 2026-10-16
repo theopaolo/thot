@@ -34,18 +34,38 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
     "",
     LIBELLES,
   );
-  const conversation = await chat([
-    {
-      id: "message-1",
-      question: titre,
-      etat: "answered",
-      avis: null,
-      resultat: JSON.stringify({
+  const conversation = await chat({
+    compte: "compte-1",
+    conversation: { id: "conversation-1", titre, archivee: false },
+    messages: [
+      {
+        id: "message-1",
+        question: titre,
         etat: "answered",
-        affirmations: [{ texte: titre, titre, source_id: "source-1", citation: "Passage" }],
-      }),
-    },
-  ]);
+        avis: null,
+        resultat: JSON.stringify({
+          etat: "answered",
+          affirmations: [{ texte: titre, titre, source_id: "source-1", citation: "Passage" }],
+        }),
+      },
+    ],
+    idees: ["Et ensuite ?"],
+    liste: [
+      {
+        id: "conversation-1",
+        titre,
+        perimetre: titre,
+        active_le: "2026-01-01T00:00:00Z",
+        etat: null,
+      },
+    ],
+    archivees: 0,
+    suite: "",
+    perimetre: { chapitre: "", matiere_id: "", cours_id: "", theme_id: "" },
+    catalogue: { matieres: [], cours: [], themes: [] },
+    theme: "Thème",
+    indisponible: false,
+  });
   const panneau = await panneauSource(
     { titre, citation: "Passage", source_id: "source-1" },
     {
@@ -89,6 +109,9 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
   assertStringIncludes(String(chapitre), "data-verifier-quiz");
   assertStringIncludes(String(conversation), 'hx-target="#source"');
   assertStringIncludes(String(conversation), "data-ouvrir-feuille");
+  // « Pour continuer » envoie dans la conversation ouverte, avec sa propre clé d'envoi.
+  assertStringIncludes(String(conversation), 'hx-include="[name=conversation]"');
+  assertStringIncludes(String(conversation), 'name="conversation" value="conversation-1"');
   assertStringIncludes(String(panneau), 'data-reponse="message-1" data-citation="1"');
   assertStringIncludes(String(legendes), 'data-raccourci="v"');
   assertStringIncludes(String(conversation), "&lt;script&gt;alert(1)&lt;/script&gt;");
