@@ -485,6 +485,40 @@ test("prompts neutres, preuves conservées, rubriques ATC et légendes réservé
   }
 });
 
+test("profil général : les blocs du modèle rangent les affirmations que le juge garde", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const citation =
+      "La lumière traverse le prisme transparent et se décompose en couleurs visibles.";
+    await ressource(db, {}, undefined, citation);
+    const sortie = JSON.stringify({
+      affirmations: ["Un", "Deux", "Trois"].map((texte) => ({ texte, extrait: 1, citation })),
+      blocs: [{ type: "etapes", titre: "Dans l'ordre", affirmations: [2, 3, 1] }],
+    });
+    const faux = fauxModeles({
+      sorties: [sortie, sortie],
+      soutien: (texte) => (texte === "Trois" ? 0.1 : 0.9),
+    });
+    const { resultat } = await demander(
+      db,
+      faux.modeles,
+      "lumière",
+      { lecteur: null, schoolId: "pilote" },
+      0.01,
+    );
+    assertStringIncludes(faux.vus[0][0].content, "Au plus 8 affirmations et 250 mots");
+    assert(resultat.etat === "answered" && resultat.partielle);
+    assertEquals(
+      resultat.affirmations.map((a) => a.texte),
+      ["Deux", "Un"],
+    );
+    assertEquals(resultat.blocs, [{ type: "etapes", titre: "Dans l'ordre", affirmations: [0, 1] }]);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("arts appliqués : consignes mesurées, matière proposée, profil de l’instance pour les ressources", async () => {
   const { db, dir } = await environnement();
   const empreinte = async (t: string) =>

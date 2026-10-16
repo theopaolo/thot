@@ -149,6 +149,13 @@ question. Libellés : « Nouvelle conversation », « Renommer », « Archiver �
 « Conversations archivées ». Les échanges posés avant les conversations sont rangés sous
 « Anciennes questions », une conversation par périmètre.
 
+**Réponse vérifiée**
+Réponse de Thot dont chaque phrase porte un numéro qui ouvre le passage du cours qui la prouve.
+Une réponse peut ranger ses phrases en étapes numérotées, en liste ou en tableau de comparaison.
+Chaque étape et chaque case garde son numéro. Deux mentions remplacent « Réponse vérifiée dans
+les cours validés » : « Réponse partielle » quand des phrases refusées ont été retirées,
+« Vérification partielle » quand une étape de contrôle n'a pas pu être faite.
+
 **Périmètre**
 Matière, cours et thème où Thot cherche les passages d'une réponse. Le chat l'affiche au-dessus de
 la saisie : « Dans : Arts appliqués / STD2A / Bauhaus », ou « Dans : toutes tes ressources ».

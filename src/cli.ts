@@ -485,6 +485,8 @@ async function evalGeneration() {
     /** 2 quand la première sortie a échoué à `verifier()` ou au juge */
     essais: number;
     partielle: boolean;
+    /** types des blocs, absent pour une réponse en un paragraphe */
+    blocs?: string[];
     reponse?: string[];
   }[] = [];
   for (const q of [
@@ -525,6 +527,7 @@ async function evalGeneration() {
       ms: Date.now() - t,
       essais: (journal.tentatives as unknown[] | undefined)?.length ?? 0,
       partielle: resultat.etat === "answered" && !!resultat.partielle,
+      blocs: resultat.etat === "answered" ? resultat.blocs?.map((b) => b.type) : undefined,
       reponse:
         resultat.etat === "answered"
           ? resultat.affirmations.map((a) => `${a.texte} [${a.titre}]`)
@@ -548,6 +551,7 @@ async function evalGeneration() {
       panne: taux(dedans, (l) => l.etat === "failed"),
       reparee: taux(dedans, (l) => l.essais > 1),
       partielle: taux(dedans, (l) => l.partielle),
+      avec_blocs: taux(dedans, (l) => !!l.blocs),
     },
     hors_corpus: Object.fromEntries(
       [...new Set(jeu.sans_reponse.map((x) => x.registre))].map((r) => [

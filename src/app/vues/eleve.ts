@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
-import type { Affirmation, Resultat } from "../../core/reponse.ts";
+import type { BlocReponse, Resultat } from "../../core/reponse.ts";
 import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import type { Catalogue, Scope } from "../domaines.ts";
@@ -635,29 +635,54 @@ export const reponse = (
   if (r.etat === "answered") {
     // Une ligne par intertitre cité: deux sections d'un même document restent distinctes.
     const sources = [...new Map(r.affirmations.map((a) => [a.titre, a.source_id])).entries()];
+    const notes = [
+      r.partielle ? "Réponse partielle : seuls les passages vérifiés sont affichés" : "",
+      r.juge_indisponible
+        ? "Vérification partielle : une étape de contrôle n'a pas pu être faite."
+        : "",
+    ].filter(Boolean);
+    const phrase = (n: number) =>
+      html`<span>${r.affirmations[n].texte}</span>&nbsp;<button
+        class="citation"
+        aria-pressed="${String(auto && n === 0)}"
+        aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"
+        hx-get="/eleve/messages/${id}/citations/${n}"
+        hx-trigger="${auto && n === 0 ? "click, load" : "click"}"
+        hx-target="#source"
+        hx-swap="outerHTML"
+        hx-sync="#source:replace"
+        data-ouvrir-feuille
+      >${icone("quotes")}${n + 1}</button>`;
+    // Sans blocs, comme toute réponse antérieure, les affirmations forment un paragraphe. Un type
+    // inconnu se lit aussi en paragraphe.
+    const bloc = (b: BlocReponse) => {
+      if (b.type === "tableau") {
+        return html`<div class="tableau-reponse"><table>
+          ${b.titre ? html`<caption>${b.titre}</caption>` : ""}
+          <thead><tr><td></td>${b.colonnes.map((c) => html`<th scope="col">${c}</th>`)}</tr></thead>
+          <tbody>${b.lignes.map(
+            (l) =>
+              html`<tr><th scope="row">${l.titre}</th>${b.colonnes.map((_, k) => {
+                const n = l.affirmations[k];
+                return html`<td>${typeof n === "number" ? phrase(n) : ""}</td>`;
+              })}</tr>`,
+          )}</tbody>
+        </table></div>`;
+      }
+      const titre = b.titre ? html`<h2>${b.titre}</h2>` : "";
+      const items = b.affirmations.map((n) => html`<li>${phrase(n)}</li>`);
+      if (b.type === "liste") return html`${titre}<ul>${items}</ul>`;
+      if (b.type === "etapes") return html`${titre}<ol>${items}</ol>`;
+      return html`${titre}<p>${b.affirmations.map((n, k) => html`${k ? " " : ""}${phrase(n)}`)}</p>`;
+    };
     return html`
       <article class="reponse" id="reponse-${id}">
-        <p class="reponse-note">${
-          r.partielle
-            ? "Réponse partielle : seuls les passages vérifiés sont affichés"
-            : "Réponse vérifiée dans les cours validés"
-        }</p>
-        <p class="texte-reponse">${r.affirmations.map(
-          (a: Affirmation, n: number) =>
-            html`
-            ${n ? " " : ""}<span>${a.texte}</span>&nbsp;<button
-              class="citation"
-              aria-pressed="${String(auto && n === 0)}"
-              aria-label="${n + 1}, voir le passage : ${a.titre}"
-              hx-get="/eleve/messages/${id}/citations/${n}"
-              hx-trigger="${auto && n === 0 ? "click, load" : "click"}"
-              hx-target="#source"
-              hx-swap="outerHTML"
-              hx-sync="#source:replace"
-              data-ouvrir-feuille
-            >${icone("quotes")}${n + 1}</button>
-          `,
-        )}</p>
+        ${(notes.length ? notes : ["Réponse vérifiée dans les cours validés"]).map(
+          (note) => html`<p class="reponse-note">${note}</p>`,
+        )}
+        <div class="texte-reponse">${(
+          r.blocs ?? [{ type: "paragraphe", affirmations: r.affirmations.map((_, n) => n) }]
+        ).map(bloc)}</div>
         ${[
           ...new Map(r.affirmations.filter((a) => a.image_id).map((a) => [a.image_id, a])).values(),
         ].map(

@@ -25,8 +25,30 @@ export type Affirmation = {
   revision?: number;
 };
 
+/**
+ * Un bloc range des affirmations, désignées par leur indice dans la réponse. Il n'apporte aucun
+ * fait : ses titres, colonnes et lignes viennent du modèle sans preuve.
+ */
+export type BlocReponse =
+  | { type: "paragraphe" | "liste" | "etapes"; titre?: string; affirmations: number[] }
+  | {
+      type: "tableau";
+      titre?: string;
+      colonnes: string[];
+      /** une case par colonne, `null` pour une case vide */
+      lignes: { titre: string; affirmations: (number | null)[] }[];
+    };
+
+type Repondue = {
+  affirmations: Affirmation[];
+  /** absent : un seul paragraphe, comme toute réponse antérieure aux blocs */
+  blocs?: BlocReponse[];
+  /** une affirmation au moins est passée sans l'avis du juge */
+  juge_indisponible?: boolean;
+};
+
 export type Resultat =
-  | { etat: "answered"; affirmations: Affirmation[]; partielle?: boolean }
+  | ({ etat: "answered"; partielle?: boolean } & Repondue)
   | { etat: "out_of_corpus"; raison: "seuil" | "refus_modele" }
   | { etat: "failed"; code: string; message: string };
 
@@ -56,12 +78,35 @@ Regles, sans exception :
    Choisis une citation qui contient le fait affirme et, quand c'est possible, le nom de ce
    sujet : une citation qui commence par « il » ou « ils » ne dit pas de qui elle parle.
 6. Cinq affirmations au maximum, 120 mots de reponse au total.`;
+// Le profil général répond plus long et peut ranger ses affirmations en blocs (`ranger`).
+const MAX_AFFIRMATIONS = 8;
+const MAX_MOTS = 250;
+const MAX_BLOCS = 4;
+const MAX_COLONNES = 4;
+const MAX_TITRE = 60;
 const SYSTEME: Record<Profil, string> = {
   "arts-appliques": SYSTEME_ARTS,
   general: SYSTEME_ARTS.replace(
     "des eleves de Terminale a partir d'extraits d'un corpus de cours\nfourni par leur professeur",
     "une personne qui apprend a partir d'extraits de ressources\nfournies",
-  ).replace("(mouvement, artiste, oeuvre)", "(personne, notion, objet)"),
+  )
+    .replace("(mouvement, artiste, oeuvre)", "(personne, notion, objet)")
+    .replace(
+      "6. Cinq affirmations au maximum, 120 mots de reponse au total.",
+      `6. Au plus ${MAX_AFFIRMATIONS} affirmations et ${MAX_MOTS} mots de reponse au total.
+7. Si la question demande une procedure, une comparaison ou une enumeration, ajoute a cote de
+   "affirmations" une cle "blocs" qui les range dans l'ordre de lecture :
+   "blocs": [{"type": "etapes", "titre": "...", "affirmations": [1, 2, 3]}]
+   - "etapes" pour une procedure, une etape par affirmation, dans l'ordre ou on les fait.
+     "liste" pour des elements sans ordre. "paragraphe" pour une explication.
+   - Pour comparer, un bloc "tableau" : une colonne par element compare, une ligne par point
+     de comparaison, une affirmation ou null par case :
+     {"type": "tableau", "colonnes": ["A", "B"], "lignes": [{"titre": "...", "affirmations": [4, 5]}]}
+   - Les nombres designent tes affirmations, 1 pour la premiere. Chaque affirmation va dans un
+     seul bloc. ${MAX_BLOCS} blocs au maximum.
+   - Un titre, une colonne ou une ligne tient en quelques mots et n'apporte aucun fait.
+   Pour une question simple, n'ajoute pas de blocs.`,
+    ),
 };
 
 /** Les consignes d'arts appliqués servent quand toutes les sources citables en viennent. */
@@ -79,8 +124,9 @@ const bloc = (retenus: Candidat[]) =>
   retenus.map((c, i) => `[${i + 1}] ${c.titre}\n${c.preuve}`).join("\n\n");
 
 // Le modèle peut rendre n'importe quelle forme: chaque champ est vérifié avant usage.
-type Brute = { refus?: unknown; affirmations?: unknown };
+type Brute = { refus?: unknown; affirmations?: unknown; blocs?: unknown };
 type BruteAffirmation = { texte?: unknown; extrait?: unknown; citation?: unknown } | null;
+type BruteBloc = Record<string, unknown> | null;
 
 const chaine = (x: unknown) => (typeof x === "string" ? x.trim() : "");
 
@@ -98,11 +144,14 @@ function lire(sortie: string): Brute | null {
 /** Contrôles déterministes: chaque citation existe mot pour mot dans l'extrait qu'elle désigne. */
 export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
   const erreurs: string[] = [];
-  const affirmations: Affirmation[] = [];
-  if (!brute) return { erreurs: ["La sortie n'est pas un objet JSON."], affirmations };
-  if (brute.refus) return { erreurs, affirmations, refus: true };
+  // Suit la liste du modèle, que ses blocs désignent par rang : une affirmation refusée y laisse
+  // un trou.
+  const parRang: (Affirmation | undefined)[] = [];
+  if (!brute) return { erreurs: ["La sortie n'est pas un objet JSON."], affirmations: [], parRang };
+  if (brute.refus) return { erreurs, affirmations: [], parRang, refus: true };
   const liste: BruteAffirmation[] = Array.isArray(brute.affirmations) ? brute.affirmations : [];
   if (!liste.length) erreurs.push("Aucune affirmation.");
+  parRang.length = liste.length;
   liste.forEach((a, i) => {
     const c = retenus[Number(a?.extrait) - 1];
     const texte = chaine(a?.texte);
@@ -115,14 +164,14 @@ export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
     const base = { texte, citation, source_id: c.source_id, chunk_id: c.id, revision: c.revision };
     const dansTexte = trouverFragments(c.texte, citation);
     if (dansTexte) {
-      affirmations.push({
+      parRang[i] = {
         ...base,
         titre: c.titre,
         debut: c.debut + dansTexte[0],
         fin: c.debut + dansTexte[1],
-      });
+      };
     } else if (trouverFragments(c.preuve, citation)) {
-      affirmations.push({ ...base, titre: c.titre });
+      parRang[i] = { ...base, titre: c.titre };
     } else {
       erreurs.push(
         `Affirmation ${
@@ -131,7 +180,71 @@ export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
       );
     }
   });
-  return { erreurs, affirmations, refus: false };
+  return { erreurs, affirmations: parRang.filter((a) => a !== undefined), parRang, refus: false };
+}
+
+/**
+ * Range les affirmations retenues dans les blocs du modèle, dans l'ordre de lecture : les
+ * numéros des citations suivent cet ordre. Une affirmation refusée quitte son bloc, un bloc vide
+ * disparaît, une affirmation qu'aucun bloc ne range finit dans un dernier paragraphe. Une
+ * structure invalide donne un seul paragraphe.
+ */
+export function ranger(brutes: unknown, parRang: (Affirmation | undefined)[]): Repondue {
+  const plat = { affirmations: parRang.filter((a) => a !== undefined) };
+  if (!Array.isArray(brutes) || !brutes.length || brutes.length > MAX_BLOCS) return plat;
+  const invalide = (): never => {
+    throw new Error("structure invalide");
+  };
+  const titre = (x: unknown, requis = false) => {
+    const t = chaine(x);
+    return (requis && !t) || t.length > MAX_TITRE ? invalide() : t;
+  };
+  const liste = (x: unknown) => (Array.isArray(x) ? (x as unknown[]) : invalide());
+  const affirmations: Affirmation[] = [];
+  const vus = new Set<number>();
+  // Un rang désigne une affirmation du modèle, une seule fois. Il devient son indice dans la
+  // réponse, ou `null` si elle a été refusée.
+  const placer = (x: unknown) => {
+    const n = Number.isInteger(x) ? (x as number) : 0;
+    if (n < 1 || n > parRang.length || vus.has(n)) invalide();
+    vus.add(n);
+    const a = parRang[n - 1];
+    return a ? affirmations.push(a) - 1 : null;
+  };
+  try {
+    const blocs = (brutes as BruteBloc[]).flatMap((b): BlocReponse[] => {
+      const t = titre(b?.titre);
+      const avecTitre = t ? { titre: t } : {};
+      const type = b?.type;
+      if (type === "tableau") {
+        const colonnes = liste(b?.colonnes).map((c) => titre(c, true));
+        if (!colonnes.length || colonnes.length > MAX_COLONNES) invalide();
+        const lignes = liste(b?.lignes)
+          .map((l) => {
+            const cases = liste((l as BruteBloc)?.affirmations);
+            if (cases.length > colonnes.length) invalide();
+            return {
+              titre: titre((l as BruteBloc)?.titre, true),
+              affirmations: cases.map((x) => (x === null ? null : placer(x))),
+            };
+          })
+          .filter((l) => l.affirmations.some((n) => n !== null));
+        return lignes.length ? [{ type, ...avecTitre, colonnes, lignes }] : [];
+      }
+      if (type !== "paragraphe" && type !== "liste" && type !== "etapes") return invalide();
+      const indices = liste(b?.affirmations)
+        .map(placer)
+        .filter((n) => n !== null);
+      return indices.length ? [{ type, ...avecTitre, affirmations: indices }] : [];
+    });
+    const reste = plat.affirmations.filter((a) => !affirmations.includes(a));
+    if (reste.length) {
+      blocs.push({ type: "paragraphe", affirmations: reste.map((a) => affirmations.push(a) - 1) });
+    }
+    return { affirmations, blocs };
+  } catch {
+    return plat;
+  }
 }
 
 /**
@@ -177,7 +290,7 @@ const DELAI_JUGE_MS = 4000;
 /**
  * Le juge vérifie que chaque citation, lue sous le titre de son extrait, prouve sa phrase.
  * Un juge injoignable ou trop lent laisse passer l'affirmation: les citations restent vérifiées
- * mot pour mot, et la panne est notée au journal.
+ * mot pour mot, la panne est notée au journal et la réponse porte `juge_indisponible`.
  */
 async function juger(
   modeles: Modeles,
@@ -231,9 +344,9 @@ export async function demander(
   questionPrecedente?: string,
 ): Promise<{ resultat: Resultat; journal: Journal }> {
   const journal: Journal = { seuil };
-  let gardees: Affirmation[] = [];
-  const repondre = (affirmations: Affirmation[], partielle = false) => {
-    for (const a of affirmations) {
+  let gardees: Repondue = { affirmations: [] };
+  const repondre = (reponse: Repondue, partielle = false) => {
+    for (const a of reponse.affirmations) {
       const images = db
         .prepare(
           "SELECT id, legende, legende_statut FROM images WHERE source_id = ? ORDER BY position",
@@ -256,7 +369,7 @@ export async function demander(
         db,
         {
           etat: "answered",
-          affirmations,
+          ...reponse,
           ...(partielle && { partielle }),
         },
         p,
@@ -308,10 +421,11 @@ export async function demander(
       const { texte, modele } = await modeles.generer(messages);
       journal.modele = modele;
       etape("Vérification des citations");
-      const v = verifier(lire(texte), r.retenus);
+      const brute = lire(texte);
+      const v = verifier(brute, r.retenus);
       if (v.refus) {
         tentatives.push({ sortie: texte, erreurs: v.erreurs });
-        if (gardees.length) return repondre(gardees, true);
+        if (gardees.affirmations.length) return repondre(gardees, true);
         // Sans reclasseur, les extraits sont mal triés: leur refus ne prouve pas une limite du cours.
         if (r.panneReclasseur) {
           return {
@@ -324,8 +438,16 @@ export async function demander(
       const j = await juger(modeles, v.affirmations, journal, profil);
       const erreurs = [...v.erreurs, ...j.erreurs];
       tentatives.push({ sortie: texte, erreurs, soutien: j.probabilites });
-      if (j.soutenues.length > gardees.length) gardees = j.soutenues;
-      if (!erreurs.length) return repondre(j.soutenues);
+      // Les réponses d'arts appliqués restent plates, comme l'évaluation les a mesurées.
+      const rangee: Repondue = {
+        ...ranger(
+          profil === "general" ? brute?.blocs : undefined,
+          v.parRang.map((a) => (a && j.soutenues.includes(a) ? a : undefined)),
+        ),
+        ...(j.probabilites.includes(null) && { juge_indisponible: true }),
+      };
+      if (rangee.affirmations.length > gardees.affirmations.length) gardees = rangee;
+      if (!erreurs.length) return repondre(rangee);
       messages.push(
         { role: "assistant", content: texte },
         {
@@ -336,7 +458,7 @@ export async function demander(
         },
       );
     }
-    if (gardees.length) return repondre(gardees, true);
+    if (gardees.affirmations.length) return repondre(gardees, true);
     return {
       resultat: {
         etat: "failed",
@@ -349,7 +471,7 @@ export async function demander(
   } catch (e) {
     const code = e instanceof PanneModele ? e.code : "INTERNAL_ERROR";
     journal.erreur = (e as Error).message;
-    if (gardees.length) {
+    if (gardees.affirmations.length) {
       try {
         return repondre(gardees, true);
       } catch {

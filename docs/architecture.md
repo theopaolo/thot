@@ -10,7 +10,8 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
    lecteur peut lire et que Thot peut citer. `verifier()` dans `src/core/reponse.ts` le contrôle. Un
    juge (`juger()`, même fichier) contrôle ensuite que ce passage, lu sous le titre de son
    extrait, prouve toute la phrase. Un juge injoignable ou plus lent que 4 s laisse passer
-   l'affirmation et le note au journal. Le dépassement du délai annule la requête du juge.
+   l'affirmation et le note au journal. La réponse affiche alors « Vérification partielle » au
+   lieu de « Réponse vérifiée ». Le dépassement du délai annule la requête du juge.
    Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau,
    dans la révision que cite la réponse. Si une preuve ou son titre a changé, ou si le lecteur
    n'y a plus accès, la réponse est signalée comme indisponible et peut être recalculée. Une
@@ -287,6 +288,16 @@ flowchart TD
 Le seuil d'abstention est une probabilité du reclasseur et ne s'applique pas aux rangs FTS5. En
 panne du reclasseur, le générateur et le juge décident seuls. Leur refus donne `failed`, car des
 extraits mal triés ne prouvent pas que le cours est muet.
+
+L'affirmation reste l'unité de preuve. Le profil général peut ranger les affirmations d'une
+réponse en blocs : paragraphe, liste, étapes ou tableau. Un bloc ne désigne que des affirmations
+vérifiées, donc chaque étape, élément ou case de tableau garde sa citation. Les titres de blocs,
+de colonnes et de lignes viennent du modèle sans preuve et restent courts. Un tableau juxtapose
+des cases vérifiées une à une et n'affirme aucune relation entre elles : une relation est une
+affirmation avec sa propre citation. `ranger()` dans `src/core/reponse.ts` borne la structure.
+Une structure invalide donne un seul paragraphe, une affirmation refusée quitte son bloc. Une
+réponse sans blocs, comme toutes celles d'avant, se lit en un paragraphe. Les réponses d'arts
+appliqués restent plates : leur consigne mesurée ne demande pas de blocs.
 
 ## Règles de travail
 

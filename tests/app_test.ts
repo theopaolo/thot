@@ -10,7 +10,7 @@ import {
 import { join } from "node:path";
 import { openrouter, PanneModele } from "../src/core/modeles.ts";
 import { chercherFts } from "../src/core/recherche.ts";
-import { demander } from "../src/core/reponse.ts";
+import { demander, ranger } from "../src/core/reponse.ts";
 import { cacheModeles, maintenant, migrer, purgerMessages } from "../src/app/db.ts";
 import {
   authentifier,
@@ -702,6 +702,16 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   const juge4 = await demander(db, sansJuge.modeles, q, p, 0.023);
   assertEquals(juge4.resultat.etat, "answered", "un juge en panne ne bloque pas la réponse");
   assertEquals(juge4.journal.juge_indisponible, "juge injoignable");
+  assertEquals(juge4.resultat.etat === "answered" && juge4.resultat.juge_indisponible, true);
+  assert(ok.resultat.etat === "answered" && !ok.resultat.juge_indisponible);
+
+  // Les consignes d'arts appliqués ne demandent pas de blocs : une réponse d'arts reste plate.
+  const avecBlocs = JSON.stringify({
+    ...JSON.parse(bonne),
+    blocs: [{ type: "etapes", affirmations: [1] }],
+  });
+  const arts = await demander(db, fauxModeles({ sorties: [avecBlocs] }).modeles, q, p, 0.023);
+  assert(arts.resultat.etat === "answered" && !arts.resultat.blocs);
 
   const vide = fauxModeles();
   vide.modeles.generer = () => {
@@ -710,6 +720,62 @@ test("trois états de réponse distincts, et une citation fausse ne passe jamais
   const panne = await demander(db, vide.modeles, q, p, 0.023);
   assertEquals(panne.resultat.etat, "failed", "une sortie vide est une panne, pas un refus");
   if (panne.resultat.etat === "failed") assertEquals(panne.resultat.code, "MODEL_EMPTY_RESPONSE");
+});
+
+test("les blocs rangent les affirmations retenues dans l'ordre de lecture, une structure invalide donne un paragraphe", () => {
+  const [un, deux, trois, quatre] = ["Un", "Deux", "Trois", "Quatre"].map((texte) => ({
+    texte,
+    citation: texte,
+    source_id: "s",
+    chunk_id: "c",
+    titre: "T",
+  }));
+  // La troisième affirmation du modèle a été refusée.
+  const parRang = [un, deux, undefined, trois, quatre];
+  assertEquals(
+    ranger(
+      [
+        { type: "etapes", titre: " Dans l'ordre ", affirmations: [2, 1] },
+        { type: "liste", affirmations: [3] },
+        {
+          type: "tableau",
+          colonnes: ["A", "B"],
+          lignes: [
+            { titre: "Rôle", affirmations: [null, 4] },
+            { titre: "Vide", affirmations: [] },
+          ],
+        },
+      ],
+      parRang,
+    ),
+    {
+      affirmations: [deux, un, trois, quatre],
+      blocs: [
+        { type: "etapes", titre: "Dans l'ordre", affirmations: [0, 1] },
+        {
+          type: "tableau",
+          colonnes: ["A", "B"],
+          lignes: [{ titre: "Rôle", affirmations: [null, 2] }],
+        },
+        { type: "paragraphe", affirmations: [3] },
+      ],
+    },
+  );
+  for (const blocs of [
+    undefined,
+    "etapes",
+    [{ type: "schema", affirmations: [1] }],
+    Array(5).fill({ type: "liste", affirmations: [] }),
+    [{ type: "liste", titre: "x".repeat(61), affirmations: [1] }],
+    [{ type: "liste", affirmations: [1, 1] }],
+    [{ type: "liste", affirmations: [6] }],
+    [{ type: "liste", affirmations: [1.5] }],
+    [{ type: "tableau", colonnes: ["A"], lignes: [{ titre: "x", affirmations: [1, 2] }] }],
+    [{ type: "tableau", colonnes: Array(5).fill("A"), lignes: [] }],
+    [{ type: "tableau", colonnes: ["A"], lignes: [{ titre: "", affirmations: [1] }] }],
+  ]) {
+    assertEquals(ranger(blocs, parRang), { affirmations: [un, deux, trois, quatre] });
+  }
 });
 
 test("le chat: question, flux SSE, réponse citée, panneau source", async () => {

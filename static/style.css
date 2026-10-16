@@ -1276,8 +1276,10 @@ main.page-chat #erreur-reseau {
   z-index: 5;
   margin: 0;
 }
+/* Une colonne qui ne s'élargit pas : un tableau de réponse défile dans son cadre. */
 .chat {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 @media (min-width: 1180px) {
   .chat {
@@ -1317,6 +1319,31 @@ main.page-chat #erreur-reseau {
   margin: 0 0 var(--s3);
   font-size: 1.125rem;
   line-height: 1.75;
+}
+.texte-reponse h2 {
+  margin: var(--s4) 0 var(--s1);
+  font-size: 1.125rem;
+}
+.texte-reponse :is(ul, ol) {
+  margin: 0 0 var(--s3);
+  padding-left: 1.5em;
+}
+/* Un tableau défile dans son cadre plutôt que d'écraser ses cases sur un téléphone. */
+.tableau-reponse {
+  margin: 0 0 var(--s3);
+  overflow-x: auto;
+}
+.tableau-reponse table {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.tableau-reponse caption {
+  padding-bottom: var(--s2);
+  font-weight: 700;
+  text-align: left;
+}
+.tableau-reponse tbody td {
+  min-width: 14rem;
 }
 /* Marque de citation dans la phrase: petite à l'œil, 44 px au toucher. */
 .citation {
