@@ -23,11 +23,16 @@ const TRAITS: Record<Lien, string> = { cause: "-->", suite: "==>", theme: "-.-" 
 
 /**
  * Le texte Mermaid d'un schéma validé. Seul ce code écrit la syntaxe : un nom ne garde que ses
- * lettres, chiffres et espaces, le reste passe en entité Mermaid (`#60;`). Aucune directive,
- * aucun lien, aucun clic. Les numéros sont ceux des citations.
+ * lettres, chiffres, espaces et une ponctuation sans rôle dans la syntaxe, le reste devient une
+ * espace. Une entité Mermaid (`#40;`) s'afficherait telle quelle, les étiquettes n'étant pas en
+ * HTML. Aucune directive, aucun lien, aucun clic. Les numéros sont ceux des citations.
  */
 export function texteMermaid(s: Schema) {
-  const texte = (t: string) => `"${t.replace(/[^\p{L}\p{N} ]/gu, (c) => `#${c.codePointAt(0)};`)}"`;
+  const texte = (t: string) =>
+    `"${t
+      .replace(/[^\p{L}\p{N} ().,:'’?!+=/-]/gu, " ")
+      .replace(/ {2,}/g, " ")
+      .trim()}"`;
   const numero = (n?: number) => (n === undefined ? "" : ` (${n + 1})`);
   // Le flux SSE remplace les sauts de ligne par des espaces : le `;` sépare encore les lignes.
   return [

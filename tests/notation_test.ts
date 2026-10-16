@@ -27,17 +27,17 @@ test("le texte Mermaid d'un schéma ne laisse passer aucune syntaxe venue des no
   const lignes = texteMermaid(schema).split(";\n");
   assertEquals(lignes[0], "flowchart TD");
   // Chaque ligne suit la grammaire écrite par le code, et un nom n'y garde que lettres,
-  // chiffres, espaces et entités.
-  const nom = String.raw`"(?:[\p{L}\p{N} ]|#\d+;)*"`;
+  // chiffres, espaces et une ponctuation sans rôle dans la syntaxe.
+  const nom = String.raw`"[\p{L}\p{N} ().,:'’?!+=/-]*"`;
   const forme = new RegExp(`^(?:n\\d\\[${nom}\\]|n\\d (?:-->|==>|-\\.-)\\|${nom}\\| n\\d)$`, "u");
   for (const ligne of lignes.slice(1)) assert(forme.test(ligne), ligne);
   assertEquals(lignes.length, 1 + 9 + 3);
-  assertEquals(lignes[9], 'n8["Éléphant 2 #40;1#41;"]');
-  assertEquals(lignes[10], 'n0 -->|"entraîne #40;2#41;"| n1');
-  assertEquals(lignes[11], 'n1 ==>|"précède #40;3#41;"| n2');
-  assertEquals(lignes[12], 'n2 -.-|"est lié à #40;4#41;"| n8');
+  assertEquals(lignes[9], 'n8["Éléphant 2 (1)"]');
+  assertEquals(lignes[10], 'n0 -->|"entraîne (2)"| n1');
+  assertEquals(lignes[11], 'n1 ==>|"précède (3)"| n2');
+  assertEquals(lignes[12], 'n2 -.-|"est lié à (4)"| n8');
   const noms = [...lignes.join("\n").matchAll(/"([^"]*)"/g)].map((m) => m[1]).join("");
-  for (const interdit of ["<", ">", "%%", "$", "`", "\\", "\n", "°", "¶", "|", "["]) {
+  for (const interdit of ["<", ">", "%", "$", "`", "\\", "\n", "°", "¶", "|", "[", "#", "{", ";"]) {
     assert(!noms.includes(interdit), interdit);
   }
 });
