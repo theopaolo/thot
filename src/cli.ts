@@ -5,7 +5,8 @@ import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
-import { demander } from "./core/reponse.ts";
+import { demander, profilSources, SEUIL_SOUTIEN } from "./core/reponse.ts";
+import type { Profil } from "./core/profils.ts";
 import { chercher, chercherFts, documentsProches, transaction } from "./core/recherche.ts";
 import {
   creerAdministrateur,
@@ -562,6 +563,7 @@ async function evalGeneration() {
           titre: a.titre,
           paragraphe: paragraphe(a),
           citation: a.citation,
+          profil: profilSources(db, [a.source_id]),
           soutient: null,
         }),
       );
@@ -644,6 +646,8 @@ type Paire = {
   /** le paragraphe que le panneau source montre autour de la citation, pour l'annotation */
   paragraphe?: string;
   citation: string;
+  /** la consigne du juge. Absent: arts appliqués, le corpus des premières paires. */
+  profil?: Profil;
   soutient: boolean | null;
 };
 
@@ -666,16 +670,22 @@ async function evalSoutien() {
   if (!annotees.some((x) => x.soutient) || !annotees.some((x) => !x.soutient)) {
     throw new Error("Il faut des paires annotées `soutient: true` et `soutient: false`.");
   }
-  const lignes: { id: string; famille: string; soutient: boolean; p: number; ms: number }[] = [];
+  const lignes: {
+    id: string;
+    famille: string;
+    soutient: boolean;
+    p: number;
+    ms: number;
+    modele: string;
+  }[] = [];
   for (const x of annotees) {
     const t = Date.now();
-    // Les paires viennent du corpus pilote, en arts appliqués.
-    const { probabilite } = await modeles.soutenir(
+    const { probabilite, modele } = await modeles.soutenir(
       x.texte,
       x.citation,
       x.titre ?? "",
       undefined,
-      "arts-appliques",
+      x.profil ?? "arts-appliques",
     );
     lignes.push({
       id: x.id,
@@ -683,6 +693,7 @@ async function evalSoutien() {
       soutient: !!x.soutient,
       p: probabilite,
       ms: Date.now() - t,
+      modele,
     });
     console.log(`${x.id.padEnd(10)} ${String(x.soutient).padEnd(5)} ${probabilite.toFixed(3)}`);
   }
@@ -699,15 +710,22 @@ async function evalSoutien() {
     n: lignes.length,
     non_annotees: toutes.length - annotees.length,
     auc: +(gagnees / (vrais.length * faux.length)).toFixed(3),
-    // Au seuil 0,5: part des bonnes affirmations rejetées, part des mauvaises qui passent.
-    faux_rejets: taux(vrais, (l) => l.p < 0.5),
-    faux_passages: taux(faux, (l) => l.p >= 0.5),
+    seuil: SEUIL_SOUTIEN,
+    // Au seuil: part des bonnes affirmations rejetées, part des mauvaises qui passent.
+    faux_rejets: taux(vrais, (l) => l.p < SEUIL_SOUTIEN),
+    faux_passages: taux(faux, (l) => l.p >= SEUIL_SOUTIEN),
     par_famille: Object.fromEntries(
       [...new Set(lignes.map((l) => l.famille))].map((f) => {
         const ls = lignes.filter((l) => l.famille === f);
-        return [f, { n: ls.length, erreurs_a_0_5: taux(ls, (l) => l.p >= 0.5 !== l.soutient) }];
+        return [f, { n: ls.length, erreurs: taux(ls, (l) => l.p >= SEUIL_SOUTIEN !== l.soutient) }];
       }),
     ),
+    // Pour choisir le seuil: ce que chaque valeur rejette de bon et attrape de faux.
+    seuils: [0.001, 0.01, 0.05, 0.1, 0.3, 0.5, 0.7, 0.9].map((s) => ({
+      seuil: s,
+      bonnes_rejetees: `${vrais.filter((l) => l.p < s).length}/${vrais.length}`,
+      erreurs_attrapees: `${faux.filter((l) => l.p < s).length}/${faux.length}`,
+    })),
     latence_mediane_ms: lignes.map((l) => l.ms).sort((a, b) => a - b)[
       Math.floor(lignes.length / 2)
     ],

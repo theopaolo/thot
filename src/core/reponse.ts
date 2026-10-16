@@ -342,7 +342,12 @@ export function journalSans(journal: Journal, retiree: (sourceId: string) => boo
   return reste;
 }
 
-/** Probabilité de soutien sous laquelle une affirmation est refusée (`evaluation/resultats/soutien.json`). */
+/**
+ * Probabilité de soutien sous laquelle une affirmation est refusée. Le juge raisonne puis rend
+ * presque toujours 0 ou 1. Sur 223 paires et trois passages
+ * (`evaluation/resultats/soutien-calibrage-*.json`), aucune paire fausse ne dépasse 0,35 et
+ * aucune bonne phrase ne tombe entre 0,35 et 0,59.
+ */
 export const SEUIL_SOUTIEN = 0.5;
 /** Un appel du juge dure 1 s en médiane, mais la queue monte à 10 s: au-delà, il ne bloque pas. */
 const DELAI_JUGE_MS = 4000;

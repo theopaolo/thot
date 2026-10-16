@@ -27,11 +27,15 @@ repère une citation réelle qui ne prouve pas la phrase qu'elle accompagne.
 
 ```bash
 pnpm thot eval generation --paires=../mesures/thot-real/paires-soutien.json
-pnpm thot eval soutien --paires=../mesures/thot-real/paires-soutien.json
+pnpm thot eval soutien --paires=../mesures/thot-real/paires-soutien-calibrage.json
 ```
 
 Le fichier de paires contient des citations du corpus : il reste dans le dépôt de recherche.
-`eval generation` refuse d'écraser un fichier existant. L'annotation remplit `soutient` :
+`paires-soutien.json` garde les 103 paires d'arts appliqués. `paires-soutien-calibrage.json`
+les reprend et ajoute les sorties du jeu développement et les négatifs partiels : c'est le
+fichier qui fixe le seuil. Une paire porte `profil` quand le juge doit lire la consigne du
+profil général, sinon il lit celle d'arts appliqués. `eval generation` écrit ce champ et refuse
+d'écraser un fichier existant. L'annotation remplit `soutient` :
 
 - `true` si la citation suffit à établir toute la phrase, sans savoir extérieur. Le titre de
   l'extrait (`titre`) et le paragraphe autour de la citation (`paragraphe`, celui que le
@@ -42,8 +46,17 @@ Le fichier de paires contient des citations du corpus : il reste dans le dépôt
 
 Les sorties réelles sont presque toutes justes. Les négatifs s'écrivent à la main : copier une
 ligne, lui donner un nouvel `id`, réécrire `texte` et nommer la `famille` (`inversion`,
-`généralisation`, `attribution`, `ajout`). Le rapport donne l'AUC, les erreurs au seuil 0,5 par
-famille, et ne garde que les identifiants. Le modèle jugé se change par `THOT_MODELE_SOUTIEN`.
+`généralisation`, `attribution`, `ajout`, `chiffre`, `partiel`). Un négatif `partiel` change
+peu une phrase juste : un mot glisse (« textiles » devient « vêtements »), une cause s'ajoute,
+une moitié de la phrase n'est pas dans la citation. Les sorties qui recopient une ligne de code
+ou une commande ont la famille `code`.
+
+Le rapport donne l'AUC, les erreurs au seuil `SEUIL_SOUTIEN` par famille, la table `seuils`
+(bonnes phrases rejetées et erreurs attrapées à plusieurs seuils), le modèle qui a répondu pour
+chaque paire, et ne garde que les identifiants. Le modèle jugé se change par
+`THOT_MODELE_SOUTIEN`. Chaque passage écrase `soutien.json`. Pour mesurer la stabilité du juge,
+lancer trois passages, copier le rapport entre deux, et compter les paires dont le verdict au
+seuil change.
 
 Les rapports produits par `thot eval` restent dans le répertoire de données de l’instance,
 sous `evaluation/resultats/`. Les résultats de référence suivis dans ce dépôt restent dans

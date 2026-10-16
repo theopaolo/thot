@@ -1,0 +1,1873 @@
+{
+ "date": "2026-10-16T19:41:46.270Z",
+ "modele": "z-ai/glm-5.3",
+ "n": 223,
+ "non_annotees": 0,
+ "auc": 0.958,
+ "seuil": 0.5,
+ "faux_rejets": 0.11,
+ "faux_passages": 0,
+ "par_famille": {
+  "sortie": {
+   "n": 159,
+   "erreurs": 0.08
+  },
+  "inversion": {
+   "n": 9,
+   "erreurs": 0
+  },
+  "généralisation": {
+   "n": 6,
+   "erreurs": 0
+  },
+  "attribution": {
+   "n": 8,
+   "erreurs": 0
+  },
+  "ajout": {
+   "n": 6,
+   "erreurs": 0
+  },
+  "chiffre": {
+   "n": 4,
+   "erreurs": 0
+  },
+  "code": {
+   "n": 6,
+   "erreurs": 0.5
+  },
+  "partiel": {
+   "n": 25,
+   "erreurs": 0
+  }
+ },
+ "seuils": [
+  {
+   "seuil": 0.001,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "84/86"
+  },
+  {
+   "seuil": 0.01,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "84/86"
+  },
+  {
+   "seuil": 0.05,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "84/86"
+  },
+  {
+   "seuil": 0.1,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "84/86"
+  },
+  {
+   "seuil": 0.3,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "85/86"
+  },
+  {
+   "seuil": 0.5,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "86/86"
+  },
+  {
+   "seuil": 0.7,
+   "bonnes_rejetees": "15/137",
+   "erreurs_attrapees": "86/86"
+  },
+  {
+   "seuil": 0.9,
+   "bonnes_rejetees": "17/137",
+   "erreurs_attrapees": "86/86"
+  }
+ ],
+ "latence_mediane_ms": 491,
+ "lignes": [
+  {
+   "id": "G01-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 812,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G01-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999957778339404,
+   "ms": 336,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G01-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 594,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G01-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 2354,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G01-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1515,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9857418702394892,
+   "ms": 441,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 422,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999623252385585,
+   "ms": 531,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 794,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 875,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 407,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 1012,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 532,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G04-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9985794566681043,
+   "ms": 1842,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G04-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998965092449651,
+   "ms": 283,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G04-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1166,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G06-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 271,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G06-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 513,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G06-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1377,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G07-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 455,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G07-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9979156660125352,
+   "ms": 663,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G07-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9992285450045447,
+   "ms": 427,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G07-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999788161965085,
+   "ms": 492,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G07-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1124,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998140646883746,
+   "ms": 336,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9996070886843561,
+   "ms": 512,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998906508816653,
+   "ms": 1163,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.7537222857182672,
+   "ms": 274,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9145188022904607,
+   "ms": 553,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 399,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999109375721954,
+   "ms": 475,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999737925439514,
+   "ms": 575,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999904856803791,
+   "ms": 345,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999453333760356,
+   "ms": 427,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G10-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 3243,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G10-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 526,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G10-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.14828617474638717,
+   "ms": 3015,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G10-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9986427968011458,
+   "ms": 2889,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G11-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997699372506647,
+   "ms": 1219,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 3437,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G11-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9382496553864891,
+   "ms": 434,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1341,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999993462047321,
+   "ms": 278,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999948561622622,
+   "ms": 375,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997727782072534,
+   "ms": 1182,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999599121481051,
+   "ms": 571,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9991480816314221,
+   "ms": 443,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G13-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 676,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G13-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000007778037780034815,
+   "ms": 2358,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1008,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 670,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 1961,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999347605776667,
+   "ms": 657,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.0005449178100403627,
+   "ms": 378,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997216564605059,
+   "ms": 443,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999688115221406,
+   "ms": 381,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 3016,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G15-4",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 372,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-5",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 496,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997383472862753,
+   "ms": 432,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999790788096574,
+   "ms": 544,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999239577935044,
+   "ms": 252,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G18-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 822,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G18-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9996647179448345,
+   "ms": 964,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G18-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 419,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G20-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 439,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G20-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.00003112423061154226,
+   "ms": 809,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G20-3",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.000004759598213401577,
+   "ms": 415,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "N10-1",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 667,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "N10-2",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0,
+   "ms": 410,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 3716,
+   "modele": "z-ai/glm-5.3"
+  },
+  {
+   "id": "G03-3-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 889,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 516,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-4-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 913,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-3-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 1048,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0.000005414754013947487,
+   "ms": 858,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 1072,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-1-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 2483,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G14-2-inv1",
+   "famille": "inversion",
+   "soutient": false,
+   "p": 0,
+   "ms": 342,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-3-gén2",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0.00002276950098772257,
+   "ms": 490,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-1-gén2",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 720,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 630,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G10-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 1267,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-1-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0,
+   "ms": 527,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-5-gén1",
+   "famille": "généralisation",
+   "soutient": false,
+   "p": 0.00022985483423332742,
+   "ms": 327,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 576,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G06-1-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 450,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 256,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-3-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 267,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G18-2-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 752,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G10-1-att2",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 796,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G04-1-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 1144,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-3-att1",
+   "famille": "attribution",
+   "soutient": false,
+   "p": 0,
+   "ms": 505,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G06-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 1215,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-3-ajo3",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 1176,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-4-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 274,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-1-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 646,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 747,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G11-2-ajo1",
+   "famille": "ajout",
+   "soutient": false,
+   "p": 0,
+   "ms": 299,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-3-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 551,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-1-chi3",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 500,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-3-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 527,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G04-1-chi2",
+   "famille": "chiffre",
+   "soutient": false,
+   "p": 0,
+   "ms": 301,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 1046,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.99999649957902,
+   "ms": 354,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999757089963376,
+   "ms": 1000,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999829118356952,
+   "ms": 441,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 874,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 459,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-7",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 388,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 581,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-1",
+   "famille": "code",
+   "soutient": true,
+   "p": 0.9999942288874163,
+   "ms": 532,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9953471178681466,
+   "ms": 891,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999785589014596,
+   "ms": 571,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 1469,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999877861885005,
+   "ms": 523,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 829,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 498,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-4",
+   "famille": "code",
+   "soutient": true,
+   "p": 0.9986655992932909,
+   "ms": 541,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 452,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999925894308073,
+   "ms": 374,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 452,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 525,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 341,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 373,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998837096864976,
+   "ms": 363,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999930400757522,
+   "ms": 893,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-7",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 537,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G05-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 638,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G05-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999798685978311,
+   "ms": 305,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G05-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999688010950954,
+   "ms": 350,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G06-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 233,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998357001577852,
+   "ms": 1027,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9818623337171574,
+   "ms": 1093,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999554051590177,
+   "ms": 659,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999546702916984,
+   "ms": 317,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 281,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999757116043378,
+   "ms": 305,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 302,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999977384496871,
+   "ms": 369,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999942295886711,
+   "ms": 280,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 291,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999974813532477,
+   "ms": 281,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999546793485948,
+   "ms": 361,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999438298600595,
+   "ms": 361,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999960335043708,
+   "ms": 309,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 525,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9965702088487384,
+   "ms": 613,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 406,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 333,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999986155708588,
+   "ms": 302,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 651,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 621,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 301,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999938566837837,
+   "ms": 903,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-7",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 294,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 283,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999097836485933,
+   "ms": 275,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999757149869721,
+   "ms": 373,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9989256174580424,
+   "ms": 418,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999843136361972,
+   "ms": 1307,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999942294115148,
+   "ms": 332,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 246,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.000014612394490201603,
+   "ms": 301,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999964660995593,
+   "ms": 332,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999706944205101,
+   "ms": 306,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999972738261754,
+   "ms": 305,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999942289959823,
+   "ms": 272,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 378,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G13-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.999454034192103,
+   "ms": 437,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G13-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999153424676996,
+   "ms": 281,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G13-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 226,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G14-1",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9995242181884092,
+   "ms": 348,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G14-2",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.0003771001584647908,
+   "ms": 1426,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G14-3",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9805780196121558,
+   "ms": 892,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G14-4",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 353,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9997966723155554,
+   "ms": 325,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-7",
+   "famille": "code",
+   "soutient": true,
+   "p": 0,
+   "ms": 1574,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9993224885185922,
+   "ms": 354,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 348,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-9",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 875,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-10",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0,
+   "ms": 620,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-11",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9963132868465585,
+   "ms": 295,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-12",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.8515158287916771,
+   "ms": 1968,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-7",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999981264222566,
+   "ms": 266,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G07-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 274,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-7",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999962741201621,
+   "ms": 251,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-8",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 1,
+   "ms": 369,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-6",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.000007404263221975826,
+   "ms": 1375,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-7",
+   "famille": "code",
+   "soutient": true,
+   "p": 0.9456168944744225,
+   "ms": 459,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-8",
+   "famille": "code",
+   "soutient": true,
+   "p": 0,
+   "ms": 739,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-9",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999843114823311,
+   "ms": 456,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-10",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9999949067271278,
+   "ms": 2358,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-11",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9651238519235469,
+   "ms": 524,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-12",
+   "famille": "sortie",
+   "soutient": false,
+   "p": 0.3486807875070887,
+   "ms": 240,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-13",
+   "famille": "code",
+   "soutient": true,
+   "p": 0.000020887660975652807,
+   "ms": 1076,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-14",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9998911315156708,
+   "ms": 289,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G14-5",
+   "famille": "sortie",
+   "soutient": true,
+   "p": 0.9971152528896092,
+   "ms": 1339,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 1299,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G02-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 737,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G03-3-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 488,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G10-4-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 522,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-3-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 373,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G08-4-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 557,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G17-2-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0.000002724375704974548,
+   "ms": 422,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-3-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 279,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G15-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 421,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G01-3-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 348,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G12-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 426,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "G09-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 398,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G02-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 1029,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G06-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 536,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G08-3-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 371,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G10-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 416,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G09-6-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 491,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G01-6-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 421,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-2-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 285,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-14-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 349,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G04-4-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 338,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G12-5-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 406,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G03-4-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 319,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G11-7-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 505,
+   "modele": "mistral/zai-glm-5-3"
+  },
+  {
+   "id": "dev-G05-1-par1",
+   "famille": "partiel",
+   "soutient": false,
+   "p": 0,
+   "ms": 1481,
+   "modele": "mistral/zai-glm-5-3"
+  }
+ ]
+}
