@@ -702,8 +702,8 @@ export const depot = (s: {
       })}
       <div class="champ">
         <label for="fichier">Fichier *</label>
-        <p class="aide">PDF, HTML, PNG ou JPEG, 25 Mo au maximum. Le type est lu dans le contenu.</p>
-        ${champFichier(".pdf,.html,.htm,.png,.jpg,.jpeg")}
+        <p class="aide">PDF, HTML, Markdown, PNG ou JPEG, 25 Mo au maximum. Le type est lu dans le contenu.</p>
+        ${champFichier(".pdf,.html,.htm,.md,.markdown,.png,.jpg,.jpeg")}
         ${
           e.fichier
             ? html`
@@ -862,9 +862,9 @@ export const detailSource = (d: Detail) => {
       d.source.reponses ? ", cité par Thot" : ""
     }.</p>
     ${
-      d.source.format === "pdf"
+      d.source.format === "pdf" || d.source.format === "md"
         ? html`
-        <p><a href="/prof/sources/${d.source.id}/original" target="_blank">Ouvrir le PDF</a></p>
+        <p><a href="/prof/sources/${d.source.id}/original" target="_blank">Ouvrir le ${d.source.format === "pdf" ? "PDF" : "Markdown"}</a></p>
       `
         : ""
     }

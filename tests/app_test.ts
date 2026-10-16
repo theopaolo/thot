@@ -19,7 +19,9 @@ import {
   reinitialiserMotDePasse,
 } from "../src/app/comptes.ts";
 import { detecterFormat, MAX_OCTETS, nomSur } from "../src/app/depot.ts";
+import { tranche } from "../src/core/texte.ts";
 import {
+  lireDocument,
   lireInformations,
   proposerInformations,
   reextraire,
@@ -1498,4 +1500,54 @@ test("le délai du juge annule son signal avant de laisser passer la citation", 
     globalThis.setTimeout = timeout;
     db.close();
   }
+});
+
+const COURS_MD = enc(
+  "---\ntitle: Docker\n---\n\n# Docker\n\nUne **image** décrit le conteneur.\n\n## Construire\n\n```dockerfile\n# Image de base\nFROM node:26\n```\n\n- `docker build` crée l'image\n",
+);
+
+test("le Markdown se reconnaît à l'extension et à l'UTF-8, pas au type annoncé", () => {
+  assertEquals(detecterFormat(enc("# Titre\n"), "cours.MD"), "md");
+  assertEquals(detecterFormat(enc("<details>a</details>"), "cours.markdown"), "md");
+  assertEquals(detecterFormat(enc("# Titre\n"), "cours.txt"), null);
+  assertEquals(detecterFormat(new Uint8Array([0x23, 0x20, 0xe9, 0x0a]), "cours.md"), null);
+  assertEquals(detecterFormat(enc("# a\0b"), "cours.md"), null);
+});
+
+test("Markdown non UTF-8 refusé au dépôt", async () => {
+  const { db } = await environnement();
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  const r = await requete("/prof/depot", {
+    method: "POST",
+    body: formulaire(CHAMPS, new Uint8Array([0x23, 0x20, 0xe9, 0x0a]), "latin1.md"),
+  });
+  assertEquals(r.status, 400);
+  assertStringIncludes(await r.text(), "Format non reconnu");
+  assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
+});
+
+test("Markdown: dépôt, extraction aux offsets exacts, original servi, réextraction identique", async () => {
+  const { db } = await environnement();
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  const r = await requete("/prof/depot", {
+    method: "POST",
+    body: formulaire(CHAMPS, COURS_MD, "docker.md"),
+  });
+  assertEquals(r.status, 200);
+  const s = db.prepare("SELECT id, format FROM sources").get()!;
+  assertEquals(s.format, "md");
+  await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+
+  const { texte, blocs } = lireDocument(s.id as string);
+  assertEquals(
+    blocs.map((b) => b.section),
+    ["Docker", "Docker", "Construire", "Construire", "Construire"],
+  );
+  for (const b of blocs) assertEquals(tranche(texte, b.debut, b.fin), b.texte);
+  assertStringIncludes(texte, "# Image de base\nFROM node:26");
+  assert(!texte.includes("**") && !texte.includes("title:"));
+
+  const original = await requete(`/prof/sources/${s.id}/original`);
+  assertEquals(original.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assertEquals(await reextraire(db, s.id as string), "identique");
 });

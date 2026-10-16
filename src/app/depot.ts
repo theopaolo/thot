@@ -7,7 +7,7 @@ import { CHAMPS, validerInformations } from "../core/profils.ts";
 
 export const MAX_OCTETS = 25 * 1024 * 1024;
 
-export const FORMATS = ["pdf", "html", "png", "jpg"] as const;
+export const FORMATS = ["pdf", "html", "png", "jpg", "md"] as const;
 export type Format = (typeof FORMATS)[number];
 
 // ponytail: listes en dur. Elles viendront du catalogue de l'établissement.
@@ -87,9 +87,22 @@ const SIGNATURES: [Format, number[]][] = [
   ["jpg", [0xff, 0xd8, 0xff]],
 ];
 
-/** Le type vient du contenu, jamais de l'extension annoncée par le client. */
-export function detecterFormat(octets: Uint8Array): Format | null {
+const EST_MARKDOWN = /\.(md|markdown)$/i;
+
+/**
+ * Le type vient du contenu. Le Markdown n'a pas de signature: il demande l'extension du nom
+ * reçu, des octets UTF-8 valides et aucun NUL. Le type MIME annoncé par le client n'est pas lu.
+ */
+export function detecterFormat(octets: Uint8Array, nom = ""): Format | null {
   for (const [format, sig] of SIGNATURES) if (sig.every((b, i) => octets[i] === b)) return format;
+  if (EST_MARKDOWN.test(nom)) {
+    try {
+      new TextDecoder("utf-8", { fatal: true }).decode(octets);
+    } catch {
+      return null;
+    }
+    return octets.includes(0) ? null : "md";
+  }
   const debut = new TextDecoder().decode(octets.subarray(0, 512)).trimStart();
   return debut.startsWith("<") ? "html" : null;
 }
@@ -111,12 +124,15 @@ export async function sha256(octets: Uint8Array) {
 }
 
 /** Contrôle un fichier reçu. Rend le format ou le message à afficher sous le champ. */
-export function controlerFichier(octets: Uint8Array): { format: Format } | { erreur: string } {
+export function controlerFichier(
+  octets: Uint8Array,
+  nom = "",
+): { format: Format } | { erreur: string } {
   if (!octets.length) return { erreur: "Un fichier est attendu." };
   if (octets.length > MAX_OCTETS) {
     return { erreur: `Fichier trop lourd, ${MAX_OCTETS / 1024 / 1024} Mo au maximum.` };
   }
-  const format = detecterFormat(octets);
+  const format = detecterFormat(octets, nom);
   if (!format) return { erreur: `Format non reconnu. Acceptés : ${FORMATS.join(", ")}.` };
   return { format };
 }

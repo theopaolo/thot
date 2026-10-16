@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
 import { assembler, type Bloc, decouper, type Extraction } from "../core/document.ts";
 import { extraireHtml } from "../core/html.ts";
+import { extraireMarkdown } from "../core/markdown.ts";
 import type { Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
 import { type ChunkIndexe, indexerSource, transaction } from "../core/recherche.ts";
@@ -67,6 +68,7 @@ async function extraire(s: Source): Promise<Extraction> {
   const chemin = contenu(s.id, "original", s.fichier);
   if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
   if (s.format === "html") return extraireHtml(await readFile(chemin, "utf8"), s.titre);
+  if (s.format === "md") return extraireMarkdown(await readFile(chemin, "utf8"), s.titre);
   const extension = s.format;
   return {
     parties: [{ texte: s.titre, section: s.titre }],
@@ -166,7 +168,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
  */
 export async function reextraire(db: Db, sourceId: string) {
   const s = lireSource(db, sourceId);
-  if (s.format !== "html" && s.format !== "pdf") return "ignoree";
+  if (!["html", "pdf", "md"].includes(s.format)) return "ignoree";
   const doc = assembler((await extraire(s)).parties);
   const dossier = contenu(s.id);
   if (doc.texte !== (await readFile(`${dossier}/document.txt`, "utf8"))) return "texte_change";

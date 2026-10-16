@@ -699,7 +699,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       }
       const octets =
         fichier instanceof File ? new Uint8Array(await fichier.arrayBuffer()) : new Uint8Array();
-      const controle = controlerFichier(octets);
+      const controle = controlerFichier(octets, fichier instanceof File ? fichier.name : "");
       const erreurs = {
         ...("erreurs" in v ? v.erreurs : {}),
         ...("erreur" in controle ? { fichier: controle.erreur } : {}),
@@ -774,13 +774,19 @@ export function creerApp(db: Db, modeles: Modeles) {
     const d = detail(c.req.param("id"), c.get("compte"));
     return d ? c.html(rendre(c, d.source.titre, Prof.detailSource(d))) : c.notFound();
   });
-  // Seul un PDF s'ouvre: un original HTML lancerait ses scripts sur l'origine de Thot.
+  // Un original HTML ne s'ouvre pas: il lancerait ses scripts sur l'origine de Thot.
+  const TYPES_ORIGINAL: Record<string, string> = {
+    pdf: "application/pdf",
+    md: "text/markdown; charset=utf-8",
+  };
   app.get("/prof/sources/:id/original", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
-    if (d?.source.format !== "pdf") return c.notFound();
+    const type = d && TYPES_ORIGINAL[d.source.format];
+    if (!d || !type) return c.notFound();
     return c.body(await readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
-      "content-type": "application/pdf",
+      "content-type": type,
       "content-disposition": "inline",
+      "x-content-type-options": "nosniff",
     });
   });
   app.post("/prof/sources/:id/modifier", async (c) => {

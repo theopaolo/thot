@@ -3,6 +3,7 @@ import { mkdir, opendir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { parseArgs } from "node:util";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
+import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander } from "./core/reponse.ts";
 import { chercher, chercherFts, retirerSource, transaction } from "./core/recherche.ts";
@@ -116,7 +117,16 @@ const db = connexion();
 migrer(db);
 const modeles = openrouter(config.modeles, cacheModeles(db));
 
-const FORMATS_ACCEPTES = new Set([".pdf", ".html", ".htm", ".png", ".jpg", ".jpeg"]);
+const FORMATS_ACCEPTES = new Set([
+  ".pdf",
+  ".html",
+  ".htm",
+  ".md",
+  ".markdown",
+  ".png",
+  ".jpg",
+  ".jpeg",
+]);
 
 async function* fichiers(chemin: string): AsyncGenerator<string> {
   const info = await stat(chemin);
@@ -144,7 +154,7 @@ async function ingest(chemin: string) {
       continue;
     }
     const octets = await readFile(f);
-    const controle = controlerFichier(octets);
+    const controle = controlerFichier(octets, nom);
     if ("erreur" in controle) {
       refus.push(`${relative(racine, f)}: ${controle.erreur}`);
       continue;
@@ -179,6 +189,7 @@ async function ingest(chemin: string) {
       sommaires.set(dossier, rubriques);
     }
     const sequence = basename(dossier);
+    const nomSansExtension = nom.replace(/\.[^.]+$/, "");
     const titre =
       controle.format === "html"
         ? decoder(
@@ -187,7 +198,9 @@ async function ingest(chemin: string) {
               .match(/<title>([\s\S]*?)<\/title>/i)?.[1]
               ?.trim() ?? nom,
           )
-        : nom.replace(/\.[^.]+$/, "");
+        : controle.format === "md"
+          ? (lireFrontMatter(new TextDecoder().decode(octets)).titre ?? nomSansExtension)
+          : nomSansExtension;
     const champs = {
       titre: titre.replace(/\s+/g, " ").slice(0, 200),
       type_document: args.type ?? "cours",

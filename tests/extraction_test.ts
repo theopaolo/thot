@@ -4,6 +4,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fileURLToPath } from "node:url";
 import { assembler } from "../src/core/document.ts";
 import { extraireHtml, pageVide, rubriquesSommaire } from "../src/core/html.ts";
+import { extraireMarkdown, lireFrontMatter } from "../src/core/markdown.ts";
 import { decouperPdf, extrairePdf } from "../src/core/pdf.ts";
 import { tranche } from "../src/core/texte.ts";
 
@@ -147,4 +148,81 @@ test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une é
       "Les Fauves",
     ],
   );
+});
+
+const COURS_MD = `---
+title: "Docker : les bases"
+order: 2
+hidden: true
+---
+
+# Docker : les bases
+
+Une **image** décrit le _conteneur_ ([voir la doc](https://docs.docker.com)).
+
+## Construire
+
+- \`docker build\` crée l'image
+- \`docker run\` la lance
+
+\`\`\`dockerfile
+# Image de base
+FROM node:26
+# Dépendances
+RUN pnpm install
+\`\`\`
+
+| Commande | Rôle |
+|----------|------|
+| build    | crée |
+
+![schéma des couches](img/couches.png) ![logo](https://exemple.fr/logo.png)
+
+\`\`\`mermaid
+graph TD
+  A --> B
+\`\`\`
+`;
+
+test("Markdown: le front matter donne le titre et sort du texte", () => {
+  const ext = extraireMarkdown(COURS_MD, "repli");
+  assertEquals(ext.parties[0], { texte: "Docker : les bases", section: "Docker : les bases" });
+  assert(ext.parties.every((p) => !p.texte.includes("order") && !p.texte.includes("hidden")));
+  assertEquals(extraireMarkdown("# Seul\n\ntexte", "repli").parties[0].texte, "repli");
+  assertEquals(lireFrontMatter("---\r\ntitle: 'Cours'\r\n---\r\ncorps").titre, "Cours");
+});
+
+test("Markdown: titres en sections, marques réduites, code gardé tel quel", () => {
+  const ext = extraireMarkdown(COURS_MD, "repli");
+  assertEquals(
+    ext.parties.map((p) => [p.texte.split("\n")[0], p.section]),
+    [
+      ["Docker : les bases", "Docker : les bases"],
+      ["Une image décrit le conteneur (voir la doc).", "Docker : les bases"],
+      ["Construire", "Construire"],
+      ["docker build crée l'image", "Construire"],
+      ["# Image de base", "Construire"],
+      ["Commande | Rôle", "Construire"],
+      ["graph TD", "Construire"],
+    ],
+  );
+  assertEquals(
+    ext.parties[4].texte,
+    "# Image de base\nFROM node:26\n# Dépendances\nRUN pnpm install",
+  );
+  assertEquals(ext.parties[3].texte, "docker build crée l'image\ndocker run la lance");
+  assertEquals(ext.parties[5].texte, "Commande | Rôle\nbuild | crée");
+  assertEquals(ext.parties[6].texte, "graph TD\n  A --> B");
+});
+
+test("Markdown: une image relative est nommée dans un avertissement, son alt n'est pas du texte", () => {
+  const ext = extraireMarkdown(COURS_MD, "repli");
+  assertEquals(ext.avertissements, ["Images liées, non jointes à la source : img/couches.png."]);
+  assert(ext.parties.every((p) => !p.texte.includes("schéma") && !p.texte.includes("logo")));
+  assertEquals(ext.images, []);
+});
+
+test("Markdown: les offsets assemblés retrouvent chaque bloc", () => {
+  const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
+  for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);
 });

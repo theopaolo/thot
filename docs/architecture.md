@@ -42,6 +42,13 @@ une table SQLite avec un verrou expirable : un worker tué reprend le travail au
 (`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
 
+Le dépôt accepte PDF, HTML, PNG, JPEG et Markdown. Le type vient du contenu, sauf le Markdown
+qui n'a pas de signature : il demande l'extension `.md` ou `.markdown`, des octets UTF-8 valides
+et aucun NUL. Son texte de preuve est celui que le lecteur voit une fois la page rendue : les
+titres ATX (`#`) ouvrent les sections, les marques de lien et d'emphase disparaissent, les blocs de
+code et `mermaid` restent mot pour mot. Le front matter fournit le titre, ses autres clés sont
+ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
+
 ## Instances
 
 Une installation possède son identité persistante, ses comptes et son répertoire de données.
