@@ -1,7 +1,7 @@
 import { longueur } from "./texte.ts";
 
-/** Un passage extrait, avant assemblage. */
-export type Partie = { texte: string; section: string; page?: number };
+/** Un passage extrait, avant assemblage. `code` marque un bloc de code, rendu dans un `<pre>`. */
+export type Partie = { texte: string; section: string; page?: number; code?: true };
 
 export type Bloc = Partie & { id: string; debut: number; fin: number };
 

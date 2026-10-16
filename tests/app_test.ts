@@ -1651,6 +1651,27 @@ test("Markdown: dépôt, extraction aux offsets exacts, original servi, réextra
   assertEquals(await reextraire(db, s.id as string), "identique");
 });
 
+test("Markdown: réextraire pose l'indicateur de code sur une source déjà importée, sans révision", async () => {
+  const { db } = await environnement();
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, COURS_MD, "docker.md") });
+  const id = db.prepare("SELECT id FROM sources").get()!.id as string;
+  await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+  const fichier = join(config.donnees, "content", id, "blocs.jsonl");
+  const actuel = await readFile(fichier, "utf8");
+  assertEquals(lireDocument(id, 1).blocs.filter((b) => b.code).length, 1);
+  // Les blocs d'avant l'indicateur: même texte, mêmes offsets, pas de `code`.
+  const ancien = actuel
+    .split("\n")
+    .map((l) => JSON.stringify({ ...JSON.parse(l), code: undefined }))
+    .join("\n");
+  await writeFile(fichier, ancien);
+  assert(!lireDocument(id, 1).blocs.some((b) => b.code));
+  assertEquals(await reextraire(db, id), "mise_a_jour");
+  assertEquals(await readFile(fichier, "utf8"), actuel);
+  assertEquals(db.prepare("SELECT count(*) n FROM revisions").get()!.n, 1);
+});
+
 /** Un envoi de fichiers sous les champs de `CHAMPS`, sans le titre commun. */
 const envoi = (
   fichiers: [string, string | Uint8Array<ArrayBuffer>][],

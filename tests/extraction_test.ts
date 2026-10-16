@@ -239,6 +239,10 @@ test("Markdown: titres en sections, marques réduites, code gardé tel quel", ()
   assertEquals(ext.parties[3].texte, "docker build crée l'image\ndocker run la lance");
   assertEquals(ext.parties[5].texte, "Commande | Rôle\nbuild | crée");
   assertEquals(ext.parties[6].texte, "graph TD\n  A --> B");
+  assertEquals(
+    ext.parties.map((p) => !!p.code),
+    [false, false, false, false, true, false, true],
+  );
 });
 
 test("Markdown: une image relative est nommée dans un avertissement, son alt n'est pas du texte", () => {
@@ -274,4 +278,14 @@ test("Markdown: HTML brut, échappements et espaces insécables réduits au text
 test("Markdown: les offsets assemblés retrouvent chaque bloc", () => {
   const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
   for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);
+});
+
+test("Markdown: l'indicateur de code passe dans les blocs sans bouger les offsets", () => {
+  const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
+  assert(coherent(doc));
+  assertEquals(
+    doc.blocs.filter((b) => b.code).map((b) => b.texte.split("\n")[0]),
+    ["# Image de base", "graph TD"],
+  );
+  assert(doc.blocs.every((b) => b.code === undefined || b.code === true));
 });

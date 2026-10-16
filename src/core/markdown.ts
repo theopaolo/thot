@@ -89,7 +89,7 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
       for (i++; i < brut.length && !ferme(brut[i]); i++) {
         code.push(brut[i].replace(new RegExp(`^ {0,${retrait.length}}`), ""));
       }
-      parties.push({ texte: code.join("\n"), section });
+      parties.push({ texte: code.join("\n"), section, code: true });
     } else if (titreLigne) {
       fermer();
       section = lisible(titreLigne[1], images);

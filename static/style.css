@@ -852,6 +852,22 @@ kbd {
   font-size: 1.125rem;
   line-height: 1.5;
 }
+.document pre {
+  margin: var(--s4) 0;
+  padding: var(--s2) var(--s3);
+  overflow-x: auto;
+  background: var(--surface-tinted);
+  font:
+    0.9375rem/1.5 ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  tab-size: 2;
+}
+.document pre code {
+  font: inherit;
+}
 .document h3,
 .document .intertitre {
   margin-top: var(--s5);
@@ -1164,6 +1180,8 @@ button.idee .icone {
 }
 .passage {
   margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   font-size: 1.0625rem;
   line-height: 1.55;
 }

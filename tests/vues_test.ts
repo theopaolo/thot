@@ -123,6 +123,24 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
   assertStringIncludes(String(await blocs[0]), '<mark id="passage">Gaudí</mark>');
 });
 
+test("un bloc de code se rend en pre avec son surlignage, un ancien bloc reste un paragraphe", async () => {
+  const code = "FROM node:26\n  RUN <b>x</b>";
+  const blocs = [
+    { id: "b1", texte: code, section: "", debut: 0, fin: 26, code: true as const },
+    { id: "b2", texte: code, section: "", debut: 28, fin: 54 },
+  ];
+  const [avecCode, ancien] = texteDocument(blocs, [5, 12]);
+  assertStringIncludes(
+    String(await avecCode),
+    '<pre id="b1"><code>FROM <mark id="passage">node:26</mark>\n  RUN &lt;b&gt;x&lt;/b&gt;</code></pre>',
+  );
+  assertEquals(String(await texteDocument([blocs[0]])[0]).includes("<mark"), false);
+  assertStringIncludes(
+    String(await ancien),
+    '<p id="b2">FROM node:26\n  RUN &lt;b&gt;x&lt;/b&gt;</p>',
+  );
+});
+
 test("une réponse en blocs passe par les gabarits de l'application, chaque phrase avec sa citation", async () => {
   const piege = '<img src=x onerror="alert(1)">';
   const affirmations = ["Un", "Deux", "Trois", "Quatre", piege].map((texte) => ({

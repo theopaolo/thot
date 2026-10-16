@@ -16,23 +16,28 @@ const intertitre = (texte: string, niveau: 2 | 3, id?: string) => {
 export const texteDocument = (blocs: Bloc[], marque?: [number, number], niveau: 2 | 3 = 3) => {
   let section = "";
   return blocs.map((b) => {
-    const titre =
-      b.section !== section && b.texte !== b.section ? intertitre(b.section, niveau) : "";
+    // Un bloc de code dont le texte répète sa section reste du code.
+    const intitule = b.texte === b.section && !b.code;
+    const titre = b.section !== section && !intitule ? intertitre(b.section, niveau) : "";
     section = b.section;
-    const t = Array.from(b.texte);
-    if (marque && marque[0] < b.fin && marque[1] > b.debut) {
+    const vise = marque && marque[0] < b.fin && marque[1] > b.debut;
+    if (intitule && !vise) return intertitre(b.texte, niveau, b.id);
+    let corps = html`${b.texte}`;
+    if (marque && vise) {
+      const t = Array.from(b.texte);
       const a = Math.max(0, marque[0] - b.debut);
       const z = Math.min(t.length, marque[1] - b.debut);
-      return html`
-        ${titre}<p id="${b.id}">${t.slice(0, a).join("")}<mark id="passage">${t
-          .slice(a, z)
-          .join("")}</mark>${t.slice(z).join("")}</p>
-      `;
+      corps = html`${t.slice(0, a).join("")}<mark id="passage">${t
+        .slice(a, z)
+        .join("")}</mark>${t.slice(z).join("")}`;
     }
-    return b.texte === b.section
-      ? intertitre(b.texte, niveau, b.id)
+    // Pas d'espace dans le <pre>: il s'afficherait.
+    return b.code
+      ? html`
+      ${titre}<pre id="${b.id}"><code>${corps}</code></pre>
+    `
       : html`
-      ${titre}<p id="${b.id}">${b.texte}</p>
+      ${titre}<p id="${b.id}">${corps}</p>
     `;
   });
 };
