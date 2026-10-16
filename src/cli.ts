@@ -27,6 +27,7 @@ import {
   traiter,
 } from "./app/ingestion.ts";
 import { contexte } from "./core/texte.ts";
+import { sauvegarder } from "./app/sauvegarde.ts";
 import { genererSuggestions } from "./app/suggestions.ts";
 import * as Domaines from "./app/domaines.ts";
 import { valider } from "./app/depot.ts";
@@ -72,6 +73,8 @@ const AIDE = `thot <commande>
   rebuild                                   reconstruit l'index des sources certifiées
   reextraire                                rejoue l'extraction des sources, un texte changé
                                             devient une révision à certifier
+  backup <destination>                      copie base, contenu et secret dans un répertoire vide,
+                                            serveur et worker peuvent tourner
   ask "<question>" [--json]                 pose une question sur le corpus certifié
   eval recherche --img-order=<img_order.json> [--docs=<docs.json>] [--sans-reclasseur]
                                             rejoue les 59 requêtes annotées
@@ -850,6 +853,12 @@ switch (commande) {
     for (const id of ids) indexer(db, id);
     const n = db.prepare("SELECT count(*) n FROM chunks").get()!.n;
     console.log(`${ids.length} source(s) relue(s), ${n} chunk(s) indexé(s).`);
+    break;
+  }
+  case "backup": {
+    if (reste.length !== 1) throw new Error("usage: thot backup <destination>");
+    sauvegarder(db, reste[0]);
+    console.log(`Sauvegarde dans ${resolve(reste[0])}`);
     break;
   }
   case "ask": {
