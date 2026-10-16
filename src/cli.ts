@@ -398,7 +398,8 @@ async function evalRecherche() {
       );
       // Un repli FTS5 mesuré sous l'étiquette du reclasseur fausserait le rapport.
       if (recherche.panneReclasseur) throw new Error(recherche.panneReclasseur);
-      trouves = recherche.retenus;
+      // Sous le seuil, l'élève reçoit un refus : aucun passage n'est montré.
+      trouves = recherche.horsCorpus ? [] : recherche.retenus;
     }
     const rang = trouves.findIndex((c) => touche(c, attendus)) + 1;
     lignes.push({

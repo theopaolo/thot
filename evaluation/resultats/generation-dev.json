@@ -1,0 +1,410 @@
+{
+ "date": "2026-10-16T19:29:38.694Z",
+ "modele": "deepseek/deepseek-v4.1-flash",
+ "seuil": 0.023,
+ "dans_le_corpus": {
+  "n": 15,
+  "repond": 0.93,
+  "bonne_source": 0.93,
+  "faux_refus": 0.07,
+  "panne": 0,
+  "reparee": 0.2,
+  "partielle": 0.07,
+  "avec_blocs": 0.4
+ },
+ "hors_corpus": {
+  "domaine voisin, hors corpus": {
+   "n": 4,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  },
+  "au-delà du cours": {
+   "n": 2,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  },
+  "hors sujet": {
+   "n": 2,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  }
+ },
+ "latence_mediane_ms": 2618,
+ "lignes": [
+  {
+   "qid": "G01",
+   "registre": "dans le corpus",
+   "question": "Pourquoi je ne peux pas utiliser localhost pour joindre PostgreSQL depuis le conteneur de mon API ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.99609375,
+   "ms": 1800,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Dans un conteneur, localhost désigne le conteneur lui-même. [Docker : localhost]",
+    "Depuis l'API, localhost:5432 ne mène donc pas à PostgreSQL. [Docker : localhost]",
+    "L'API utilise le nom du service : db:5432. [Docker : localhost]",
+    "Depuis un conteneur, localhost désigne ce conteneur lui-même. [Docker Cheat-Sheet : Attention à localhost]",
+    "Depuis api, on ne fait pas localhost:5432 mais on indique le service db:5432. [Docker Cheat-Sheet : Attention à localhost]"
+   ]
+  },
+  {
+   "qid": "G02",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce qui arrive aux données de ma base quand je lance docker compose down -v ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 2810,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "docker compose down -v supprime aussi les volumes. [Docker Cheat-Sheet : Nettoyage]",
+    "Pour PostgreSQL, supprimer les volumes peut signifier que la base de données est supprimée. [Docker Cheat-Sheet : Nettoyage]",
+    "Pour une base de développement, docker compose down -v veut dire base remise à zéro. [Docker : Volume nommé]"
+   ]
+  },
+  {
+   "qid": "G03",
+   "registre": "dans le corpus",
+   "question": "À quoi sert un Dockerfile multi-stage et pourquoi l'image de production est plus petite ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 1,
+   "ms": 11261,
+   "essais": 2,
+   "partielle": false,
+   "blocs": [
+    "paragraphe",
+    "paragraphe"
+   ],
+   "reponse": [
+    "Un Dockerfile multi-stage sépare le développement, le build et la production dans un seul fichier. [Docker : Dockerfile multi-stage]",
+    "L'image de production ne garde que le résultat du build, sans les outils de développement. [Docker : Dockerfile multi-stage]",
+    "Un Dockerfile multi-stage peut produire une image dev et une image production. [Docker Cheat-Sheet : Rappels mentaux]",
+    "La ligne COPY --from=build /app/dist ./dist copie seulement le résultat du stage build. [Dockerfile multi-stage : Stage production]",
+    "L'image de production n'a donc pas besoin de contenir les tests, ESLint, Vite, TypeScript, les outils de build et les devDependencies. [Dockerfile multi-stage : Stage production]",
+    "Le résultat est des images plus petites. [Dockerfile multi-stage : Stage production]"
+   ]
+  },
+  {
+   "qid": "G04",
+   "registre": "dans le corpus",
+   "question": "Pourquoi staging et production doivent utiliser la même image Docker ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.99609375,
+   "ms": 5545,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Staging et production utilisent idéalement exactement la même image. [Docker Cheat-Sheet : Git → Registry → Deploy]",
+    "Ce qui change entre staging et production, ce n'est pas le code ni l'image. [Docker Cheat-Sheet : Git → Registry → Deploy]",
+    "Staging et production devraient idéalement utiliser la même image. [Docker Cheat-Sheet : Rappels mentaux]",
+    "Les serveurs de staging et de production ne reconstruisent pas l'application. [Docker, Git et les environnements : CI/CD]",
+    "Les serveurs de staging et de production récupèrent une image déjà construite. [Docker, Git et les environnements : CI/CD]",
+    "Après validation, la production déploie la même image. [Docker, Git et les environnements : CI/CD]",
+    "Construire l'image de production une seule fois, puis déployer cette même image en staging et en production. [Docker : Écrire un bon Compose]"
+   ]
+  },
+  {
+   "qid": "G05",
+   "registre": "dans le corpus",
+   "question": "Est-ce que j'ai besoin du consentement de l'utilisateur pour créer son compte ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 3133,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Créer un compte revient à conclure un contrat. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]",
+    "Les données strictement nécessaires à ce contrat n'ont pas besoin d'un consentement séparé. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]",
+    "Pour la création du compte, la base légale est le contrat et le consentement n'est pas nécessaire. [Le RGPD pour les développeur·euses : Choisir la bonne base légale]"
+   ]
+  },
+  {
+   "qid": "G06",
+   "registre": "dans le corpus",
+   "question": "Dans quel délai faut-il notifier une violation de données à la CNIL ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.96875,
+   "ms": 1643,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Le délai pour notifier une violation de données à la CNIL est de 72 h. [Repères AI Act et RGPD : Les chiffres]"
+   ]
+  },
+  {
+   "qid": "G07",
+   "registre": "dans le corpus",
+   "question": "Mon assistant de révision pour des lycéens relève-t-il du haut risque dans le règlement sur l'IA ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.96875,
+   "ms": 5992,
+   "essais": 1,
+   "partielle": false,
+   "blocs": [
+    "paragraphe"
+   ],
+   "reponse": [
+    "L'annexe III, point 3, vise en éducation quatre usages : décider de l'admission, évaluer les acquis d'apprentissage, évaluer le niveau d'enseignement accessible et surveiller les examens. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "L'assistant de révision n'en fait aucun et relève de la transparence. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "Un quiz qui juge si l'élève a compris tombe dans le point 3 b. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "Une détection de la frustration ou de l'ennui tomberait dans l'interdit. [Repères AI Act et RGPD : Exemple : un assistant de révision pour lycéens]",
+    "Un système de l'annexe III peut sortir du haut risque s'il ne pèse pas sur la décision. [Repères AI Act et RGPD : L'essentiel en dix points]",
+    "Il y reste s'il profile des personnes, et le fournisseur doit documenter son analyse. [Repères AI Act et RGPD : L'essentiel en dix points]"
+   ]
+  },
+  {
+   "qid": "G08",
+   "registre": "dans le corpus",
+   "question": "Quelle différence entre SSR et SSG, et quand choisir l'un ou l'autre ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.95703125,
+   "ms": 5644,
+   "essais": 1,
+   "partielle": false,
+   "blocs": [
+    "tableau"
+   ],
+   "reponse": [
+    "Avec le server-side rendering, un serveur reçoit une requête pour une URL et produit le HTML de la page à ce moment-là. [Frontend, backend et rendu : SSR : rendu côté serveur]",
+    "Avec la static site generation, les pages HTML sont produites pendant le build. [Frontend, backend et rendu : SSG : génération statique]",
+    "Le SSR est adapté à une page publique dont le contenu varie souvent ou dépend de la requête. [Frontend, backend et rendu : SSR : rendu côté serveur]",
+    "Le SSG convient à une documentation, un blog, un portfolio ou des pages de présentation dont le contenu change moins souvent que les consultations. [Frontend, backend et rendu : SSG : génération statique]",
+    "Pour le SSG, une modification demande une nouvelle génération. [Frontend, backend et rendu : SSG : génération statique]",
+    "Le SSR demande un environnement capable de produire les réponses qui ne sont pas déjà dans un cache. [Frontend, backend et rendu : SSR : rendu côté serveur]"
+   ]
+  },
+  {
+   "qid": "G09",
+   "registre": "dans le corpus",
+   "question": "Pourquoi un ADR doit lister au moins une conséquence négative ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.98046875,
+   "ms": 1633,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Un ADR doit lister au moins un coût, une limite ou un risque. [ADR : Nommer les conséquences négatives]",
+    "Si aucune conséquence négative n'apparaît, la comparaison des options est probablement incomplète. [ADR : Nommer les conséquences négatives]",
+    "Dans les deux cas, il faut donner le contexte et au moins une conséquence négative. [ADR : Version minimale]",
+    "Une revue peut signaler qu'aucune conséquence négative n'est listée, or tout choix a un coût. [ADR : Rendre l'incertitude visible]"
+   ]
+  },
+  {
+   "qid": "G10",
+   "registre": "dans le corpus",
+   "question": "Pourquoi une réservation ferme qui hérite d'une réservation annulable pose problème ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 1,
+   "ms": 6368,
+   "essais": 1,
+   "partielle": false,
+   "blocs": [
+    "paragraphe",
+    "paragraphe"
+   ],
+   "reponse": [
+    "ReservationFerme hérite de Reservation, mais remplace sa méthode annuler() par une erreur. [SOLID, comprendre les cinq principes : Un remplacement qui échoue]",
+    "Quand annulerEtConfirmer reçoit ferme, la ligne reservation.annuler() lève une erreur. [SOLID, comprendre les cinq principes : Un remplacement qui échoue]",
+    "Le return n'est jamais atteint et la réservation reste confirmée. [SOLID, comprendre les cinq principes : Un remplacement qui échoue]",
+    "Le remplacement a rompu la promesse faite à l'appelant, c'est la violation de Liskov. [SOLID, comprendre les cinq principes : Un remplacement qui échoue]",
+    "ReservationFlexible promet que l'annulation rend annulee vrai. [SOLID, comprendre les cinq principes : Réponse expliquée]",
+    "Une méthode qui ne fait rien conserve la signature mais ne tient pas cette postcondition. [SOLID, comprendre les cinq principes : Réponse expliquée]",
+    "Le refus d'annuler une réservation ferme est une règle métier légitime, c'est le contrat annoncé par le type qui doit changer. [SOLID, comprendre les cinq principes : Annoncer seulement les capacités possibles]",
+    "La classe ReservationFerme implémente seulement ReservationConsultable, si bien qu'elle expose son état, toujours confirmé, sans hériter d'une méthode impossible à respecter. [SOLID, comprendre les cinq principes : Annoncer seulement les capacités possibles]"
+   ]
+  },
+  {
+   "qid": "G11",
+   "registre": "dans le corpus",
+   "question": "Comment ajouter un tarif solidaire sans toucher aux règles de la méthode reserver ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 1,
+   "ms": 5654,
+   "essais": 2,
+   "partielle": true,
+   "blocs": [
+    "etapes",
+    "paragraphe"
+   ],
+   "reponse": [
+    "Le calcul du montant s'écrit const montantCentimes = tarif.appliquer(atelier.prixCentimes); [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "La classe TarifSolidaire applique Math.round(prixCentimes / 2). [Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation]",
+    "Une autre option fournit un objet de tarif à la réservation. [Mise en situation : Situation 1, des tarifs qui varient]",
+    "Chaque règle peut évoluer séparément dans sa classe, mais le choix de cet objet doit être organisé ailleurs. [Mise en situation : Situation 1, des tarifs qui varient]",
+    "Nous pouvons ajouter une classe de tarif sans modifier Reservation, qui l'utilise. [SOLID, comprendre les cinq principes : Après, la réservation reçoit la règle qui varie]",
+    "Le code qui choisit le tarif change toujours quelque part. [SOLID, comprendre les cinq principes : Après, la réservation reçoit la règle qui varie]"
+   ]
+  },
+  {
+   "qid": "G12",
+   "registre": "dans le corpus",
+   "question": "Que se passe-t-il pour la réservation si l'envoi du courriel échoue avec un Observer ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 2772,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Avec un Observer, le faux courriel lance une exception synchrone. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "#notifier conserve cette erreur et poursuit les autres réactions. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "reserver renvoie ensuite la réservation. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "L'appelant peut donc constater une réservation confirmée et une réaction en échec. [Faire réagir les vues avec Observer : Séparer le succès de la réservation et celui du courriel]",
+    "L'échec du courriel ne doit pas annuler une réservation déjà confirmée. [Mise en situation : Situation 3, plusieurs réactions puis une interface]",
+    "L'interface conserve la réservation confirmée et signale séparément l'échec d'envoi. [Mise en situation : Situation 3, plusieurs réactions puis une interface]"
+   ]
+  },
+  {
+   "qid": "G13",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce qu'un README doit présenter en premier ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.9921875,
+   "ms": 3070,
+   "essais": 1,
+   "partielle": false,
+   "reponse": [
+    "Un README doit commencer par ce que l'application permet de faire et pour qui. [README et guides : Présenter l'usage avant les technologies]",
+    "Le README présente le projet et indique par où commencer. [README et guides : Rédiger un README et des guides pratiques]",
+    "Le README présente le projet à l'entrée du dépôt. [Organiser les contenus : Choisir où publier]"
+   ]
+  },
+  {
+   "qid": "G14",
+   "registre": "dans le corpus",
+   "question": "Quelle est la différence entre le MCD, le MLD et le MPD ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "score": 0.984375,
+   "ms": 5692,
+   "essais": 2,
+   "partielle": false,
+   "blocs": [
+    "tableau",
+    "paragraphe"
+   ],
+   "reponse": [
+    "Le modèle conceptuel des données (MCD) décrit les objets du métier et leurs liens, sans choisir comment les stocker. [Données et Merise : Distinguer les trois modèles]",
+    "Le modèle logique des données (MLD) décrit l'organisation en tables et en clés dans le cas relationnel. [Données et Merise : Distinguer les trois modèles]",
+    "Le modèle physique des données (MPD) décrit les colonnes, types, contraintes et index du moteur choisi. [Données et Merise : Distinguer les trois modèles]",
+    "Le MCD ne précise pas encore les types de colonnes de la base. [Écrire clairement : Expliquer les acronymes à leur première utilisation]"
+   ]
+  },
+  {
+   "qid": "G15",
+   "registre": "dans le corpus",
+   "question": "Un conteneur C4, c'est la même chose qu'un conteneur Docker ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "bonne_source": false,
+   "score": 0.8515625,
+   "ms": 650,
+   "essais": 1,
+   "partielle": false
+  },
+  {
+   "qid": "N01",
+   "registre": "domaine voisin, hors corpus",
+   "question": "Comment déployer mon application sur Kubernetes avec un chart Helm ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0021820068359375,
+   "ms": 642,
+   "essais": 0,
+   "partielle": false
+  },
+  {
+   "qid": "N02",
+   "registre": "domaine voisin, hors corpus",
+   "question": "Comment écrire un Dockerfile pour une application Java Spring Boot ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.3203125,
+   "ms": 808,
+   "essais": 1,
+   "partielle": false
+  },
+  {
+   "qid": "N03",
+   "registre": "domaine voisin, hors corpus",
+   "question": "Comment écrire une boucle asynchrone en Python avec asyncio ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.00023651123046875,
+   "ms": 1372,
+   "essais": 0,
+   "partielle": false
+  },
+  {
+   "qid": "N04",
+   "registre": "domaine voisin, hors corpus",
+   "question": "Comment implémenter le pattern Singleton en Java sans risque pour les threads ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0021209716796875,
+   "ms": 2618,
+   "essais": 0,
+   "partielle": false
+  },
+  {
+   "qid": "N05",
+   "registre": "au-delà du cours",
+   "question": "Quelle amende a été infligée à Google en 2019 au titre du RGPD ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "score": 0.09521484375,
+   "ms": 780,
+   "essais": 1,
+   "partielle": false
+  },
+  {
+   "qid": "N06",
+   "registre": "au-delà du cours",
+   "question": "Comment configurer un certificat Let's Encrypt derrière Nginx ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0.0001239776611328125,
+   "ms": 478,
+   "essais": 0,
+   "partielle": false
+  },
+  {
+   "qid": "N07",
+   "registre": "hors sujet",
+   "question": "Quelle est la capitale de l'Australie ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0,
+   "ms": 1,
+   "essais": 0,
+   "partielle": false
+  },
+  {
+   "qid": "N08",
+   "registre": "hors sujet",
+   "question": "Quelle est la recette de la pâte à crêpes ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "score": 0,
+   "ms": 0,
+   "essais": 0,
+   "partielle": false
+  }
+ ]
+}

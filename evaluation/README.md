@@ -106,9 +106,32 @@ suffit.
 
 Les 8 pièges `hors-corpus` ne se mesurent pas ici. FTS5 renvoie des passages pour 7 d'entre eux
 (les mots courants suffisent : « amende », « configurer », « Docker »). Seul le seuil du
-reclasseur (`THOT_SEUIL_ABSTENTION`) décide de les écarter. La commande sans `--sans-reclasseur`
-donne `hors_corpus.avec_resultat`, qui doit tomber à 0 sans retirer de passage utile aux autres
-familles. `eval generation` mesure le refus de bout en bout sur les pièges de `questions.json`.
+reclasseur (`THOT_SEUIL_ABSTENTION`) décide de les écarter.
+
+### Reclasseur et génération
+
+[`resultats/recherche-reclasseur-dev.json`](resultats/recherche-reclasseur-dev.json), même corpus,
+seuil 0,023 : succès@5 1,00 dans toutes les familles, MRR 0,95 (paraphrase et deux-cours 0,90).
+`hors_corpus.avec_resultat` compte les pièges qui passent le seuil : 2 sur 8 (N03 asyncio, N05
+l'amende de Google). D'un passage à l'autre, le score d'un même piège change chez le reclasseur :
+N03 passait sous le seuil dans la génération.
+
+[`resultats/generation-dev.json`](resultats/generation-dev.json) :
+
+| Mesure | Valeur |
+| --- | --- |
+| questions répondables répondues | 14 sur 15 |
+| bonne source citée | 14 sur 15 |
+| réponses réparées (second appel) | 3 sur 15 |
+| réponses partielles | 1 sur 15 |
+| réponses en blocs | 6 sur 15 (deux tableaux, des étapes) |
+| pièges refusés | 8 sur 8, 6 au seuil et 2 par le modèle |
+| latence médiane | 2,6 s |
+
+Le faux refus est G15 (« un conteneur C4, c'est la même chose qu'un conteneur Docker ? ») : le
+modèle refuse, aucun extrait ne compare les deux. Les réparations viennent toutes du juge, jamais
+d'une citation introuvable. Il refuse surtout des phrases qui citent du code. Deux sources qui
+disent la même chose donnent encore deux affirmations (G01, G04).
 
 ## Langues et profils
 

@@ -103,6 +103,9 @@ const SYSTEME: Record<Profil, string> = {
     .replace(
       "6. Cinq affirmations au maximum, 120 mots de reponse au total.",
       `6. Au plus ${MAX_AFFIRMATIONS} affirmations et ${MAX_MOTS} mots de reponse au total.
+   Ecris seulement ce que la question demande. Chaque affirmation apporte un fait nouveau :
+   retire celle qui redit une affirmation precedente avec d'autres mots, meme si elle vient
+   d'un autre extrait.
 7. Si la question demande une procedure, une comparaison ou une enumeration, ajoute a cote de
    "affirmations" une cle "blocs" qui les range dans l'ordre de lecture :
    "blocs": [{"type": "etapes", "titre": "...", "affirmations": [1, 2, 3]}]

@@ -1,0 +1,580 @@
+{
+ "date": "2026-10-16T19:31:42.950Z",
+ "moteur": "fts5 + qwen/qwen3-reranker-8b",
+ "tous": {
+  "n": 36,
+  "succes_5": 1,
+  "mrr": 0.95
+ },
+ "familles": {
+  "code": {
+   "n": 7,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "definition": {
+   "n": 6,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "deux-cours": {
+   "n": 5,
+   "succes_5": 1,
+   "mrr": 0.9
+  },
+  "paraphrase": {
+   "n": 12,
+   "succes_5": 1,
+   "mrr": 0.9
+  },
+  "terme-exact": {
+   "n": 6,
+   "succes_5": 1,
+   "mrr": 1
+  }
+ },
+ "sans_cible": [],
+ "echecs": [],
+ "hors_corpus": {
+  "n": 8,
+  "avec_resultat": 2
+ },
+ "lignes": [
+  {
+   "qid": "T01",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Dockerfile multi-stage : Stage production",
+    "Docker Cheat-Sheet : Multi-stage Dockerfile",
+    "Dockerfile multi-stage : Exemple Python (FastAPI)",
+    "Dockerfile multi-stage : Exemple Node : le Dockerfile en un seul stage",
+    "Dockerfile multi-stage : Stage build"
+   ]
+  },
+  {
+   "qid": "T02",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Docker : service_completed_successfully",
+    "Docker Cheat-Sheet : Avec healthcheck",
+    "Docker : Dépendances entre services",
+    "Docker : service_healthy",
+    "Docker : Écrire un bon Compose"
+   ]
+  },
+  {
+   "qid": "T03",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Docker Cheat-Sheet : Nettoyage",
+    "Docker : Volume nommé",
+    "Docker Cheat-Sheet : Conteneurs",
+    "Docker Cheat-Sheet : Volumes",
+    "Docker Cheat-Sheet : Volume nommé"
+   ]
+  },
+  {
+   "qid": "T04",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Critères d’un choix technique : Les critères les plus communs",
+    "Préparer la persistance avec Repository : Faire passer les trois méthodes par le contrat",
+    "Préparer la persistance avec Repository : Faire passer les trois méthodes par le contrat",
+    "Le RGPD pour les développeur·euses : Justifier chaque donnée collectée",
+    "SOLID, comprendre les cinq principes : Après, le stockage satisfait le contrat demandé par le métier"
+   ]
+  },
+  {
+   "qid": "T05",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Repères AI Act et RGPD : Quand faire une AIPD RGPD, article 35",
+    "Repères AI Act et RGPD : Les chiffres",
+    "Repères AI Act et RGPD : Documents à vérifier",
+    "Repères AI Act et RGPD : Deux textes, deux questions",
+    "Repères AI Act et RGPD : Les principes RGPD, article 5"
+   ]
+  },
+  {
+   "qid": "T06",
+   "type": "terme-exact",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Documentation vivante et BDD : Organiser les exemples",
+    "Pourquoi documenter : Exemple : répondre à trois collègues",
+    "Documentation vivante et BDD : Exercice : faire évoluer une règle",
+    "Outils et sources : Lectures par chapitre",
+    "Crédits des visuels : Schémas du cours"
+   ]
+  },
+  {
+   "qid": "P01",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Dockerfile multi-stage : Exemple Node : le Dockerfile en un seul stage",
+    "Docker Cheat-Sheet : Rappels mentaux",
+    "Docker : Écrire un bon Compose",
+    "Docker Cheat-Sheet : Node et node_modules",
+    "Docker : Secrets"
+   ]
+  },
+  {
+   "qid": "P02",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Docker : localhost",
+    "Docker Cheat-Sheet : Attention à localhost",
+    "Docker Cheat-Sheet : Réseau Docker Compose",
+    "Docker : Ports",
+    "Docker : Réseaux explicites"
+   ]
+  },
+  {
+   "qid": "P03",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Docker Cheat-Sheet : Avec healthcheck",
+    "Docker : Healthchecks",
+    "Docker : service_started",
+    "Docker Cheat-Sheet : Simple",
+    "Docker : Plusieurs applications dans un même conteneur"
+   ]
+  },
+  {
+   "qid": "P04",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Frontend, backend et rendu : SSG : génération statique",
+    "Frontend, backend et rendu : Avantages et limites",
+    "Frontend, backend et rendu : Rendu hybride",
+    "Architecture C4 : Montrer les applications et les stockages",
+    "Outils et sources : Ce que chaque outil produit"
+   ]
+  },
+  {
+   "qid": "P05",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Le RGPD pour les développeur·euses : Choisir la bonne base légale",
+    "Le RGPD pour les développeur·euses : Exemple de cartographie des traitements",
+    "Le RGPD pour les développeur·euses : Prévoir les droits des utilisateurs",
+    "Le RGPD pour les développeur·euses",
+    "Le RGPD pour les développeur·euses : Lister les fonctionnalités"
+   ]
+  },
+  {
+   "qid": "P06",
+   "type": "paraphrase",
+   "rang": 3,
+   "cibles": 1,
+   "trouves": [
+    "Frontend, backend et rendu : SPA : navigation sans rechargement complet",
+    "Frontend, backend et rendu : Avantages et limites",
+    "Frontend, backend et rendu : CSR : rendu côté client",
+    "Frontend, backend et rendu : SSR : rendu côté serveur",
+    "Frontend, backend et rendu : Frontend, backend et stratégies de rendu"
+   ]
+  },
+  {
+   "qid": "P07",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Vérifier et maintenir : Vérifier et maintenir la documentation",
+    "Pourquoi documenter : Pourquoi documenter un projet ?",
+    "Documenter son projet web : Parcours",
+    "README et guides : Exemple fourni : un README que l’on peut essayer",
+    "README et guides : Structure de README à compléter"
+   ]
+  },
+  {
+   "qid": "P08",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Repères AI Act et RGPD : Les droits des personnes RGPD, articles 12 à 22",
+    "Repères AI Act et RGPD : Les chiffres",
+    "SOLID, comprendre les cinq principes : Après, l'écran annonce son besoin de lecture",
+    "SOLID, comprendre les cinq principes : I, ségrégation des interfaces",
+    "README et guides : Préciser les conditions avant les actions"
+   ]
+  },
+  {
+   "qid": "P09",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Docker : Bind mounts",
+    "Docker Cheat-Sheet : Bind mount",
+    "Docker : Volumes et stockage",
+    "Docker : Image et conteneur",
+    "Docker Cheat-Sheet : Conteneurs"
+   ]
+  },
+  {
+   "qid": "P10",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Le RGPD pour les développeur·euses : Exemple de cartographie des traitements",
+    "Le RGPD pour les développeur·euses : Décrire le traitement",
+    "Le RGPD pour les développeur·euses : Justifier chaque donnée collectée",
+    "Organiser les contenus : Garder une procédure facile à suivre",
+    "Le RGPD pour les développeur·euses"
+   ]
+  },
+  {
+   "qid": "P11",
+   "type": "paraphrase",
+   "rang": 2,
+   "cibles": 2,
+   "trouves": [
+    "Documentation vivante et BDD : Faire vivre la documentation avec le projet",
+    "Documentation vivante et BDD : Relier le texte au logiciel",
+    "Documenter son projet web : Parcours",
+    "Comprendre une stack technique : Décrire le périmètre",
+    "SOLID, comprendre les cinq principes : Choisir quel principe examiner"
+   ]
+  },
+  {
+   "qid": "P12",
+   "type": "paraphrase",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Critères d’un choix technique : Éliminer les options incompatibles puis comparer",
+    "Critères d’un choix technique : Les critères les plus communs",
+    "Ajouter un tarif avec Strategy : Vérifier les deux solutions",
+    "Ajouter un tarif avec Strategy",
+    "Ressources et bibliographie"
+   ]
+  },
+  {
+   "qid": "C01",
+   "type": "code",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Dockerfile multi-stage : Stage production",
+    "Dockerfile multi-stage : Stage build",
+    "Dockerfile multi-stage : Stage dev",
+    "Dockerfile multi-stage : Stage base",
+    "Dockerfile multi-stage : Exemple Node : le Dockerfile en un seul stage"
+   ]
+  },
+  {
+   "qid": "C02",
+   "type": "code",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Docker : Healthchecks",
+    "Docker Cheat-Sheet : Avec healthcheck",
+    "Docker : Valeur par défaut",
+    "Ressources et bibliographie : Frameworks et cycle d'exécution",
+    "SOLID, comprendre les cinq principes : Après, l'écran annonce son besoin de lecture"
+   ]
+  },
+  {
+   "qid": "C03",
+   "type": "code",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Docker Cheat-Sheet : Extensions / anchors Compose",
+    "Docker : Une image commune pour plusieurs services",
+    "Docker : Image et conteneur",
+    "Docker Cheat-Sheet : Modèle mental",
+    "Docker Cheat-Sheet : Avec healthcheck"
+   ]
+  },
+  {
+   "qid": "C04",
+   "type": "code",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Les bases de la programmation orientée objet : Duck typing et typage structurel",
+    "Exemples et corrigés : 8. Des tests qui vérifient les effets",
+    "SOLID, comprendre les cinq principes : Un remplacement qui échoue",
+    "Les bases de la programmation orientée objet : Contrats et polymorphisme",
+    "Exemples et corrigés : 8. Des tests qui vérifient les effets"
+   ]
+  },
+  {
+   "qid": "C05",
+   "type": "code",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Préparer la persistance avec Repository : Donner un contrat aux opérations nécessaires",
+    "Préparer la persistance avec Repository : Adapter les appels et provoquer une panne",
+    "Préparer la persistance avec Repository : Simuler le contrat en mémoire",
+    "Préparer la persistance avec Repository : Faire passer les trois méthodes par le contrat",
+    "Faire réagir les vues avec Observer : Ajouter une inscription et son retrait"
+   ]
+  },
+  {
+   "qid": "C06",
+   "type": "code",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Décisions et code : Retrouver une modification et générer une référence",
+    "Exemples et corrigés : 9. Un scénario relié au code",
+    "Exemples et corrigés : 8. Des tests qui vérifient les effets",
+    "Exemples et corrigés : Inclure des sources dans MkDocs",
+    "Documentation dans l'éditeur : Obtenir le survol en JavaScript"
+   ]
+  },
+  {
+   "qid": "C07",
+   "type": "code",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Exemples et corrigés : 9. Un scénario relié au code",
+    "Documentation vivante et BDD : Formuler un scénario lisible",
+    "Exemples et corrigés : 8. Des tests qui vérifient les effets",
+    "Exemples et corrigés : 9. Un scénario relié au code",
+    "Écrire clairement : Exemple à exécuter et à réécrire"
+   ]
+  },
+  {
+   "qid": "D01",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Docker : Image et conteneur",
+    "Docker Cheat-Sheet : Rappels mentaux",
+    "Docker Cheat-Sheet : Modèle mental",
+    "Docker : Docker en bref",
+    "Docker : Une image commune pour plusieurs services"
+   ]
+  },
+  {
+   "qid": "D02",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Repères AI Act et RGPD : Votre rôle",
+    "Le RGPD pour les développeur·euses : Identifier les données personnelles",
+    "Repères AI Act et RGPD : Dans le code",
+    "Glossaire : Fonctions et organisation du code",
+    "Glossaire : Objets et relations"
+   ]
+  },
+  {
+   "qid": "D03",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Comprendre une stack technique : Que signifie full stack ?",
+    "Comprendre une stack technique",
+    "Comprendre une stack technique : Décrire le périmètre",
+    "Comprendre une stack technique : Stack et architecture répondent à des questions différentes",
+    "Comprendre une stack technique : La stack MEAN"
+   ]
+  },
+  {
+   "qid": "D04",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Les bases de la programmation orientée objet : Duck typing et typage structurel",
+    "Glossaire : Contrats et types",
+    "Ressources et bibliographie : Situer les auteurs et les contrats",
+    "SOLID, comprendre les cinq principes : Vérifier les promesses du contrat",
+    "POO, design patterns et frameworks"
+   ]
+  },
+  {
+   "qid": "D05",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Données et Merise : Distinguer les trois modèles",
+    "Écrire clairement : Expliquer les acronymes à leur première utilisation",
+    "Données et Merise : Second terrain d’exercice : une bibliothèque d’objets",
+    "Données et Merise : Construire le MCD et lire les cardinalités",
+    "Données et Merise : Vérifier le MPD dans le projet"
+   ]
+  },
+  {
+   "qid": "D06",
+   "type": "definition",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Frontend, backend et rendu : Hydratation",
+    "Frontend, backend et rendu : Ressources",
+    "Frontend, backend et rendu : SPA : navigation sans rechargement complet",
+    "Comprendre une stack technique : Ressources",
+    "Organiser les contenus : Exercice : réorganiser une page"
+   ]
+  },
+  {
+   "qid": "X01",
+   "type": "deux-cours",
+   "rang": 1,
+   "cibles": 3,
+   "trouves": [
+    "Décisions et code : Conserver une décision technique",
+    "ADR : Documenter les décisions techniques",
+    "ADR : Version minimale",
+    "Mise en situation : Garder la raison d'une décision avec un ADR",
+    "Décisions et code : Exemple complet : une décision avec son diagramme"
+   ]
+  },
+  {
+   "qid": "X02",
+   "type": "deux-cours",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Préparer la persistance avec Repository : Lire Repository avec notre collection",
+    "Patterns, styles et abstractions : MVC (Modèle, Vue, Contrôleur)",
+    "Frontend, backend et rendu : Backend",
+    "Patterns, styles et abstractions : ORM (Object-Relational Mapping)",
+    "SOLID, comprendre les cinq principes : Après, le stockage satisfait le contrat demandé par le métier"
+   ]
+  },
+  {
+   "qid": "X03",
+   "type": "deux-cours",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Patterns, styles et abstractions : MVC (Modèle, Vue, Contrôleur)",
+    "Frameworks et inversion de contrôle : Le cycle d'une interface",
+    "Frontend, backend et rendu : Backend",
+    "Les bases de la programmation orientée objet : Cohésion, couplage et responsabilités",
+    "Patterns, styles et abstractions : Architecture en couches"
+   ]
+  },
+  {
+   "qid": "X04",
+   "type": "deux-cours",
+   "rang": 2,
+   "cibles": 2,
+   "trouves": [
+    "Architecture C4 : Représenter l'architecture avec C4",
+    "Architecture C4 : Montrer les applications et les stockages",
+    "Architecture C4 : Deux vues prêtes à lire et à modifier",
+    "Docker : Image et conteneur",
+    "Docker Cheat-Sheet : Rappels mentaux"
+   ]
+  },
+  {
+   "qid": "X05",
+   "type": "deux-cours",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Critères d’un choix technique : Critères de contexte et de valeurs",
+    "Critères d’un choix technique : Éliminer les options incompatibles puis comparer",
+    "Le RGPD pour les développeur·euses : Identifier les données personnelles",
+    "Le RGPD pour les développeur·euses",
+    "Repères AI Act et RGPD"
+   ]
+  },
+  {
+   "qid": "N01",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N02",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N03",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Repères AI Act et RGPD : Les chiffres",
+    "Le RGPD pour les développeur·euses : Choisir la bonne base légale",
+    "Repères AI Act et RGPD : Les six bases légales RGPD, article 6",
+    "Le RGPD pour les développeur·euses : Prévoir les droits des utilisateurs",
+    "Le RGPD pour les développeur·euses : Définir une durée de conservation"
+   ]
+  },
+  {
+   "qid": "N04",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N05",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Docker Cheat-Sheet : Docker Compose",
+    "Docker Cheat-Sheet : Git → Registry → Deploy",
+    "Docker, Git et les environnements",
+    "Docker Cheat-Sheet : État de Docker",
+    "Comprendre une stack technique : Documenter la stack d'un projet"
+   ]
+  },
+  {
+   "qid": "N06",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N07",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N08",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  }
+ ]
+}
