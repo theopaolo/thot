@@ -1162,6 +1162,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       c.req.param("action") as "certified" | "rejected",
       String(b.texte ?? ""),
       c.get("compte").nom,
+      String(b.credit ?? ""),
     );
     return c.html(Prof.legende(aLegender(c), fileLegendes(c)));
   });
@@ -1365,15 +1366,17 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
       )
       .get(id, instance.school_id, ...parametresAcces(l)) as
-      | (Omit<Eleve.Apercu, "image_id" | "legende" | "images" | "extrait"> & { revision: number })
+      | (Omit<Eleve.Apercu, "image_id" | "legende" | "credit" | "images" | "extrait"> & {
+          revision: number;
+        })
       | undefined;
     if (!s) return undefined;
     const images = db
       .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
+        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
        FROM images WHERE source_id = ? ORDER BY position`,
       )
-      .all(id) as { id: string; legende: string | null }[];
+      .all(id) as { id: string; legende: string | null; credit: string | null }[];
     let extrait = "";
     try {
       const texte = lireDocument(id, s.revision)
@@ -1391,6 +1394,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       ...s,
       image_id: images[0]?.id ?? null,
       legende: images[0]?.legende ?? null,
+      credit: images[0]?.credit ?? null,
       images: images.length,
       extrait,
     };
@@ -1406,10 +1410,10 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     if (!s) return c.notFound();
     const images = db
       .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende
+        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
        FROM images WHERE source_id = ? ORDER BY position`,
       )
-      .all(s.id) as { id: string; legende: string | null }[];
+      .all(s.id) as { id: string; legende: string | null; credit: string | null }[];
     const debut = Number(c.req.query("debut"));
     const fin = Number(c.req.query("fin"));
     const marque =

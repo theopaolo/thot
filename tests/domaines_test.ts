@@ -115,6 +115,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0015_lots.sql",
       "0016_comparaison.sql",
       "0017_suppression.sql",
+      "0020_credits.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();

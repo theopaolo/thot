@@ -343,6 +343,7 @@ export type Apercu = {
   date: string;
   image_id: string | null;
   legende: string | null;
+  credit: string | null;
   images: number;
   extrait: string;
 };
@@ -361,7 +362,13 @@ export const lecteur = (d: Apercu | undefined, l: Libelles) =>
               ? html`
               <figure class="oeuvre-grande">
                 <img src="/media/${d.image_id}" alt="${d.legende ?? d.titre}">
-                ${d.legende ? html`<figcaption>${d.legende}</figcaption>` : ""}
+                ${
+                  d.legende || d.credit
+                    ? html`<figcaption>${d.legende}${
+                        d.credit ? html`<span class="credit">${d.credit}</span>` : ""
+                      }</figcaption>`
+                    : ""
+                }
               </figure>
             `
               : ""
@@ -515,7 +522,7 @@ export const pageChapitre = (
 
 export const lectureSource = (
   s: SourceLue,
-  images: { id: string; legende: string | null }[],
+  images: { id: string; legende: string | null; credit: string | null }[],
   blocs: Bloc[],
   informations: Champ[],
   l: Libelles,
@@ -570,9 +577,11 @@ export const lectureSource = (
         (i) =>
           html`
           <figure class="oeuvre-grande"><img src="/media/${i.id}" alt="${i.legende ?? s.titre}">${
-            i.legende
+            i.legende || i.credit
               ? html`
-              <figcaption>${i.legende}</figcaption>
+              <figcaption>${i.legende}${
+                i.credit ? html`<span class="credit">${i.credit}</span>` : ""
+              }</figcaption>
             `
               : ""
           }</figure>

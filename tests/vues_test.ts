@@ -85,6 +85,7 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'Ã
       legende_statut: "unreviewed",
       legende_origine: "generated",
       modele: "test",
+      credit: null,
     },
     [],
   );

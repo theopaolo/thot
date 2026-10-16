@@ -132,7 +132,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
        ON CONFLICT (source_id, position) DO UPDATE SET fichier = excluded.fichier,
          mime = excluded.mime, checksum = excluded.checksum, legende = NULL,
          legende_origine = NULL, legende_statut = 'unreviewed', modele = NULL, relu_par = NULL,
-         relu_le = NULL
+         relu_le = NULL, credit = NULL
        WHERE checksum != excluded.checksum`,
     );
     for (const [i, img] of ext.images.entries()) {
@@ -541,6 +541,7 @@ export function relireLegende(
   action: "certified" | "rejected",
   texte: string,
   par: string,
+  credit = "",
 ) {
   transaction(db, () => {
     const img = db.prepare("SELECT source_id, legende FROM images WHERE id = ?").get(imageId) as
@@ -551,9 +552,19 @@ export function relireLegende(
     db.prepare(
       `UPDATE images SET legende_statut = ?, relu_par = ?, relu_le = ?,
        legende = CASE WHEN ? THEN ? ELSE legende END,
-       legende_origine = CASE WHEN ? THEN 'teacher' ELSE legende_origine END
+       legende_origine = CASE WHEN ? THEN 'teacher' ELSE legende_origine END,
+       credit = ?
      WHERE id = ?`,
-    ).run(action, par, maintenant(), corrigee ? 1 : 0, texte.trim(), corrigee ? 1 : 0, imageId);
+    ).run(
+      action,
+      par,
+      maintenant(),
+      corrigee ? 1 : 0,
+      texte.trim(),
+      corrigee ? 1 : 0,
+      credit.trim() || null,
+      imageId,
+    );
     const s = lireSource(db, img.source_id);
     indexerSource(db, s.id, s.statut === "certifiee" ? chunksSource(db, s.id) : []);
   });

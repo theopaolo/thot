@@ -1446,6 +1446,40 @@ test("un échec d'extraction ou d'indexation laisse servir la révision certifi�
   }
 });
 
+test("le crédit se saisit à la relecture, s'affiche échappé et ne sort ni de la recherche ni du générateur", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const acces = { audience: "eleves", reponses: false } as const;
+    const texte = "Carapace de dragon en écailles turquoise.";
+    const id = await sourceTraitee(db, texte, acces, prof);
+    statuer(db, id, "certifiee", "Prof");
+    const credit = "<script>alert(1)</script> Musée";
+    const corps = new URLSearchParams({ image: `${id}-0`, texte, credit });
+    assertEquals(
+      (await prof.requete("/prof/legendes/certified", { method: "POST", body: corps })).status,
+      200,
+    );
+    assertEquals(
+      db.prepare("SELECT credit FROM images WHERE id = ?").get(`${id}-0`)!.credit,
+      credit,
+    );
+
+    const { requete } = await session(db, fauxModeles().modeles, "eleve");
+    const page = await (await requete(`/eleve/sources/${id}`)).text();
+    assertStringIncludes(page, '<span class="credit">&lt;script&gt;alert(1)&lt;/script&gt; Musée');
+    assert(!page.includes("<script>alert(1)"), "crédit non échappé");
+
+    assertEquals(chercherFts(db, "Musée", { lecteur: null, schoolId: "pilote" }).length, 0);
+    const f = fauxModeles({ sorties: ['{"refus": true}'] });
+    await demander(db, f.modeles, "dragon turquoise", { lecteur: null, schoolId: "pilote" }, 0.023);
+    assert(!JSON.stringify(f.vus).includes("Musée"), "crédit envoyé au générateur");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("une légende relue ne reste pas sur une autre image à la même place", async () => {
   const { db, dir } = await environnement();
   try {

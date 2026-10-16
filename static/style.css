@@ -925,6 +925,9 @@ figcaption {
   color: var(--ink-muted);
   font-size: 0.9375rem;
 }
+figcaption .credit {
+  display: block;
+}
 
 /* Une œuvre se montre entière sur un passe-partout, jamais recadrée. */
 .passe-partout {

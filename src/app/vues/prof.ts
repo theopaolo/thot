@@ -1101,7 +1101,12 @@ const LEGENDES: Record<string, string> = {
   rejected: "rejetée",
 };
 
-export type ALegender = ImageVue & { source_id: string; titre: string; restantes: number };
+export type ALegender = ImageVue & {
+  source_id: string;
+  titre: string;
+  restantes: number;
+  credit: string | null;
+};
 
 export const legende = (i: ALegender | undefined, file: { id: string; titre: string }[] = []) =>
   i
@@ -1133,6 +1138,8 @@ export const legende = (i: ALegender | undefined, file: { id: string; titre: str
             <label for="texte">Légende proposée</label>
             <p class="aide">Seule une légende validée peut être citée à un élève.</p>
             <textarea id="texte" name="texte" rows="7">${i.legende ?? ""}</textarea>
+            <label for="credit">Crédit</label>
+            <input type="text" id="credit" name="credit" value="${i.credit ?? ""}">
             <input type="hidden" name="image" value="${i.id}">
             <div class="barre">
               <button class="principal" hx-post="/prof/legendes/certified" data-raccourci="v"
