@@ -1,0 +1,418 @@
+{
+ "date": "2026-10-16T21:47:48.893Z",
+ "moteur": "fts5 + qwen/qwen3-reranker-8b",
+ "tous": {
+  "n": 25,
+  "succes_5": 1,
+  "mrr": 1
+ },
+ "familles": {
+  "en-livre": {
+   "n": 5,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "fr-cours": {
+   "n": 5,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "fr-livre": {
+   "n": 15,
+   "succes_5": 1,
+   "mrr": 1
+  }
+ },
+ "sans_cible": [],
+ "echecs": [],
+ "hors_corpus": {
+  "n": 5,
+  "avec_resultat": 4
+ },
+ "lignes": [
+  {
+   "qid": "L01",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain",
+    "ADR : Rester court",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L02",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "ADR : Rendre l'incertitude visible",
+    "Faire une revue de code constructive : Grille de review",
+    "Préparer et recevoir une review : Clore les fils de discussion",
+    "Préparer et recevoir une review"
+   ]
+  },
+  {
+   "qid": "L03",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code"
+   ]
+  },
+  {
+   "qid": "L04",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Préparer et recevoir une review : Se relire avant de faire relire",
+    "Exercice : justifier ses choix : 7. Relire avec une autre personne",
+    "Préparer et recevoir une review : Baliser son propre code",
+    "Préparer et recevoir une review : Une PR = une intention"
+   ]
+  },
+  {
+   "qid": "L05",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Code smells : Smells",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L06",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Vocabulaire : Clean code",
+    "Faire une revue de code constructive : Cohérence",
+    "Faire une revue de code constructive : Maintenabilité",
+    "Principes et méthodos : KISS (Keep It Simple, Stupid)"
+   ]
+  },
+  {
+   "qid": "L07",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Lire, comprendre et améliorer une codebase : Sections",
+    "Domain-Driven Design : À quoi ça sert",
+    "Programmers_brain",
+    "Code smells : Astuces pratiques"
+   ]
+  },
+  {
+   "qid": "L08",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Domain-Driven Design : Exemple : un projet de fret",
+    "Exemples et corrigés : 7. Une décision, un commentaire et une implémentation",
+    "UML, lire et dessiner un diagramme de classes : Lire une classe",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L09",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code"
+   ]
+  },
+  {
+   "qid": "L10",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Lire du code"
+   ]
+  },
+  {
+   "qid": "L11",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Refactoriser : Quand tu ajoutes une fonctionnalité",
+    "Vocabulaire : Dette technique",
+    "Refactoriser : Pendant une code review"
+   ]
+  },
+  {
+   "qid": "L12",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code"
+   ]
+  },
+  {
+   "qid": "L13",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Vocabulaire : Dette technique",
+    "Faire une revue de code constructive : Grille de review",
+    "Programmers_brain",
+    "Pourquoi documenter : Écrire pour une personne et une tâche"
+   ]
+  },
+  {
+   "qid": "L14",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire, comprendre et améliorer une codebase",
+    "Lire du code : Cartographier",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L15",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "E01",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain",
+    "Programmers_brain",
+    "ADR : Rester court"
+   ]
+  },
+  {
+   "qid": "E02",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Ressources et bibliographie : Décisions et mise en pratique",
+    "Programmers_brain",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "E03",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Préparer et recevoir une review : Le code n'est pas toi",
+    "Préparer la persistance avec Repository : Adapter les appels et provoquer une panne",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "E04",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Faire une revue de code constructive : Cohérence",
+    "Faire une revue de code constructive : Rédiger une bonne review",
+    "Vocabulaire : Clean code",
+    "Faire une revue de code constructive : Maintenabilité"
+   ]
+  },
+  {
+   "qid": "E05",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Vocabulaire : Dette technique",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Programmers_brain",
+    "Pourquoi documenter : Exemple : répondre à trois collègues"
+   ]
+  },
+  {
+   "qid": "C01",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Code smells : Smells",
+    "Code smells : 🟢 Les plus simples à repérer",
+    "Lire du code : Cartographier",
+    "Code smells : 🔴 Au niveau de l'architecture",
+    "Code smells : 🟡 Demandent une lecture plus attentive"
+   ]
+  },
+  {
+   "qid": "C02",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Préparer et recevoir une review : Décrire la PR",
+    "Préparer et recevoir une review : Checklist avant d'ouvrir la PR",
+    "ADR : Rendre l'incertitude visible",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Écrire clairement : Nommer qui fait quoi"
+   ]
+  },
+  {
+   "qid": "C03",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Domain-Driven Design : Langage ubiquitaire (ubiquitous language)",
+    "Domain-Driven Design : À quoi ça sert",
+    "Domain-Driven Design : Tester à voix haute",
+    "Domain-Driven Design : DDD : Domain-Driven Design",
+    "Documentation vivante et BDD : Formuler un scénario lisible"
+   ]
+  },
+  {
+   "qid": "C04",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Lire du code : Cartographier",
+    "Faire une revue de code constructive : Cohérence",
+    "README et guides : Préparer les instructions de lancement",
+    "Organiser les contenus : Choisir où publier",
+    "README et guides : Structure de README à compléter"
+   ]
+  },
+  {
+   "qid": "C05",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Principes et méthodos : YAGNI (You Aren't Gonna Need It)",
+    "Principes et méthodos : Références",
+    "Ressources et bibliographie : Décisions et mise en pratique",
+    "ADR : Ressources",
+    "Code smells : Références"
+   ]
+  },
+  {
+   "qid": "N01",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N02",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N03",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": []
+  },
+  {
+   "qid": "N04",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Lire du code",
+    "Programmers_brain",
+    "Code smells : Références",
+    "Programmers_brain",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N05",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Principes et méthodos : KISS (Keep It Simple, Stupid)",
+    "ADR : Rester court",
+    "Code smells : 🟡 Demandent une lecture plus attentive",
+    "Glossaire : Fonctions et organisation du code",
+    "Glossaire : Fonctions et organisation du code"
+   ]
+  }
+ ]
+}

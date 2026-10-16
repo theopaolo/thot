@@ -218,9 +218,16 @@ pas du tout. Les réglages de l'instance et la liste des champs de chaque matiè
 version : un enregistrement parti d'une version périmée n'enregistre rien et rend la saisie avec
 la version actuelle.
 
-La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
-française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de
-`tests/domaines_test.ts` ne qualifie ni le reclasseur ni les modèles pour l'anglais.
+La langue décrit la source, pas sa matière ou son niveau. Une source anglaise (`en`, `en-GB`…)
+s'indexe avec les racines anglaises, toute autre avec les racines françaises. Changer la langue
+d'une source la réindexe. Quand le périmètre d'une question contient une source anglaise
+citable, la recherche ajoute aux racines françaises de la question ses racines anglaises, et un
+appel de modèle traduit la question. Les candidats FTS5 de la traduction rejoignent ceux de la
+question avant le reclasseur, qui lit la question de l'élève. Une traduction en panne laisse la
+question seule. Sans source anglaise dans le périmètre, la question garde ses seules racines
+françaises et aucun appel de traduction n'a lieu. La réponse
+reste en français et cite le passage anglais mot pour mot. Les autres langues restent signalées
+comme non prises en charge. Les mesures sont dans `evaluation/README.md`, « Jeu langues ».
 
 ## Lecteurs et propriétaire
 

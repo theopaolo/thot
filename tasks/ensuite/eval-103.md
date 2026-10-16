@@ -15,6 +15,8 @@ the linked implementation tasks rather than claiming generality from the arts be
 The first non-arts set exists in [evaluation/dev/](../../evaluation/dev/), built from five
 developer courses (`thot eval recherche --requetes=...`). Its FTS5 baseline is in
 [evaluation/README.md](../../evaluation/README.md). The reranker and generation runs remain.
+The [evaluation/langues/](../../evaluation/langues/) set measures French questions on an English
+source apart from same-language search ([[lang-101]]).
 
 ## Evaluation sets
 

@@ -14,7 +14,13 @@ import { extraireMarkdown } from "../core/markdown.ts";
 import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
 import { extrairePptx } from "../core/pptx.ts";
-import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../core/recherche.ts";
+import {
+  type ChunkIndexe,
+  estAnglais,
+  indexerSource,
+  retirerSource,
+  transaction,
+} from "../core/recherche.ts";
 import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
 import { oublierSource, revoirActivites } from "./activites.ts";
 import { config, contenu } from "./config.ts";
@@ -124,7 +130,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     const ext = await extraire(s);
     const doc = assembler(ext.parties);
     const avertissements = [...ext.avertissements];
-    if (s.langue !== "fr") {
+    if (s.langue !== "fr" && !estAnglais(s.langue)) {
       avertissements.push("Langue non prise en charge pour la recherche : " + s.langue);
     }
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");

@@ -1,0 +1,426 @@
+{
+ "date": "2026-10-16T21:47:12.622Z",
+ "moteur": "fts5",
+ "tous": {
+  "n": 25,
+  "succes_5": 0.96,
+  "mrr": 0.66
+ },
+ "familles": {
+  "en-livre": {
+   "n": 5,
+   "succes_5": 1,
+   "mrr": 1
+  },
+  "fr-cours": {
+   "n": 5,
+   "succes_5": 0.8,
+   "mrr": 0.67
+  },
+  "fr-livre": {
+   "n": 15,
+   "succes_5": 1,
+   "mrr": 0.54
+  }
+ },
+ "sans_cible": [],
+ "echecs": [
+  "C02"
+ ],
+ "hors_corpus": {
+  "n": 5,
+  "avec_resultat": 5
+ },
+ "lignes": [
+  {
+   "qid": "L01",
+   "type": "fr-livre",
+   "rang": 3,
+   "cibles": 1,
+   "trouves": [
+    "Lire du code",
+    "ADR : Rester court",
+    "Programmers_brain",
+    "Écrire clairement : Expliquer les acronymes à leur première utilisation",
+    "Décisions et code : Conserver une décision technique"
+   ]
+  },
+  {
+   "qid": "L02",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Critères d’un choix technique : Évaluer aussi le coût des critères de valeur",
+    "Programmers_brain",
+    "ADR : Rendre l'incertitude visible",
+    "Programmers_brain",
+    "Décisions et code : Décrire ce qu'une fonction ou une route garantit"
+   ]
+  },
+  {
+   "qid": "L03",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Lire les places du partenaire avec Adapter : Retenir une frontière utile",
+    "Programmers_brain",
+    "Lire du code",
+    "Programmers_brain",
+    "Ressources et bibliographie"
+   ]
+  },
+  {
+   "qid": "L04",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Critères d’un choix technique : Les critères les plus communs",
+    "Programmers_brain",
+    "Préparer la persistance avec Repository : Lire Repository avec notre collection",
+    "Principes et méthodos : DRY (Don't Repeat Yourself)",
+    "Frontend, backend et rendu : Questions de décision"
+   ]
+  },
+  {
+   "qid": "L05",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Lire du code : Modifier pour mieux comprendre",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L06",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Faire une revue de code constructive : Cohérence",
+    "Programmers_brain",
+    "Vérifier et maintenir : Montrer un défaut détecté",
+    "Programmers_brain",
+    "Ajouter un tarif avec Strategy : Comparer un objet de tarif fourni à la réservation"
+   ]
+  },
+  {
+   "qid": "L07",
+   "type": "fr-livre",
+   "rang": 4,
+   "cibles": 1,
+   "trouves": [
+    "Lire du code : Modifier pour mieux comprendre",
+    "S'entraîner et vérifier sa compréhension : 2. Deux variables désignent-elles deux objets ?",
+    "Outils et sources : Lectures par chapitre",
+    "Programmers_brain",
+    "Principes et méthodos : S, Single Responsibility Principle"
+   ]
+  },
+  {
+   "qid": "L08",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Domain-Driven Design : Notions pour commencer en DDD",
+    "Programmers_brain",
+    "Outils et sources : Commencer avec une chaîne courte",
+    "Programmers_brain",
+    "Domain-Driven Design : Exemple : un projet de fret"
+   ]
+  },
+  {
+   "qid": "L09",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Préparer la persistance avec Repository : Simuler le contrat en mémoire",
+    "Programmers_brain",
+    "Préparer la persistance avec Repository : Lire Repository avec notre collection",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L10",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Faire une revue de code constructive : Grille de review",
+    "Programmers_brain",
+    "Lire du code : Cartographier",
+    "Programmers_brain",
+    "README et guides : Rédiger un README et des guides pratiques"
+   ]
+  },
+  {
+   "qid": "L11",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Vocabulaire : Dette technique",
+    "Programmers_brain",
+    "Pourquoi documenter : Écrire pour une personne et une tâche",
+    "Programmers_brain",
+    "Refactoriser : Quand tu ajoutes une fonctionnalité"
+   ]
+  },
+  {
+   "qid": "L12",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Lire du code : Cartographier",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Faire une revue de code constructive : Grille de review",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "L13",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Vocabulaire : Dette technique",
+    "Programmers_brain",
+    "Domain-Driven Design : Langage ubiquitaire (ubiquitous language)",
+    "Programmers_brain",
+    "Choisir une création avec Factory, aide facultative : Lire une fabrique qui garde une configuration"
+   ]
+  },
+  {
+   "qid": "L14",
+   "type": "fr-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "S'entraîner et vérifier sa compréhension : 6. Créer un objet et calculer un tarif sont-ils le même choix ?",
+    "Programmers_brain",
+    "Frontend, backend et rendu : Frontend, backend et stratégies de rendu",
+    "S'entraîner et vérifier sa compréhension : 1. Où le nom de la créature est-il conservé ?"
+   ]
+  },
+  {
+   "qid": "L15",
+   "type": "fr-livre",
+   "rang": 2,
+   "cibles": 1,
+   "trouves": [
+    "Refactoriser : Quand refactoriser",
+    "Programmers_brain",
+    "Code smells : Astuces pratiques",
+    "Programmers_brain",
+    "Lire du code"
+   ]
+  },
+  {
+   "qid": "E01",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "ADR : Rester court",
+    "Lire du code",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "E02",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Lire du code : Cartographier",
+    "Programmers_brain",
+    "README et guides : Rédiger un README et des guides pratiques",
+    "Comprendre une stack technique : Ressources"
+   ]
+  },
+  {
+   "qid": "E03",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Principes et méthodos : Références",
+    "Préparer la persistance avec Repository : Donner un contrat aux opérations nécessaires"
+   ]
+  },
+  {
+   "qid": "E04",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Faire une revue de code constructive : Cohérence",
+    "Programmers_brain",
+    "Exemples et corrigés : Inclure des sources dans MkDocs",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "E05",
+   "type": "en-livre",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Programmers_brain",
+    "Faire une revue de code constructive : Les principaux labels",
+    "Comprendre une stack technique : Ressources",
+    "SOLID, comprendre les cinq principes : Avant, chaque nouveau tarif modifie le calcul commun",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "C01",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Code smells : Smells",
+    "Code smells : 🔴 Au niveau de l'architecture",
+    "Code smells",
+    "Code smells : 🟡 Demandent une lecture plus attentive",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "C02",
+   "type": "fr-cours",
+   "rang": 0,
+   "cibles": 1,
+   "trouves": [
+    "ADR : Rendre l'incertitude visible",
+    "Documentation dans l'éditeur : Écrire la variante TypeScript avec des commentaires TSDoc",
+    "Programmers_brain",
+    "Écrire clairement : Remplacer les appréciations par des faits",
+    "Comprendre une stack technique : Ressources"
+   ]
+  },
+  {
+   "qid": "C03",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 1,
+   "trouves": [
+    "Domain-Driven Design : Langage ubiquitaire (ubiquitous language)",
+    "Domain-Driven Design : Notions pour commencer en DDD",
+    "Programmers_brain",
+    "Domain-Driven Design : DDD : Domain-Driven Design",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "C04",
+   "type": "fr-cours",
+   "rang": 3,
+   "cibles": 1,
+   "trouves": [
+    "README et guides : Préparer les instructions de lancement",
+    "Programmers_brain",
+    "Lire du code : Cartographier",
+    "Programmers_brain",
+    "README et guides : Structure de README à compléter"
+   ]
+  },
+  {
+   "qid": "C05",
+   "type": "fr-cours",
+   "rang": 1,
+   "cibles": 2,
+   "trouves": [
+    "Principes et méthodos : YAGNI (You Aren't Gonna Need It)",
+    "Comprendre une stack technique : Ressources",
+    "Principes et méthodos : Références",
+    "Programmers_brain",
+    "Principes et méthodos : DRY (Don't Repeat Yourself)"
+   ]
+  },
+  {
+   "qid": "N01",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "S'entraîner et vérifier sa compréhension : 6. Créer un objet et calculer un tarif sont-ils le même choix ?",
+    "Documentation dans l'éditeur : Distinguer les rôles",
+    "Programmers_brain",
+    "Frameworks et inversion de contrôle : Vérifier le trajet choisi",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N02",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Faire des choix techniques : Une préférence peut devenir une décision",
+    "README et guides : Rédiger un README et des guides pratiques",
+    "Programmers_brain",
+    "Les bases de la programmation orientée objet",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N03",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "S'entraîner et vérifier sa compréhension : 6. Créer un objet et calculer un tarif sont-ils le même choix ?",
+    "Documentation dans l'éditeur : Faire signaler un mauvais type",
+    "Principes et méthodos : YAGNI (You Aren't Gonna Need It)",
+    "Décisions et code : Modèle de note à adapter",
+    "Programmers_brain"
+   ]
+  },
+  {
+   "qid": "N04",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Code smells : Références",
+    "Programmers_brain",
+    "Programmers_brain",
+    "Lire du code",
+    "Lire du code : Repérer les beacons"
+   ]
+  },
+  {
+   "qid": "N05",
+   "type": "hors-corpus",
+   "rang": 0,
+   "cibles": 0,
+   "trouves": [
+    "Principes et méthodos : KISS (Keep It Simple, Stupid)",
+    "Programmers_brain",
+    "ADR : Rester court",
+    "Programmers_brain",
+    "SOLID, comprendre les cinq principes : Situer SOLID et Clean Code"
+   ]
+  }
+ ]
+}

@@ -3,11 +3,20 @@ import snowball from "snowball";
 import { type Modeles, PanneModele } from "./modeles.ts";
 import { mots } from "./texte.ts";
 
-const stemmer = snowball.newStemmer("french");
+const francais = snowball.newStemmer("french");
+const anglais = snowball.newStemmer("english");
 
-/** Racines françaises. L'élision est retirée à la main: le Snowball npm date d'avant ce retrait. */
-export const racines = (texte: string) =>
-  mots(texte).map((m) => stemmer.stem(m.replace(/^(qu|[cdjlmnst])'/, "")) as string);
+/**
+ * Racines françaises, ou anglaises avec `enAnglais`. L'élision française est retirée à la main:
+ * le Snowball npm date d'avant ce retrait.
+ */
+export const racines = (texte: string, enAnglais = false) =>
+  mots(texte).map((m) =>
+    enAnglais ? anglais.stem(m) : francais.stem(m.replace(/^(qu|[cdjlmnst])'/, "")),
+  );
+
+/** Une source se racinise en anglais si sa langue est l'anglais (`en`, `en-GB`…), sinon en français. */
+export const estAnglais = (langue: unknown) => /^en(-|$)/i.test(String(langue ?? ""));
 
 export type ChunkIndexe = {
   id: string;
@@ -97,6 +106,8 @@ export type Recherche = {
   panneReclasseur?: string;
   /** comparaison : les matières sans extrait au-dessus du seuil */
   sansPassage?: string[];
+  /** la question traduite, quand le périmètre contient une source anglaise */
+  traduction?: string;
 };
 
 export function transaction<T>(db: DatabaseSync, f: () => T): T {
@@ -118,9 +129,15 @@ export function retirerSource(db: DatabaseSync, sourceId: string) {
   db.prepare("DELETE FROM chunks WHERE source_id = ?").run(sourceId);
 }
 
-/** Remplace les chunks d'une source dans l'index. Appelé dans une transaction. */
+/**
+ * Remplace les chunks d'une source dans l'index, racinisés dans la langue de la source. Appelé
+ * dans une transaction.
+ */
 export function indexerSource(db: DatabaseSync, sourceId: string, chunks: ChunkIndexe[]) {
   retirerSource(db, sourceId);
+  const enAnglais = estAnglais(
+    db.prepare("SELECT langue FROM sources WHERE id = ?").get(sourceId)?.langue,
+  );
   const ins = db.prepare(
     "INSERT INTO chunks (id, source_id, school_id, titre, debut, fin, texte, rappel, preuve, revision)" +
       " VALUES (:id, :source_id, :school_id, :titre, :debut, :fin, :texte, :rappel, :preuve, :revision)",
@@ -128,12 +145,31 @@ export function indexerSource(db: DatabaseSync, sourceId: string, chunks: ChunkI
   const fts = db.prepare("INSERT INTO chunks_fts (rowid, titre, texte) VALUES (?, ?, ?)");
   for (const c of chunks) {
     const { lastInsertRowid } = ins.run(c);
-    fts.run(lastInsertRowid, racines(c.titre).join(" "), racines(c.rappel).join(" "));
+    fts.run(
+      lastInsertRowid,
+      racines(c.titre, enAnglais).join(" "),
+      racines(c.rappel, enAnglais).join(" "),
+    );
   }
 }
 
+/** Le périmètre contient-il une source citable en anglais ? */
+const anglaisCitable = (db: DatabaseSync, p: Perimetre) =>
+  db
+    .prepare(
+      `SELECT 1 FROM sources s WHERE ${CITABLE} AND (s.langue = 'en' OR s.langue LIKE 'en-%') LIMIT 1`,
+    )
+    .get(...parametresCitable(p)) !== undefined;
+
+/**
+ * Cherche les racines françaises de la question. Si le périmètre contient une source anglaise, ses
+ * racines anglaises s'y ajoutent : la question ou sa traduction peut être dans l'une ou l'autre
+ * langue.
+ */
 export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k = 20): Candidat[] {
-  const termes = [...new Set(racines(question))];
+  const termes = [
+    ...new Set([...racines(question), ...(anglaisCitable(db, p) ? racines(question, true) : [])]),
+  ];
   if (!termes.length) return [];
   // Le filtre d'établissement s'applique dans la même requête que le classement.
   const lignes = db
@@ -187,33 +223,60 @@ export const revisionCitable = (db: DatabaseSync, sourceId: string, p: Perimetre
 export const MAX_MATIERES = 4;
 
 /**
- * Comparaison : les 20 candidats FTS5 se partagent entre les matières, puis s'entrelacent par rang.
- * Un chunk trouvé dans deux matières garde les deux noms.
+ * Les 20 candidats FTS5 de chaque requête, entrelacés par rang. En comparaison, ces 20 candidats se
+ * partagent entre les matières, et un chunk trouvé dans deux matières garde les deux noms.
  */
-function chercherMatieres(db: DatabaseSync, question: string, p: Perimetre) {
-  const matieres = db
-    .prepare(
-      "SELECT id, nom FROM matieres WHERE id IN (SELECT value FROM json_each(?)) ORDER BY nom",
-    )
-    .all(JSON.stringify(p.matieres)) as { id: string; nom: string }[];
+function fusionner(db: DatabaseSync, requetes: string[], p: Perimetre) {
+  const matieres =
+    (p.matieres?.length ?? 0) > 1
+      ? (db
+          .prepare(
+            "SELECT id, nom FROM matieres WHERE id IN (SELECT value FROM json_each(?)) ORDER BY nom",
+          )
+          .all(JSON.stringify(p.matieres)) as { id: string; nom: string }[])
+      : undefined;
   const parChunk = new Map<string, Candidat>();
-  for (const m of matieres) {
-    for (const c of chercherFts(
-      db,
-      question,
-      { ...p, matieres: [m.id] },
-      Math.floor(20 / matieres.length),
-    )) {
-      const cle = `${c.source_id}/${c.id}`;
-      const deja = parChunk.get(cle);
-      if (deja) deja.matieres!.push(m.nom);
-      else parChunk.set(cle, { ...c, matieres: [m.nom] });
+  for (const q of requetes) {
+    for (const m of matieres ?? [undefined]) {
+      const trouves = m
+        ? chercherFts(db, q, { ...p, matieres: [m.id] }, Math.floor(20 / matieres!.length))
+        : chercherFts(db, q, p);
+      for (const c of trouves) {
+        const cle = `${c.source_id}/${c.id}`;
+        const deja = parChunk.get(cle);
+        if (!deja) parChunk.set(cle, m ? { ...c, matieres: [m.nom] } : c);
+        else if (m && !deja.matieres!.includes(m.nom)) deja.matieres!.push(m.nom);
+      }
     }
   }
   return {
-    noms: matieres.map((m) => m.nom),
+    noms: matieres?.map((m) => m.nom),
     candidats: [...parChunk.values()].sort((a, b) => a.rang_fts - b.rang_fts),
   };
+}
+
+/**
+ * Candidats FTS5 de la question. Si le périmètre contient une source anglaise, un appel de modèle
+ * traduit la question, et les candidats de la traduction rejoignent les siens. Une traduction
+ * indisponible laisse la question seule.
+ */
+export async function candidatsFts(
+  db: DatabaseSync,
+  modeles: Modeles,
+  question: string,
+  p: Perimetre,
+  signal?: AbortSignal,
+) {
+  let traduction: string | undefined;
+  if (anglaisCitable(db, p)) {
+    try {
+      const t = (await modeles.traduire(question, signal)).trim();
+      if (t && t.length <= 1000) traduction = t;
+    } catch {
+      /* Une traduction indisponible ne bloque pas la question. */
+    }
+  }
+  return { ...fusionner(db, traduction ? [question, traduction] : [question], p), traduction };
 }
 
 /**
@@ -228,9 +291,8 @@ export async function chercher(
   seuil: number,
   signal?: AbortSignal,
 ): Promise<Recherche> {
-  const comparaison = (p.matieres?.length ?? 0) > 1 ? chercherMatieres(db, question, p) : undefined;
-  const candidats = comparaison?.candidats ?? chercherFts(db, question, p);
-  if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true };
+  const { candidats, noms, traduction } = await candidatsFts(db, modeles, question, p, signal);
+  if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true, traduction };
   let ordre: { index: number; score: number }[];
   let panneReclasseur: string | undefined;
   try {
@@ -267,19 +329,18 @@ export async function chercher(
     // refus du générateur et le juge décident.
     horsCorpus: !classes.length || (!panneReclasseur && score < seuil),
     panneReclasseur,
+    traduction,
   };
-  if (!comparaison) return recherche;
+  if (!noms) return recherche;
   // Seuls les extraits au-dessus du seuil servent. Le meilleur de chaque matière a sa place, les
   // meilleurs restants complètent les cinq. Une matière sans extrait est signalée, pas complétée.
   const admis = classes.filter((c) => panneReclasseur || c.score! >= seuil);
-  const garantis = new Set(
-    comparaison.noms.flatMap((m) => admis.find((c) => c.matieres!.includes(m)) ?? []),
-  );
+  const garantis = new Set(noms.flatMap((m) => admis.find((c) => c.matieres!.includes(m)) ?? []));
   const libres = admis.filter((c) => !garantis.has(c)).slice(0, Math.max(0, 5 - garantis.size));
   return {
     ...recherche,
     retenus: admis.filter((c) => garantis.has(c) || libres.includes(c)),
-    sansPassage: comparaison.noms.filter((m) => !admis.some((c) => c.matieres!.includes(m))),
+    sansPassage: noms.filter((m) => !admis.some((c) => c.matieres!.includes(m))),
   };
 }
 

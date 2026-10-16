@@ -380,7 +380,7 @@ export const informations = (
 export const langue = (valeur = "fr") =>
   html`
     <label>Langue de la source <input type="text" name="langue" value="${valeur}" maxlength="30"></label><p
-      class="aide">Français (fr) pris en charge. Anglais (en) et autres langues : recherche non prise en charge.</p>
+      class="aide">Français (fr) et anglais (en) pris en charge : une question en français trouve aussi les passages en anglais. Autres langues : recherche non prise en charge.</p>
   `;
 export const champsScope = (p: Record<string, string>) =>
   html`${Object.entries(p).map(([n, v]) => html`<input type="hidden" name="${n}" value="${v}">`)}`;

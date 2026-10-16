@@ -527,6 +527,7 @@ export async function demander(
     etape("Recherche dans les documents du cours");
     const r = await chercher(db, modeles, recherche, p, seuil, signal);
     journal.score = r.score;
+    if (r.traduction) journal.traduction = r.traduction;
     if (r.panneReclasseur) journal.reclasseur_indisponible = r.panneReclasseur;
     journal.candidats = r.candidats.map((c) => ({
       id: c.id,

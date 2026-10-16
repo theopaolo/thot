@@ -1,0 +1,35 @@
+[
+  { "qid": "L01", "type": "fr-livre", "q": "Combien de temps une information reste-t-elle dans la mémoire à court terme ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L02", "type": "fr-livre", "q": "Que reste-t-il de ce qu'on a appris au bout de deux jours sans révision ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L03", "type": "fr-livre", "q": "Comment utiliser des cartes mémoire pour retenir la syntaxe d'un langage ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L04", "type": "fr-livre", "q": "À quelle fréquence faut-il revoir ses fiches pour ne pas oublier ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L05", "type": "fr-livre", "q": "Pourquoi les experts retiennent-ils mieux le code que les débutants ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L06", "type": "fr-livre", "q": "Quels défauts de nommage rendent une méthode trompeuse ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L07", "type": "fr-livre", "q": "Vaut-il mieux nommer ses variables en camel case ou en snake case ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L08", "type": "fr-livre", "q": "Quelle proportion des identifiants qui commencent par is ne sont pas des booléens ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L09", "type": "fr-livre", "q": "Quelle différence entre mémoire épisodique et mémoire sémantique ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L10", "type": "fr-livre", "q": "Qu'est-ce que la pratique délibérée pour un développeur ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L11", "type": "fr-livre", "q": "Comment se remettre au travail plus vite après avoir été interrompu ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L12", "type": "fr-livre", "q": "Qu'est-ce que la mémoire prospective ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L13", "type": "fr-livre", "q": "Comment accueillir un nouveau développeur dans l'équipe sans le surcharger ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L14", "type": "fr-livre", "q": "Quelles stratégies de compréhension de texte peut-on appliquer à la lecture de code ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "L15", "type": "fr-livre", "q": "Combien de choses la mémoire de travail peut-elle traiter à la fois ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+
+  { "qid": "E01", "type": "en-livre", "q": "How long does information stay in short-term memory?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "E02", "type": "en-livre", "q": "What is deliberate practice?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "E03", "type": "en-livre", "q": "How can I prepare for interruptions while programming?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "E04", "type": "en-livre", "q": "Which naming mistakes make a method name misleading?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+  { "qid": "E05", "type": "en-livre", "q": "How should a senior developer onboard a newcomer?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+
+  { "qid": "C01", "type": "fr-cours", "q": "À quel moment la plupart des code smells apparaissent-ils dans un fichier ?", "gold": ["lire-une-codebase/02-code-smells.md"] },
+  { "qid": "C02", "type": "fr-cours", "q": "Que faut-il écrire dans la description d'une pull request ?", "gold": ["lire-une-codebase/04-preparer-une-review.md"] },
+  { "qid": "C03", "type": "fr-cours", "q": "À quoi sert le langage ubiquitaire en DDD ?", "gold": ["lire-une-codebase/06-ddd.md"] },
+  { "qid": "C04", "type": "fr-cours", "q": "Dans quel ordre lire les fichiers d'un projet qu'on reprend ?", "gold": ["lire-une-codebase/01-lire-du-code.md"] },
+  { "qid": "C05", "type": "fr-cours", "q": "Que signifie le principe YAGNI ?", "gold": ["lire-une-codebase/10-principes.md", "poo-patterns-frameworks/01-fondations.md"] },
+
+  { "qid": "N01", "type": "hors-corpus", "q": "Quel rôle joue l'hippocampe dans la mémoire des programmeurs ?", "gold": [] },
+  { "qid": "N02", "type": "hors-corpus", "q": "Combien d'heures de pratique faut-il pour devenir expert en programmation ?", "gold": [] },
+  { "qid": "N03", "type": "hors-corpus", "q": "Comment configurer ESLint pour imposer le camelCase ?", "gold": [] },
+  { "qid": "N04", "type": "hors-corpus", "q": "What does Felienne Hermans say about teaching Scratch to children?", "gold": [] },
+  { "qid": "N05", "type": "hors-corpus", "q": "Quelle complexité cyclomatique maximale recommander pour une fonction ?", "gold": [] }
+]

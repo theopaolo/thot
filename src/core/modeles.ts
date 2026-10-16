@@ -26,6 +26,8 @@ export interface Modeles {
   ): Promise<{ index: number; score: number }[]>;
   generer(messages: Message[], signal?: AbortSignal): Promise<{ texte: string; modele: string }>;
   reformuler(questionPrecedente: string, question: string, signal?: AbortSignal): Promise<string>;
+  /** la question en anglais, ou en français si elle est déjà en anglais */
+  traduire(question: string, signal?: AbortSignal): Promise<string>;
   /** probabilité que `citation`, lue sous le titre de son extrait, suffise à établir `texte` */
   soutenir(
     texte: string,
@@ -356,6 +358,25 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           },
         ],
         // Le raisonnement compte dans le budget. Sans effort réglé, `low` borne la latence.
+        600,
+        config.effort ?? "low",
+        false,
+        signal,
+      );
+      return texte.trim();
+    },
+
+    async traduire(question, signal) {
+      const { texte } = await chat(
+        config.generation,
+        [
+          {
+            role: "system",
+            content:
+              "Traduis la question en anglais. Si elle est déjà en anglais, traduis-la en français. Rends seulement la traduction, sans commentaire ni réponse.",
+          },
+          { role: "user", content: question },
+        ],
         600,
         config.effort ?? "low",
         false,

@@ -7,7 +7,7 @@ import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander, profilSources, SEUIL_SOUTIEN } from "./core/reponse.ts";
 import type { Profil } from "./core/profils.ts";
-import { chercher, chercherFts, documentsProches, transaction } from "./core/recherche.ts";
+import { candidatsFts, chercher, documentsProches, transaction } from "./core/recherche.ts";
 import {
   creerAdministrateur,
   creerCompte,
@@ -396,10 +396,13 @@ async function evalRecherche() {
     let trouves;
     let affichage;
     if (args["sans-reclasseur"]) {
-      trouves = chercherFts(db, r.q, { lecteur: null, schoolId: lireInstance(db).school_id }).slice(
-        0,
-        5,
-      );
+      // Sans reclasseur, mais avec la traduction quand le périmètre contient une source anglaise.
+      trouves = (
+        await candidatsFts(db, modeles, r.q, {
+          lecteur: null,
+          schoolId: lireInstance(db).school_id,
+        })
+      ).candidats.slice(0, 5);
     } else {
       const recherche = await chercher(
         db,

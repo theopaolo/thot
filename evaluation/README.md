@@ -162,12 +162,103 @@ en donne un valide. Le modèle y donne à un nœud la preuve de sa relation, et 
 
 `tests/domaines_test.ts` contient une sonde lexicale synthétique français/anglais et les contrôles
 sans fournisseur des prompts génériques, du profil arts et des périmètres de recherche. Il
-vérifie que les consignes du profil arts ont l'empreinte des mesures ml4. La sonde
-trouve trois cibles sur quatre en français et une sur quatre en anglais avec la racinisation
-actuelle. Le pluriel irrégulier français et les formes anglaises montrent les limites du moteur.
-Ce petit jeu ne mesure ni la recherche bilingue entre documents et questions ni la qualité des
-modèles. L'anglais reste non pris en charge dans l'interface. Aucun changement de tokenisation ni
-reindexage automatique n'est introduit.
+vérifie que les consignes du profil arts ont l'empreinte des mesures ml4. Chaque source se
+racinise dans sa langue : la sonde trouve trois cibles sur quatre en français, comme avant, et
+quatre sur quatre en anglais. Le pluriel irrégulier français reste une limite du moteur. La
+recherche entre une question française et une source anglaise se mesure à part, dans le jeu
+langues.
+
+## Jeu langues
+
+`langues/requetes.json` et `langues/questions.json` mesurent la recherche entre langues, à part
+de la recherche dans une seule langue. L'instance a le profil général, une matière et quatre
+cours de développement : `lire-une-codebase`, `architecture-logicielle`,
+`poo-patterns-frameworks` et `documentation`, tous en français. Le cours `lire-une-codebase`
+reçoit aussi `Programmers_brain.pdf`, une fiche de synthèse en anglais de *The Programmer's
+Brain*, seule dans un dossier `programmers-brain` et déposée avec `--langue=en`. Le PDF donne
+cinq passages sans section, ses cibles nomment donc le fichier. L'instance compte 52 sources et
+499 passages. Le livre et ses citations restent hors du dépôt.
+
+```bash
+pnpm thot ingest <dossier>/lire-une-codebase --matiere-id=<m> --cours-id=<c> --langue=fr
+pnpm thot ingest <dossier>/programmers-brain --matiere-id=<m> --cours-id=<c> --langue=en
+pnpm thot eval recherche --requetes=evaluation/langues/requetes.json --sans-reclasseur
+pnpm thot eval recherche --requetes=evaluation/langues/requetes.json
+pnpm thot eval generation --requetes=evaluation/langues/questions.json
+```
+
+Familles de `requetes.json` :
+
+- `fr-livre` (15) : une question française dont la réponse n'est que dans le PDF anglais.
+- `en-livre` (5) : une question anglaise sur le PDF.
+- `fr-cours` (5) : une question française sur une leçon française de `lire-une-codebase`.
+- `hors-corpus` (5) : des pièges voisins du livre (l'hippocampe, les 10 000 heures, ESLint,
+  Scratch, la complexité cyclomatique).
+
+Avec une source anglaise dans le périmètre, `eval recherche --sans-reclasseur` appelle aussi le
+modèle de traduction. Succès@5 / MRR avant (racines françaises partout, commit `6b5e710`) et
+après (racines de la langue de chaque source, racines anglaises de la question, traduction) :
+
+| Famille | n | FTS5 avant | FTS5 après | reclasseur avant | reclasseur après |
+| --- | --- | --- | --- | --- | --- |
+| fr-livre | 15 | 0,13 / 0,06 | 1,00 / 0,54 | 0,40 / 0,40 | 1,00 / 1,00 |
+| en-livre | 5 | 1,00 / 1,00 | 1,00 / 1,00 | 1,00 / 1,00 | 1,00 / 1,00 |
+| fr-cours | 5 | 0,80 / 0,70 | 0,80 / 0,67 | 1,00 / 1,00 | 1,00 / 1,00 |
+
+Rapports : [`resultats/recherche-fts5-langues.json`](resultats/recherche-fts5-langues.json) et
+[`resultats/recherche-reclasseur-langues.json`](resultats/recherche-reclasseur-langues.json).
+Les pièges qui passent le seuil du reclasseur passent de 3 à 4 sur 5 : N02 (les 10 000 heures)
+trouve le passage sur la pratique délibérée.
+
+Les deux mécanismes se mesurent séparément sur `fr-livre`, chaque source racinisée dans sa
+langue :
+
+| Requête FTS5 | FTS5 | reclasseur |
+| --- | --- | --- |
+| racines françaises de la question | 0,13 / 0,10 | 0,33 / 0,33 |
+| plus ses racines anglaises | 0,33 / 0,22 | 0,40 / 0,40 |
+| racines françaises, plus la traduction | 0,80 / 0,42 | 1,00 / 0,96 |
+| racines des deux langues, plus la traduction | 1,00 / 0,54 | 1,00 / 1,00 |
+
+La traduction fait presque tout le gain. Les racines anglaises servent surtout la traduction :
+racinisée en français, « memory » reste « memory » alors que l'index anglais contient
+« memori ». Sans reclasseur, en repli, elles font passer `fr-livre` de 0,80 à 1,00. Avec le
+reclasseur, le passage qui contient la réponse arrive premier pour les 15 questions `fr-livre`,
+vérifié à la main sur les cinq passages du PDF. La traduction dure 0,37 s en médiane (0,71 s au
+plus) et double au plus les candidats du reclasseur, de 20 à 40.
+
+[`resultats/generation-langues.json`](resultats/generation-langues.json), 10 questions
+répondables et 3 pièges :
+
+| Mesure | Valeur |
+| --- | --- |
+| questions répondables répondues | 10 sur 10 |
+| bonne source citée | 10 sur 10 |
+| réponses sur le PDF qui citent le passage anglais | 8 sur 8 |
+| réponses réparées (second appel) | 5 sur 10 |
+| réponses partielles | 2 sur 10 |
+| réponses avec « Vérification partielle » | 5 sur 10 |
+| pièges refusés | 3 sur 3, 1 au seuil et 2 par le modèle |
+| latence médiane | 6,8 s |
+
+Les phrases restent en français et les citations recopient l'anglais mot pour mot :
+`verifier()` ne dépend pas de la langue. Les réparations ont deux causes. La fiche anglaise
+découpe ses phrases en fragments, d'où des citations de moins de trois mots et une citation qui
+recolle deux zones de la page. Le juge refuse aussi des phrases qui ajoutent à leur citation
+(« régulièrement », un lien de cause), et laisse passer les traductions fidèles.
+
+Un second passage du juge reprend les 49 affirmations finales, qui ont passé le juge ou son
+délai, et 8 négatifs écrits à la main. Il accepte 33 affirmations sur 37 prouvées par une
+citation anglaise, et 9 sur 12 prouvées par une citation française. Ses refus suivent le même
+motif dans les deux langues : la phrase nomme un sujet que la citation ne contient pas. Il
+refuse les 8 négatifs (chiffre changé, ajout, inversion). Les paires restent hors du dépôt,
+elles citent le livre. Les « Vérification partielle » viennent du délai de 4 s du juge, dépassé
+sur des réponses de six à huit affirmations. Au second passage, 6 appels sur 37 dépassent 4 s
+pour une citation anglaise, et 1 sur 12 pour une citation française.
+
+Ce jeu mesure une seule source anglaise, courte et sans section, en un seul passage. Un manuel
+anglais long (REAPER) dira si les mots courants anglais, que la liste de mots vides française ne
+retire pas, gênent FTS5.
 
 ## Comparaison des modèles
 

@@ -45,6 +45,7 @@ export function fauxModeles(
       return Promise.resolve({ texte, modele: "faux-llm" });
     },
     reformuler: (_precedente, question) => Promise.resolve(question),
+    traduire: (question) => Promise.resolve(question),
     soutenir: (texte) =>
       Promise.resolve({ probabilite: o.soutien?.(texte) ?? 1, modele: "faux-juge" }),
   };

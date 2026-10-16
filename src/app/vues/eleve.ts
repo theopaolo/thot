@@ -2,6 +2,7 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { BlocReponse, Resultat } from "../../core/reponse.ts";
 import { formules, LIENS, texteMermaid } from "../../core/notation.ts";
+import { estAnglais } from "../../core/recherche.ts";
 import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
@@ -560,7 +561,7 @@ export const lectureSource = (
     <article class="document">
       <h1>${s.titre}</h1>
       ${
-        s.langue && s.langue !== "fr"
+        s.langue && s.langue !== "fr" && !estAnglais(s.langue)
           ? html`<p class="note">Langue non prise en charge pour la recherche : ${s.langue}</p>`
           : ""
       }

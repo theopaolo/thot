@@ -1,0 +1,338 @@
+{
+ "date": "2026-10-16T21:49:57.515Z",
+ "modele": "deepseek/deepseek-v4.1-flash",
+ "seuil": 0.023,
+ "dans_le_corpus": {
+  "n": 10,
+  "repond": 1,
+  "bonne_source": 1,
+  "faux_refus": 0,
+  "panne": 0,
+  "reparee": 0.5,
+  "partielle": 0.2
+ },
+ "hors_corpus": {
+  "voisin du livre, hors corpus": {
+   "n": 3,
+   "refuse": 1,
+   "repond": 0,
+   "panne": 0
+  }
+ },
+ "latence_mediane_ms": 6776,
+ "lignes": [
+  {
+   "qid": "G01",
+   "registre": "dans le corpus",
+   "question": "Que reste-t-il de ce qu'on a appris au bout de deux jours, et comment éviter de l'oublier ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 5,
+   "citations_anglaises": 5,
+   "score": 0.98828125,
+   "ms": 9401,
+   "essais": 2,
+   "partielle": true,
+   "juge_indisponible": true,
+   "soutien": [
+    [
+     1,
+     0.999995215766299,
+     1,
+     1.3693457237407163e-05,
+     1
+    ],
+    [
+     1,
+     0.9999885232980794,
+     1,
+     null,
+     null
+    ]
+   ]
+  },
+  {
+   "qid": "G02",
+   "registre": "dans le corpus",
+   "question": "Comment utiliser des cartes mémoire pour retenir la syntaxe d'un langage ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 6,
+   "citations_anglaises": 6,
+   "score": 0.97265625,
+   "ms": 10002,
+   "essais": 2,
+   "partielle": false,
+   "juge_indisponible": true,
+   "soutien": [
+    [
+     0.730591694558699,
+     0.9971484285237208,
+     0,
+     0.9993248261367075,
+     1,
+     1
+    ],
+    [
+     0.9998985168696057,
+     0.9732981988112809,
+     0.9970776241935593,
+     0.9926358531698335,
+     null,
+     1
+    ]
+   ]
+  },
+  {
+   "qid": "G03",
+   "registre": "dans le corpus",
+   "question": "Comment se préparer à être interrompu quand on programme ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 6,
+   "citations_anglaises": 6,
+   "score": 0.9921875,
+   "ms": 13169,
+   "essais": 2,
+   "partielle": false,
+   "juge_indisponible": true,
+   "soutien": [
+    [
+     0.996766741518956,
+     3.5243503655517873e-05,
+     0.9999119788995361,
+     0,
+     1,
+     1
+    ],
+    [
+     null,
+     0.9999347450294974,
+     0.9999785834755427,
+     null,
+     1,
+     0.9999646721739949
+    ]
+   ]
+  },
+  {
+   "qid": "G04",
+   "registre": "dans le corpus",
+   "question": "Qu'est-ce que la pratique délibérée pour un développeur ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 3,
+   "citations_anglaises": 3,
+   "score": 0.98046875,
+   "ms": 6471,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    [
+     1,
+     0.9995420130518061,
+     0.9999925895292312
+    ]
+   ]
+  },
+  {
+   "qid": "G05",
+   "registre": "dans le corpus",
+   "question": "Quels défauts de nommage rendent une méthode trompeuse ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 7,
+   "citations_anglaises": 7,
+   "score": 0.796875,
+   "ms": 11678,
+   "essais": 2,
+   "partielle": true,
+   "juge_indisponible": false,
+   "soutien": [
+    [
+     null,
+     3.0036281479735145e-05,
+     0.7056714162064348,
+     0.00012334426673829717,
+     null,
+     null,
+     3.1057478926587154e-05,
+     3.103846421380914e-05
+    ],
+    [
+     0.9997388462401636,
+     0.9967058060674222,
+     0.9984788977961473,
+     0,
+     0.9912799419327722,
+     0.9963116445520611,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "qid": "G06",
+   "registre": "dans le corpus",
+   "question": "Quelle différence entre mémoire épisodique et mémoire sémantique ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 2,
+   "citations_anglaises": 2,
+   "score": 0.376953125,
+   "ms": 6776,
+   "essais": 2,
+   "partielle": false,
+   "juge_indisponible": true,
+   "soutien": [
+    [],
+    [
+     null,
+     0.9981623645230335
+    ]
+   ]
+  },
+  {
+   "qid": "G07",
+   "registre": "dans le corpus",
+   "question": "Comment accueillir un nouveau développeur dans l'équipe sans le surcharger ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 8,
+   "citations_anglaises": 6,
+   "score": 0.81640625,
+   "ms": 6575,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": true,
+   "soutien": [
+    [
+     0.9900702678652619,
+     null,
+     0.9996419016018905,
+     0.9999741355660461,
+     1,
+     0.9999921150982916,
+     null,
+     0.9998311277011241
+    ]
+   ]
+  },
+  {
+   "qid": "G08",
+   "registre": "dans le corpus",
+   "question": "Combien de temps une information reste-t-elle dans la mémoire à court terme, et combien d'éléments y tiennent ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 2,
+   "citations_anglaises": 2,
+   "score": 0.984375,
+   "ms": 4981,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    [
+     0.9948480294700468,
+     0.9785583312661523
+    ]
+   ]
+  },
+  {
+   "qid": "G09",
+   "registre": "dans le corpus",
+   "question": "Que faut-il écrire dans la description d'une pull request ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 6,
+   "citations_anglaises": 0,
+   "score": 0.9921875,
+   "ms": 9089,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    [
+     0.9998292214454675,
+     0.9969407418558887,
+     0.9967626391046672,
+     0.7044172045484673,
+     0.9137002354216575,
+     0.9971368801931522
+    ]
+   ]
+  },
+  {
+   "qid": "G10",
+   "registre": "dans le corpus",
+   "question": "À quel moment la plupart des code smells apparaissent-ils dans un fichier ?",
+   "etat": "answered",
+   "bonne_source": true,
+   "affirmations": 4,
+   "citations_anglaises": 0,
+   "score": 1,
+   "ms": 7985,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    [
+     0.9999822357495536,
+     0.9978957443926272,
+     0.9999949069241741,
+     0.9999970979055605
+    ]
+   ]
+  },
+  {
+   "qid": "N01",
+   "registre": "voisin du livre, hors corpus",
+   "question": "Quel rôle joue l'hippocampe dans la mémoire des programmeurs ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "affirmations": 0,
+   "citations_anglaises": 0,
+   "score": 0.89453125,
+   "ms": 1277,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    null
+   ]
+  },
+  {
+   "qid": "N02",
+   "registre": "voisin du livre, hors corpus",
+   "question": "Combien d'heures de pratique faut-il pour devenir expert en programmation ?",
+   "etat": "out_of_corpus",
+   "detail": "refus_modele",
+   "affirmations": 0,
+   "citations_anglaises": 0,
+   "score": 0.1328125,
+   "ms": 1252,
+   "essais": 1,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": [
+    null
+   ]
+  },
+  {
+   "qid": "N03",
+   "registre": "voisin du livre, hors corpus",
+   "question": "Comment configurer ESLint pour imposer le camelCase ?",
+   "etat": "out_of_corpus",
+   "detail": "seuil",
+   "affirmations": 0,
+   "citations_anglaises": 0,
+   "score": 0.003082275390625,
+   "ms": 964,
+   "essais": 0,
+   "partielle": false,
+   "juge_indisponible": false,
+   "soutien": []
+  }
+ ]
+}

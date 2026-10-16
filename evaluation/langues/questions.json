@@ -1,0 +1,19 @@
+{
+  "questions": [
+    { "qid": "G01", "q": "Que reste-t-il de ce qu'on a appris au bout de deux jours, et comment éviter de l'oublier ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G02", "q": "Comment utiliser des cartes mémoire pour retenir la syntaxe d'un langage ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G03", "q": "Comment se préparer à être interrompu quand on programme ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G04", "q": "Qu'est-ce que la pratique délibérée pour un développeur ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G05", "q": "Quels défauts de nommage rendent une méthode trompeuse ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G06", "q": "Quelle différence entre mémoire épisodique et mémoire sémantique ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G07", "q": "Comment accueillir un nouveau développeur dans l'équipe sans le surcharger ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G08", "q": "Combien de temps une information reste-t-elle dans la mémoire à court terme, et combien d'éléments y tiennent ?", "gold": ["programmers-brain/Programmers_brain.pdf"] },
+    { "qid": "G09", "q": "Que faut-il écrire dans la description d'une pull request ?", "gold": ["lire-une-codebase/04-preparer-une-review.md"] },
+    { "qid": "G10", "q": "À quel moment la plupart des code smells apparaissent-ils dans un fichier ?", "gold": ["lire-une-codebase/02-code-smells.md"] }
+  ],
+  "sans_reponse": [
+    { "qid": "N01", "q": "Quel rôle joue l'hippocampe dans la mémoire des programmeurs ?", "registre": "voisin du livre, hors corpus" },
+    { "qid": "N02", "q": "Combien d'heures de pratique faut-il pour devenir expert en programmation ?", "registre": "voisin du livre, hors corpus" },
+    { "qid": "N03", "q": "Comment configurer ESLint pour imposer le camelCase ?", "registre": "voisin du livre, hors corpus" }
+  ]
+}
