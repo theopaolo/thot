@@ -35,6 +35,12 @@ export function assembler(parties: Partie[]): Document {
   return { texte, blocs };
 }
 
+/** Vrai si chaque bloc retombe exactement sur sa tranche du texte, comptée en points de code. */
+export function coherent(doc: Document) {
+  const caracteres = Array.from(doc.texte);
+  return doc.blocs.every((b) => caracteres.slice(b.debut, b.fin).join("") === b.texte);
+}
+
 const MAX_CHUNK = 1800;
 
 /**

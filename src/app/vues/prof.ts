@@ -784,7 +784,10 @@ export type Detail = {
   meta: Record<string, unknown>;
   job: { etat: string; erreur: string | null; avertissements: string[] } | undefined;
   images: ImageVue[];
+  /** blocs de la révision servie */
   blocs: Bloc[];
+  /** une extraction plus récente, dont le texte a changé */
+  attente?: { n: number; cree_le: string; avertissements: string[]; blocs: Bloc[] };
   catalogue?: Catalogue;
   affiliations?: Affiliation[];
 };
@@ -938,15 +941,34 @@ export const detailSource = (d: Detail) => {
         </p>
       `
           : ""
-    } ${
-      d.job?.avertissements.length
+    } ${avertissements(d.job?.avertissements ?? [])} ${
+      d.attente
         ? html`
-        <div class="alerte"><strong>Avertissements</strong><ul>${d.job.avertissements.map(
-          (a) =>
-            html`
-            <li>${a}</li>
-          `,
-        )}</ul></div>
+        <section aria-labelledby="revision-attente">
+          <h2 id="revision-attente">Nouvelle version à relire</h2>
+          <p class="note">
+            L'extraction du ${jour(d.attente.cree_le)} a changé le texte. Les lecteurs et Thot
+            gardent le texte actuel tant que cette version n'est pas certifiée. Les réponses déjà
+            données gardent le passage qu'elles citent.
+          </p>
+          ${avertissements(d.attente.avertissements)} ${
+            d.modifiable
+              ? html`
+              <form method="post" class="barre">
+                <button class="principal"
+                  formaction="/prof/sources/${d.source.id}/revisions/${d.attente.n}/certifiee">
+                  Certifier cette version
+                </button>
+                <button formaction="/prof/sources/${d.source.id}/revisions/${d.attente.n}/rejetee"
+                  data-confirmer="Rejeter cette version ? Elle sera supprimée, le texte actuel reste en service.">
+                  Rejeter cette version
+                </button>
+              </form>
+            `
+              : ""
+          }
+          <div class="document">${texteDocument(d.attente.blocs)}</div>
+        </section>
       `
         : ""
     } ${
@@ -973,11 +995,18 @@ export const detailSource = (d: Detail) => {
       `
         : ""
     }
-    <h2>Texte extrait</h2>
+    <h2>${d.attente ? "Texte actuel" : "Texte extrait"}</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
     </div>
   `;
 };
+
+const avertissements = (liste: string[]) =>
+  liste.length
+    ? html`<div class="alerte"><strong>Avertissements</strong><ul>${liste.map(
+        (a) => html`<li>${a}</li>`,
+      )}</ul></div>`
+    : "";
 
 const LEGENDES: Record<string, string> = {
   unreviewed: "non relue",

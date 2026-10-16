@@ -269,6 +269,8 @@ export type SourceLue = {
   sequence: string;
   seance: string;
   date: string;
+  /** la révision servie */
+  revision: number;
 };
 
 /** Cartel de musée: seulement les champs connus, rien d'inventé. */
@@ -488,6 +490,8 @@ export const lectureSource = (
   images: { id: string; legende: string | null }[],
   blocs: Bloc[],
   marque?: [number, number],
+  /** les blocs viennent d'une révision qui ne sert plus */
+  ancienne = false,
 ) =>
   html`
     <a class="bouton retour" href="${
@@ -500,6 +504,14 @@ export const lectureSource = (
       ${
         s.langue && s.langue !== "fr"
           ? html`<p class="note">Langue non prise en charge pour la recherche : ${s.langue}</p>`
+          : ""
+      }
+      ${
+        ancienne
+          ? html`<p class="note">
+              Version citée par une réponse précédente. Le texte du document a changé depuis.
+              <a href="/eleve/sources/${s.id}">Lire la version actuelle</a>
+            </p>`
           : ""
       }
       ${
@@ -697,6 +709,7 @@ export const panneauSource = (
     source_id: string;
     debut?: number;
     fin?: number;
+    revision?: number;
     avant?: string;
     milieu?: string;
     apres?: string;
@@ -760,7 +773,9 @@ export const panneauSource = (
         </div>
         <div class="feuille-pied">
           <a class="bouton" href="/eleve/sources/${a.source_id}${
-            a.debut !== undefined ? `?debut=${a.debut}&fin=${a.fin}#passage` : ""
+            a.debut !== undefined
+              ? `?debut=${a.debut}&fin=${a.fin}&revision=${a.revision ?? 1}#passage`
+              : ""
           }">${icone("file-text")}Ouvrir le document complet</a>
         </div>
       </aside>

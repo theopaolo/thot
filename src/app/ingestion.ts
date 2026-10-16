@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises";
-import { assembler, type Bloc, decouper, type Extraction } from "../core/document.ts";
+import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
+import {
+  assembler,
+  type Bloc,
+  coherent,
+  decouper,
+  type Document,
+  type Extraction,
+} from "../core/document.ts";
 import { extraireHtml } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
 import type { Modeles } from "../core/modeles.ts";
@@ -28,6 +35,8 @@ type Source = {
   statut: string;
   profil: Profil;
   langue: string;
+  /** la révision servie aux lecteurs et à l'index */
+  revision: number;
 };
 
 /**
@@ -113,19 +122,22 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
 
     const dossier = contenu(s.id);
     await mkdir(`${dossier}/assets`, { recursive: true });
-    await ecrireAtomique(`${dossier}/document.txt`, doc.texte);
-    await ecrireAtomique(
-      `${dossier}/blocs.jsonl`,
-      doc.blocs.map((b) => JSON.stringify(b)).join("\n"),
-    );
+    await enregistrer(db, s, doc, ext.avertissements);
+    // Une légende relue décrit des octets précis : d'autres octets à la même place repartent sans
+    // légende. La ligne change avant le fichier, une légende ne décrit donc jamais d'autres octets.
     const ins = db.prepare(
-      `INSERT OR IGNORE INTO images (id, source_id, position, fichier, mime, checksum)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO images (id, source_id, position, fichier, mime, checksum)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT (source_id, position) DO UPDATE SET fichier = excluded.fichier,
+         mime = excluded.mime, checksum = excluded.checksum, legende = NULL,
+         legende_origine = NULL, legende_statut = 'unreviewed', modele = NULL, relu_par = NULL,
+         relu_le = NULL
+       WHERE checksum != excluded.checksum`,
     );
     for (const [i, img] of ext.images.entries()) {
       const fichier = `image-${i}.${img.extension}`;
-      await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
       ins.run(`${s.id}-${i}`, s.id, i, fichier, img.mime, await sha256(img.octets));
+      await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
     }
     etat(db, job, "enriching", avertissements);
 
@@ -151,7 +163,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
       }
     }
     etat(db, job, "awaiting_review", avertissements, true);
-    // Une source déjà certifiée qu'on réingère se réindexe avec son nouveau texte.
+    // Une source déjà certifiée qu'on réingère se réindexe avec ses sections et légendes.
     if (s.statut === "certifiee") indexer(db, s.id);
   } catch (e) {
     db.prepare(
@@ -161,28 +173,103 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
   }
 }
 
+/** La révision 1 garde les fichiers du pilote, à la racine de la source. */
+const dossierRevision = (sourceId: string, n: number) =>
+  n === 1 ? contenu(sourceId) : contenu(sourceId, "revisions", String(n));
+
+const jsonl = (blocs: Bloc[]) => blocs.map((b) => JSON.stringify(b)).join("\n");
+
+const lireFichiers = async (dossier: string) => ({
+  texte: await readFile(`${dossier}/document.txt`, "utf8").catch(() => undefined),
+  blocs: await readFile(`${dossier}/blocs.jsonl`, "utf8").catch(() => undefined),
+});
+
+async function ecrireDocument(dossier: string, doc: Document) {
+  await mkdir(dossier, { recursive: true });
+  await ecrireAtomique(`${dossier}/document.txt`, doc.texte);
+  await ecrireAtomique(`${dossier}/blocs.jsonl`, jsonl(doc.blocs));
+}
+
+/** La révision plus récente que la révision servie, qui attend la relecture d'un enseignant. */
+export const revisionEnAttente = (db: Db, sourceId: string) =>
+  db
+    .prepare(
+      `SELECT r.n, r.avertissements, r.cree_le FROM revisions r JOIN sources s ON s.id = r.source_id
+     WHERE r.source_id = ? AND r.n > s.revision ORDER BY r.n DESC`,
+    )
+    .get(sourceId) as { n: number; avertissements: string; cree_le: string } | undefined;
+
 /**
- * Rejoue l'extraction d'une source déjà déposée, après une amélioration de l'extracteur. Seules
- * les sections changent: si le texte de `document.txt` différait, les offsets des citations déjà
- * données bougeraient, et la source reste telle quelle.
+ * Range une extraction. Une première extraction, ou un texte identique à celui de la révision
+ * servie, s'écrit en place : les offsets des citations ne bougent pas. Un autre texte devient une
+ * révision en attente, vérifiée avant d'être enregistrée. La révision servie reste citée jusqu'à
+ * ce qu'un enseignant certifie la nouvelle.
+ */
+async function enregistrer(db: Db, s: Source, doc: Document, avertissements: string[]) {
+  const blocs = jsonl(doc.blocs);
+  const servie = await lireFichiers(dossierRevision(s.id, s.revision));
+  if (servie.texte === undefined || servie.texte === doc.texte) {
+    db.prepare(
+      `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
+       ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
+    ).run(s.id, s.revision, JSON.stringify(avertissements), maintenant());
+    if (servie.texte === doc.texte && servie.blocs === blocs) return "identique";
+    await ecrireDocument(dossierRevision(s.id, s.revision), doc);
+    return "mise_a_jour";
+  }
+  const attente = revisionEnAttente(db, s.id);
+  if (attente) {
+    const fichiers = await lireFichiers(dossierRevision(s.id, attente.n));
+    if (fichiers.texte === doc.texte && fichiers.blocs === blocs) return "identique";
+  }
+  const n = (attente?.n ?? s.revision) + 1;
+  const dossier = contenu(s.id, "revisions", String(n));
+  // Un dossier sans ligne en base reste d'un essai interrompu.
+  await rm(dossier, { recursive: true, force: true });
+  await ecrireDocument(dossier, doc);
+  if (!coherent(lireDocument(s.id, n))) {
+    throw new Error(`Révision ${n} incohérente : un bloc ne retombe pas sur son texte.`);
+  }
+  db.prepare(
+    "INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)",
+  ).run(s.id, n, JSON.stringify(avertissements), maintenant());
+  // L'ancienne révision en attente n'a jamais servi : la nouvelle la remplace.
+  if (attente) await ecarterRevision(db, s.id, attente.n);
+  return "revision";
+}
+
+/** Écarte la révision en attente. Elle n'a jamais servi, personne ne la cite. */
+export async function ecarterRevision(db: Db, sourceId: string, n: number) {
+  const { changes } = db
+    .prepare(
+      `DELETE FROM revisions WHERE source_id = ? AND n = ?
+       AND n > (SELECT revision FROM sources WHERE id = ?)`,
+    )
+    .run(sourceId, n, sourceId);
+  if (!changes) throw new Error("Cette version n'attend plus de relecture.");
+  await rm(contenu(sourceId, "revisions", String(n)), { recursive: true, force: true });
+}
+
+/**
+ * Rejoue l'extraction d'une source extraite, après une amélioration de l'extracteur. Un texte
+ * changé devient une révision en attente : les citations déjà données gardent la leur.
  */
 export async function reextraire(db: Db, sourceId: string) {
   const s = lireSource(db, sourceId);
-  if (!["html", "pdf", "md"].includes(s.format)) return "ignoree";
-  const doc = assembler((await extraire(s)).parties);
-  const dossier = contenu(s.id);
-  if (doc.texte !== (await readFile(`${dossier}/document.txt`, "utf8"))) return "texte_change";
-  const blocs = doc.blocs.map((b) => JSON.stringify(b)).join("\n");
-  if (blocs === (await readFile(`${dossier}/blocs.jsonl`, "utf8"))) return "identique";
-  await ecrireAtomique(`${dossier}/blocs.jsonl`, blocs);
-  indexer(db, s.id);
-  return "mise_a_jour";
+  const job = db.prepare("SELECT etat FROM ingestion_jobs WHERE source_id = ?").get(sourceId);
+  if (!["html", "pdf", "md"].includes(s.format) || job?.etat !== "awaiting_review") {
+    return "ignoree";
+  }
+  const ext = await extraire(s);
+  const r = await enregistrer(db, s, assembler(ext.parties), ext.avertissements);
+  if (r === "mise_a_jour") indexer(db, s.id);
+  return r;
 }
 
 export type Meta = { sequence?: string; seance?: string };
 
-export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] } {
-  const dossier = contenu(sourceId);
+export function lireDocument(sourceId: string, revision: number): Document {
+  const dossier = dossierRevision(sourceId, revision);
   const texte = readFileSync(`${dossier}/document.txt`, "utf8");
   const blocs = readFileSync(`${dossier}/blocs.jsonl`, "utf8")
     .split("\n")
@@ -191,9 +278,13 @@ export function lireDocument(sourceId: string): { texte: string; blocs: Bloc[] }
   return { texte, blocs };
 }
 
-/** Chunks d'une source: texte de recherche avec toutes les légendes, preuve avec les certifiées. */
-export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
+/**
+ * Chunks d'une révision, la servie par défaut: texte de recherche avec toutes les légendes,
+ * preuve avec les certifiées. Titres et légendes sont ceux d'aujourd'hui, même pour une ancienne.
+ */
+export function chunksSource(db: Db, sourceId: string, revision?: number): ChunkIndexe[] {
   const s = lireSource(db, sourceId);
+  const n = revision ?? s.revision;
   const meta = JSON.parse(s.metadonnees) as Meta;
   const contexte = [
     s.profil === "arts-appliques" ? meta.sequence?.replace(/^ATC /, "") : meta.sequence,
@@ -207,7 +298,7 @@ export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
      WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
     )
     .all(sourceId) as { legende: string; legende_statut: string }[];
-  const chunks = decouper(lireDocument(sourceId));
+  const chunks = decouper(lireDocument(sourceId, n));
   return chunks.map((c, i) => {
     // Les images d'une page accompagnent son premier passage.
     const legendes = i === 0 ? images : [];
@@ -232,6 +323,7 @@ export function chunksSource(db: Db, sourceId: string): ChunkIndexe[] {
           .filter((l) => l.legende_statut === "certified")
           .map((l) => `Image : ${l.legende}`),
       ].join("\n\n"),
+      revision: n,
     };
   });
 }
@@ -303,7 +395,7 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
     `Fichier : ${s.fichier}`,
     `Séquence : ${meta.sequence ?? ""}`,
     `Séance : ${meta.seance ?? ""}`,
-    `Texte : ${lireDocument(sourceId).texte.slice(0, 2000)}`,
+    `Texte : ${lireDocument(sourceId, s.revision).texte.slice(0, 2000)}`,
   ].join("\n");
   let propositions = {};
   try {
@@ -332,7 +424,17 @@ export function indexer(db: Db, sourceId: string) {
   });
 }
 
-export function statuer(db: Db, sourceId: string, statut: "certifiee" | "rejetee", par: string) {
+/**
+ * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
+ * celle-ci dans la transaction de l'index : un échec laisse servir l'ancienne.
+ */
+export function statuer(
+  db: Db,
+  sourceId: string,
+  statut: "certifiee" | "rejetee",
+  par: string,
+  revision?: number,
+) {
   transaction(db, () => {
     if (
       statut === "certifiee" &&
@@ -340,6 +442,16 @@ export function statuer(db: Db, sourceId: string, statut: "certifiee" | "rejetee
         "awaiting_review"
     ) {
       throw new Error("La source n'est pas prête à être certifiée.");
+    }
+    if (revision !== undefined) {
+      if (revisionEnAttente(db, sourceId)?.n !== revision) {
+        throw new Error("Cette version n'attend plus de relecture.");
+      }
+      // Les questions suggérées ont été vérifiées sur l'ancien texte.
+      db.prepare("UPDATE sources SET revision = ?, suggestions_le = NULL WHERE id = ?").run(
+        revision,
+        sourceId,
+      );
     }
     db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?").run(
       statut,

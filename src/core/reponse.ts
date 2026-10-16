@@ -6,6 +6,7 @@ import {
   type ChunkIndexe,
   lireChunk,
   type Perimetre,
+  revisionCitable,
 } from "./recherche.ts";
 import { trouverFragments } from "./texte.ts";
 import type { Profil } from "./profils.ts";
@@ -20,6 +21,8 @@ export type Affirmation = {
   /** offsets dans `document.txt`, absents quand la citation vient d'une légende certifiée */
   debut?: number;
   fin?: number;
+  /** révision citée, absente des réponses antérieures aux révisions: elles citent la révision 1 */
+  revision?: number;
 };
 
 export type Resultat =
@@ -109,7 +112,7 @@ export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
     if (citation.split(/\s+/).length < 3) {
       return erreurs.push(`Affirmation ${i + 1}: citation trop courte.`);
     }
-    const base = { texte, citation, source_id: c.source_id, chunk_id: c.id };
+    const base = { texte, citation, source_id: c.source_id, chunk_id: c.id, revision: c.revision };
     const dansTexte = trouverFragments(c.texte, citation);
     if (dansTexte) {
       affirmations.push({
@@ -131,11 +134,28 @@ export function verifier(brute: Brute | null, retenus: ChunkIndexe[]) {
   return { erreurs, affirmations, refus: false };
 }
 
-/** Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. */
-export function actualiserResultat(db: DatabaseSync, resultat: Resultat, p: Perimetre): Resultat {
+/**
+ * Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. Une
+ * citation d'une révision qui ne sert plus se revérifie dans les chunks que `ancienne` recalcule
+ * pour cette révision, avec les titres et légendes actuels.
+ */
+export function actualiserResultat(
+  db: DatabaseSync,
+  resultat: Resultat,
+  p: Perimetre,
+  ancienne: (sourceId: string, revision: number) => ChunkIndexe[] = () => [],
+): Resultat {
   if (resultat.etat !== "answered") return resultat;
   for (const a of resultat.affirmations) {
-    const c = lireChunk(db, a.source_id, a.chunk_id, p);
+    const n = a.revision ?? 1;
+    let c = lireChunk(db, a.source_id, a.chunk_id, p);
+    if (c?.revision !== n) {
+      const servie = c?.revision ?? revisionCitable(db, a.source_id, p);
+      c =
+        servie !== undefined && n < servie
+          ? ancienne(a.source_id, n).find((x) => x.id === a.chunk_id)
+          : undefined;
+    }
     const valide = c && verifier({ affirmations: [{ ...a, extrait: 1 }] }, [c]).affirmations[0];
     if (!valide || valide.titre !== a.titre || valide.debut !== a.debut || valide.fin !== a.fin) {
       return {

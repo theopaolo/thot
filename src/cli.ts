@@ -67,7 +67,8 @@ const AIDE = `thot <commande>
   suggestions <source_id...> | --tout       questions vérifiées proposées aux élèves
   nettoyer                                  retire les pages Pearltrees réduites à leur titre
   rebuild                                   reconstruit l'index des sources certifiées
-  reextraire                                rejoue l'extraction des sources, garde les offsets
+  reextraire                                rejoue l'extraction des sources, un texte changé
+                                            devient une révision à certifier
   ask "<question>" [--json]                 pose une question sur le corpus certifié
   eval recherche --img-order=<img_order.json> [--docs=<docs.json>] [--sans-reclasseur]
                                             rejoue les 59 requêtes annotées
@@ -589,9 +590,15 @@ type Paire = {
   soutient: boolean | null;
 };
 
-function paragraphe(a: { source_id: string; citation: string; debut?: number; fin?: number }) {
+function paragraphe(a: {
+  source_id: string;
+  citation: string;
+  debut?: number;
+  fin?: number;
+  revision?: number;
+}) {
   if (a.debut === undefined || a.fin === undefined) return a.citation;
-  const x = contexte(lireDocument(a.source_id).texte, a.debut, a.fin);
+  const x = contexte(lireDocument(a.source_id, a.revision ?? 1).texte, a.debut, a.fin);
   return x.avant + x.milieu + x.apres;
 }
 
@@ -828,7 +835,7 @@ switch (commande) {
     }
     for (const [etat, fichiers] of Object.entries(bilan)) {
       console.log(`${etat}: ${fichiers.length}`);
-      if (etat === "texte_change") fichiers.forEach((f) => console.log(`  ${f}`));
+      if (etat === "revision") fichiers.forEach((f) => console.log(`  ${f}`));
     }
     break;
   }

@@ -47,6 +47,8 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
     db.exec(`INSERT INTO sources
       (id, school_id, titre, metadonnees, fichier, format, checksum, octets, enseignant, cree_le)
       VALUES ('ancien', 'ecole-historique', 'Document', '{}', 'cours.html', 'html', 'abc', 1, 'Prof', 'fixture')`);
+    db.exec(`INSERT INTO chunks (id, source_id, school_id, titre, debut, fin, texte, rappel, preuve)
+      VALUES ('chk_0', 'ancien', 'ecole-historique', 'Document', 0, 5, 'Texte', 'Texte', 'Texte')`);
     cacheModeles(db).ecrire("commun", "pilote");
     db.exec(`INSERT INTO messages (id, compte_id, question, etat, cree_le, maj_le)
       SELECT 'historique', id, 'Question du pilote', 'out_of_corpus', 'fixture', 'fixture' FROM comptes`);
@@ -56,6 +58,7 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
       "0008_acces.sql",
       "0009_membres.sql",
       "0010_liens.sql",
+      "0011_revisions.sql",
     ]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
@@ -65,6 +68,18 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
     assertEquals(cacheModeles(db).lire("commun"), "pilote");
     assertEquals(db.prepare("SELECT question FROM messages").get()!.question, "Question du pilote");
     assertEquals(db.prepare("SELECT school_id FROM sources").get()!.school_id, "ecole-historique");
+    // Les fichiers du pilote et son index deviennent la révision 1, servie.
+    assertEquals(
+      {
+        ...db
+          .prepare(
+            `SELECT s.revision AS servie, r.n, c.revision AS indexee FROM sources s
+             JOIN revisions r ON r.source_id = s.id JOIN chunks c ON c.source_id = s.id`,
+          )
+          .get(),
+      },
+      { servie: 1, n: 1, indexee: 1 },
+    );
     assertEquals(migrer(db), []);
     configurerInstance(db, "Nouveau nom");
     assertEquals(lireInstance(db).id, instance.id);

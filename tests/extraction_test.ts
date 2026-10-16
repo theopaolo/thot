@@ -2,11 +2,21 @@ import { readdirSync } from "node:fs";
 import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
 import { fileURLToPath } from "node:url";
-import { assembler } from "../src/core/document.ts";
+import { assembler, coherent } from "../src/core/document.ts";
 import { extraireHtml, pageVide, rubriquesSommaire } from "../src/core/html.ts";
 import { extraireMarkdown, lireFrontMatter } from "../src/core/markdown.ts";
 import { decouperPdf, extrairePdf } from "../src/core/pdf.ts";
 import { tranche } from "../src/core/texte.ts";
+
+test("une révision est cohérente quand chaque bloc retombe sur son texte en points de code", () => {
+  const doc = assembler([
+    { texte: "Palette 🎨 de Gaudí", section: "A" },
+    { texte: "Il refuse la ligne droite.", section: "A" },
+  ]);
+  assert(coherent(doc));
+  const decale = { ...doc.blocs[1], debut: doc.blocs[1].debut - 1 };
+  assert(!coherent({ ...doc, blocs: [doc.blocs[0], decale] }));
+});
 
 test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, page muette signalée", () => {
   const brut = [

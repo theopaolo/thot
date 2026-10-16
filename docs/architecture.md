@@ -11,9 +11,10 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
    juge (`juger()`, même fichier) contrôle ensuite que ce passage, lu sous le titre de son
    extrait, prouve toute la phrase. Un juge injoignable ou plus lent que 4 s laisse passer
    l'affirmation et le note au journal. Le dépassement du délai annule la requête du juge.
-   Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau.
-   Si une preuve ou son titre a changé, ou si le lecteur n'y a plus accès, la réponse est
-   signalée comme indisponible et peut être recalculée.
+   Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau,
+   dans la révision que cite la réponse. Si une preuve ou son titre a changé, ou si le lecteur
+   n'y a plus accès, la réponse est signalée comme indisponible et peut être recalculée. Une
+   nouvelle révision ne rend pas indisponible une réponse qui cite l'ancienne.
 2. Une légende d'image générée et non relue sert à la recherche. Elle ne sert pas de preuve et
    ne s'affiche pas à l'élève. Chaque chunk porte donc deux textes : `rappel` pour la recherche,
    `preuve` pour la citation.
@@ -24,11 +25,16 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
    qu'un enseignant ne l'a pas certifié. Les questions suggérées font exception : le worker ne
    garde que celles auxquelles la chaîne de réponse répond avec des citations vérifiées.
 5. Le corpus reste lisible sans l'application. Chaque source vit dans
-   `data/content/{source}/` : original, `document.txt`, `blocs.jsonl`, images. L'index de
-   recherche se reconstruit depuis ces fichiers par `thot rebuild`.
-6. `document.txt` est le système de coordonnées des citations. Les offsets comptent des points
-   de code, les chaînes JavaScript des unités UTF-16. Tout découpage passe par
-   `src/core/texte.ts`.
+   `data/content/{source}/` : original, images, `document.txt` et `blocs.jsonl` de sa révision 1,
+   puis `revisions/{n}/` pour chaque révision suivante. La base dit quelle révision sert.
+   L'index de recherche se reconstruit depuis les révisions servies par `thot rebuild`.
+6. Le `document.txt` d'une révision est le système de coordonnées de ses citations, et son texte
+   ne change plus. Une extraction dont le texte diffère de la révision servie devient une
+   révision en attente, vérifiée bloc par bloc. Elle ne sert qu'une fois certifiée par un
+   enseignant, et l'index ne contient que la révision servie. Une ancienne révision se lit avec
+   les mêmes droits que la source : retirer l'accès à la source la retire aussi.
+   Les offsets comptent des points de code, les chaînes JavaScript des unités UTF-16. Tout
+   découpage passe par `src/core/texte.ts`.
 7. Le choix d'un modèle est un réglage d'environnement. Il ne traverse pas le domaine.
 
 ## Forme du système
@@ -90,8 +96,7 @@ et le quiz d'identification. Il garde aussi les consignes de réponse, de juge, 
 de légende mesurées sur le pilote. La première matière fixe le profil de l'instance. Une seule
 action le change pour toutes les matières, tant qu'aucune ressource n'a un autre profil. Ensuite,
 l'administration et la CLI refusent une matière d'un autre profil. La source capture le profil au
-dépôt, y compris sans matière. Une réextraction
-conserve ce profil et refuse de déplacer les citations si le texte change.
+dépôt, y compris sans matière. Une réextraction conserve ce profil.
 
 La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
 française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de
@@ -163,6 +168,19 @@ stateDiagram-v2
     rejetee --> certifiee
   }
   note right of Source: seule une source certifiee a des chunks dans l'index
+```
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  state "Révision" as Revision {
+    [*] --> servie: première extraction
+    [*] --> en_attente: texte changé
+    en_attente --> servie: certifiée
+    en_attente --> [*]: rejetée ou remplacée
+    servie --> conservee: une autre est certifiée
+  }
+  note right of Revision: certifier une révision certifie aussi sa source
 ```
 
 ```mermaid

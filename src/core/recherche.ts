@@ -22,6 +22,8 @@ export type ChunkIndexe = {
   rappel: string;
   /** texte de preuve: texte et légendes certifiées seulement */
   preuve: string;
+  /** révision de la source dont le chunk est tiré */
+  revision: number;
 };
 
 export type Candidat = ChunkIndexe & { rang_fts: number; score?: number };
@@ -104,8 +106,8 @@ export function retirerSource(db: DatabaseSync, sourceId: string) {
 export function indexerSource(db: DatabaseSync, sourceId: string, chunks: ChunkIndexe[]) {
   retirerSource(db, sourceId);
   const ins = db.prepare(
-    "INSERT INTO chunks (id, source_id, school_id, titre, debut, fin, texte, rappel, preuve)" +
-      " VALUES (:id, :source_id, :school_id, :titre, :debut, :fin, :texte, :rappel, :preuve)",
+    "INSERT INTO chunks (id, source_id, school_id, titre, debut, fin, texte, rappel, preuve, revision)" +
+      " VALUES (:id, :source_id, :school_id, :titre, :debut, :fin, :texte, :rappel, :preuve, :revision)",
   );
   const fts = db.prepare("INSERT INTO chunks_fts (rowid, titre, texte) VALUES (?, ?, ?)");
   for (const c of chunks) {
@@ -144,28 +146,34 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));
 }
 
-export function lireChunk(db: DatabaseSync, sourceId: string, id: string, p: Perimetre) {
-  return db
+/** Une source que le périmètre peut citer: certifiée, lisible par son lecteur, dans son domaine. */
+const CITABLE = `s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
+  AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
+  AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`;
+const parametresCitable = (p: Perimetre) => [
+  p.schoolId,
+  ...parametresAcces(p.lecteur),
+  p.bibliotheque ? 1 : 0,
+  p.chapitre ?? "",
+  p.chapitre ?? "",
+  p.sourceId ?? "",
+  p.sourceId ?? "",
+  ...parametresDomaine(p),
+];
+
+export const lireChunk = (db: DatabaseSync, sourceId: string, id: string, p: Perimetre) =>
+  db
     .prepare(
       `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
-     WHERE c.source_id = ? AND c.id = ? AND s.school_id = ? AND s.statut = 'certifiee'
-       AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-       AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
-       AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`,
+     WHERE c.source_id = ? AND c.id = ? AND ${CITABLE}`,
     )
-    .get(
-      sourceId,
-      id,
-      p.schoolId,
-      ...parametresAcces(p.lecteur),
-      p.bibliotheque ? 1 : 0,
-      p.chapitre ?? "",
-      p.chapitre ?? "",
-      p.sourceId ?? "",
-      p.sourceId ?? "",
-      ...parametresDomaine(p),
-    ) as ChunkIndexe | undefined;
-}
+    .get(sourceId, id, ...parametresCitable(p)) as ChunkIndexe | undefined;
+
+/** La révision servie d'une source que le périmètre peut citer, sinon `undefined`. */
+export const revisionCitable = (db: DatabaseSync, sourceId: string, p: Perimetre) =>
+  db
+    .prepare(`SELECT s.revision FROM sources s WHERE s.id = ? AND ${CITABLE}`)
+    .get(sourceId, ...parametresCitable(p))?.revision as number | undefined;
 
 /**
  * FTS5 top 20, reclassement, top 5. Sous le seuil, la question est hors corpus. Si le reclasseur

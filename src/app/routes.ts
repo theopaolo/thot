@@ -44,7 +44,14 @@ import { lireInstance } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { audience, controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
-import { chunksSource, lireDocument, relireLegende, statuer } from "./ingestion.ts";
+import {
+  chunksSource,
+  ecarterRevision,
+  lireDocument,
+  relireLegende,
+  revisionEnAttente,
+  statuer,
+} from "./ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import {
   administration,
@@ -743,18 +750,26 @@ export function creerApp(db: Db, modeles: Modeles) {
   const detail = (id: string, compte: Compte): Prof.Detail | undefined => {
     const source = db
       .prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?")
-      .get(id, instance.school_id) as (Prof.Detail["source"] & { metadonnees: string }) | undefined;
+      .get(id, instance.school_id) as
+      | (Prof.Detail["source"] & { metadonnees: string; revision: number })
+      | undefined;
     if (!source || !peutLire(db, compte, id)) return undefined;
     const job = db
       .prepare("SELECT etat, erreur, avertissements FROM ingestion_jobs WHERE source_id = ?")
       .get(id) as { etat: string; erreur: string | null; avertissements: string } | undefined;
     let blocs: Prof.Detail["blocs"] = [];
     try {
-      blocs = lireDocument(id).blocs;
+      blocs = lireDocument(id, source.revision).blocs;
     } catch {
       /* pas encore extrait */
     }
+    const attente = revisionEnAttente(db, id);
     return {
+      attente: attente && {
+        ...attente,
+        avertissements: JSON.parse(attente.avertissements),
+        blocs: lireDocument(id, attente.n).blocs,
+      },
       source,
       modifiable: peutModifier(db, compte, id),
       catalogue: Domaines.catalogueDe(db, compte),
@@ -867,13 +882,32 @@ export function creerApp(db: Db, modeles: Modeles) {
     }
     return c.redirect(`/prof/sources/${d.source.id}`, 303);
   });
-  app.post("/prof/sources/:id/:statut{certifiee|rejetee}", (c) => {
+  // Hono ne groupe pas l'alternative d'un motif : sans `(?:…)`, ce chemin prendrait toute
+  // adresse qui finit par « rejetee », celle d'une révision comprise.
+  app.post("/prof/sources/:id/:statut{(?:certifiee|rejetee)}", (c) => {
     const id = c.req.param("id");
     const d = detail(id, c.get("compte"));
     if (!d) return c.notFound();
     if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
     return c.html(Prof.statutSource(detail(id, c.get("compte"))!.source));
+  });
+  // Certifier la version en attente la fait servir, la rejeter la supprime.
+  app.post("/prof/sources/:id/revisions/:n{[0-9]+}/:statut{(?:certifiee|rejetee)}", async (c) => {
+    const id = c.req.param("id");
+    const d = detail(id, c.get("compte"));
+    if (!d) return c.notFound();
+    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    const n = Number(c.req.param("n"));
+    try {
+      if (c.req.param("statut") === "certifiee") {
+        statuer(db, id, "certifiee", c.get("compte").nom, n);
+      } else await ecarterRevision(db, id, n);
+    } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+      return c.text((e as Error).message, 409);
+    }
+    return c.redirect(`/prof/sources/${id}`, 303);
   });
 
   // La file ne propose que les images des sources que le compte peut relire.
@@ -908,7 +942,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       rendre(c, "Légendes", Prof.pageLegendes(aLegender(c, c.req.query("image")), fileLegendes(c))),
     ),
   );
-  app.post("/prof/legendes/:action{certified|rejected}", async (c) => {
+  app.post("/prof/legendes/:action{(?:certified|rejected)}", async (c) => {
     const b = await c.req.parseBody();
     const source = db.prepare("SELECT source_id FROM images WHERE id = ?").get(String(b.image))
       ?.source_id as string | undefined;
@@ -929,7 +963,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const sourceCertifiee = (id: string, l: Lecteur) =>
     db
       .prepare(
-        `SELECT id, titre, enseignant, profil, langue, metadonnees, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
+        `SELECT id, titre, enseignant, profil, langue, metadonnees, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
@@ -1108,15 +1142,14 @@ export function creerApp(db: Db, modeles: Modeles) {
   const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
     const s = db
       .prepare(
-        `SELECT id, titre, enseignant, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
+        `SELECT id, titre, enseignant, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
       )
-      .get(id, instance.school_id, ...parametresAcces(l)) as Omit<
-      Eleve.Apercu,
-      "image_id" | "legende" | "images" | "extrait"
-    >;
+      .get(id, instance.school_id, ...parametresAcces(l)) as
+      | (Omit<Eleve.Apercu, "image_id" | "legende" | "images" | "extrait"> & { revision: number })
+      | undefined;
     if (!s) return undefined;
     const images = db
       .prepare(
@@ -1126,7 +1159,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       .all(id) as { id: string; legende: string | null }[];
     let extrait = "";
     try {
-      const texte = lireDocument(id)
+      const texte = lireDocument(id, s.revision)
         .blocs.filter(
           (b) =>
             b.texte !== s.titre && b.texte !== b.section && !Eleve.COMPTEUR_DIAPO.test(b.texte),
@@ -1166,6 +1199,9 @@ export function creerApp(db: Db, modeles: Modeles) {
       Number.isInteger(debut) && Number.isInteger(fin) && fin > debut
         ? ([debut, fin] as [number, number])
         : undefined;
+    // Une ancienne réponse ouvre la révision qu'elle cite. Une révision en attente ne se lit pas.
+    const revision = Number(c.req.query("revision") ?? s.revision);
+    if (!Number.isInteger(revision) || revision < 1 || revision > s.revision) return c.notFound();
     return c.html(
       rendre(
         c,
@@ -1173,8 +1209,9 @@ export function creerApp(db: Db, modeles: Modeles) {
         Eleve.lectureSource(
           s,
           images,
-          lireDocument(s.id).blocs.filter((b) => !Eleve.COMPTEUR_DIAPO.test(b.texte)),
+          lireDocument(s.id, revision).blocs.filter((b) => !Eleve.COMPTEUR_DIAPO.test(b.texte)),
           marque,
+          revision < s.revision,
         ),
         "lecture",
       ),
@@ -1255,9 +1292,17 @@ export function creerApp(db: Db, modeles: Modeles) {
     );
   });
 
-  // La relecture d'une réponse revérifie ses preuves avec les droits actuels du lecteur.
+  // La relecture d'une réponse revérifie ses preuves avec les droits actuels du lecteur, dans la
+  // révision qu'elle cite.
+  // ponytail: une révision qui ne sert plus se relit et se redécoupe à chaque affichage. Garder ses
+  // chunks en mémoire si le chat ralentit.
   const resultatActuel = (texte: string, l: Lecteur) =>
-    actualiserResultat(db, JSON.parse(texte), { schoolId: instance.school_id, lecteur: l });
+    actualiserResultat(
+      db,
+      JSON.parse(texte),
+      { schoolId: instance.school_id, lecteur: l },
+      (id, n) => chunksSource(db, id, n),
+    );
 
   const messagesDe = (compte: Compte) =>
     (
@@ -1538,11 +1583,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     if (a.debut === undefined || a.fin === undefined) {
       return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
     }
-    const texte = lireDocument(a.source_id).texte;
+    const revision = a.revision ?? 1;
+    const texte = lireDocument(a.source_id, revision).texte;
     return c.html(
       Eleve.panneauSource(
         {
           ...a,
+          revision,
           enseignant: source.enseignant,
           ...contexte(texte, a.debut, a.fin),
         },

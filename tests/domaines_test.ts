@@ -106,6 +106,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0008_acces.sql",
       "0009_membres.sql",
       "0010_liens.sql",
+      "0011_revisions.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -834,6 +835,7 @@ test("sonde lexicale français / anglais : français conservé, anglais non qual
           texte: x.texte,
           rappel: x.texte,
           preuve: x.texte,
+          revision: 1,
         })),
       );
       resultats[langue] = jeu.filter((x, i) =>

@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { rm, mkdtemp } from "node:fs/promises";
+import { rm, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
@@ -8,7 +8,7 @@ import { connexion, type Db, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { type Audience, deposer, valider } from "../src/app/depot.ts";
 import { configurerInstance, lireInstance } from "../src/app/instance.ts";
-import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
+import { reextraire, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import { chercherFts, type Lecteur } from "../src/core/recherche.ts";
 import { actualiserResultat, demander } from "../src/core/reponse.ts";
 import type { Modeles } from "../src/core/modeles.ts";
@@ -204,6 +204,7 @@ test("écriture : le propriétaire et les administrateurs seulement", async () =
     const modifier = { titre: "Corrigé", sequence: "", audience: "prive" };
     assertEquals(await poster(b, `/prof/sources/${collegues}/modifier`, modifier), 403);
     assertEquals(await poster(b, `/prof/sources/${collegues}/rejetee`, {}), 403);
+    assertEquals(await poster(b, `/prof/sources/${collegues}/revisions/2/certifiee`, {}), 403);
     assertEquals(
       await poster(b, "/prof/legendes/rejected", { image: image(db, collegues), texte: "" }),
       403,
@@ -335,6 +336,47 @@ test("réponses : preuves lisibles par le lecteur, retrait pendant la générati
   }
 });
 
+test("révisions : une version citée ne se lit qu'avec l'accès actuel", async () => {
+  const { db, dir, eleve, eleves } = await instance(fauxModeles({ sorties: [BONNE] }).modeles);
+  try {
+    const fragment = await (
+      await eleve.requete("/eleve/questions", {
+        method: "POST",
+        headers: { "HX-Request": "true" },
+        body: new URLSearchParams({ texte: "Pourquoi la façade n'a pas de ligne droite ?" }),
+      })
+    ).text();
+    const mid = fragment.match(/messages\/([\w-]+)\/flux/)![1];
+    await (await eleve.requete(`/eleve/messages/${mid}/flux`)).text();
+
+    // La version citée cesse de servir, une troisième attend sa certification.
+    const original = join(config.donnees, "content", eleves, "original", "cours.html");
+    const page = readFileSync(original, "utf8");
+    await writeFile(original, page.replace("<p>", "<p>Une phrase ajoutée.</p><p>"));
+    assertEquals(await reextraire(db, eleves), "revision");
+    statuer(db, eleves, "certifiee", "Test", 2);
+    await writeFile(original, page.replace("<p>", "<p>Une autre phrase.</p><p>"));
+    assertEquals(await reextraire(db, eleves), "revision");
+
+    const ancienne = `/eleve/sources/${eleves}?revision=1`;
+    const panneau = async () => (await eleve.requete(`/eleve/messages/${mid}/citations/0`)).text();
+    assertEquals(await statut(eleve.requete(ancienne)), 200);
+    assertEquals(await statut(eleve.requete(`/eleve/sources/${eleves}?revision=3`)), 404);
+    assertStringIncludes(await panneau(), "<mark>");
+
+    db.prepare("UPDATE sources SET audience = 'prive' WHERE id = ?").run(eleves);
+    assertEquals(await statut(eleve.requete(ancienne)), 404);
+    assert(!(await panneau()).includes("<mark>"));
+    assertStringIncludes(
+      await (await eleve.requete("/eleve/chat")).text(),
+      "Une source de cette réponse a été retirée ou modifiée.",
+    );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("partager une source ne partage pas les échanges de son propriétaire", async () => {
   const f = fauxModeles({ sorties: [BONNE] });
   const { db, dir, a, b } = await instance(f.modeles);
@@ -415,7 +457,12 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
         `INSERT INTO sources (id,school_id,titre,metadonnees,fichier,format,checksum,octets,enseignant,cree_le) VALUES (?, 'pilote', 'Cours', ?, 'cours.html', 'html', 'x', 1, ?, 'fixture')`,
       ).run(String(i), JSON.stringify({ sequence: "Lumière", publics }), enseignant);
     }
-    assertEquals(migrer(db), ["0008_acces.sql", "0009_membres.sql", "0010_liens.sql"]);
+    assertEquals(migrer(db), [
+      "0008_acces.sql",
+      "0009_membres.sql",
+      "0010_liens.sql",
+      "0011_revisions.sql",
+    ]);
     assertEquals(
       db
         .prepare("SELECT audience, reponses, proprietaire_id, metadonnees FROM sources ORDER BY id")
@@ -602,7 +649,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       INSERT INTO cours (id, matiere_id, nom) VALUES ('c1', 'm', 'Design'), ('c2', 'm', 'Histoire');
       INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le)
         VALUES ('p', 'p', 'Prof', 'enseignant', '', '', 'x'), ('e', 'e', 'Élève', 'eleve', '', '', 'x');`);
-    assertEquals(migrer(db), ["0009_membres.sql", "0010_liens.sql"]);
+    assertEquals(migrer(db), ["0009_membres.sql", "0010_liens.sql", "0011_revisions.sql"]);
     assertEquals(
       db
         .prepare("SELECT cours_id || compte_id AS m FROM membres_cours ORDER BY m")

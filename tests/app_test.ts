@@ -175,7 +175,7 @@ async function sourceTraitee(
   return db.prepare("SELECT id FROM sources").get()!.id as string;
 }
 
-test("réextraire met à jour les sections, jamais le texte des citations", async () => {
+test("réextraire met à jour les sections en place, jamais le texte des citations", async () => {
   const { db } = await environnement();
   const id = await sourceTraitee(db);
   assertEquals(await reextraire(db, id), "identique");
@@ -185,10 +185,15 @@ test("réextraire met à jour les sections, jamais le texte des citations", asyn
   assertEquals(await reextraire(db, id), "mise_a_jour");
   assertEquals(await readFile(blocs, "utf8"), avant);
   const doc = join(config.donnees, "content", id, "document.txt");
-  await writeFile(doc, (await readFile(doc, "utf8")) + " modifié");
+  const extrait = await readFile(doc, "utf8");
+  await writeFile(doc, extrait + " modifié");
   await writeFile(blocs, "");
-  assertEquals(await reextraire(db, id), "texte_change", "des offsets bougeraient");
-  assertEquals(await readFile(blocs, "utf8"), "", "la source reste telle quelle");
+  assertEquals(await reextraire(db, id), "revision", "des offsets bougeraient");
+  assertEquals(await readFile(blocs, "utf8"), "", "la révision servie reste telle quelle");
+  assertEquals(
+    await readFile(join(config.donnees, "content", id, "revisions/2/document.txt"), "utf8"),
+    extrait,
+  );
 });
 
 test("un travail interrompu reprend après expiration du verrou, sans image en double", async () => {
@@ -1230,6 +1235,139 @@ test("les réponses conservées et leurs panneaux revérifient la preuve actuell
   }
 });
 
+/** Réécrit l'original HTML de la source, comme le lirait un extracteur corrigé. */
+async function changerOriginal(id: string, avant: string, apres: string) {
+  const original = join(config.donnees, "content", id, "original", "casa.html");
+  await writeFile(original, (await readFile(original, "utf8")).replace(avant, apres));
+}
+
+const revisions = (db: Parameters<typeof traiter>[0], id: string) => ({
+  servie: db.prepare("SELECT revision FROM sources WHERE id = ?").get(id)!.revision,
+  index: db
+    .prepare("SELECT DISTINCT revision FROM chunks WHERE source_id = ?")
+    .all(id)
+    .map((c) => c.revision),
+  enregistrees: db
+    .prepare("SELECT n FROM revisions WHERE source_id = ? ORDER BY n")
+    .all(id)
+    .map((r) => r.n),
+});
+
+test("un texte réextrait attend sa certification, une ancienne réponse garde son passage", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const id = await sourceTraitee(db, undefined, undefined, prof);
+    statuer(db, id, "certifiee", "Prof");
+    const sorties = [REPONSE_CITEE, REPONSE_CITEE];
+    const eleve = await session(db, fauxModeles({ sorties }).modeles, "eleve");
+    const ancien = await poserQuestion(eleve.requete);
+    await (await eleve.requete(`/eleve/messages/${ancien}/flux`)).text();
+
+    // Une phrase de plus avant le passage cité déplace ses offsets.
+    await changerOriginal(id, "<p>Gaudí", "<p>Une phrase ajoutée.</p><p>Gaudí");
+    assertEquals(await reextraire(db, id), "revision");
+    assertEquals(await reextraire(db, id), "identique", "la version en attente est déjà là");
+    assertEquals(revisions(db, id), { servie: 1, index: [1], enregistrees: [1, 2] });
+    assertStringIncludes(
+      await (await prof.requete(`/prof/sources/${id}`)).text(),
+      "Nouvelle version à relire",
+    );
+    assertEquals((await eleve.requete(`/eleve/sources/${id}?revision=2`)).status, 404);
+
+    const certifier = await prof.requete(`/prof/sources/${id}/revisions/2/certifiee`, {
+      method: "POST",
+    });
+    assertEquals(certifier.status, 303);
+    assertEquals(revisions(db, id), { servie: 2, index: [2], enregistrees: [1, 2] });
+
+    assertStringIncludes(
+      await (await eleve.requete("/eleve/chat")).text(),
+      "Gaudí refuse la ligne droite.",
+    );
+    const panneau = await (await eleve.requete(`/eleve/messages/${ancien}/citations/0`)).text();
+    assertStringIncludes(panneau, "<mark>Gaudí refuse la ligne droite dans toute la façade</mark>");
+    const lien = panneau.match(/href="(\/eleve\/sources\/[^"#]+)/)![1].replaceAll("&amp;", "&");
+    assertStringIncludes(lien, "revision=1");
+    const lecture = await (await eleve.requete(lien)).text();
+    assertStringIncludes(lecture, "Version citée par une réponse précédente");
+    assert(!lecture.includes("Une phrase ajoutée."));
+
+    const nouveau = await poserQuestion(eleve.requete);
+    await (await eleve.requete(`/eleve/messages/${nouveau}/flux`)).text();
+    const [a, b] = [ancien, nouveau].map(
+      (m) =>
+        JSON.parse(
+          db.prepare("SELECT resultat FROM messages WHERE id = ?").get(m)!.resultat as string,
+        ).affirmations[0],
+    );
+    assertEquals([a.revision, b.revision], [1, 2]);
+    assert(b.debut > a.debut, "la nouvelle réponse cite la nouvelle version");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("un échec d'extraction ou d'indexation laisse servir la révision certifiée", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const id = await sourceTraitee(db, undefined, undefined, prof);
+    statuer(db, id, "certifiee", "Prof");
+    const racine = join(config.donnees, "content", id);
+    const page = await readFile(join(racine, "original", "casa.html"));
+    await rm(join(racine, "original", "casa.html"));
+    await assertRejects(() => reextraire(db, id));
+    assertEquals(revisions(db, id), { servie: 1, index: [1], enregistrees: [1] });
+
+    await writeFile(join(racine, "original", "casa.html"), page);
+    await changerOriginal(id, "ligne droite", "ligne sinueuse");
+    assertEquals(await reextraire(db, id), "revision");
+    db.exec(`CREATE TRIGGER index_indisponible BEFORE INSERT ON chunks
+      BEGIN SELECT RAISE(ABORT, 'Index indisponible'); END`);
+    assertThrows(() => statuer(db, id, "certifiee", "Prof", 2), Error, "Index indisponible");
+    db.exec("DROP TRIGGER index_indisponible");
+    assertEquals(revisions(db, id), { servie: 1, index: [1], enregistrees: [1, 2] });
+    const cherche = (q: string) => chercherFts(db, q, { lecteur: null, schoolId: "pilote" }).length;
+    assertEquals([cherche("droite"), cherche("sinueuse")], [1, 0]);
+
+    // Rejeter la version en attente la supprime. Une page restée ouverte ne la certifie plus.
+    const rejeter = await prof.requete(`/prof/sources/${id}/revisions/2/rejetee`, {
+      method: "POST",
+    });
+    assertEquals(rejeter.status, 303);
+    assertEquals(revisions(db, id), { servie: 1, index: [1], enregistrees: [1] });
+    await assertRejects(() => readFile(join(racine, "revisions", "2", "document.txt")));
+    assertStringIncludes(await readFile(join(racine, "document.txt"), "utf8"), "ligne droite");
+    const tard = await prof.requete(`/prof/sources/${id}/revisions/2/certifiee`, {
+      method: "POST",
+    });
+    assertEquals(tard.status, 409);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("une légende relue ne reste pas sur une autre image à la même place", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const id = await sourceTraitee(db, "Façade aux balcons en masques.");
+    relireLegende(db, `${id}-0`, "certified", "", "Prof");
+    await changerOriginal(id, "/9j/4AAQ", "/9j/4AAR");
+    db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
+    await traiter(db, revendiquer(db)!, fauxModeles({ legende: "Autre image." }).modeles);
+    assertEquals(
+      { ...db.prepare("SELECT legende, legende_statut FROM images WHERE id = ?").get(`${id}-0`) },
+      { legende: "Autre image.", legende_statut: "unreviewed" },
+    );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("la durée de session est vérifiée côté serveur même pour un cookie copié", async () => {
   const { db } = await environnement();
   const now = Date.now;
@@ -1538,7 +1676,7 @@ test("Markdown: dépôt, extraction aux offsets exacts, original servi, réextra
   assertEquals(s.format, "md");
   await traiter(db, revendiquer(db)!, fauxModeles().modeles);
 
-  const { texte, blocs } = lireDocument(s.id as string);
+  const { texte, blocs } = lireDocument(s.id as string, 1);
   assertEquals(
     blocs.map((b) => b.section),
     ["Docker", "Docker", "Construire", "Construire", "Construire"],
