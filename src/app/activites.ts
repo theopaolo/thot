@@ -5,6 +5,7 @@ import {
   type Contenu,
   CRITERES,
   genererActivite,
+  jugerChamps,
   MAX_TEXTE,
 } from "../core/activite.ts";
 import type { Modeles } from "../core/modeles.ts";
@@ -272,13 +273,24 @@ export async function preparer(
 export const nomChamp = (i: number, n: number) =>
   i === 0 ? "Consigne" : i === 1 ? "Réponse attendue" : i === n - 1 ? "Retour" : `Critère ${i - 1}`;
 
+/** Ce que lit le juge : un champ qui garde son texte et ses passages garde son avis. */
+const lu = (ch: Champ) =>
+  JSON.stringify([ch.texte, ch.citations.map((c) => [c.citation, c.titre])]);
+
 /**
  * Enregistre la saisie du formulaire de modification (`texte_{i}`, `citation_{i}_{j}`, dans
  * l'ordre de `champs`). Chaque passage se recherche mot pour mot dans la révision servie de sa
  * source : une citation d'une ancienne version s'y réancre ou bloque l'enregistrement. Un critère
- * ou un passage vidé disparaît. Un changement crée une version de l'exercice, à relire.
+ * ou un passage vidé disparaît. Un changement crée une version de l'exercice, à relire. Le juge
+ * relit les champs changés et ceux restés sans avis.
  */
-export function modifier(db: Db, compte: Compte, a: Activite, b: Record<string, unknown>) {
+export async function modifier(
+  db: Db,
+  modeles: Modeles,
+  compte: Compte,
+  a: Activite,
+  b: Record<string, unknown>,
+) {
   if (Number(b.revision) !== a.revision) return "conflit";
   const liste = champs(JSON.parse(a.contenu) as Contenu);
   const p = perimetre(db, a);
@@ -304,7 +316,10 @@ export function modifier(db: Db, compte: Compte, a: Activite, b: Record<string, 
     });
     if (!t) return undefined;
     if (!cites.length) throw new Error(`${nom} : un champ garde au moins un passage cité.`);
-    return { texte: t, citations: cites };
+    const nouveau: Champ = { texte: t, citations: cites };
+    return lu(nouveau) === lu(ch) && "soutien" in ch
+      ? { ...nouveau, soutien: ch.soutien }
+      : nouveau;
   });
   const [consigne, attendu] = nouveaux;
   const retour = nouveaux.at(-1);
@@ -315,8 +330,10 @@ export function modifier(db: Db, compte: Compte, a: Activite, b: Record<string, 
   if (criteres.length < CRITERES.min || criteres.length > CRITERES.max) {
     throw new Error(`De ${CRITERES.min} à ${CRITERES.max} critères.`);
   }
-  const contenu = JSON.stringify({ consigne, attendu, criteres, retour } satisfies Contenu);
-  if (contenu === a.contenu) return "inchange";
+  const neuf: Contenu = { consigne, attendu, criteres, retour };
+  if (JSON.stringify(neuf) === a.contenu) return "inchange";
+  await jugerChamps(modeles, champs(neuf));
+  const contenu = JSON.stringify(neuf);
   return transaction(db, () => {
     const r = db
       .prepare(

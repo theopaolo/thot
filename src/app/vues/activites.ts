@@ -1,5 +1,6 @@
 import { html } from "hono/html";
 import { type Champ, type Citation, champs, type Contenu } from "../../core/activite.ts";
+import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
 import { type Activite, MAX_SOURCES, nomChamp, type Tentative } from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
 import { icone } from "../icones.ts";
@@ -40,6 +41,14 @@ const passages = (ch: Champ, servies?: Map<string, number | undefined>) =>
         return html`<li>« ${c.citation} » <a href="${lien(c)}">${c.titre}</a>${ecart}</li>`;
       })}</ul>`
     : "";
+
+/** L'avis du juge de soutien sur un champ. Il ne bloque rien : l'enseignant tranche. */
+const avis = (ch: Champ) =>
+  ch.soutien === null
+    ? html`<p><span class="statut a_relire">Juge indisponible</span> <span class="discret">Les passages sont retrouvés mot pour mot, mais le juge n'a pas vérifié qu'ils établissent ce champ.</span></p>`
+    : ch.soutien !== undefined && ch.soutien < SEUIL_SOUTIEN
+      ? html`<p><span class="statut failed">À vérifier</span> <span class="discret">Selon le juge de soutien, les passages cités n'établissent pas tout ce que dit ce champ.</span></p>`
+      : "";
 
 export const listeProf = (liste: Activite[]) => html`
   <h1>Bibliothèque</h1>
@@ -183,7 +192,7 @@ export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: 
   ];
   const personnel = a.audience === "prive";
   const champ = (ch: Champ) =>
-    html`<p>${ch.texte || html`<span class="discret">Vide : sa source a été supprimée.</span>`}</p>${passages(ch, servies)}`;
+    html`<p>${ch.texte || html`<span class="discret">Vide : sa source a été supprimée.</span>`}</p>${avis(ch)}${passages(ch, servies)}`;
   return html`
     <p><a href="/prof/activites">Exercices</a></p>
     <h1>${a.intitule}</h1>

@@ -1,6 +1,6 @@
 import type { Message, Modeles } from "./modeles.ts";
 import type { ChunkIndexe } from "./recherche.ts";
-import { type Affirmation, lire, verifier } from "./reponse.ts";
+import { type Affirmation, juger, lire, verifier } from "./reponse.ts";
 
 /** Un passage cité : la révision de la source et ses offsets dans son `document.txt`. */
 export type Citation = {
@@ -12,8 +12,11 @@ export type Citation = {
   debut: number;
   fin: number;
 };
-/** Un champ de l'exercice et les passages qui le prouvent. */
-export type Champ = { texte: string; citations: Citation[] };
+/**
+ * Un champ de l'exercice et les passages qui le prouvent. `soutien` : l'avis du juge sur le champ
+ * entier, `null` si le juge n'a pas répondu, absent avant tout jugement.
+ */
+export type Champ = { texte: string; citations: Citation[]; soutien?: number | null };
 export type Contenu = { consigne: Champ; attendu: Champ; criteres: Champ[]; retour: Champ };
 
 export const CRITERES = { min: 2, max: 5 };
@@ -118,7 +121,32 @@ export async function genererActivite(
     .filter((c) => c !== undefined);
   const retour = garder(brute.retour, "Retour");
   if (!consigne || !attendu || !retour || criteres.length < CRITERES.min) return { rejets, modele };
-  return { contenu: { consigne, attendu, criteres, retour }, rejets, modele };
+  const contenu = { consigne, attendu, criteres, retour };
+  await jugerChamps(modeles, champs(contenu), signal);
+  return { contenu, rejets, modele };
+}
+
+/**
+ * Une citation retrouvée ne prouve que son passage, pas tout le champ. Le juge de soutien des
+ * réponses lit chaque champ sans avis contre ses passages mis bout à bout, un appel par champ, en
+ * parallèle. Il ne rejette rien : l'enseignant relit les champs qu'il ne soutient pas.
+ */
+export async function jugerChamps(modeles: Modeles, liste: Champ[], signal?: AbortSignal) {
+  const sans = liste.filter((ch) => typeof ch.soutien !== "number");
+  const { probabilites } = await juger(
+    modeles,
+    sans.map((ch) => ({
+      texte: ch.texte,
+      citation: ch.citations.map((c) => c.citation).join(" […] "),
+      titre: [...new Set(ch.citations.map((c) => c.titre))].join(", "),
+      source_id: ch.citations[0].source_id,
+      chunk_id: ch.citations[0].chunk_id,
+    })),
+    {},
+    "general",
+    signal,
+  );
+  sans.forEach((ch, i) => (ch.soutien = probabilites[i]));
 }
 
 /**

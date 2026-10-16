@@ -1279,7 +1279,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     try {
       const action = c.req.param("action");
       if (action === "modifier") {
-        if (Activites.modifier(db, compte, a, b) === "conflit") refus = CONFLIT;
+        if ((await Activites.modifier(db, modeles, compte, a, b)) === "conflit") refus = CONFLIT;
       } else if (action === "relire") {
         if (!Activites.relire(db, compte, a, Number(b.revision))) refus = CONFLIT;
       } else {

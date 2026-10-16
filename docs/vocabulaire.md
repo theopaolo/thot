@@ -181,6 +181,11 @@ bibliothèque les range sous l'onglet « Exercices ». « Préparer un exercice 
 brouillon ». Un champ dont un passage ne se retrouve pas mot pour mot est un « champ rejeté », et
 la page de l'exercice les compte. L'élève trouve les exercices publiés dans ses ressources.
 
+**À vérifier, juge indisponible**
+Avis du juge de soutien sur un champ d'exercice, dans la page de l'enseignant. « À vérifier » : les
+passages cités n'établissent pas tout ce que dit le champ. « Juge indisponible » : les passages
+sont retrouvés mot pour mot, mais le juge n'a pas répondu. Aucun des deux n'empêche de publier.
+
 **Brouillon, relu, publié, à revoir**
 États d'un exercice. Thot rédige un « Brouillon ». « Marquer la version relue » le rend « Relu »,
 « Publier aux élèves du cours » le rend « Publié ». « Enregistrer une nouvelle version » remet un

@@ -268,8 +268,16 @@ générateur rédige la consigne, la réponse attendue, deux à cinq critères e
 dans l'extrait désigné, avec la révision et les offsets de leur source. Un champ dont une citation
 ne se retrouve pas, ou ne se retrouve que dans une légende d'image, est rejeté et compté, comme le
 prévoit l'ADR 0002. Sans consigne, réponse attendue, retour et deux critères ancrés, rien n'est
-enregistré, pas même un nouvel objectif. Le juge de soutien ne lit pas ces champs : l'enseignant
-les relit.
+enregistré, pas même un nouvel objectif.
+
+Une citation retrouvée ne prouve que son passage : un premier essai réel gardait un retour qui en
+disait plus que ses citations. Le juge de soutien des réponses lit donc chaque champ gardé contre
+ses passages mis bout à bout, un appel par champ, avec la consigne du profil général et
+`SEUIL_SOUTIEN`. Il ne rejette rien. Un champ qu'il ne soutient pas est « À vérifier » dans la page
+de l'enseignant, et un juge en panne ou trop lent laisse « Juge indisponible ». L'avis est enregistré
+dans le champ, avec la version : afficher la page ne rappelle pas le juge. Une modification fait
+juger les champs dont le texte ou les passages changent, et ceux restés sans avis. Publier ne
+demande pas l'avis du juge : la relecture de l'enseignant reste la barrière.
 
 Un exercice est brouillon, relu, publié ou à revoir. Une relecture vaut pour une version de
 l'exercice. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut

@@ -358,7 +358,7 @@ const DELAI_JUGE_MS = 4000;
  * Un juge injoignable ou trop lent laisse passer l'affirmation: les citations restent vérifiées
  * mot pour mot, la panne est notée au journal et la réponse porte `juge_indisponible`.
  */
-async function juger(
+export async function juger(
   modeles: Modeles,
   affirmations: Affirmation[],
   journal: Journal,

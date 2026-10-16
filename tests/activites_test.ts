@@ -55,13 +55,17 @@ const envoyer = (s: Session, url: string, corps: Record<string, string | string[
 const page = async (s: Session, url: string) => (await s.requete(url)).text();
 const statut = async (r: Response | Promise<Response>) => (await r).status;
 
-/** Un cours, sa source publiée aux élèves, un enseignant et un élève du cours. */
-async function cadre(personnel = false) {
+/**
+ * Un cours, sa source publiée aux élèves, un enseignant et un élève du cours. `juge` remplace le
+ * juge de soutien de l'enseignant.
+ */
+async function cadre(personnel = false, juge?: Modeles["soutenir"], sorties = [sortie()]) {
   const { db, dir } = await environnement();
   if (personnel) configurerInstance(db, "Mon étude", "personal");
   const coursId = cours(db, matiere(db, "Arts appliqués"), "Design");
   const source = await publier(db, "Casa Batlló", coursId);
-  const generateur = fauxModeles({ sorties: [sortie()] });
+  const generateur = fauxModeles({ sorties });
+  if (juge) generateur.modeles.soutenir = juge;
   const prof = await compte(db, "enseignant", generateur.modeles);
   const eleve = await compte(db, "eleve");
   return { db, dir, coursId, source, prof, eleve, vus: generateur.vus };
@@ -391,6 +395,64 @@ test("exercice : nouvelle version, lecteurs retirés, rejet et suppression de la
       await page(prof, `/prof/activites/${id}`),
       "Vide : sa source a été supprimée.",
     );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("exercice : le juge marque un champ à vérifier sans le rejeter, une modification ne rejuge que les champs changés", async () => {
+  const juges: string[] = [];
+  const { db, dir, coursId, source, prof } = await cadre(false, (texte) => {
+    juges.push(texte);
+    return Promise.resolve({ probabilite: texte === RETOUR ? 0.1 : 1, modele: "faux-juge" });
+  });
+  try {
+    const id = await preparer(prof, coursId, source);
+    assertEquals(juges.length, 5, "un appel par champ gardé");
+    const contenu = JSON.parse(ligne(db, id).contenu) as Contenu;
+    assertEquals(
+      champsDe(contenu).map((ch) => ch.soutien),
+      [1, 1, 1, 1, 0.1],
+    );
+    const detail = await page(prof, `/prof/activites/${id}`);
+    assertEquals(detail.split("À vérifier").length - 1, 1);
+    assertStringIncludes(detail, "les passages cités n'établissent pas tout");
+    // Afficher la page ne rappelle pas le juge.
+    assertEquals(juges.length, 5);
+    // Le juge ne bloque pas la publication : la relecture reste la barrière.
+    await relirePublier(prof, db, id);
+
+    const nouveau = "Il refuse la ligne droite.";
+    const r = envoyer(
+      prof,
+      `/prof/activites/${id}/modifier`,
+      formulaire(db, id, { texte_1: nouveau }),
+    );
+    assertEquals(await statut(r), 303);
+    assertEquals(juges.slice(5), [nouveau], "seul le champ changé repasse");
+    const apres = JSON.parse(ligne(db, id).contenu) as Contenu;
+    assertEquals(apres.retour.soutien, 0.1, "le retour inchangé garde son avis");
+    assertStringIncludes(await page(prof, `/prof/activites/${id}`), "À vérifier");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("exercice : un juge en panne laisse le brouillon et le dit", async () => {
+  const { db, dir, coursId, source, prof } = await cadre(false, () =>
+    Promise.reject(new Error("panne du juge")),
+  );
+  try {
+    const id = await preparer(prof, coursId, source);
+    const contenu = JSON.parse(ligne(db, id).contenu) as Contenu;
+    assert(champsDe(contenu).every((ch) => ch.soutien === null));
+    assertEquals(ligne(db, id).etat, "brouillon");
+    const detail = await page(prof, `/prof/activites/${id}`);
+    assertStringIncludes(detail, "Juge indisponible");
+    assert(!detail.includes("À vérifier"));
+    await relirePublier(prof, db, id);
   } finally {
     db.close();
     await rm(dir, { recursive: true });
