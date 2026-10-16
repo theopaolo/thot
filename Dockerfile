@@ -22,7 +22,8 @@ COPY migrations/ migrations/
 COPY src/ src/
 COPY static/ static/
 COPY --from=build /app/static/dist/ static/dist/
-RUN mkdir -p data/tmp && chmod 700 data data/tmp && chown -R node:node data
+RUN mkdir -p data/tmp /sauvegardes && chmod 700 data data/tmp \
+  && chown -R node:node data /sauvegardes
 
 ENV THOT_HOST=0.0.0.0 THOT_PORT=8000 THOT_DATA_DIR=/app/data
 ENV TMPDIR=/app/data/tmp SQLITE_TMPDIR=/app/data/tmp
