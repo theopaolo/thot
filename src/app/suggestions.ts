@@ -150,7 +150,13 @@ export function faitAuHasard(db: Db, l: Lecteur): Fait | undefined {
 }
 
 /** Les questions suggérées viennent des sources publiées aux élèves que le lecteur lit. */
-export function suggestionsDuPerimetre(db: Db, l: Lecteur, ids: Set<string>, question = "") {
+export function suggestionsDuPerimetre(
+  db: Db,
+  l: Lecteur,
+  ids: Set<string>,
+  question = "",
+  limite = 3,
+) {
   return db
     .prepare(
       `SELECT sg.question, sg.source_id FROM suggestions sg JOIN sources s ON s.id = sg.source_id
@@ -161,6 +167,6 @@ export function suggestionsDuPerimetre(db: Db, l: Lecteur, ids: Set<string>, que
     )
     .all(question, ...parametresAcces(l))
     .filter((s) => ids.has(s.source_id as string))
-    .slice(0, 3)
+    .slice(0, limite)
     .map((s) => s.question as string);
 }

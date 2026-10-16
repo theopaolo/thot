@@ -1,6 +1,8 @@
 import { test } from "vite-plus/test";
 import { assertEquals } from "@std/assert";
-import { renvoie } from "../src/core/suggestions.ts";
+import { PanneModele } from "../src/core/modeles.ts";
+import { questionsProches, renvoie } from "../src/core/suggestions.ts";
+import { fauxModeles } from "./outils.ts";
 
 test("une suggestion qui renvoie à une image absente est écartée, une question qui la nomme passe", () => {
   for (const q of [
@@ -20,4 +22,24 @@ test("une suggestion qui renvoie à une image absente est écartée, une questio
   ]) {
     assertEquals(renvoie(q), false, q);
   }
+});
+
+test("après un refus, seules les questions proches du sens de la question sont proposées", async () => {
+  const candidates = [
+    "Qui est Gaudí ?",
+    "Qu'est-ce que l'Art nouveau ?",
+    "Que réunit le Bauhaus ?",
+  ];
+  const proches = (scores: number[]) => {
+    const { modeles } = fauxModeles();
+    modeles.reclasser = (_q, docs) =>
+      Promise.resolve(docs.map((_, index) => ({ index, score: scores[index] })));
+    return questionsProches(modeles, "Où a vécu Gaudí ?", candidates, 0.5);
+  };
+  assertEquals(await proches([0.9, 0.1, 0.6]), ["Qui est Gaudí ?", "Que réunit le Bauhaus ?"]);
+  assertEquals(await proches([0.01, 0.02, 0.03]), [], "rien de proche, rien de proposé");
+
+  const { modeles } = fauxModeles();
+  modeles.reclasser = () => Promise.reject(new PanneModele("reclasseur 503"));
+  assertEquals(await questionsProches(modeles, "Où a vécu Gaudí ?", candidates, 0.5), []);
 });

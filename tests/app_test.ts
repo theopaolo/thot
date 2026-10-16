@@ -1799,3 +1799,38 @@ test("un lot compte au plus MAX_LOT fichiers", async () => {
   assertStringIncludes(await r.text(), `Un lot compte ${MAX_LOT} fichiers au maximum.`);
   assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, MAX_LOT);
 });
+
+test("un refus propose les questions proches de la question, et rien si aucune ne l'est", async () => {
+  const { db } = await environnement();
+  const source = await sourceTraitee(db);
+  statuer(db, source, "certifiee", "test");
+  db.prepare("INSERT INTO suggestions VALUES ('sg', ?, 'Qui est Gaudí ?', 'faux', 'test')").run(
+    source,
+  );
+  const f = fauxModeles();
+  // Les passages restent sous le seuil, donc les deux questions sont refusées. Seule la suggestion
+  // est proche, et seulement de la question qui parle de Gaudí.
+  f.modeles.reclasser = (q, docs) =>
+    Promise.resolve(
+      docs.map((d, index) => ({
+        index,
+        score: q.includes("Gaudí") && d.startsWith("Qui") ? 0.9 : 0.001,
+      })),
+    );
+  const eleve = await session(db, f.modeles, "eleve");
+  const refus = async (texte: string) => {
+    const r = await eleve.requete("/eleve/questions", {
+      method: "POST",
+      headers: { "HX-Request": "true" },
+      body: new URLSearchParams({ texte }),
+    });
+    const id = (await r.text()).match(/messages\/([\w-]+)\/flux/)![1];
+    return (await eleve.requete(`/eleve/messages/${id}/flux`)).text();
+  };
+  const proche = await refus("Où Gaudí a-t-il vécu ?");
+  assertStringIncludes(proche, "Ce que ton cours couvre");
+  assertStringIncludes(proche, "Qui est Gaudí ?");
+  const loin = await refus("Quelle est la capitale du Pérou ?");
+  assertStringIncludes(loin, "Je ne trouve pas la réponse");
+  assert(!loin.includes("Ce que ton cours couvre"));
+});

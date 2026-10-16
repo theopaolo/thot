@@ -65,6 +65,7 @@ import {
   supprimerSource,
 } from "./ingestion.ts";
 import { ARRETEE, attendreChangement, boucleReponses, memePerimetre } from "./reponses.ts";
+import { questionsProches } from "../core/suggestions.ts";
 import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
 import {
   administration,
@@ -1550,30 +1551,33 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     });
   };
 
-  const ideesPour = (l: Lecteur, r: Resultat, question = "", messageId = "") => {
+  const ideesPour = async (l: Lecteur, r: Resultat, question = "", messageId = "") => {
     const m = messageId
       ? db
           .prepare("SELECT matiere_id, cours_id, theme_id, matieres FROM messages WHERE id = ?")
           .get(messageId)
       : undefined;
-    if (m && Object.values(m).some(Boolean)) {
+    const cadre = m && Object.values(m).some(Boolean);
+    // Après un refus, seules les questions proches du sens de la question, dans le cadre posé.
+    if (r.etat === "out_of_corpus") {
+      const candidates = cadre
+        ? suggestionsDuPerimetre(
+            db,
+            l,
+            Domaines.sourcesPerimetre(db, Domaines.lireScope(m)),
+            question,
+            Infinity,
+          )
+        : [...suggestionsParChapitre(db, l, Infinity).values()].flat();
+      return questionsProches(modeles, question, candidates, config.seuil);
+    }
+    if (cadre) {
       return suggestionsDuPerimetre(
         db,
         l,
         Domaines.sourcesPerimetre(db, Domaines.lireScope(m)),
         question,
       );
-    }
-    // Hors cours: les questions que couvre le chapitre du passage le plus proche, ou du chapitre posé.
-    if (r.etat === "out_of_corpus") {
-      const m = db
-        .prepare(
-          `SELECT coalesce(nullif(m.chapitre, ''), json_extract(s.metadonnees, '$.sequence'), '') AS nom
-         FROM messages m LEFT JOIN sources s ON s.id = json_extract(m.journal, '$.candidats[0].source_id')
-         WHERE m.id = ?`,
-        )
-        .get(messageId) as { nom: string } | undefined;
-      return m?.nom ? (suggestionsParChapitre(db, l).get(m.nom) ?? []).slice(0, 3) : [];
     }
     if (r.etat !== "answered") return [];
     const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
@@ -1689,7 +1693,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       )
       .get(c.get("compte").id)!.n as number;
 
-  const pageChat = (c: Context<Env>, conv?: Conversation) => {
+  const pageChat = async (c: Context<Env>, conv?: Conversation) => {
     const compte = c.get("compte");
     if (conv) db.prepare("UPDATE messages SET nouvelle = 0 WHERE conversation_id = ?").run(conv.id);
     const cat = Domaines.catalogueVisible(db, lu(c));
@@ -1729,7 +1733,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
                 Domaines.sourcesPerimetre(db, Domaines.lireScope(p)),
               )
             : dernier
-              ? ideesPour(lu(c), JSON.parse(dernier.resultat!), dernier.question, dernier.id)
+              ? await ideesPour(lu(c), JSON.parse(dernier.resultat!), dernier.question, dernier.id)
               : [],
           liste,
           archivees: nombreArchivees(c),
@@ -2015,7 +2019,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           await flux.writeSSE({
             event: "reponse",
             data: String(
-              await Eleve.reponse(id, r, null, ideesPour(lecteur(compte), r, m.question, id), true),
+              await Eleve.reponse(
+                id,
+                r,
+                null,
+                await ideesPour(lecteur(compte), r, m.question, id),
+                true,
+              ),
             ).replace(/\n/g, " "),
           });
           return;

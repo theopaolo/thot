@@ -24,7 +24,10 @@ modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
    fournisseur, sortie vide, citations introuvables).
 4. Un contenu pédagogique généré (fiche, quiz, page de wiki) reste invisible aux élèves tant
    qu'un enseignant ne l'a pas certifié. Les questions suggérées font exception : le worker ne
-   garde que celles auxquelles la chaîne de réponse répond avec des citations vérifiées.
+   garde que celles auxquelles la chaîne de réponse répond avec des citations vérifiées, et pas
+   celles qui renvoient à une image ou à un extrait que l'élève ne voit pas. Après un refus, le
+   reclasseur ne laisse passer que les questions proches de la question refusée, au seuil de la
+   recherche. Aucune n'est proposée si rien n'est proche ou si le reclasseur est en panne.
 5. Le corpus reste lisible sans l'application. Chaque source vit dans
    `data/content/{source}/` : original, images, `document.txt` et `blocs.jsonl` de sa révision 1,
    puis `revisions/{n}/` pour chaque révision suivante. La base dit quelle révision sert.

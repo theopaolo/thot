@@ -14,6 +14,30 @@ const MOTIF = /\b(le|du|au) motif\b/i;
 export const renvoie = (q: string) =>
   RENVOI.test(q) || (MOTIF.test(q) && !/\p{Lu}/u.test(q.slice(1)));
 
+/**
+ * Les `n` questions que le reclasseur juge proches de `question`, au-dessus du seuil de recherche.
+ * Sans reclasseur, aucune: un refus suivi de questions sans rapport induit en erreur.
+ */
+export async function questionsProches(
+  modeles: Modeles,
+  question: string,
+  candidates: string[],
+  seuil: number,
+  n = 3,
+): Promise<string[]> {
+  if (!candidates.length) return [];
+  try {
+    return (await modeles.reclasser(question, candidates))
+      .filter((r) => r.score >= seuil)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, n)
+      .map((r) => candidates[r.index]);
+  } catch (e) {
+    if (e instanceof PanneModele) return [];
+    throw e;
+  }
+}
+
 // Le texte d'arts appliqués est celui que mesurent `evaluation/resultats/ml4-*`.
 const CONSIGNE_ARTS = `Voici un extrait d'un cours de lycee.
 
