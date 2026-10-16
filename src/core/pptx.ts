@@ -79,13 +79,36 @@ const REPETES = new Set(["ftr", "sldNum", "dt", "hdr"]);
 
 type Lu = { titre: string; blocs: string[]; medias: string[]; manques: Set<string> };
 
+/** Les éléments d'un arbre que `parcourir` lit. Les propriétés de l'arbre et les connecteurs n'ont pas de texte. */
+const FORMES = new Set(["sp", "grpSp", "graphicFrame", "pic", "AlternateContent"]);
+/** Un demi-pouce en EMU : deux formes dont le haut tombe dans la même bande sont sur une ligne. */
+const BANDE = 457_200;
+
 /**
- * Formes d'un arbre, dans l'ordre du fichier. C'est l'ordre de superposition, pas forcément
- * l'ordre de lecture visuel, sauf le titre placé en tête. Un groupe se lit à sa place.
+ * L'ordre du fichier est celui de superposition. Quand toutes les formes d'un niveau ont une
+ * position, elles se lisent par bandes de haut en bas, puis de gauche à droite. Sinon, souvent des
+ * espaces réservés placés par la disposition, l'ordre du fichier reste.
+ * Une ligne garde ensemble un numéro et son libellé, un chiffre et sa légende.
+ * ponytail: deux colonnes se lisent ligne à ligne, un titre centré à gauche d'une liste tombe au
+ * milieu de celle-ci. Une vraie mise en page demanderait le rendu de la diapositive.
  */
+function ordreDeLecture(formes: Noeud[]) {
+  const positions = formes.map((f) => premier(f, "off"));
+  if (positions.some((o) => !o)) return formes;
+  const cle = (i: number) => ({
+    x: Number(positions[i]!.getAttribute("x")),
+    y: Math.floor(Number(positions[i]!.getAttribute("y")) / BANDE),
+  });
+  return formes
+    .map((f, i) => ({ f, ...cle(i) }))
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+    .map((e) => e.f);
+}
+
+/** Formes d'un arbre dans leur ordre de lecture, le titre en tête. Un groupe se lit à sa place. */
 function parcourir(arbre: Noeud, rels: Map<string, { cible: string }>, lu: Lu, profondeur = 0) {
   if (profondeur > 32) throw new Error("PPTX : formes imbriquées sur plus de 32 niveaux.");
-  for (const f of enfants(arbre)) {
+  for (const f of ordreDeLecture(enfants(arbre).filter((f) => FORMES.has(f.localName)))) {
     if (f.localName === "sp") {
       const ph = premier(f, "ph")?.getAttribute("type") ?? "";
       if (REPETES.has(ph)) continue;

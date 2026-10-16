@@ -344,6 +344,30 @@ test("PPTX : diapositives dans l'ordre de la présentation, titres, groupes, tab
   ]);
 });
 
+test("PPTX : des zones de texte placées se lisent de haut en bas puis de gauche à droite", async () => {
+  // L'ordre du fichier est celui de superposition : « 1. » a été ajouté en dernier.
+  const place = (x: number, y: number, texte: string) =>
+    forme("", texte).replace(
+      "</p:nvSpPr>",
+      `</p:nvSpPr><p:spPr><a:xfrm><a:off x="${x}" y="${y}"/></a:xfrm></p:spPr>`,
+    );
+  const ext = extrairePptx(
+    await pptx([
+      {
+        formes:
+          place(4_000_000, 2_000_000, "2. Découvrir") +
+          place(8_000_000, 2_100_000, "3. Auditer") +
+          place(500_000, 2_050_000, "1. Comprendre") +
+          place(500_000, 5_000_000, "Conclusion"),
+      },
+    ]),
+  );
+  assertEquals(
+    ext.parties.slice(1).map((x) => x.texte),
+    ["1. Comprendre", "2. Découvrir", "3. Auditer", "Conclusion"],
+  );
+});
+
 test("PPTX : une diapositive masquée s'inclut sur demande, marquée comme telle", async () => {
   const ext = extrairePptx(await pptx(DECK, { medias: MEDIAS }), true);
   assertEquals(
