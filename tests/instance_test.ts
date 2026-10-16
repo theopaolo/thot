@@ -59,6 +59,7 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
       "0009_membres.sql",
       "0010_liens.sql",
       "0011_revisions.sql",
+      "0012_reglages.sql",
     ]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
@@ -144,7 +145,10 @@ test("administrateur personnel : code à usage unique, changement obligatoire, r
     const gestion = await (await get("/prof")).text();
     assert(!gestion.includes('href="/prof/eleves"'));
     assertStringIncludes(gestion, "Mon étude &lt;privée&gt;");
-    assertEquals((await get("/administration")).status, 200);
+    // Un dépôt personnel n'a qu'un lecteur : les lecteurs par défaut ne se règlent pas.
+    const administration = await get("/administration");
+    assertEquals(administration.status, 200);
+    assert(!(await administration.text()).includes('name="lecteurs"'));
     const formulaire = new FormData();
     for (const [k, v] of Object.entries({
       titre: "Cours",

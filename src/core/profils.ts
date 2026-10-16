@@ -3,8 +3,11 @@ export type Profil = "general" | "arts-appliques";
 export const PROFILS = {
   general: {
     nom: "Général",
-    public: "Niveau",
-    theme: "Thème",
+    niveau: "Niveau",
+    regroupement: "Thème",
+    regroupements: "Thèmes",
+    sousRegroupement: "Sous-thème",
+    seance: "Section",
     rubriques: [],
     informations: [
       "auteur",
@@ -19,8 +22,11 @@ export const PROFILS = {
   },
   "arts-appliques": {
     nom: "Arts appliqués",
-    public: "Classe",
-    theme: "Séquence",
+    niveau: "Classe",
+    regroupement: "Séquence",
+    regroupements: "Séquences",
+    sousRegroupement: "Sous-matière",
+    seance: "Séance",
     rubriques: [
       "Ou et Quand ?",
       "Quoi ?",
@@ -53,20 +59,27 @@ export const CHAMPS = {
   mouvement: { label: "Mouvement", type: "tags" },
 } as const;
 
-export function validerInformations(champs: Record<string, string>, profil: Profil) {
+/** Un champ du dépôt : une entrée de `CHAMPS` ou un champ personnalisé de l'instance. */
+export type Champ = { cle: string; label: string; type: "text" | "date" | "tags" };
+
+/** L'enrichissement arts et le quiz lisent ces champs : une matière arts les garde. */
+export const champsVerrouilles = (profil: Profil): readonly string[] =>
+  profil === "arts-appliques" ? PROFILS[profil].informations : [];
+
+export function validerInformations(champs: Record<string, string>, liste: Champ[]) {
   const meta: Record<string, string> = {};
-  for (const nom of PROFILS[profil].informations) {
-    const valeur = (champs[nom] ?? "").trim();
-    if (valeur.length > 120) throw new Error(`${CHAMPS[nom].label} : 120 caractères maximum.`);
+  for (const { cle, label, type } of liste) {
+    const valeur = (champs[cle] ?? "").trim();
+    if (valeur.length > 120) throw new Error(`${label} : 120 caractères maximum.`);
     if (
-      CHAMPS[nom].type === "date" &&
+      type === "date" &&
       valeur &&
       (!/^\d{4}-\d{2}-\d{2}$/.test(valeur) ||
         new Date(valeur).toISOString().slice(0, 10) !== valeur)
     ) {
-      throw new Error(`${CHAMPS[nom].label} : date invalide.`);
+      throw new Error(`${label} : date invalide.`);
     }
-    meta[nom] = valeur;
+    meta[cle] = valeur;
   }
   if (meta.valide_du && meta.valide_au && meta.valide_du > meta.valide_au) {
     throw new Error("La fin de validité précède son début.");

@@ -1,6 +1,15 @@
 import { html } from "hono/html";
-import { CHAMPS, type Profil, PROFILS } from "../../core/profils.ts";
-import type { Affiliation, Catalogue, Cours, Scope } from "../domaines.ts";
+import { CHAMPS, type Champ, champsVerrouilles, PROFILS } from "../../core/profils.ts";
+import {
+  type Affiliation,
+  type Catalogue,
+  type Cours,
+  type Matiere,
+  type Scope,
+  TYPES_CHAMP,
+} from "../domaines.ts";
+import type { Libelles } from "../instance.ts";
+import { ongletsAdministration } from "./page.ts";
 
 const options = (liste: { id: string; nom: string }[], valeur = "") =>
   liste.map(
@@ -10,13 +19,15 @@ export const selectionProfil = (valeur = "general") =>
   html`<label>Profil <select name="profil">${Object.entries(PROFILS).map(
     ([id, p]) => html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`,
   )}</select></label>`;
-const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème" };
+const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème", champ: "champ" };
 const ligne = (genre: keyof typeof LIBELLES, id: string, nom: string, contexte = "") => {
   const libelle = `Nom (${LIBELLES[genre]})`;
   return html`
     <form method="post" action="/administration/domaines/renommer" class="barre">
       <input type="hidden" name="genre" value="${genre}"><input type="hidden" name="id" value="${id}">
-      <input type="text" name="nom" value="${nom}" required maxlength="200" aria-label="${libelle}">
+      <input type="text" name="nom" value="${nom}" required maxlength="${
+        genre === "champ" ? 60 : 200
+      }" aria-label="${libelle}">
       <button>Renommer</button>
       <button formaction="/administration/domaines/supprimer" formnovalidate>Supprimer</button>
       ${contexte ? html`<span class="discret">${contexte}</span>` : ""}
@@ -82,11 +93,70 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouver
     </details>
   `;
 };
+/**
+ * `listes` : les clés cochées de chaque matière. `saisie` : les clés envoyées avec une version
+ * périmée, rendues telles quelles. `ressources` : le nombre de ressources qui remplissent le champ.
+ */
+export type ChampsDepot = {
+  catalogue: (Champ & { ressources: number })[];
+  listes: Map<string, string[]>;
+  saisie?: { id: string; cles: string[] };
+  enregistre: boolean;
+};
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+/** Une case par champ du catalogue. Une matière arts garde cochés les champs que le quiz lit. */
+const champsDuDepot = (m: Matiere, d: ChampsDepot, ouvert: boolean) => {
+  const conflit = d.saisie?.id === m.id;
+  const coches = conflit ? d.saisie!.cles : (d.listes.get(m.id) ?? []);
+  const figes = champsVerrouilles(m.profil);
+  const caseChamp = (c: Champ) => {
+    const fige = figes.includes(c.cle);
+    return html`<label><input type="checkbox" name="champs" value="${c.cle}" ${
+      fige || coches.includes(c.cle) ? "checked" : ""
+    } ${fige ? html`disabled aria-describedby="figes-${m.id}"` : ""}> ${c.label}</label>`;
+  };
+  const personnalises = d.catalogue.filter((c) => !Object.hasOwn(CHAMPS, c.cle));
+  return html`
+    <details id="champs-${m.id}" ${ouvert || conflit ? "open" : ""}>
+      <summary>Champs du dépôt : ${d.listes.get(m.id)?.length ?? 0}</summary>
+      ${
+        conflit
+          ? html`<p role="alert" tabindex="-1" autofocus>Ces réglages ont changé pendant votre saisie. Vos valeurs sont conservées.</p>`
+          : ouvert && d.enregistre
+            ? html`<p role="status" tabindex="-1" autofocus>Réglages enregistrés.</p>`
+            : ""
+      }
+      <form method="post" action="/administration/domaines/champs" class="etroit reglages">
+        <input type="hidden" name="matiere_id" value="${m.id}"><input type="hidden" name="version" value="${m.version}">
+        <fieldset>
+          <legend>Champs prédéfinis</legend>
+          <div class="deux">${d.catalogue.filter((c) => Object.hasOwn(CHAMPS, c.cle)).map(caseChamp)}</div>
+          ${figes.length ? html`<p class="aide" id="figes-${m.id}">Utilisé par le quiz et les propositions de Thot.</p>` : ""}
+        </fieldset>
+        <fieldset>
+          <legend>Champs personnalisés</legend>
+          ${
+            personnalises.length
+              ? html`<div class="deux">${personnalises.map(caseChamp)}</div>`
+              : html`<p class="discret">Aucun champ personnalisé.</p>`
+          }
+        </fieldset>
+        <div class="barre">
+          <button class="principal">Enregistrer les champs</button>
+          <button type="reset">Annuler</button>
+          <a href="/prof/depot?matiere_id=${m.id}">Voir le formulaire de dépôt</a>
+        </div>
+      </form>
+    </details>
+  `;
+};
 export const gestion = (
   cat: Catalogue,
   erreur: string,
   figee: boolean,
   inscriptions: Inscriptions,
+  champs: ChampsDepot,
+  l: Libelles,
 ) => {
   const profil = cat.matieres[0]?.profil;
   const controleProfil = !profil
@@ -99,17 +169,23 @@ export const gestion = (
       <form method="post" action="/administration/domaines/profil"
         class="barre">${selectionProfil(
           profil,
-        )}<button>Changer le profil de l'instance</button></form>
+        )}<button data-confirmer="Changer le profil ? Les termes et les champs jamais modifiés prennent les valeurs du profil choisi.">Changer le profil de l'instance</button></form>
     `;
+  const personnalises = champs.catalogue.filter((c) => !Object.hasOwn(CHAMPS, c.cle));
   return html`
-    <h1>Matières et cours</h1>${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+    <h1>Administration</h1>
+    ${ongletsAdministration("/administration/domaines")}
+    ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
     <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     ${controleProfil}
     <p>Renommer garde les rattachements. Supprimer est refusé tant qu'une ressource ou une question
     d'élève utilise l'entrée. Une matière ou un cours emporte ses cours et ses thèmes.</p>
     <h2>Matières</h2>
-    ${cat.matieres.map((m) => ligne("matiere", m.id, m.nom))}
+    ${cat.matieres.map(
+      (m) =>
+        html`${ligne("matiere", m.id, m.nom)}${champsDuDepot(m, champs, inscriptions.ouvert === m.id)}`,
+    )}
     <form method="post" action="/administration/domaines/matiere"
       class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${
         profil ? "" : selectionProfil()
@@ -135,7 +211,7 @@ export const gestion = (
     <form method="post" action="/administration/domaines/cours"
       class="etroit"><label>Matière <select name="matiere_id" required>${options(
         cat.matieres,
-      )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>Public ou niveau (facultatif) <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>
+      )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>
     <h2>Thèmes</h2>${cat.themes.map((t) =>
       ligne(
         "theme",
@@ -154,6 +230,30 @@ export const gestion = (
           nom: `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`,
         })),
       )}</select></label><label>Nouveau thème <input type="text" name="nom" required maxlength="200"></label><button>Créer le thème</button></form>
+    <h2>Champs personnalisés</h2>
+    <p>Un champ se coche ensuite dans les champs du dépôt de chaque matière. Renommer garde ses
+    valeurs. Son type ne change plus après sa création.</p>
+    ${
+      personnalises.length
+        ? personnalises.map((c) =>
+            ligne(
+              "champ",
+              c.cle,
+              c.label,
+              `${TYPES_CHAMP[c.type]}, ${pluriel(
+                [...champs.listes.values()].filter((liste) => liste.includes(c.cle)).length,
+                "matière",
+              )}, ${pluriel(c.ressources, "ressource")}`,
+            ),
+          )
+        : html`<p class="discret">Aucun champ personnalisé.</p>`
+    }
+    <form method="post" action="/administration/domaines/champ"
+      class="etroit"><label>Nouveau champ <input type="text" name="nom" required maxlength="60"></label><label>Type <select name="type">${Object.entries(
+        TYPES_CHAMP,
+      ).map(
+        ([v, libelle]) => html`<option value="${v}">${libelle}</option>`,
+      )}</select></label><button>Créer le champ</button></form>
   `;
 };
 
@@ -233,18 +333,24 @@ export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
           )}</select></label></div>
       `,
   )}</fieldset>`;
-export const informations = (profil: Profil, meta: Record<string, unknown>) =>
-  html`${PROFILS[profil].informations.map(
-    (n) =>
-      html`
-        <div
-          class="champ"><label for="${n}">${
-            CHAMPS[n].label
-          }</label><input id="${n}" name="${n}" type="${
-            CHAMPS[n].type === "date" ? "date" : "text"
-          }" value="${String(meta[n] ?? "")}" maxlength="120"></div>
-      `,
-  )}`;
+export const informations = (
+  liste: Champ[],
+  meta: Record<string, unknown>,
+  propositions: Record<string, string> = {},
+) =>
+  html`${liste.map((c) => {
+    const propose = !meta[c.cle] && Boolean(propositions[c.cle]);
+    return html`
+      <div
+        class="champ"><label for="${c.cle}">${c.label}</label>${
+          propose ? html`<p class="aide" id="${c.cle}-aide">Proposé par Thot, à vérifier.</p>` : ""
+        }<input id="${c.cle}" name="${c.cle}" type="${
+          c.type === "date" ? "date" : "text"
+        }" value="${String(meta[c.cle] || propositions[c.cle] || "")}" maxlength="120" ${
+          propose ? html`aria-describedby="${c.cle}-aide"` : ""
+        }></div>
+    `;
+  })}`;
 export const langue = (valeur = "fr") =>
   html`
     <label>Langue de la source <input type="text" name="langue" value="${valeur}" maxlength="30"></label><p

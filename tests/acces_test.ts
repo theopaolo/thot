@@ -462,6 +462,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0009_membres.sql",
       "0010_liens.sql",
       "0011_revisions.sql",
+      "0012_reglages.sql",
     ]);
     assertEquals(
       db
@@ -649,7 +650,12 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       INSERT INTO cours (id, matiere_id, nom) VALUES ('c1', 'm', 'Design'), ('c2', 'm', 'Histoire');
       INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le)
         VALUES ('p', 'p', 'Prof', 'enseignant', '', '', 'x'), ('e', 'e', 'Élève', 'eleve', '', '', 'x');`);
-    assertEquals(migrer(db), ["0009_membres.sql", "0010_liens.sql", "0011_revisions.sql"]);
+    assertEquals(migrer(db), [
+      "0009_membres.sql",
+      "0010_liens.sql",
+      "0011_revisions.sql",
+      "0012_reglages.sql",
+    ]);
     assertEquals(
       db
         .prepare("SELECT cours_id || compte_id AS m FROM membres_cours ORDER BY m")
@@ -924,7 +930,7 @@ test("questions des élèves : la séquence mémorisée n'est montrée qu'à qui
     assertEquals(await vues(profA), [secrete, collegues, ouverte]);
     assertEquals(await vues(profC), [collegues, ouverte]);
     assertEquals(await vues(profB), [ouverte]);
-    assertStringIncludes(await texteDe(profB, "/prof/questions"), "Sans séquence");
+    assertStringIncludes(await texteDe(profB, "/prof/questions"), "Autres questions");
   } finally {
     db.close();
     await rm(dir, { recursive: true });

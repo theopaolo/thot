@@ -238,7 +238,7 @@ async function ingest(chemin: string) {
       format: controle.format,
       schoolId: lireInstance(db).school_id,
       enseignant: args.enseignant ?? "import en ligne de commande",
-      audience: "eleves",
+      audience: lireInstance(db).lecteurs,
       reponses: true,
       liens: args["cours-id"]
         ? [{ cours_id: args["cours-id"], theme_id: args["theme-id"] ?? null }]

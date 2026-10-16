@@ -98,7 +98,19 @@ Espace de stockage et d'organisation des ressources de l'établissement dans Tho
 
 **Matière**
 Discipline ou sujet d'étude dans l'instance. Toutes les matières d'une instance partagent son
-profil, qui détermine les champs et traitements des dépôts.
+profil, qui détermine les traitements des dépôts. Chaque matière choisit ses champs du dépôt.
+
+**Profil**
+Préréglage d'une instance, général ou arts appliqués. Il fixe les traitements des documents et
+fournit les termes et les champs du dépôt tant qu'un administrateur ne les change pas.
+
+**Champ du dépôt**
+Information demandée au dépôt d'une ressource, comme l'auteur ou la date de publication. Une
+matière coche ses champs parmi les champs prédéfinis et les champs personnalisés.
+
+**Champ personnalisé**
+Champ du dépôt créé par un administrateur pour toute l'instance, par exemple « Norme » ou
+« Version du logiciel ». Son type, texte, date ou mots-clés, ne change plus après sa création.
 
 **Cours**
 Collection de ressources, avec un public et un objectif facultatifs. Une ressource peut appartenir
@@ -116,12 +128,19 @@ enseignant de ses cours peut le révoquer.
 
 **Thème**
 Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents
-restent distincts. Le profil arts emploie aussi le terme « séquence ».
+restent distincts. L'administration les nomme « thèmes ». Les autres pages emploient le terme de
+regroupement de l'instance : « Thème » par défaut, « Séquence » pour le profil arts, ou le terme
+choisi par un administrateur, comme « Module ».
+
+**Niveau**
+Public d'un cours ou d'une ressource : « Niveau » par défaut, « Classe » pour le profil arts, ou
+le terme choisi par un administrateur.
 
 **Lecteurs d'une ressource**
 Les comptes qui peuvent la lire : « Moi seulement », « Les enseignants » ou « Les enseignants et
 les élèves ». Les administrateurs lisent toutes les ressources. La case « Thot s'en sert pour
-répondre » décide à part si les réponses peuvent la citer.
+répondre » décide à part si les réponses peuvent la citer. Le dépôt propose les lecteurs par
+défaut que l'administrateur a choisis pour l'instance.
 
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.

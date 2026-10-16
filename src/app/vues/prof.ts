@@ -3,7 +3,8 @@ import type { Bloc } from "../../core/document.ts";
 import { type Audience, AUDIENCES, CLASSES, TYPES_DOCUMENT } from "../depot.ts";
 import { icone } from "../icones.ts";
 import { type Affiliation, type Catalogue, MATIERES } from "../domaines.ts";
-import { type Profil } from "../../core/profils.ts";
+import type { Champ, Profil } from "../../core/profils.ts";
+import type { Libelles } from "../instance.ts";
 import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 
@@ -119,10 +120,9 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
           groupes.size > 1
             ? html`
               <section class="seance">
-                <h2>${
-                  sequence ||
-                  (lignes.some((l) => l.profil === "general") ? "Sans thème" : "Sans séquence")
-                } <span class="discret">${liste.length}</span></h2>
+                <h2>${sequence || "Autres documents"} <span class="discret">${
+                  liste.length
+                }</span></h2>
                 <ul class="tuiles grille-sources">${liste.map(carte)}</ul>
               </section>
             `
@@ -172,6 +172,7 @@ export const sources = (
   lignes: LigneSource[],
   f: Filtres,
   repartition: { sequence: string; statut: string; n: number }[],
+  l: Libelles,
   general = false,
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
@@ -189,8 +190,8 @@ export const sources = (
     ${
       general
         ? ""
-        : html`<nav class="onglets" aria-label="Séquence">
-      ${[["", "Toutes les séquences"], ...sequences.map((s) => [s, s])].map(
+        : html`<nav class="onglets" aria-label="${l.regroupements}">
+      ${[["", "Tout"], ...sequences.map((s) => [s, s])].map(
         ([v, l]) =>
           html`
           <a href="${lienFiltres(f, { sequence: v })}"
@@ -556,7 +557,7 @@ export const questionsProf = (messages: QuestionProf[]) => {
   const refus = messages.filter((m) => m.etat === "out_of_corpus");
   const groupes = Map.groupBy(
     messages.filter((m) => m.etat !== "out_of_corpus"),
-    (m) => m.chapitre || "Sans séquence",
+    (m) => m.chapitre || "Autres questions",
   );
   return html`
     <h1>Questions des élèves</h1>
@@ -679,10 +680,16 @@ export const depot = (s: {
   personnel?: boolean;
   catalogue?: Catalogue;
   profil?: Profil;
+  /** les champs du dépôt de la matière choisie */
+  informations: Champ[];
+  libelles: Libelles;
+  /** les lecteurs proposés quand la saisie n'en choisit pas */
+  lecteurs: Audience;
   liens?: Affiliation[];
 }) => {
   const c = s.champs ?? {};
   const e = s.erreurs ?? {};
+  // Le profil arts propose les classes du lycée.
   const arts = s.profil === "arts-appliques" || !s.catalogue;
   return html`
     <h1>Déposer une ressource</h1>
@@ -726,7 +733,7 @@ export const depot = (s: {
           erreur: e.type_document,
         })} ${champ({
           nom: "classe",
-          label: arts ? "Classe (facultative)" : "Niveau (facultatif)",
+          label: s.libelles.niveau,
           options: arts ? CLASSES : undefined,
           valeur: c.classe,
           erreur: e.classe,
@@ -735,32 +742,32 @@ export const depot = (s: {
             ? html`<input type="hidden" name="matiere_id" value="${c.matiere_id ?? ""}">`
             : champ({
                 nom: "matiere",
-                label: "Matière (facultative)",
+                label: "Matière",
                 options: MATIERES,
                 valeur: c.matiere,
                 erreur: e.matiere,
               })
         } ${champ({
           nom: "sous_matiere",
-          label: arts ? "Sous-matière" : "Sous-thème",
+          label: s.libelles.sousRegroupement,
           valeur: c.sous_matiere,
         })} ${champ({
           nom: "sequence",
-          label: arts ? "Séquence" : "Thème (facultatif)",
+          label: s.libelles.regroupement,
           valeur: c.sequence,
           aide: "Choisir le rattachement au cours ci-dessous.",
-        })} ${champ({ nom: "seance", label: arts ? "Séance" : "Section", valeur: c.seance })}
+        })} ${champ({ nom: "seance", label: s.libelles.seance, valeur: c.seance })}
       </div>
       ${s.catalogue ? Domaines.liens(s.catalogue, s.liens) : ""}
       ${Domaines.langue(c.langue)}
-      <div class="deux">${Domaines.informations(s.profil ?? "general", c)}</div>
+      <div class="deux">${Domaines.informations(s.informations, c)}</div>
       ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })} ${champ({
         nom: "objectifs",
         label: "Objectifs pédagogiques",
         zone: true,
         valeur: c.objectifs,
       })} ${champ({ nom: "evaluation", label: "Évaluation", valeur: c.evaluation })}
-      ${lecteurs(c.audience, c.audience === undefined || Boolean(c.reponses))}
+      ${lecteurs(c.audience ?? s.lecteurs, c.audience === undefined || Boolean(c.reponses))}
       <button class="principal">Déposer</button>
     </form>
   `;
@@ -778,6 +785,7 @@ export type Detail = {
     enseignant: string;
     cree_le: string;
     profil?: Profil;
+    matiere_id: string | null;
     langue?: string;
     audience: Audience;
     reponses: number;
@@ -785,6 +793,9 @@ export type Detail = {
   /** le propriétaire ou un administrateur */
   modifiable?: boolean;
   meta: Record<string, unknown>;
+  /** les champs du dépôt de sa matière */
+  informations: Champ[];
+  libelles: Libelles;
   job: { etat: string; erreur: string | null; avertissements: string[] } | undefined;
   images: ImageVue[];
   /** blocs de la révision servie */
@@ -849,13 +860,6 @@ export const detailSource = (d: Detail) => {
   // Une proposition de Thot remplit un champ encore vide. Enregistrer la valide.
   const propositions = (d.meta.propositions ?? {}) as Record<string, string>;
   const propose = (nom: string) => !d.meta[nom] && Boolean(propositions[nom]);
-  const information = (nom: string, label: string) =>
-    champ({
-      nom,
-      label,
-      valeur: String(d.meta[nom] || propositions[nom] || ""),
-      aide: propose(nom) ? "Proposé par Thot, à vérifier." : undefined,
-    });
   return html`
     <p><a href="/prof">Bibliothèque</a></p>
     <h1>${d.source.titre}</h1>
@@ -892,17 +896,10 @@ export const detailSource = (d: Detail) => {
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
         ${champ({
           nom: "sequence",
-          label: d.source.profil === "general" ? "Thème" : "Séquence",
+          label: d.libelles.regroupement,
           valeur: String(d.meta.sequence ?? ""),
         })}
-        ${
-          d.source.profil === "general"
-            ? Domaines.informations("general", d.meta)
-            : html`${information("date", "Date de l'œuvre")} ${information("artiste", "Artiste")} ${information(
-                "mouvement",
-                "Mouvement",
-              )}`
-        }
+        ${Domaines.informations(d.informations, d.meta, propositions)}
       </div>
       ${
         d.source.profil !== "general"

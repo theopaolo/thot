@@ -2,7 +2,13 @@ import { writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { contenu } from "./config.ts";
 import { transaction } from "../core/recherche.ts";
 import { type Db, maintenant } from "./db.ts";
-import { type Affiliation, affiliations, domaineSource, rangerLegacy } from "./domaines.ts";
+import {
+  type Affiliation,
+  affiliations,
+  champsMatiere,
+  domaineSource,
+  rangerLegacy,
+} from "./domaines.ts";
 import { CHAMPS, validerInformations } from "../core/profils.ts";
 
 export const MAX_OCTETS = 25 * 1024 * 1024;
@@ -55,9 +61,13 @@ export type Metadonnees = {
 const REQUIS = ["titre", "type_document", "matiere", "classe", "matiere_id", "langue"] as const;
 const LIBRES = ["sous_matiere", "sequence", "seance", "resume", "objectifs", "evaluation"] as const;
 
-/** Valide la saisie. Rend les métadonnées ou un message par champ. */
+/**
+ * Valide la saisie. Rend les métadonnées ou un message par champ. Les valeurs des champs
+ * `informations` passent telles quelles : le dépôt les valide selon la matière.
+ */
 export function valider(
   champs: Record<string, string>,
+  informations: string[] = Object.keys(CHAMPS),
 ): { meta: Metadonnees } | { erreurs: Record<string, string> } {
   const erreurs: Record<string, string> = {};
   const lu = (nom: string) => (champs[nom] ?? "").trim();
@@ -73,12 +83,10 @@ export function valider(
   }
   if (Object.keys(erreurs).length) return { erreurs };
   const meta = Object.fromEntries([...REQUIS, ...LIBRES].map((n) => [n, lu(n)]));
-  const informations = Object.fromEntries(
-    Object.keys(CHAMPS)
-      .filter((n) => champs[n]?.trim())
-      .map((n) => [n, champs[n].trim()]),
+  const valeurs = Object.fromEntries(
+    informations.filter((n) => champs[n]?.trim()).map((n) => [n, champs[n].trim()]),
   );
-  return { meta: { ...meta, ...informations } as Metadonnees };
+  return { meta: { ...meta, ...valeurs } as Metadonnees };
 }
 
 const SIGNATURES: [Format, number[]][] = [
@@ -169,10 +177,12 @@ export async function deposer(
   try {
     transaction(db, () => {
       const domaine = domaineSource(db, d.meta as unknown as Record<string, string>);
+      // Seuls les champs de la matière sont validés puis enregistrés.
       const informations = validerInformations(
         d.meta as unknown as Record<string, string>,
-        domaine.profil,
+        champsMatiere(db, domaine.matiere_id, domaine.profil),
       );
+      const saisie = Object.fromEntries([...REQUIS, ...LIBRES].map((n) => [n, d.meta[n]]));
       if (domaine.profil === "arts-appliques") {
         for (const nom of Object.keys(informations)) {
           if (!informations[nom]) delete informations[nom];
@@ -185,7 +195,7 @@ export async function deposer(
         source_id,
         d.schoolId,
         d.meta.titre,
-        JSON.stringify({ ...d.meta, ...informations }),
+        JSON.stringify({ ...saisie, ...informations }),
         nom,
         d.format,
         checksum,

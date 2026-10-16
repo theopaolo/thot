@@ -2,8 +2,9 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { Affirmation, Resultat } from "../../core/reponse.ts";
 import { type Icone, icone } from "../icones.ts";
-import { CHAMPS, type Profil, PROFILS } from "../../core/profils.ts";
+import type { Champ, Profil } from "../../core/profils.ts";
 import type { Scope } from "../domaines.ts";
+import type { Libelles } from "../instance.ts";
 import { champsScope } from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 
@@ -61,10 +62,11 @@ const nomChapitre = (nom: string) => nom.replace(/^ATC\s+/, "");
 export const accueilEleve = (
   prenom: string,
   chapitres: ChapitreVue[],
-  fait?: FaitVue,
-  oeuvre?: SourceChapitre,
-  personnel = false,
-  mention = "",
+  fait: FaitVue | undefined,
+  oeuvre: SourceChapitre | undefined,
+  personnel: boolean,
+  mention: string,
+  l: Libelles,
 ) =>
   html`
     <h1>Bonjour ${prenom}</h1>
@@ -79,7 +81,7 @@ export const accueilEleve = (
     </form>
     <div class="accueil-grille">
       <section aria-labelledby="tes-chapitres">
-        <h2 id="tes-chapitres">${personnel ? "Mes documents" : "Tes séquences"}</h2>
+        <h2 id="tes-chapitres">${personnel ? "Mes documents" : l.regroupements}</h2>
         ${
           chapitres.length
             ? html`
@@ -94,7 +96,7 @@ export const accueilEleve = (
                         : c.coursId && c.nom
                           ? `/eleve?cours_id=${c.coursId}`
                           : lienChapitre(c.nom)
-                    }">${nomChapitre(c.nom || "Sans séquence")}</a></h3>
+                    }">${nomChapitre(c.nom || "Autres documents")}</a></h3>
                     <span class="discret">${c.sources.length} documents${
                       chapitres.some((autre) => autre.nom === c.nom && autre.coursId !== c.coursId)
                         ? ` / ${c.cours}`
@@ -130,7 +132,9 @@ export const accueilEleve = (
                       : c.coursId && c.nom
                         ? `/eleve?cours_id=${c.coursId}`
                         : lienChapitre(c.nom)
-                  }">${icone("arrow-right")}Ouvrir la séquence</a>
+                  }" aria-label="Ouvrir ${nomChapitre(c.nom || "Autres documents")}">${icone(
+                    "arrow-right",
+                  )}Ouvrir</a>
                 </li>
               `,
             )}</ul>
@@ -264,6 +268,7 @@ export type SourceLue = {
   titre: string;
   enseignant: string;
   profil?: Profil;
+  matiere_id: string | null;
   langue?: string;
   metadonnees?: string;
   sequence: string;
@@ -274,13 +279,16 @@ export type SourceLue = {
 };
 
 /** Cartel de musée: seulement les champs connus, rien d'inventé. */
-const cartel = (d: {
-  seance: string;
-  chapitre: string;
-  date: string;
-  enseignant: string;
-  profil?: Profil;
-}) =>
+const cartel = (
+  d: {
+    seance: string;
+    chapitre: string;
+    date: string;
+    enseignant: string;
+    profil?: Profil;
+  },
+  l: Libelles,
+) =>
   html`
     <dl class="cartel">
       ${
@@ -302,7 +310,7 @@ const cartel = (d: {
       ${
         d.chapitre
           ? html`
-          <dt>${d.profil === "general" ? "Thème" : "Séquence"}</dt>
+          <dt>${l.regroupement}</dt>
           <dd>${d.profil === "general" ? d.chapitre : nomChapitre(d.chapitre)}</dd>
         `
           : ""
@@ -324,7 +332,7 @@ export type Apercu = {
   extrait: string;
 };
 
-export const lecteur = (d?: Apercu) =>
+export const lecteur = (d: Apercu | undefined, l: Libelles) =>
   d
     ? html`
       <aside id="lecteur" class="feuille" aria-labelledby="lecteur-titre">
@@ -343,7 +351,7 @@ export const lecteur = (d?: Apercu) =>
             `
               : ""
           }
-          ${cartel(d)}
+          ${cartel(d, l)}
           ${d.images > 1 ? html`<p class="discret">${d.images} images dans le document.</p>` : ""}
           ${d.extrait ? html`<p class="extrait">${d.extrait}</p>` : ""}
         </div>
@@ -392,19 +400,22 @@ export const pageChapitre = (
   nom: string,
   sources: SourceChapitre[],
   questions: string[],
-  choisi?: Apercu,
-  themeId?: string,
-  perimetre = "",
-  mention = "",
+  choisi: Apercu | undefined,
+  themeId: string | undefined,
+  perimetre: string,
+  mention: string,
+  l: Libelles,
 ) => {
   const quiLit = mention ? html`<small>${mention}</small>` : "";
+  const surQuoi = (titre: string) =>
+    titre ? `Une question sur ${titre} ?` : "Une question sur ces documents ?";
   if (sources.every((s) => s.profil === "general")) {
     return html`
       <p><a href="/eleve">Ressources</a></p><h1>${
         nom || "Ressources non classées"
       }</h1><p class="discret">${perimetre}</p>
           <form method="post" action="/eleve/questions"
-        class="question-rapide"><label for="texte">Une question sur ce thème ?</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
+        class="question-rapide"><label for="texte">${surQuoi(nom)}</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
           themeId ?? ""
         }"><input type="hidden" name="chapitre" value="${
           themeId ? "" : nom
@@ -423,13 +434,13 @@ export const pageChapitre = (
   return html`
     <div class="mur-lecteur" data-feuille>
       <div class="mur">
-    <a class="bouton retour" href="/eleve">${icone("arrow-left")}Toutes les séquences</a>
-    <h1>${themeId ? nom : nomChapitre(nom || "Sans séquence")}</h1>
+    <a class="bouton retour" href="/eleve">${icone("arrow-left")}${l.regroupements}</a>
+    <h1>${themeId ? nom : nomChapitre(nom || "Autres documents")}</h1>
     <p class="sous-titre">${
       sources.length
     } documents publiés par tes enseignants, rangés par séance.</p>
     <form method="post" action="/eleve/questions" class="question-rapide">
-      <label for="texte">Une question sur cette séquence ?</label>
+      <label for="texte">${surQuoi(themeId ? nom : nomChapitre(nom))}</label>
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
           placeholder="Pose ta question">
@@ -463,7 +474,7 @@ export const pageChapitre = (
           `,
         )}
       </div>
-      <div class="colonne-lecteur">${lecteur(choisi)}</div>
+      <div class="colonne-lecteur">${lecteur(choisi, l)}</div>
     </div>
     ${
       oeuvre
@@ -489,6 +500,8 @@ export const lectureSource = (
   s: SourceLue,
   images: { id: string; legende: string | null }[],
   blocs: Bloc[],
+  informations: Champ[],
+  l: Libelles,
   marque?: [number, number],
   /** les blocs viennent d'une révision qui ne sert plus */
   ancienne = false,
@@ -498,7 +511,7 @@ export const lectureSource = (
       s.profil === "general" ? "/eleve" : lienChapitre(s.sequence, s.id)
     }">${icone(
       "arrow-left",
-    )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Sans séquence")}</a>
+    )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Autres documents")}</a>
     <article class="document">
       <h1>${s.titre}</h1>
       ${
@@ -516,11 +529,11 @@ export const lectureSource = (
       }
       ${
         s.metadonnees
-          ? html`<dl class="cartel">${PROFILS[s.profil ?? "general"].informations.map((n) => {
-              const valeur = JSON.parse(s.metadonnees!)[n];
+          ? html`<dl class="cartel">${informations.map((c) => {
+              const valeur = JSON.parse(s.metadonnees!)[c.cle];
               return valeur
                 ? html`
-                <dt>${CHAMPS[n].label}</dt>
+                <dt>${c.label}</dt>
                 <dd>${String(valeur)}</dd>
               `
                 : "";
@@ -528,7 +541,7 @@ export const lectureSource = (
           : ""
       }
       <div class="document-tete">
-        ${cartel({ ...s, chapitre: s.sequence })}
+        ${cartel({ ...s, chapitre: s.sequence }, l)}
         <form method="post" action="/eleve/questions">
           <input type="hidden" name="texte" value="Que dit le cours sur « ${s.titre} » ?">
           <input type="hidden" name="chapitre" value="${s.sequence}">

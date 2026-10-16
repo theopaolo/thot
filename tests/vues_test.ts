@@ -5,6 +5,14 @@ import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vue
 import { chat, pageChapitre, panneauSource } from "../src/app/vues/eleve.ts";
 import { texteDocument } from "../src/app/vues/document.ts";
 
+const LIBELLES = {
+  niveau: "Classe",
+  regroupement: "Séquence",
+  regroupements: "Séquences",
+  sousRegroupement: "Sous-matière",
+  seance: "Séance",
+};
+
 test("les vues partagent le bundle et gardent leurs contrats de fragments et d'échappement", async () => {
   const titre = "<script>alert(1)</script>";
   const chapitre = await pageChapitre(
@@ -20,6 +28,11 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
       },
     ],
     [],
+    undefined,
+    undefined,
+    "",
+    "",
+    LIBELLES,
   );
   const conversation = await chat([
     {
@@ -58,7 +71,13 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
     page("Chapitre", null, chapitre),
     page("Chat", null, conversation),
     page("Légendes", null, legendes, "", "/prof/legendes"),
-    page("Dépôt", null, depot({}), "", "/prof/depot"),
+    page(
+      "Dépôt",
+      null,
+      depot({ informations: [], libelles: LIBELLES, lecteurs: "eleves" }),
+      "",
+      "/prof/depot",
+    ),
   ]);
   for (const rendu of rendus.map(String)) {
     assertStringIncludes(rendu, '<script type="module" src="/static/dist/app.js"></script>');
@@ -93,10 +112,13 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
     cree_le: "2026-01-01T00:00:00Z",
     audience: "eleves" as const,
     reponses: 1,
+    matiere_id: null,
   };
   const d = {
     source,
     meta: {},
+    informations: [],
+    libelles: LIBELLES,
     job: { etat: "extracting", erreur: null, avertissements: [] },
     images: [],
     blocs: [],

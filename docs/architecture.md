@@ -63,7 +63,8 @@ change ni son identité ni ses sources. L'ancien identifiant d'établissement es
 existantes, ou de l'environnement pour une base vide. Une base qui contient plusieurs
 établissements exige une séparation explicite avant son initialisation.
 
-Le nom et le mode d'usage sont enregistrés en base. Chemins, origine, clés, fournisseurs autorisés
+Le nom et le mode d'usage sont enregistrés en base. Un administrateur renomme l'instance depuis
+l'administration, le mode y reste en lecture seule. Chemins, origine, clés, fournisseurs autorisés
 et localisations déclarées restent des réglages d'opérateur. La localisation affichée ne prouve
 pas le lieu d'exécution du fournisseur. Désactiver un fournisseur interdit aussi son emploi en
 repli, même si sa clé est présente.
@@ -97,6 +98,39 @@ de légende mesurées sur le pilote. La première matière fixe le profil de l'i
 action le change pour toutes les matières, tant qu'aucune ressource n'a un autre profil. Ensuite,
 l'administration et la CLI refusent une matière d'un autre profil. La source capture le profil au
 dépôt, y compris sans matière. Une réextraction conserve ce profil.
+
+Un profil est un préréglage de code. Il fixe les traitements construits ou mesurés pour lui et
+fournit les termes et les champs du dépôt par défaut. Les réglages de l'administration
+n'enregistrent que ce qui s'en écarte : un terme vide, ou une matière dont les champs n'ont jamais
+été enregistrés, reprend le profil. Changer de profil avant le premier dépôt change ces valeurs
+par défaut sans réécrire les réglages enregistrés. Un autre traitement demande un nouveau profil
+en code, avec sa propre évaluation.
+
+Les termes de niveau et de regroupement appartiennent à l'instance, pas à la matière : l'accueil
+de l'élève et la bibliothèque montrent plusieurs matières sur une page. Un terme se règle au
+singulier et au pluriel, sans genre. L'interface ne l'accorde donc avec aucun article ni
+adjectif.
+
+Les champs du dépôt appartiennent à chaque matière. Une matière coche des champs prédéfinis et
+des champs personnalisés de l'instance, de type texte, date ou mots-clés. La valeur d'un champ
+reste dans les métadonnées de la source, sous la clé du champ. Renommer le champ garde sa clé.
+Ses valeurs suivent la validation des champs prédéfinis. Retirer un champ d'une matière le
+masque des formulaires et de la lecture, sans effacer ses valeurs. Un champ personnalisé ne se
+supprime que si aucune ressource ne porte de valeur pour lui. Une matière arts garde la date,
+l'artiste et le mouvement, que lisent les propositions de Thot et le quiz.
+
+Aucun réglage n'atteint un modèle : ni terme, ni nom ou valeur de champ. Les consignes viennent
+du profil des sources retrouvées. Une consigne écrite pour un autre public modifie le profil et
+rejoue l'évaluation.
+
+Les lecteurs par défaut d'un dépôt s'appliquent aux dépôts suivants, par le web comme par la CLI.
+Les ressources déposées gardent leurs lecteurs. Le mode personnel n'a pas ce réglage : un dépôt
+n'y a qu'un lecteur.
+
+Seuls les administrateurs modifient ces réglages. Chaque formulaire s'enregistre en entier ou
+pas du tout. Les réglages de l'instance et la liste des champs de chaque matière portent une
+version : un enregistrement parti d'une version périmée n'enregistre rien et rend la saisie avec
+la version actuelle.
 
 La langue décrit la source, pas sa matière ou son niveau. La recherche conserve sa racinisation
 française. Les autres langues sont signalées comme non prises en charge. La sonde lexicale de

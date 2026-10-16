@@ -40,7 +40,7 @@ import {
   reinitialiserMotDePasse,
   secretSession,
 } from "./comptes.ts";
-import { lireInstance } from "./instance.ts";
+import { enregistrerReglages, libelles, lireInstance, type Reglages } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { audience, controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
@@ -228,9 +228,39 @@ export function creerApp(db: Db, modeles: Modeles) {
     deleteCookie(c, SESSION, { path: "/", secure: config.origine.startsWith("https:") });
     return c.redirect("/connexion");
   });
+  const pageAdministration = (c: Context<Env>, etat: Parameters<typeof administration>[3] = {}) =>
+    rendre(
+      c,
+      "Administration",
+      administration(
+        lireInstance(db),
+        Domaines.profilInstance(db),
+        !!db.prepare("SELECT 1 FROM sources").get(),
+        etat,
+      ),
+    );
   app.get("/administration", (c) =>
-    c.html(rendre(c, "Administration", administration(lireInstance(db)))),
+    c.html(pageAdministration(c, { enregistre: c.req.query("enregistre") !== undefined })),
   );
+  // Une version périmée n'enregistre rien et rend la saisie avec la version actuelle.
+  app.post("/administration", async (c) => {
+    const b = await c.req.parseBody();
+    const champ = (n: string) => String(b[n] ?? "").trim();
+    const saisie: Reglages = {
+      nom: champ("nom"),
+      niveau: champ("niveau"),
+      regroupement: champ("regroupement"),
+      regroupements: champ("regroupements"),
+      // Le mode personnel ne montre pas ce choix : un dépôt n'y a qu'un lecteur.
+      lecteurs: String(b.lecteurs ?? lireInstance(db).lecteurs) as Reglages["lecteurs"],
+    };
+    const r = enregistrerReglages(db, saisie, Number(b.version));
+    if (r === true) return c.redirect("/administration?enregistre", 303);
+    return c.html(
+      pageAdministration(c, r ? { saisie, erreurs: r } : { saisie, conflit: true }),
+      r ? 400 : 409,
+    );
+  });
 
   // ------------------------------------------------------------ inscription par lien
   // Le lien inscrit des élèves seulement. Un enseignant ou un administrateur qui l'ouvre lit une
@@ -289,39 +319,86 @@ export function creerApp(db: Db, modeles: Modeles) {
     const m = cat.matieres.find((m) =>
       champs.matiere_id ? m.id === champs.matiere_id : m.nom === champs.matiere,
     );
+    // Le profil que le dépôt donnera à la source : ses champs sont ceux qu'il validera.
+    const profil =
+      m?.profil ??
+      Domaines.profilInstance(db) ??
+      (champs.matiere === "arts-appliques" ? ("arts-appliques" as const) : ("general" as const));
+    const instance = lireInstance(db);
     return {
-      personnel: lireInstance(db).mode === "personal",
+      personnel: instance.mode === "personal",
       champs,
       catalogue: cat,
-      profil:
-        m?.profil ??
-        (champs.matiere === "arts-appliques" ? ("arts-appliques" as const) : ("general" as const)),
+      profil,
+      informations: Domaines.champsMatiere(db, m?.id ?? null, profil),
+      libelles: libelles(db),
+      lecteurs: instance.lecteurs,
       liens: Domaines.liensFormulaire(b),
     };
   };
-  const pageDomaines = (c: Context<Env>, erreur = "", ouvert = "") => {
+  const pageDomaines = (
+    c: Context<Env>,
+    erreur = "",
+    ouvert = "",
+    saisie?: DomaineVue.ChampsDepot["saisie"],
+  ) => {
     const cat = Domaines.catalogue(db);
     return rendre(
       c,
       "Matières et cours",
-      DomaineVue.gestion(cat, erreur, !!db.prepare("SELECT 1 FROM sources").get(), {
-        membres: new Map(cat.cours.map((x) => [x.id, Domaines.membres(db, x.id)])),
-        comptes: db
-          .prepare("SELECT id, identifiant, nom, role FROM comptes ORDER BY nom")
-          .all() as DomaineVue.Inscrit[],
-        ouvert,
-      }),
+      DomaineVue.gestion(
+        cat,
+        erreur,
+        !!db.prepare("SELECT 1 FROM sources").get(),
+        {
+          membres: new Map(cat.cours.map((x) => [x.id, Domaines.membres(db, x.id)])),
+          comptes: db
+            .prepare("SELECT id, identifiant, nom, role FROM comptes ORDER BY nom")
+            .all() as DomaineVue.Inscrit[],
+          ouvert,
+        },
+        {
+          // Seul un champ personnalisé montre combien de ressources le remplissent.
+          catalogue: Domaines.catalogueChamps(db).map((x) => ({
+            ...x,
+            ressources: x.cle.startsWith("perso_") ? Domaines.ressourcesAvec(db, x.cle) : 0,
+          })),
+          listes: new Map(
+            cat.matieres.map((m) => [
+              m.id,
+              Domaines.champsMatiere(db, m.id, m.profil).map((x) => x.cle),
+            ]),
+          ),
+          saisie,
+          enregistre: c.req.query("enregistre") !== undefined,
+        },
+        libelles(db),
+      ),
     );
   };
   app.get("/administration/domaines", (c) => c.html(pageDomaines(c, "", c.req.query("ouvert"))));
   app.post("/administration/domaines/:action", async (c) => {
-    const b = await c.req.parseBody();
+    const b = await c.req.parseBody({ all: true });
     const action = c.req.param("action");
-    // Les membres d'un cours restent affichés après un ajout ou un retrait.
+    // Les membres d'un cours et les champs d'une matière restent affichés après un changement.
     const ouvert =
-      action === "inscrire" || action === "desinscrire" ? String(b.cours_id ?? "") : "";
+      action === "inscrire" || action === "desinscrire"
+        ? String(b.cours_id ?? "")
+        : action === "champs"
+          ? String(b.matiere_id ?? "")
+          : "";
     try {
       switch (action) {
+        case "champs": {
+          const cles = [b.champs ?? []].flat().map(String);
+          if (!Domaines.enregistrerChamps(db, ouvert, cles, Number(b.version))) {
+            return c.html(pageDomaines(c, "", ouvert, { id: ouvert, cles }), 409);
+          }
+          break;
+        }
+        case "champ":
+          Domaines.champPersonnalise(db, String(b.nom ?? ""), String(b.type ?? ""));
+          break;
         case "matiere":
           Domaines.matiere(db, String(b.nom ?? ""), b.profil ? String(b.profil) : undefined);
           break;
@@ -360,7 +437,11 @@ export function creerApp(db: Db, modeles: Modeles) {
     }
     const id = encodeURIComponent(ouvert);
     return c.redirect(
-      ouvert ? `/administration/domaines?ouvert=${id}#membres-${id}` : "/administration/domaines",
+      action === "champs"
+        ? `/administration/domaines?ouvert=${id}&enregistre#champs-${id}`
+        : ouvert
+          ? `/administration/domaines?ouvert=${id}#membres-${id}`
+          : "/administration/domaines",
       303,
     );
   });
@@ -443,6 +524,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           ),
           f,
           repartition,
+          libelles(db),
           ressources.some((s) => s.profil === "general"),
         )}`,
       ),
@@ -699,7 +781,10 @@ export function creerApp(db: Db, modeles: Modeles) {
       const refus = (erreurs: Record<string, string>) =>
         c.html(rendre(c, "Déposer", Prof.depot({ ...optionsDepot(c, champs, b), erreurs })), 400);
 
-      const v = valider(champs);
+      const v = valider(
+        champs,
+        Domaines.catalogueChamps(db).map((x) => x.cle),
+      );
       const fichier = b.fichier;
       if (fichier instanceof File && fichier.size > MAX_OCTETS) {
         return refus({
@@ -726,8 +811,8 @@ export function creerApp(db: Db, modeles: Modeles) {
           enseignant: c.get("compte").nom,
           proprietaireId: c.get("compte").id,
           par: c.get("compte"),
-          // Sans le choix des lecteurs, la ressource va aux élèves et sert aux réponses.
-          audience: audience(b.audience ?? "eleves"),
+          // Sans le choix des lecteurs, la ressource va aux lecteurs par défaut et sert aux réponses.
+          audience: audience(b.audience ?? lireInstance(db).lecteurs),
           reponses: b.audience === undefined || Boolean(b.reponses),
           liens:
             b.cours !== undefined
@@ -780,6 +865,8 @@ export function creerApp(db: Db, modeles: Modeles) {
         .prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ?")
         .all(id) as Domaines.Affiliation[],
       meta: JSON.parse(source.metadonnees),
+      informations: Domaines.champsMatiere(db, source.matiere_id, source.profil ?? "general"),
+      libelles: libelles(db),
       job: job && { ...job, avertissements: JSON.parse(job.avertissements) },
       images: db
         .prepare("SELECT * FROM images WHERE source_id = ? ORDER BY position")
@@ -834,9 +921,10 @@ export function creerApp(db: Db, modeles: Modeles) {
     try {
       langue = Domaines.langueSource(String(b.langue ?? d.source.langue ?? "fr"));
       if (b.audience !== undefined) lecteurs = audience(b.audience);
+      // Un champ retiré de la matière garde sa valeur : il n'est ni montré ni validé.
       informations = validerInformations(
         Object.fromEntries(Object.entries({ ...d.meta, ...b }).map(([k, v]) => [k, String(v)])),
-        d.source.profil ?? "general",
+        d.informations,
       );
     } catch (e) {
       return c.text((e as Error).message, 400);
@@ -966,7 +1054,7 @@ export function creerApp(db: Db, modeles: Modeles) {
   const sourceCertifiee = (id: string, l: Lecteur) =>
     db
       .prepare(
-        `SELECT id, titre, enseignant, profil, langue, metadonnees, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
+        `SELECT id, titre, enseignant, profil, matiere_id, langue, metadonnees, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
          coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date
        FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
@@ -1080,6 +1168,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           oeuvre,
           lireInstance(db).mode === "personal",
           mention,
+          libelles(db),
         )}`,
         "accueil",
       ),
@@ -1122,7 +1211,7 @@ export function creerApp(db: Db, modeles: Modeles) {
     return c.html(
       rendre(
         c,
-        nom || "Sans séquence",
+        nom || "Autres documents",
         Eleve.pageChapitre(
           nom,
           sources,
@@ -1137,6 +1226,7 @@ export function creerApp(db: Db, modeles: Modeles) {
           themeId,
           theme ? `${matiere?.nom} / ${cours?.nom} / ${nom}` : "",
           mentionLecteurs(c),
+          libelles(db),
         ),
       ),
     );
@@ -1184,7 +1274,7 @@ export function creerApp(db: Db, modeles: Modeles) {
 
   app.get("/eleve/documents/:id/apercu", (c) => {
     const a = apercu(c.req.param("id"), lu(c));
-    return a ? c.html(Eleve.lecteur(a)) : c.notFound();
+    return a ? c.html(Eleve.lecteur(a, libelles(db))) : c.notFound();
   });
 
   app.get("/eleve/sources/:id", (c) => {
@@ -1213,6 +1303,8 @@ export function creerApp(db: Db, modeles: Modeles) {
           s,
           images,
           lireDocument(s.id, revision).blocs.filter((b) => !Eleve.COMPTEUR_DIAPO.test(b.texte)),
+          Domaines.champsMatiere(db, s.matiere_id, s.profil ?? "general"),
+          libelles(db),
           marque,
           revision < s.revision,
         ),

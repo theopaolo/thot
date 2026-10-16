@@ -18,9 +18,11 @@ import {
   affiliations,
   catalogue,
   catalogueVisible,
+  champsMatiere,
   changerProfil,
   cours,
   coursDuCompte,
+  enregistrerChamps,
   inscrire,
   matiere,
   renommer,
@@ -107,6 +109,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0009_membres.sql",
       "0010_liens.sql",
       "0011_revisions.sql",
+      "0012_reglages.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -467,10 +470,11 @@ test("prompts neutres, preuves conservées, rubriques ATC et légendes réservé
     assertEquals(decouperPdf(brut, "general").parties[0].section, "Introduction");
     assertEquals(PROFILS.general.activites, ["explication"]);
     assertEquals(CHAMPS.date_evenement.type, "date");
+    const general = champsMatiere(db, null, "general");
     assertThrows(() =>
-      validerInformations({ valide_du: "2026-01-01", valide_au: "2025-01-01" }, "general"),
+      validerInformations({ valide_du: "2026-01-01", valide_au: "2025-01-01" }, general),
     );
-    assertThrows(() => validerInformations({ date_publication: "2025-02-30" }, "general"));
+    assertThrows(() => validerInformations({ date_publication: "2025-02-30" }, general));
     await assertRejects(() => ressource(db, { matiere_id: "inconnue" }));
   } finally {
     db.close();
@@ -591,7 +595,10 @@ test("arts appliqués : consignes mesurées, matière proposée, profil de l’i
     assertThrows(() => matiere(db, "Physique", "general"), Error, "un seul profil");
     assertEquals(catalogue(db).matieres.length, 1);
     const eleve = await session(db, faux.modeles, "eleve");
-    assertStringIncludes(await (await eleve.requete("/eleve")).text(), "Tes séquences");
+    assertStringIncludes(
+      await (await eleve.requete("/eleve")).text(),
+      '<h2 id="tes-chapitres">Séquences</h2>',
+    );
   } finally {
     db.close();
     await rm(dir, { recursive: true });
@@ -913,6 +920,10 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
     await cli("retirer-membre", c, "noe");
     const fichier = join(dir, "physique.html");
     await writeFile(fichier, "<p>La lumière traverse le prisme transparent.</p>");
+    // L'import prend les lecteurs par défaut de l'instance.
+    const reglage = connexion(join(dir, "state.sqlite3"));
+    reglage.prepare("UPDATE instance SET lecteurs = 'collegues'").run();
+    reglage.close();
     await cli(
       "ingest",
       fichier,
@@ -928,6 +939,7 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
       const s = db.prepare("SELECT * FROM sources").get()!;
       assertEquals(s.profil, "general");
       assertEquals(s.langue, "en");
+      assertEquals(s.audience, "collegues");
       const meta = JSON.parse(s.metadonnees as string);
       assertEquals(meta.auteur, "Newton");
       assertEquals(meta.classe, "");
@@ -1145,5 +1157,221 @@ test("l'élève apprend qui lit ses questions, sauf en mode personnel", async ()
   } finally {
     perso.db.close();
     await rm(perso.dir, { recursive: true });
+  }
+});
+
+test("champs du dépôt : « Norme » se coche par matière, se valide, se masque sans perdre ses valeurs", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const elec = matiere(db, "Électricité", "arts-appliques");
+    const cles = (profil: "general" | "arts-appliques") =>
+      champsMatiere(db, elec, profil).map((c) => c.cle);
+    // Une matière arts garde les champs que le quiz lit, même décochés.
+    assert(enregistrerChamps(db, elec, [], 0));
+    assertEquals(cles("arts-appliques"), ["date", "artiste", "mouvement"]);
+    // Changer de profil ne réécrit pas une liste enregistrée.
+    changerProfil(db, "general");
+    assertEquals(cles("general"), ["date", "artiste", "mouvement"]);
+
+    const admin = await administrateur(db);
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    assertEquals((await admin.poster("champ", { nom: "Norme", type: "text" })).status, 303);
+    assertEquals((await admin.poster("champ", { nom: "Norme", type: "date" })).status, 400);
+    const norme = db.prepare("SELECT id FROM champs_personnalises").get()!.id as string;
+    const champs = (version: string, ...liste: string[]) =>
+      admin.requete("/administration/domaines/champs", {
+        method: "POST",
+        body: new URLSearchParams([
+          ["matiere_id", elec],
+          ["version", version],
+          ...liste.map((c) => ["champs", c]),
+        ]),
+      });
+    const refus = await prof.requete("/administration/domaines/champs", {
+      method: "POST",
+      body: new URLSearchParams({ matiere_id: elec, version: "1", champs: norme }),
+    });
+    assertEquals(refus.status, 403);
+    const enregistre = await champs("1", "auteur", norme);
+    assertEquals(enregistre.status, 303);
+    const page = await (await admin.requete(enregistre.headers.get("location")!)).text();
+    assertStringIncludes(page, `<details id="champs-${elec}" open>`);
+    assertStringIncludes(page, "Réglages enregistrés.");
+    assertStringIncludes(page, "Champs du dépôt : 2");
+    assertStringIncludes(page, "Texte, 1 matière, 0 ressource");
+
+    // Une version périmée n'enregistre rien et rend la saisie avec la version actuelle.
+    const conflit = await champs("1", norme);
+    assertEquals(conflit.status, 409);
+    const saisie = await conflit.text();
+    assertStringIncludes(saisie, "Ces réglages ont changé pendant votre saisie.");
+    assertStringIncludes(saisie, `name="version" value="2"`);
+    assertStringIncludes(saisie, `value="${norme}" checked`);
+    assert(!saisie.includes(`value="auteur" checked`));
+    assertEquals(cles("general"), ["auteur", norme]);
+
+    const formulaire = await (await admin.requete(`/prof/depot?matiere_id=${elec}`)).text();
+    assertStringIncludes(formulaire, `<label for="${norme}">Norme</label>`);
+    assert(!formulaire.includes('name="juridiction"'));
+    const deposer = (valeur: string) => {
+      const f = new FormData();
+      for (const [k, v] of Object.entries({
+        titre: "Tableau",
+        type_document: "cours",
+        matiere_id: elec,
+        [norme]: valeur,
+      }))
+        f.set(k, v);
+      f.set("fichier", new File(["<p>Chaque circuit a son disjoncteur.</p>"], "tableau.html"));
+      return admin.requete("/prof/depot", { method: "POST", body: f });
+    };
+    const long = await deposer("x".repeat(121));
+    assertEquals(long.status, 400);
+    assertStringIncludes(await long.text(), "Norme : 120 caractères maximum.");
+    assertEquals((await deposer("NF C 15-100")).status, 200);
+    const id = db.prepare("SELECT id FROM sources").get()!.id as string;
+    await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+    statuer(db, id, "certifiee", "Test");
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const lecture = async () => (await eleve.requete(`/eleve/sources/${id}`)).text();
+    assertStringIncludes(await lecture(), "<dt>Norme</dt>");
+    assertStringIncludes(await lecture(), "NF C 15-100");
+
+    // Retiré de la matière, le champ quitte les pages et garde sa valeur, même après une
+    // modification de la ressource.
+    assertEquals((await champs("2", "auteur")).status, 303);
+    assert(!(await lecture()).includes("NF C 15-100"));
+    assert(!(await (await admin.requete(`/prof/sources/${id}`)).text()).includes(norme));
+    assertEquals(
+      (
+        await admin.requete(`/prof/sources/${id}/modifier`, {
+          method: "POST",
+          body: new URLSearchParams({ titre: "Tableau électrique", sequence: "" }),
+        })
+      ).status,
+      303,
+    );
+    const valeur = () =>
+      JSON.parse(
+        db.prepare("SELECT metadonnees FROM sources WHERE id = ?").get(id)!.metadonnees as string,
+      )[norme];
+    assertEquals(valeur(), "NF C 15-100");
+    const suppression = await admin.poster("supprimer", { genre: "champ", id: norme });
+    assertEquals(suppression.status, 400);
+    assertStringIncludes(
+      await suppression.text(),
+      "« Norme » est rempli sur 1 ressource. Retirez-le des matières pour le masquer.",
+    );
+
+    // Recoché puis renommé, il montre la même valeur sous la même clé.
+    assertEquals((await champs("3", "auteur", norme)).status, 303);
+    await admin.poster("renommer", { genre: "champ", id: norme, nom: "Norme NF" });
+    assertStringIncludes(await lecture(), "<dt>Norme NF</dt>");
+    assertStringIncludes(await lecture(), "NF C 15-100");
+    // Un champ que rien ne remplit se supprime.
+    await admin.poster("champ", { nom: "Version du logiciel", type: "text" });
+    const vide = db
+      .prepare("SELECT id FROM champs_personnalises WHERE nom = 'Version du logiciel'")
+      .get()!.id as string;
+    assertEquals((await admin.poster("supprimer", { genre: "champ", id: vide })).status, 303);
+    assertEquals(db.prepare("SELECT count(*) n FROM champs_personnalises").get()!.n, 1);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("réglages de l'instance : « Module » change les pages, pas les consignes, et les lecteurs par défaut valent pour les dépôts suivants", async () => {
+  const { db, dir } = await environnement();
+  const cle = config.modeles.cle;
+  try {
+    const citation =
+      "La lumière traverse le prisme transparent et se décompose en couleurs visibles.";
+    const id = await ressource(
+      db,
+      { matiere: "arts-appliques", sequence: "Lumière" },
+      undefined,
+      Array(5).fill(citation).join(" "),
+    );
+    const [t] = catalogue(db).themes;
+    const echanges = async () => {
+      const sortie = JSON.stringify({ affirmations: [{ texte: citation, extrait: 1, citation }] });
+      const faux = fauxModeles({ sorties: [sortie] });
+      await demander(db, faux.modeles, "lumière", { lecteur: null, schoolId: "pilote" }, 0.01);
+      return JSON.stringify(faux.vus);
+    };
+    const avant = await echanges();
+    const admin = await administrateur(db);
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const reglages = (champs: Record<string, string>, qui = admin.requete) =>
+      qui("/administration", {
+        method: "POST",
+        body: new URLSearchParams({
+          nom: "Thot",
+          niveau: "",
+          regroupement: "Module",
+          regroupements: "Modules",
+          lecteurs: "collegues",
+          version: "0",
+          ...champs,
+        }),
+      });
+
+    assertEquals((await reglages({}, prof.requete)).status, 403);
+    // Une saisie invalide n'enregistre rien et revient avec ses valeurs.
+    const invalide = await reglages({ nom: "", regroupements: "" });
+    assertEquals(invalide.status, 400);
+    const erreurs = await invalide.text();
+    assertStringIncludes(erreurs, "Rien n'a été enregistré. Corrigez les champs signalés.");
+    assertStringIncludes(erreurs, 'value="Module"');
+    assertEquals(lireInstance(db).version, 0);
+
+    const ok = await reglages({});
+    assertEquals(ok.headers.get("location"), "/administration?enregistre");
+    assertStringIncludes(
+      await (await admin.requete("/administration?enregistre")).text(),
+      "Réglages enregistrés.",
+    );
+    const conflit = await reglages({ nom: "Autre nom" });
+    assertEquals(conflit.status, 409);
+    const saisie = await conflit.text();
+    assertStringIncludes(saisie, "Ces réglages ont changé pendant votre saisie.");
+    assertStringIncludes(saisie, 'value="Autre nom"');
+    assertStringIncludes(saisie, 'name="version" value="1"');
+    assertEquals(lireInstance(db).nom, "Thot");
+
+    for (const [qui, chemin, attendu] of [
+      [admin, "/prof/depot", '<label for="sequence">Module</label>'],
+      [admin, "/prof", 'aria-label="Modules"'],
+      [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
+      [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],
+      [eleve, `/eleve/sources/${id}`, "<dt>Module</dt>"],
+    ] as const) {
+      assertStringIncludes(await (await qui.requete(chemin)).text(), attendu);
+    }
+    assertEquals(await echanges(), avant);
+
+    // Les ressources déposées gardent leurs lecteurs, le dépôt suivant prend les nouveaux.
+    assertEquals(db.prepare("SELECT audience FROM sources").get()!.audience, "eleves");
+    assertStringIncludes(
+      await (await admin.requete("/prof/depot")).text(),
+      'value="collegues" checked',
+    );
+    const f = new FormData();
+    f.set("titre", "Suivant");
+    f.set("type_document", "cours");
+    f.set("fichier", new File(["<p>Un second cours.</p>"], "suivant.html"));
+    assertEquals((await admin.requete("/prof/depot", { method: "POST", body: f })).status, 200);
+    assertEquals(
+      db.prepare("SELECT audience FROM sources WHERE titre = 'Suivant'").get()!.audience,
+      "collegues",
+    );
+    config.modeles.cle = "cle-secrete-de-test";
+    assert(!(await (await admin.requete("/administration")).text()).includes("cle-secrete"));
+  } finally {
+    config.modeles.cle = cle;
+    db.close();
+    await rm(dir, { recursive: true });
   }
 });

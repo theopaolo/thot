@@ -1,8 +1,10 @@
 import { html } from "hono/html";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
-import { type Instance, traitements } from "../instance.ts";
+import { AUDIENCES } from "../depot.ts";
+import { type Instance, type Reglages, traitements } from "../instance.ts";
 import { type Icone, icone } from "../icones.ts";
+import { type Profil, PROFILS } from "../../core/profils.ts";
 
 export const page = (
   titre: string,
@@ -310,18 +312,117 @@ export const motDePasse = (erreur?: string) =>
     </form>
   `;
 
-export const administration = (instance: Instance) =>
-  html`
+export const ongletsAdministration = (chemin: string) =>
+  html`<nav class="onglets" aria-label="Administration">${[
+    ["/administration", "Instance"],
+    ["/administration/domaines", "Matières et cours"],
+  ].map(
+    ([href, libelle]) =>
+      html`<a href="${href}" ${chemin === href ? html`aria-current="page"` : ""}>${libelle}</a>`,
+  )}</nav>`;
+
+/**
+ * Les réglages de l'instance en un formulaire. Après une réponse du serveur, le focus va au
+ * message d'état, à l'alerte d'un conflit ou au premier champ invalide.
+ */
+export const administration = (
+  instance: Instance,
+  profil: Profil | undefined,
+  fige: boolean,
+  e: {
+    saisie?: Reglages;
+    erreurs?: Record<string, string>;
+    conflit?: boolean;
+    enregistre?: boolean;
+  } = {},
+) => {
+  const v = e.saisie ?? instance;
+  const erreurs = e.erreurs ?? {};
+  const premiere = Object.keys(erreurs)[0];
+  const preset = PROFILS[profil ?? "general"];
+  const texte = (
+    nom: "nom" | "niveau" | "regroupement" | "regroupements",
+    label: string,
+    max: number,
+  ) => {
+    const aide = nom === "nom" ? "" : `Vide : ${preset[nom]}, le terme du profil ${preset.nom}.`;
+    const decrit = [aide && `${nom}-aide`, erreurs[nom] && `${nom}-erreur`].filter(Boolean);
+    return html`
+      <div class="champ">
+        <label for="${nom}">${label}</label>
+        ${aide ? html`<p class="aide" id="${nom}-aide">${aide}</p>` : ""}
+        <input type="text" id="${nom}" name="${nom}" value="${v[nom]}" maxlength="${max}" ${
+          nom === "nom" ? "required" : html`placeholder="${preset[nom]}"`
+        } ${decrit.length ? html`aria-describedby="${decrit.join(" ")}"` : ""} ${
+          erreurs[nom] ? html`aria-invalid="true"` : ""
+        } ${premiere === nom ? "autofocus" : ""}>
+        ${erreurs[nom] ? html`<p class="erreur" id="${nom}-erreur">${erreurs[nom]}</p>` : ""}
+      </div>
+    `;
+  };
+  return html`
+    <h1>Administration</h1>
+    ${ongletsAdministration("/administration")}
+    ${e.enregistre ? html`<p role="status" tabindex="-1" autofocus>Réglages enregistrés.</p>` : ""}
+    ${
+      e.conflit
+        ? html`<p role="alert" tabindex="-1" autofocus>Ces réglages ont changé pendant votre saisie. Vos valeurs sont conservées.</p>`
+        : premiere
+          ? html`<p role="alert">Rien n'a été enregistré. Corrigez les champs signalés.</p>`
+          : ""
+    }
+    <form method="post" action="/administration" class="etroit reglages">
+      <input type="hidden" name="version" value="${instance.version}">
+      <fieldset>
+        <legend>Identité</legend>
+        ${texte("nom", "Nom de l'instance", 100)}
+        <p>Mode d'usage : ${instance.mode === "personal" ? "personnel" : "partagé"}<br><span
+            class="aide">Choisi par l'opérateur avant la création des comptes.</span></p>
+        <p>Identité de l'instance : <code>${instance.id}</code></p>
+      </fieldset>
+      <fieldset>
+        <legend>Vocabulaire</legend>
+        ${texte("niveau", "Niveau", 40)}
+        <div class="deux">
+          ${texte("regroupement", "Regroupement, au singulier", 40)}
+          ${texte("regroupements", "Regroupement, au pluriel", 40)}
+        </div>
+      </fieldset>
+      ${
+        instance.mode === "personal"
+          ? ""
+          : html`
+          <fieldset>
+            <legend>Nouveaux dépôts</legend>
+            <fieldset aria-describedby="lecteurs-aide">
+              <legend>Lecteurs proposés par défaut</legend>
+              <p class="aide" id="lecteurs-aide">S'applique aux prochains dépôts. Les ressources déposées gardent leurs lecteurs.</p>
+              ${AUDIENCES.map(
+                (a) =>
+                  html`<label><input type="radio" name="lecteurs" value="${a.value}" ${
+                    v.lecteurs === a.value ? "checked" : ""
+                  }> ${a.label}</label>`,
+              )}
+            </fieldset>
+          </fieldset>
+        `
+      }
+      <div class="barre">
+        <button class="principal">Enregistrer</button>
+        <button type="reset">Annuler les modifications</button>
+      </div>
+    </form>
     <section class="etroit">
-      <h1>Administration</h1>
-      <p><strong>${instance.nom}</strong> · ${
-        instance.mode === "personal" ? "Usage personnel" : "Usage partagé"
-      }</p>
-      <p>Identité de l'instance : <code>${instance.id}</code></p>
-      <p>Le nom et les services autorisés sont configurés par l'opérateur. Renommer l'instance conserve ses documents et ses comptes.</p>
-      <p><a href="/administration/domaines">Configurer les matières et les cours</a></p>
+      <h2>Profil d'import</h2>
+      <p>${profil ? PROFILS[profil].nom : "Aucun"}. ${
+        !profil
+          ? "La première matière le choisit."
+          : fige
+            ? "Des ressources sont déposées, il ne change plus."
+            : "Il se change tant qu'aucune ressource n'est déposée."
+      } <a href="/administration/domaines">Matières et cours</a></p>
       <h2>Traitement des documents et des questions</h2>
-      <p>Localisations déclarées par l'opérateur. Elles ne sont pas vérifiées par l'application.</p>
+      <p>Services autorisés et localisations déclarés par l'opérateur. Les localisations ne sont pas vérifiées par l'application.</p>
       <dl>${traitements().map(
         (f) =>
           html`
@@ -335,3 +436,4 @@ export const administration = (instance: Instance) =>
       <a class="bouton" href="/prof">Gérer les documents</a>
     </section>
   `;
+};
