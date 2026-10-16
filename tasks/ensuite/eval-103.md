@@ -1,6 +1,6 @@
 ---
 title: EVAL-103 Validate new subjects formats and teaching workflows
-status: not_started
+status: in_progress
 scope: [evaluation, qualite, design]
 type: [test]
 ---
@@ -11,6 +11,10 @@ Collect small authorised or synthetic samples for arts/physics, design/philosoph
 judicial training and sociology/anthropology. Include teacher-only material, personal material,
 outdated versions and questions without sufficient evidence. Use these to define acceptance for
 the linked implementation tasks rather than claiming generality from the arts benchmark alone.
+
+The first non-arts set exists in [evaluation/dev/](../../evaluation/dev/), built from five
+developer courses (`thot eval recherche --requetes=...`). Its FTS5 baseline is in
+[evaluation/README.md](../../evaluation/README.md). The reranker and generation runs remain.
 
 ## Evaluation sets
 

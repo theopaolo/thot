@@ -42,6 +42,74 @@ Les rapports produits par `thot eval` restent dans le répertoire de données de
 sous `evaluation/resultats/`. Les résultats de référence suivis dans ce dépôt restent dans
 `resultats/`. Le corpus ATC et `img_order.json` restent dans le dépôt de recherche.
 
+## Jeu développement
+
+`dev/requetes.json` et `dev/questions.json` forment un second jeu, tiré de cinq cours de
+développement web (`docker`, `rgpd`, `architecture-logicielle`, `poo-patterns-frameworks`,
+`documentation`). Il vérifie que la même version de Thot sert une autre matière que les arts
+appliqués. Les cours restent hors du dépôt, seuls les questions, les noms de fichiers et les
+rapports y sont.
+
+`--requetes=<fichier>` remplace le jeu du pilote dans les deux commandes `thot eval`. Une cible
+nomme une source par `<dossier du cours>/<fichier>`, par exemple
+`docker/index.md`, car plusieurs cours ont un `index.md`. `#<section>` exige en plus le titre
+d'une section, tel que l'extraction l'écrit, espaces insécables compris. Une requête réussit si
+une cible figure parmi les cinq premiers passages. Une requête sans cible est un piège : elle
+sort des taux et le rapport compte les pièges qui reçoivent encore un résultat
+(`hors_corpus.avec_resultat`). Le rapport prend le nom du dossier du jeu en suffixe
+(`recherche-fts5-dev.json`), donc il n'écrase jamais ceux du pilote.
+
+Familles de `requetes.json` :
+
+- `terme-exact` : un mot du cours, une option ou une commande, sans reformulation.
+- `paraphrase` : la question d'un apprenant, avec un vocabulaire que le cours n'emploie pas.
+- `code` : la preuve se trouve dans un bloc de code (Dockerfile, Compose, TypeScript, Gherkin).
+- `definition` : une définition ou un concept (« que signifie full stack »).
+- `deux-cours` : une question que deux cours traitent, les deux fichiers sont des cibles.
+- `hors-corpus` : un piège sans cible, dont des voisins proches (Kubernetes, asyncio, Docker Swarm,
+  une amende RGPD que le cours ne cite pas).
+
+`questions.json` suit le format de `queries_generation.json` : 15 questions répondables avec
+leurs fichiers attendus, 8 pièges classés par registre.
+
+```bash
+pnpm thot instance --nom="Thot développement" --mode=shared
+pnpm thot matiere "Développement" --profil=general
+pnpm thot cours <matiere_id> docker        # un cours par dossier, même nom que le dossier
+pnpm thot ingest <dossier>/docker --matiere-id=<matiere_id> --cours-id=<cours_id> --langue=fr
+pnpm thot traiter && pnpm thot certifier --tout --par="Évaluation"
+pnpm thot eval recherche --requetes=evaluation/dev/requetes.json --sans-reclasseur
+pnpm thot eval recherche --requetes=evaluation/dev/requetes.json
+pnpm thot eval generation --requetes=evaluation/dev/questions.json
+```
+
+Le dossier passé à `ingest` ne contient que les fichiers `.md` du cours. Son nom devient la
+séquence de la source, et les cibles du jeu en dépendent.
+
+### Référence FTS5
+
+[`resultats/recherche-fts5-dev.json`](resultats/recherche-fts5-dev.json), 46 sources, 552
+passages, profil général, sans reclasseur. 36 requêtes ont une cible :
+
+| Famille | n | succès@5 | MRR |
+| --- | --- | --- | --- |
+| terme-exact | 6 | 1,00 | 1,00 |
+| paraphrase | 12 | 0,92 | 0,65 |
+| code | 7 | 1,00 | 1,00 |
+| definition | 6 | 1,00 | 0,92 |
+| deux-cours | 5 | 1,00 | 0,74 |
+| tous | 36 | 0,97 | 0,83 |
+
+Un corpus de 552 passages est petit, FTS5 y réussit presque tout. Seule la famille `paraphrase`
+sépare les moteurs. Sur ce jeu, `deux-cours` ne compte pas les deux cours : une seule cible
+suffit.
+
+Les 8 pièges `hors-corpus` ne se mesurent pas ici. FTS5 renvoie des passages pour 7 d'entre eux
+(les mots courants suffisent : « amende », « configurer », « Docker »). Seul le seuil du
+reclasseur (`THOT_SEUIL_ABSTENTION`) décide de les écarter. La commande sans `--sans-reclasseur`
+donne `hors_corpus.avec_resultat`, qui doit tomber à 0 sans retirer de passage utile aux autres
+familles. `eval generation` mesure le refus de bout en bout sur les pièges de `questions.json`.
+
 ## Langues et profils
 
 `tests/domaines_test.ts` contient une sonde lexicale synthétique français/anglais et les contrôles

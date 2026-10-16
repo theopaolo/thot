@@ -1,0 +1,29 @@
+{
+  "questions": [
+    { "qid": "G01", "q": "Pourquoi je ne peux pas utiliser localhost pour joindre PostgreSQL depuis le conteneur de mon API ?", "gold": ["docker/index.md", "docker/03-cheat-sheet.md"] },
+    { "qid": "G02", "q": "Qu'est-ce qui arrive aux données de ma base quand je lance docker compose down -v ?", "gold": ["docker/index.md", "docker/03-cheat-sheet.md"] },
+    { "qid": "G03", "q": "À quoi sert un Dockerfile multi-stage et pourquoi l'image de production est plus petite ?", "gold": ["docker/01-dockerfile-multi-stage.md", "docker/03-cheat-sheet.md"] },
+    { "qid": "G04", "q": "Pourquoi staging et production doivent utiliser la même image Docker ?", "gold": ["docker/02-git-environnements.md", "docker/03-cheat-sheet.md"] },
+    { "qid": "G05", "q": "Est-ce que j'ai besoin du consentement de l'utilisateur pour créer son compte ?", "gold": ["rgpd/index.md"] },
+    { "qid": "G06", "q": "Dans quel délai faut-il notifier une violation de données à la CNIL ?", "gold": ["rgpd/01-reperes-ia-act-rgpd.md"] },
+    { "qid": "G07", "q": "Mon assistant de révision pour des lycéens relève-t-il du haut risque dans le règlement sur l'IA ?", "gold": ["rgpd/01-reperes-ia-act-rgpd.md"] },
+    { "qid": "G08", "q": "Quelle différence entre SSR et SSG, et quand choisir l'un ou l'autre ?", "gold": ["architecture-logicielle/02-rendu-web.md"] },
+    { "qid": "G09", "q": "Pourquoi un ADR doit lister au moins une conséquence négative ?", "gold": ["architecture-logicielle/06-adr.md"] },
+    { "qid": "G10", "q": "Pourquoi une réservation ferme qui hérite d'une réservation annulable pose problème ?", "gold": ["poo-patterns-frameworks/01-solid.md"] },
+    { "qid": "G11", "q": "Comment ajouter un tarif solidaire sans toucher aux règles de la méthode reserver ?", "gold": ["poo-patterns-frameworks/02-strategy.md"] },
+    { "qid": "G12", "q": "Que se passe-t-il pour la réservation si l'envoi du courriel échoue avec un Observer ?", "gold": ["poo-patterns-frameworks/03-observer.md"] },
+    { "qid": "G13", "q": "Qu'est-ce qu'un README doit présenter en premier ?", "gold": ["documentation/04-readme-et-guides-pratiques.md"] },
+    { "qid": "G14", "q": "Quelle est la différence entre le MCD, le MLD et le MPD ?", "gold": ["documentation/06-donnees-et-merise.md"] },
+    { "qid": "G15", "q": "Un conteneur C4, c'est la même chose qu'un conteneur Docker ?", "gold": ["documentation/05-architecture-c4.md", "docker/index.md"] }
+  ],
+  "sans_reponse": [
+    { "qid": "N01", "q": "Comment déployer mon application sur Kubernetes avec un chart Helm ?", "registre": "domaine voisin, hors corpus" },
+    { "qid": "N02", "q": "Comment écrire un Dockerfile pour une application Java Spring Boot ?", "registre": "domaine voisin, hors corpus" },
+    { "qid": "N03", "q": "Comment écrire une boucle asynchrone en Python avec asyncio ?", "registre": "domaine voisin, hors corpus" },
+    { "qid": "N04", "q": "Comment implémenter le pattern Singleton en Java sans risque pour les threads ?", "registre": "domaine voisin, hors corpus" },
+    { "qid": "N05", "q": "Quelle amende a été infligée à Google en 2019 au titre du RGPD ?", "registre": "au-delà du cours" },
+    { "qid": "N06", "q": "Comment configurer un certificat Let's Encrypt derrière Nginx ?", "registre": "au-delà du cours" },
+    { "qid": "N07", "q": "Quelle est la capitale de l'Australie ?", "registre": "hors sujet" },
+    { "qid": "N08", "q": "Quelle est la recette de la pâte à crêpes ?", "registre": "hors sujet" }
+  ]
+}

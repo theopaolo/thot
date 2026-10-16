@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { mkdir, opendir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import { basename, dirname, extname, join, relative } from "node:path";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "./core/html.ts";
 import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
@@ -71,8 +71,13 @@ const AIDE = `thot <commande>
   ask "<question>" [--json]                 pose une question sur le corpus certifié
   eval recherche --img-order=<img_order.json> [--docs=<docs.json>] [--sans-reclasseur]
                                             rejoue les 59 requêtes annotées
-  eval generation [--paires=<paires.json>]  rejoue les 20 questions d'élève et les 15 pièges,
-                                            écrit les paires affirmation-citation à annoter
+  eval recherche --requetes=<requetes.json> [--sans-reclasseur]
+                                            rejoue un autre jeu, cibles en nom de fichier
+                                            (« cours/fichier.md#section »)
+  eval generation [--requetes=<questions.json>] [--paires=<paires.json>]
+                                            rejoue les 20 questions d'élève et les 15 pièges
+                                            (ou un autre jeu), écrit les paires
+                                            affirmation-citation à annoter
   eval soutien --paires=<paires.json>       juge chaque paire annotée, mesure l'accord`;
 
 const oui = { type: "boolean" } as const;
@@ -89,6 +94,7 @@ const { values: args, positionals } = parseArgs({
     type: texte,
     "img-order": texte,
     docs: texte,
+    requetes: texte,
     enseignant: texte,
     par: texte,
     paires: texte,
@@ -327,11 +333,18 @@ const plier = (s: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
+/** Suffixe des rapports d'un autre jeu (« -dev » pour evaluation/dev/…), vide pour le pilote. */
+const suffixeJeu = args.requetes ? `-${basename(dirname(resolve(args.requetes)))}` : "";
+
 async function evalRecherche() {
-  if (!args["img-order"]) throw new Error("--img-order=<chemin vers img_order.json> est requis.");
-  const ordre = JSON.parse(await readFile(args["img-order"], "utf8")) as string[];
+  if (!args["img-order"] && !args.requetes) {
+    throw new Error("--img-order=<chemin vers img_order.json> ou --requetes=<jeu> est requis.");
+  }
+  const ordre = args["img-order"]
+    ? (JSON.parse(await readFile(args["img-order"], "utf8")) as string[])
+    : [];
   const requetes = JSON.parse(
-    await readFile(join(RACINE, "evaluation/queries_real.json"), "utf8"),
+    await readFile(args.requetes ?? join(RACINE, "evaluation/queries_real.json"), "utf8"),
   ) as Requete[];
   const sources = db
     .prepare("SELECT id, fichier, json_extract(metadonnees, '$.sequence') AS sequence FROM sources")
@@ -351,7 +364,7 @@ async function evalRecherche() {
           source: s.id,
         }));
     }
-    if (g.includes("#")) {
+    if (g.includes("#") && !args.requetes) {
       return docs
         .filter((d) => d.id.toLowerCase().includes(g.toLowerCase()))
         .flatMap((d) => {
@@ -360,9 +373,11 @@ async function evalRecherche() {
           return sources.filter((s) => s.fichier === nom).map((s) => ({ source: s.id, rubrique }));
         });
     }
+    // Autre jeu: « docker/index.md#Titre de section », le cours et le fichier, puis la section.
+    const [nom, rubrique] = g.split("#");
     return sources
-      .filter((s) => plier(`${s.sequence} ${s.fichier}`).includes(plier(g)))
-      .map((s) => ({ source: s.id }));
+      .filter((s) => plier(`${s.sequence} ${s.fichier}`).includes(plier(nom)))
+      .map((s) => ({ source: s.id, rubrique }));
   };
   const touche = (c: { source_id: string; titre: string }, attendus: Cible[]) =>
     attendus.some(
@@ -398,7 +413,10 @@ async function evalRecherche() {
       trouves: trouves.map((c) => c.titre),
     });
   }
-  const familles = [...new Set(lignes.map((l) => l.type as string))].sort();
+  // Un piège (cible vide) n'a pas de rang: il sort des taux et se compte à part.
+  const pieges = new Set(requetes.filter((r) => !r.gold.length).map((r) => r.qid));
+  const valides = lignes.filter((l) => !pieges.has(l.qid as string));
+  const familles = [...new Set(valides.map((l) => l.type as string))].sort();
   const resume = (ls: typeof lignes) => ({
     n: ls.length,
     succes_5: +(ls.filter((l) => (l.rang as number) > 0).length / ls.length).toFixed(2),
@@ -409,17 +427,27 @@ async function evalRecherche() {
   const rapport = {
     date: new Date().toISOString(),
     moteur: args["sans-reclasseur"] ? "fts5" : `fts5 + ${config.modeles.reclasseur}`,
-    tous: resume(lignes),
+    tous: resume(valides),
     familles: Object.fromEntries(
-      familles.map((f) => [f, resume(lignes.filter((l) => l.type === f))]),
+      familles.map((f) => [f, resume(valides.filter((l) => l.type === f))]),
     ),
-    sans_cible: lignes.filter((l) => !l.cibles).map((l) => l.qid),
-    echecs: lignes.filter((l) => !l.rang).map((l) => l.qid),
+    sans_cible: valides.filter((l) => !l.cibles).map((l) => l.qid),
+    echecs: valides.filter((l) => !l.rang).map((l) => l.qid),
+    ...(pieges.size
+      ? {
+          hors_corpus: {
+            n: pieges.size,
+            avec_resultat: lignes.filter(
+              (l) => pieges.has(l.qid as string) && (l.trouves as string[]).length,
+            ).length,
+          },
+        }
+      : {}),
   };
   await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
   const sortie = join(
     config.donnees,
-    `evaluation/resultats/recherche-${args["sans-reclasseur"] ? "fts5" : "reclasseur"}.json`,
+    `evaluation/resultats/recherche-${args["sans-reclasseur"] ? "fts5" : "reclasseur"}${suffixeJeu}.json`,
   );
   await writeFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
@@ -428,7 +456,7 @@ async function evalRecherche() {
 
 async function evalGeneration() {
   const jeu = JSON.parse(
-    await readFile(join(RACINE, "evaluation/queries_generation.json"), "utf8"),
+    await readFile(args.requetes ?? join(RACINE, "evaluation/queries_generation.json"), "utf8"),
   ) as {
     questions: { qid: string; q: string; gold: string[] }[];
     sans_reponse: { qid: string; q: string; registre: string }[];
@@ -536,7 +564,7 @@ async function evalGeneration() {
     ],
   };
   await mkdir(join(config.donnees, "evaluation/resultats"), { recursive: true });
-  const sortie = join(config.donnees, "evaluation/resultats/generation.json");
+  const sortie = join(config.donnees, `evaluation/resultats/generation${suffixeJeu}.json`);
   await writeFile(sortie, JSON.stringify({ ...rapport, lignes }, null, 1));
   console.log(JSON.stringify(rapport, null, 1));
   console.log(`écrit dans ${relative(process.cwd(), sortie)}`);
