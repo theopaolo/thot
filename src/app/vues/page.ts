@@ -107,7 +107,8 @@ const navEleve = (c: Compte, chemin: string, personnel: boolean) =>
           chemin === "/eleve/sans-sequence" ||
           chemin.startsWith("/eleve/sequences") ||
           chemin.startsWith("/eleve/themes") ||
-          chemin.startsWith("/eleve/sources"),
+          chemin.startsWith("/eleve/sources") ||
+          chemin.startsWith("/eleve/activites"),
       )}
       ${lienNav(
         "/eleve/chat",
@@ -163,7 +164,9 @@ const rail = (
           "/prof",
           "Bibliothèque",
           "file-text",
-          chemin === "/prof" || chemin.startsWith("/prof/sources"),
+          chemin === "/prof" ||
+            chemin.startsWith("/prof/sources") ||
+            chemin.startsWith("/prof/activites"),
         )}
         ${lienNav("/prof/depot", "Déposer", "upload-simple", chemin.startsWith("/prof/depot"))}
         ${lienNav("/prof/legendes", "Légendes", "image", chemin.startsWith("/prof/legendes"))}

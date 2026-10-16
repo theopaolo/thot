@@ -15,6 +15,8 @@ export function purgerMessages(db: Db, jours: number, date = Date.now()) {
   }
   const limite = new Date(date - jours * 86_400_000).toISOString().slice(0, 19) + "Z";
   const n = db.prepare("DELETE FROM messages WHERE cree_le < ?").run(limite).changes;
+  // Les réponses aux exercices viennent aussi de l'élève : elles suivent la même durée.
+  db.prepare("DELETE FROM tentatives WHERE cree_le < ?").run(limite);
   // Le titre reprend une question : une conversation vidée part avec ses échanges.
   db.prepare(
     "DELETE FROM conversations WHERE NOT EXISTS (SELECT 1 FROM messages WHERE conversation_id = conversations.id)",

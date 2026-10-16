@@ -12,7 +12,7 @@ type Option = { value: string; label: string };
 
 const JOUR = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Europe/Paris" });
 /** « 22 septembre 2026 » à partir d'un horodatage ISO. */
-const jour = (iso: string) => JOUR.format(new Date(iso));
+export const jour = (iso: string) => JOUR.format(new Date(iso));
 
 const ETATS_JOB: Record<string, string> = {
   received: "en file",
@@ -168,6 +168,16 @@ type Filtres = {
 const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
   `/prof?${new URLSearchParams({ ...f, ...change })}`;
 
+/** La bibliothèque range les ressources et les exercices préparés d'après elles. */
+export const ongletsBibliotheque = (chemin: string) =>
+  html`<nav class="onglets" aria-label="Bibliothèque">${[
+    ["/prof", "Ressources"],
+    ["/prof/activites", "Exercices"],
+  ].map(
+    ([href, libelle]) =>
+      html`<a href="${href}" ${chemin === href ? html`aria-current="page"` : ""}>${libelle}</a>`,
+  )}</nav>`;
+
 export const sources = (
   lignes: LigneSource[],
   f: Filtres,
@@ -188,6 +198,7 @@ export const sources = (
   const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
+    ${ongletsBibliotheque("/prof")}
     ${
       supprimee
         ? html`<p role="status" tabindex="-1" autofocus>Source supprimée définitivement.</p>`

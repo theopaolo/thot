@@ -113,8 +113,8 @@ Une instance a un seul profil d'import, partagé par ses matières et ses ressou
 établissement qui a besoin des deux profils fait tourner deux instances. Un cours regroupe des ressources avec un public et un
 objectif facultatifs. Un thème appartient à un cours. Les identifiants, jamais les libellés,
 séparent les thèmes homonymes. Renommer garde les identifiants, donc les rattachements. Une
-matière, un cours ou un thème ne se supprime que si ni une ressource ni une question d'élève ne
-l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
+matière, un cours ou un thème ne se supprime que si ni une ressource, ni une question d'élève,
+ni un objectif d'apprentissage ne l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
 
 Le thème est le seul regroupement des ressources. Le dépôt choisit un thème pour chaque cours
@@ -250,6 +250,48 @@ ou pour une image qu'une réextraction a remplacée, reste dans `cache_modeles`.
 les rapports d'évaluation de `data/evaluation/` ne sont pas touchés
 ([exploitation](exploitation.md#données-personnelles)).
 
+## Exercices sourcés
+
+Un objectif d'apprentissage appartient à un cours. Sa référence (référentiel ou programme,
+compétence et version) reste un texte libre que Thot n'interprète pas : rien ne déduit qu'un
+document couvre un objectif.
+
+Un enseignant prépare un exercice à réponse courte depuis un objectif et une à quatre sources
+certifiées du cours, publiées à ses élèves et utilisées par Thot pour répondre. Un appel du
+générateur rédige la consigne, la réponse attendue, deux à cinq critères et le retour
+(`src/core/activite.ts`). Chaque champ cite des passages que `verifier()` retrouve mot pour mot
+dans l'extrait désigné, avec la révision et les offsets de leur source. Un champ dont une citation
+ne se retrouve pas, ou ne se retrouve que dans une légende d'image, est rejeté et compté, comme le
+prévoit l'ADR 0002. Sans consigne, réponse attendue, retour et deux critères ancrés, rien n'est
+enregistré, pas même un nouvel objectif. Le juge de soutien ne lit pas ces champs : l'enseignant
+les relit.
+
+Un exercice est brouillon, relu, publié ou à revoir. Une relecture vaut pour une version de
+l'exercice. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut
+plus pour elle. Une relecture, une publication ou une modification partie d'une version périmée est
+refusée. Publier demande une version relue et des preuves qui tiennent encore. L'historique garde
+qui a relu, publié ou modifié chaque version, et quand.
+
+Un élève pratique les exercices publiés des cours dont il est membre. Avant sa réponse, la page ne
+contient que l'objectif et la consigne. La réponse attendue, les critères, le retour et les passages
+cités ne sortent du serveur qu'avec une tentative de ce compte sur la version actuelle. L'élève
+coche ensuite les critères que sa réponse remplit. Thot ne note pas la réponse et ne la compare à
+aucun texte.
+
+Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
+publiée à ses élèves et utilisée par Thot. `statuer()`, `supprimerSource()` et les changements de
+lecteurs ou de cours d'une source signalent à revoir les exercices dont une citation ne tient plus.
+La page de l'élève revérifie les citations à chaque affichage. Un exercice à revoir n'est plus servi.
+L'enseignant l'enregistre de nouveau, ce qui recherche chaque passage dans la révision servie, puis
+le relit. Une tentative garde la version de l'exercice à laquelle elle répondait.
+
+Supprimer une source retire de chaque exercice ses passages et le texte des champs qui les citaient,
+rédigés d'après elle. L'exercice devient à revoir. Les réponses des élèves restent : elles viennent
+d'eux, et suivent la purge de `THOT_RETENTION_JOURS`.
+
+En mode personnel, un exercice reste privé à son auteur, cours compris. Il le relit et le publie
+pour lui-même, et la page dit que personne d'autre ne l'a relu.
+
 ## Conversations
 
 Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, son adresse, ses
@@ -336,6 +378,22 @@ stateDiagram-v2
     servie --> conservee: une autre est certifiée
   }
   note right of Revision: certifier une révision certifie aussi sa source
+```
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  state "Exercice" as Exercice {
+    [*] --> brouillon: généré
+    brouillon --> relue: relu
+    relue --> publiee: publié
+    relue --> brouillon: modifié
+    publiee --> brouillon: modifié
+    brouillon --> a_revoir: citation retirée
+    relue --> a_revoir: citation retirée
+    publiee --> a_revoir: citation retirée
+    a_revoir --> brouillon: passages retrouvés
+  }
 ```
 
 ```mermaid

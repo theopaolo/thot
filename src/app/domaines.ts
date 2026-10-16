@@ -177,9 +177,10 @@ export function renommer(db: Db, genre: string, id: string, nom: string) {
   }
 }
 /**
- * Retire une matière, un cours ou un thème que rien n'utilise. Une matière ou un cours emporte
- * ses cours et ses thèmes, et reste en place si l'un d'eux sert encore. Un champ personnalisé
- * reste tant qu'une ressource porte une valeur pour lui.
+ * Retire une matière, un cours ou un thème que rien n'utilise : ni ressource, ni question, ni
+ * objectif d'apprentissage. Une matière ou un cours emporte ses cours et ses thèmes, et reste en
+ * place si l'un d'eux sert encore. Un champ personnalisé reste tant qu'une ressource porte une
+ * valeur pour lui.
  */
 export function supprimer(db: Db, genre: string, id: string) {
   const nom = nomEntree(db, genre, id);
@@ -229,10 +230,14 @@ export function supprimer(db: Db, genre: string, id: string) {
          OR EXISTS (SELECT 1 FROM json_each(?) j WHERE instr(',' || matieres || ',', ',' || j.value || ','))`,
       )
       .get(m, c, t, m)!.n as number;
-    if (ressources || questions) {
+    const objectifs = db
+      .prepare(`SELECT count(*) AS n FROM objectifs WHERE cours_id ${dans}`)
+      .get(c)!.n as number;
+    if (ressources || questions || objectifs) {
       const emplois = [
         ressources && `${ressources} ressource(s)`,
         questions && `${questions} question(s)`,
+        objectifs && `${objectifs} objectif(s)`,
       ];
       throw new Error(`« ${nom} » est utilisé par ${emplois.filter(Boolean).join(" et ")}.`);
     }

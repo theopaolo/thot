@@ -14,6 +14,7 @@ import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
 import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../core/recherche.ts";
 import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
+import { oublierSource, revoirActivites } from "./activites.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { sha256 } from "./depot.ts";
@@ -427,7 +428,8 @@ export function indexer(db: Db, sourceId: string) {
 
 /**
  * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
- * celle-ci dans la transaction de l'index : un échec laisse servir l'ancienne.
+ * celle-ci dans la transaction de l'index : un échec laisse servir l'ancienne. Un exercice qui
+ * citait une autre révision, ou une source rejetée, devient à revoir.
  */
 export function statuer(
   db: Db,
@@ -461,14 +463,15 @@ export function statuer(
       sourceId,
     );
     indexerSource(db, sourceId, statut === "certifiee" ? chunksSource(db, sourceId) : []);
+    revoirActivites(db, sourceId);
   });
 }
 
 /**
  * Supprime une source pour de bon. La transaction retire sa ligne et tout ce qui en dérive en
  * base : index, révisions, images, rattachements, suggestions, travail, légendes en cache, et ses
- * citations dans les réponses conservées. Ses fichiers partent ensuite. Refusée pendant que le
- * worker l'extrait : il réécrirait des fichiers et le cache après la suppression.
+ * citations dans les réponses et les exercices conservés. Ses fichiers partent ensuite. Refusée
+ * pendant que le worker l'extrait : il réécrirait des fichiers et le cache après la suppression.
  * `secure_delete` (connexion) et l'option de la migration 0017 effacent aussi son texte du
  * fichier de la base.
  */
@@ -497,6 +500,7 @@ export async function supprimerSource(db: Db, sourceId: string) {
       throw new Error("Extraction en cours : supprimer la source une fois le traitement terminé.");
     }
     retirerSource(db, sourceId);
+    oublierSource(db, sourceId);
     for (const table of ["images", "suggestions", "ingestion_jobs"]) {
       db.prepare(`DELETE FROM ${table} WHERE source_id = ?`).run(sourceId);
     }

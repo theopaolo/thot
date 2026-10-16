@@ -7,7 +7,7 @@ import { HTTPException } from "hono/http-exception";
 import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
-import type { Modeles } from "../core/modeles.ts";
+import { type Modeles, PanneModele } from "../core/modeles.ts";
 import { actualiserResultat, type Affirmation, type Resultat } from "../core/reponse.ts";
 import {
   chercher,
@@ -78,6 +78,8 @@ import * as Prof from "./vues/prof.ts";
 import * as Eleve from "./vues/eleve.ts";
 import * as Domaines from "./domaines.ts";
 import * as DomaineVue from "./vues/domaines.ts";
+import * as Activites from "./activites.ts";
+import * as ActiviteVue from "./vues/activites.ts";
 import { validerInformations } from "../core/profils.ts";
 
 type Env = { Variables: { compte: Compte } };
@@ -791,6 +793,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       }
       for (const id of ids) {
         db.prepare("UPDATE sources SET audience = ? WHERE id = ?").run(lecteurs, id);
+        Activites.revoirActivites(db, id);
       }
     } else {
       const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
@@ -1064,6 +1067,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           .prepare("SELECT statut FROM sources WHERE id = ?")
           .get(d.source.id)!.statut;
         indexerSource(db, d.source.id, statut === "certifiee" ? chunksSource(db, d.source.id) : []);
+        Activites.revoirActivites(db, d.source.id);
       });
     } catch (e) {
       if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
@@ -1163,6 +1167,123 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     return c.html(Prof.legende(aLegender(c), fileLegendes(c)));
   });
 
+  // ------------------------------------------------------------ exercices
+  app.get("/prof/activites", (c) =>
+    c.html(
+      rendre(c, "Exercices", ActiviteVue.listeProf(Activites.activitesProf(db, c.get("compte")))),
+    ),
+  );
+  const pagePreparation = (
+    c: Context<Env>,
+    saisie: Record<string, unknown> = {},
+    erreur = "",
+    rejets: string[] = [],
+  ) => {
+    const compte = c.get("compte");
+    const cat = Domaines.catalogueDe(db, compte);
+    const voulu = String(saisie.cours_id ?? c.req.query("cours_id") ?? "");
+    const cours = cat.cours.find((x) => x.id === voulu) ?? cat.cours[0];
+    const personnel = lireInstance(db).mode === "personal";
+    const cible = {
+      cours_id: cours?.id ?? "",
+      audience: personnel ? ("prive" as const) : ("cours" as const),
+      auteur_id: compte.id,
+    };
+    return rendre(
+      c,
+      "Préparer un exercice",
+      ActiviteVue.preparation({
+        catalogue: cat,
+        coursId: cible.cours_id,
+        objectifs: cours ? Activites.objectifs(db, cours.id) : [],
+        sources: cours ? Activites.sourcesCitables(db, cible) : [],
+        personnel,
+        saisie,
+        erreur,
+        rejets,
+      }),
+    );
+  };
+  app.get("/prof/activites/nouvelle", (c) => c.html(pagePreparation(c)));
+  // La génération tient la requête : un appel de modèle, sans file de travaux.
+  app.post("/prof/activites", async (c) => {
+    const b = await c.req.parseBody({ all: true });
+    let r;
+    try {
+      r = await Activites.preparer(db, modeles, c.get("compte"), {
+        coursId: String(b.cours_id ?? ""),
+        objectifId: String(b.objectif_id ?? ""),
+        intitule: String(b.intitule ?? ""),
+        reference: String(b.reference ?? ""),
+        sources: [b.sources ?? []].flat().map(String),
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+      return c.html(
+        pagePreparation(c, b, (e as Error).message),
+        e instanceof PanneModele ? 503 : 400,
+      );
+    }
+    if ("erreur" in r) return c.html(pagePreparation(c, b, r.erreur, r.rejets), 422);
+    return c.redirect(`/prof/activites/${r.id}`, 303);
+  });
+  const activiteProf = (c: Context<Env>) =>
+    Activites.activiteProf(db, c.get("compte"), c.req.param("id")!);
+  const detailActivite = (c: Context<Env>, a: Activites.Activite, erreur?: string) =>
+    rendre(
+      c,
+      a.intitule,
+      ActiviteVue.detailProf({
+        a,
+        contenu: JSON.parse(a.contenu),
+        relectures: Activites.relectures(db, a.id),
+        servies: Activites.servies(db, a),
+        erreur,
+      }),
+    );
+  app.get("/prof/activites/:id", (c) => {
+    const a = activiteProf(c);
+    return a ? c.html(detailActivite(c, a)) : c.notFound();
+  });
+  // La page de l'élève avant sa réponse : la consigne, sans corrigé.
+  app.get("/prof/activites/:id/apercu", (c) => {
+    const a = activiteProf(c);
+    if (!a) return c.notFound();
+    const vue = { a, contenu: JSON.parse(a.contenu), apercu: true };
+    return c.html(
+      rendre(
+        c,
+        a.intitule,
+        ActiviteVue.pratique({ ...vue, relecteur: Activites.relecteur(db, a) }),
+      ),
+    );
+  });
+  const CONFLIT = "Cet exercice a changé pendant votre saisie. Relisez sa version actuelle.";
+  app.post("/prof/activites/:id/:action{(?:modifier|relire|publier)}", async (c) => {
+    const a = activiteProf(c);
+    if (!a) return c.notFound();
+    const b = await c.req.parseBody();
+    const compte = c.get("compte");
+    let refus = "";
+    try {
+      const action = c.req.param("action");
+      if (action === "modifier") {
+        if (Activites.modifier(db, compte, a, b) === "conflit") refus = CONFLIT;
+      } else if (action === "relire") {
+        if (!Activites.relire(db, compte, a, Number(b.revision))) refus = CONFLIT;
+      } else {
+        const r = Activites.publier(db, compte, a.id, Number(b.revision));
+        if (r === "refus") refus = "Seule la version relue d'un exercice se publie.";
+        if (r === "preuves") refus = "Une source citée ne tient plus : l'exercice est à revoir.";
+      }
+    } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+      return c.html(detailActivite(c, a, (e as Error).message), 400);
+    }
+    if (refus) return c.html(detailActivite(c, activiteProf(c)!, refus), 409);
+    return c.redirect(`/prof/activites/${a.id}`, 303);
+  });
+
   // ------------------------------------------------------------ élève
   type Perimetre = Domaines.Scope;
   // Le thème `t` d'une source `s`, pris dans un cours du lecteur : il ouvre la page et le
@@ -1249,6 +1370,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const generique =
       visibles.every((r) => r.profil === "general") || Object.values(scope(c)).some(Boolean);
     const mention = mentionLecteurs(c);
+    const exercices = ActiviteVue.exercices(
+      Activites.activitesEleve(db, c.get("compte"), scope(c).cours_id, scope(c).matiere_id),
+    );
     if (generique) {
       return c.html(
         rendre(
@@ -1262,7 +1386,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             ${mention ? html`<small>${mention}</small>` : ""}
           </form>
           ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille")}
-          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}`,
+          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}
+          ${exercices}`,
         ),
       );
     }
@@ -1290,7 +1415,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           lireInstance(db).mode === "personal",
           mention,
           libelles(db),
-        )}`,
+        )}${exercices}`,
         "accueil",
       ),
     );
@@ -1389,6 +1514,44 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       extrait,
     };
   };
+
+  // Un exercice se pratique publié, dans un cours du compte, tant que ses preuves tiennent. Le
+  // corrigé n'est rendu qu'avec une tentative sur sa version actuelle.
+  const activiteEleve = (c: Context<Env>) =>
+    Activites.activiteEleve(db, c.get("compte"), c.req.param("id")!);
+  app.get("/eleve/activites/:id", (c) => {
+    const a = activiteEleve(c);
+    if (!a) return c.notFound();
+    return c.html(
+      rendre(
+        c,
+        a.intitule,
+        ActiviteVue.pratique({
+          a,
+          contenu: JSON.parse(a.contenu),
+          tentative: Activites.tentative(db, c.get("compte"), a),
+          relecteur: Activites.relecteur(db, a),
+        }),
+      ),
+    );
+  });
+  app.post("/eleve/activites/:id/tentatives", async (c) => {
+    const a = activiteEleve(c);
+    if (!a) return c.notFound();
+    const reponse = String((await c.req.parseBody()).reponse ?? "").trim();
+    if (!reponse || reponse.length > 4000) return c.text("Ta réponse : 1 à 4000 caractères.", 400);
+    Activites.repondre(db, c.get("compte"), a, reponse);
+    return c.redirect(`/eleve/activites/${a.id}#corrige`, 303);
+  });
+  app.post("/eleve/activites/:id/tentatives/:tentative/criteres", async (c) => {
+    const a = activiteEleve(c);
+    if (!a) return c.notFound();
+    const b = await c.req.parseBody({ all: true });
+    const coches = [b.criteres ?? []].flat().map(Number);
+    return Activites.evaluer(db, c.get("compte"), a, c.req.param("tentative"), coches)
+      ? c.redirect(`/eleve/activites/${a.id}#corrige`, 303)
+      : c.notFound();
+  });
 
   app.get("/eleve/documents/:id/apercu", (c) => {
     const a = apercu(c.req.param("id"), lu(c));

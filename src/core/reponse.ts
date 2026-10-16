@@ -151,7 +151,8 @@ type BruteBloc = Record<string, unknown> | null;
 
 const chaine = (x: unknown) => (typeof x === "string" ? x.trim() : "");
 
-function lire(sortie: string): Brute | null {
+/** Le premier objet JSON de la sortie du modèle, sans le texte autour. */
+export function lire(sortie: string): Brute | null {
   const debut = sortie.indexOf("{");
   const fin = sortie.lastIndexOf("}");
   if (debut < 0 || fin < debut) return null;

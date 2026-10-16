@@ -169,6 +169,30 @@ Périmètre qui couvre deux à quatre matières entières : « Dans : Histoire d
 questions ». Chaque phrase de la réponse porte la matière de sa source à côté de son numéro. La
 réponse nomme une matière sans passage assez proche : « Aucun passage trouvé en Philosophie. »
 
+**Objectif d'apprentissage**
+Ce qu'une personne doit savoir ou savoir faire, dans un cours. Sa « Référence » facultative nomme
+un référentiel ou un programme, une compétence et leur version. Thot ne déduit pas qu'un document
+couvre un objectif.
+
+**Exercice**
+Exercice à réponse courte préparé dans un cours, depuis un objectif et des sources certifiées :
+consigne, réponse attendue, critères et retour, chacun avec les passages qu'il cite. La
+bibliothèque les range sous l'onglet « Exercices ». « Préparer un exercice », puis « Rédiger le
+brouillon ». Un champ dont un passage ne se retrouve pas mot pour mot est un « champ rejeté », et
+la page de l'exercice les compte. L'élève trouve les exercices publiés dans ses ressources.
+
+**Brouillon, relu, publié, à revoir**
+États d'un exercice. Thot rédige un « Brouillon ». « Marquer la version relue » le rend « Relu »,
+« Publier aux élèves du cours » le rend « Publié ». « Enregistrer une nouvelle version » remet un
+brouillon à relire. « À revoir » : une source citée a une nouvelle version, n'est plus citable dans
+le cours ou a été supprimée, et les élèves ne reçoivent plus l'exercice. « Aperçu élève » montre la
+page de l'élève avant sa réponse. En mode personnel, « Publier pour m'entraîner ».
+
+**Réponse attendue, critères, retour**
+Le corrigé d'un exercice. L'élève le lit après avoir envoyé sa réponse, qui s'affiche à côté. Il
+coche les critères que sa réponse remplit puis « Enregistrer mon auto-évaluation ». Thot ne note
+pas la réponse.
+
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 
