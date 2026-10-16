@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
-import { type Audience, AUDIENCES, CLASSES, TYPES_DOCUMENT } from "../depot.ts";
+import { type Audience, AUDIENCES, CLASSES, MAX_LOT, TYPES_DOCUMENT } from "../depot.ts";
 import { icone } from "../icones.ts";
 import { type Affiliation, type Catalogue, MATIERES } from "../domaines.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
@@ -159,6 +159,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
 type Filtres = {
   statut: string;
   sequence: string;
+  lot: string;
   vue: string;
   matiere_id?: string;
   cours_id?: string;
@@ -187,6 +188,14 @@ export const sources = (
   const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
+    ${
+      f.lot
+        ? html`<p>Lot déposé : ${nombre(
+            somme(() => true),
+            "fichier",
+          )}. <a href="${lienFiltres(f, { lot: "" })}">Toute la bibliothèque</a></p>`
+        : ""
+    }
     ${
       general
         ? ""
@@ -586,7 +595,7 @@ export const questionsProf = (messages: QuestionProf[]) => {
 };
 
 /** Sélecteur de fichier au libellé français, quelle que soit la langue du navigateur. */
-const champFichier = (accept: string) =>
+const champFichier = (accept: string, plusieurs = false) =>
   html`
     <span class="fichier">
       <input
@@ -594,10 +603,13 @@ const champFichier = (accept: string) =>
         id="fichier"
         name="fichier"
         accept="${accept}"
+        ${plusieurs ? "multiple" : ""}
         required
         class="visuellement-cache"
       >
-      <label for="fichier" class="bouton">${icone("upload-simple")}Choisir un fichier</label>
+      <label for="fichier" class="bouton">${icone("upload-simple")}Choisir ${
+        plusieurs ? "des fichiers" : "un fichier"
+      }</label>
       <output for="fichier" class="discret">Aucun fichier choisi</output>
     </span>
   `;
@@ -673,10 +685,54 @@ const lecteurs = (audience = "eleves", reponses = true) =>
     </fieldset>
   `;
 
+/** Le sort d'un fichier déposé: reçu, doublon d'une source que le compte lit, ou refusé. */
+export type ResultatDepot = { nom: string } & (
+  | { etat: "recu"; id: string; titre: string; format: string }
+  | { etat: "doublon"; id: string; titre: string }
+  | { etat: "erreur"; erreurs: Record<string, string> }
+);
+
+const nombre = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+
+const bilanDepot = (d: { lot: string; resultats: ResultatDepot[] }) => {
+  const n = (etat: string) => d.resultats.filter((r) => r.etat === etat).length;
+  const bilan = [
+    n("recu") ? nombre(n("recu"), "déposé") : "",
+    n("doublon") ? nombre(n("doublon"), "doublon") : "",
+    n("erreur") ? nombre(n("erreur"), "erreur") : "",
+  ].filter(Boolean);
+  return html`
+    <section role="status" aria-labelledby="bilan-depot">
+      <h2 id="bilan-depot">${bilan.join(", ")}</h2>
+      <ul class="resultats">
+        ${d.resultats.map(
+          (r) =>
+            html`
+            <li>${
+              r.etat === "recu"
+                ? html`<span class="statut certifiee">Reçu</span> « ${r.titre} » est déposé.`
+                : r.etat === "doublon"
+                  ? html`<span class="statut a_relire">Doublon</span> ${r.nom} existe déjà : <a href="/prof/sources/${r.id}">${r.titre}</a>.`
+                  : html`<span class="statut failed">Erreur</span> ${r.nom} : ${Object.values(r.erreurs).join(" ")}`
+            }</li>
+          `,
+        )}
+      </ul>
+      ${
+        n("recu")
+          ? html`<p>Leur extraction a commencé. <a href="/prof?lot=${d.lot}">Suivre ce lot dans la bibliothèque</a>.</p>`
+          : ""
+      }
+    </section>
+  `;
+};
+
 export const depot = (s: {
   champs?: Record<string, string>;
   erreurs?: Record<string, string>;
-  ok?: string;
+  depose?: { lot: string; resultats: ResultatDepot[] };
+  /** le lot du prochain envoi, généré à chaque affichage */
+  lot?: string;
   personnel?: boolean;
   catalogue?: Catalogue;
   profil?: Profil;
@@ -694,26 +750,20 @@ export const depot = (s: {
   return html`
     <h1>Déposer une ressource</h1>
     ${s.catalogue ? Domaines.choixMatiere(s.catalogue, c.matiere_id) : ""}
-    ${
-      s.ok
-        ? html`
-        <p role="status">${s.ok}</p>
-      `
-        : ""
-    }
-    <form method="post" action="/prof/depot" enctype="multipart/form-data" class="etroit">
+    ${s.depose ? bilanDepot(s.depose) : ""}
+    <form method="post" action="/prof/depot" enctype="multipart/form-data" class="etroit" data-depot>
+      ${s.lot ? html`<input type="hidden" name="lot" value="${s.lot}">` : ""}
       ${champ({
         nom: "titre",
         label: "Nom du document",
-        requis: true,
         valeur: c.titre,
         erreur: e.titre,
-        aide: "Le nom que vous lui donnez, pas celui du fichier.",
+        aide: "Vide, il reprend le titre du fichier. Avec plusieurs fichiers, chacun garde le sien.",
       })}
       <div class="champ">
-        <label for="fichier">Fichier *</label>
-        <p class="aide">PDF, HTML, Markdown, PNG ou JPEG, 25 Mo au maximum. Le type est lu dans le contenu.</p>
-        ${champFichier(".pdf,.html,.htm,.md,.markdown,.png,.jpg,.jpeg")}
+        <label for="fichier">Fichiers *</label>
+        <p class="aide">PDF, HTML, Markdown, PNG ou JPEG, 25 Mo au maximum par fichier, ${MAX_LOT} fichiers par lot. Le type est lu dans le contenu.</p>
+        ${champFichier(".pdf,.html,.htm,.md,.markdown,.png,.jpg,.jpeg", true)}
         ${
           e.fichier
             ? html`
@@ -721,6 +771,16 @@ export const depot = (s: {
           `
             : ""
         }
+      </div>
+      <div data-lot-liste hidden>
+        <table class="lot">
+          <caption class="visuellement-cache">Fichiers à déposer</caption>
+          <thead>
+            <tr><th>Fichier</th><th>Titre</th><th>Format</th><th>Taille</th><th>Statut</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p role="status" data-lot-bilan></p>
       </div>
       ${e.domaine ? html`<p role="alert">${e.domaine}</p>` : ""}
       <div class="deux">

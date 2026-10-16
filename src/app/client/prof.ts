@@ -66,7 +66,11 @@ export function installerProf() {
     if (champ.name === "ids") majSelection(champ.form);
     if (champ.matches('.fichier input[type="file"]')) {
       const sortie = champ.parentElement?.querySelector("output");
-      if (sortie) sortie.textContent = champ.files?.[0]?.name ?? "Aucun fichier choisi";
+      const n = champ.files?.length ?? 0;
+      if (sortie) {
+        sortie.textContent =
+          n > 1 ? `${n} fichiers choisis` : (champ.files?.[0]?.name ?? "Aucun fichier choisi");
+      }
     }
   });
 

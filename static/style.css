@@ -760,6 +760,50 @@ input[type="checkbox"] {
   color: var(--danger);
 }
 
+/* Liste des fichiers d'un lot : le titre prend la place, le statut passe à la ligne. */
+table.lot {
+  margin-bottom: var(--s2);
+}
+table.lot td:nth-child(2) {
+  width: 40%;
+}
+table.lot input[type="text"] {
+  min-width: 10rem;
+}
+table.lot .statut {
+  white-space: normal;
+}
+.resultats {
+  padding-left: 0;
+  list-style: none;
+}
+.resultats li {
+  margin-bottom: var(--s1);
+}
+@media (max-width: 640px) {
+  table.lot thead {
+    display: none;
+  }
+  table.lot tr,
+  table.lot td {
+    display: block;
+  }
+  table.lot td {
+    padding: var(--s1) var(--s3);
+    border: 0;
+  }
+  table.lot td:nth-child(2) {
+    width: auto;
+  }
+  table.lot input[type="text"] {
+    width: 100%;
+  }
+  table.lot tr {
+    padding: var(--s2) 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
 .barre {
   display: flex;
   flex-wrap: wrap;

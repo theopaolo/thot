@@ -1,6 +1,8 @@
 import { writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { contenu } from "./config.ts";
-import { transaction } from "../core/recherche.ts";
+import { FILTRE_ACCES, parametresAcces, transaction } from "../core/recherche.ts";
+import { lireFrontMatter } from "../core/markdown.ts";
+import { type Compte, lecteur } from "./comptes.ts";
 import { type Db, maintenant } from "./db.ts";
 import {
   type Affiliation,
@@ -12,6 +14,8 @@ import {
 import { CHAMPS, validerInformations } from "../core/profils.ts";
 
 export const MAX_OCTETS = 25 * 1024 * 1024;
+/** Fichiers par lot. Les requêtes d'un lot arrivent une à une : le serveur compte les sources. */
+export const MAX_LOT = 50;
 
 export const FORMATS = ["pdf", "html", "png", "jpg", "md"] as const;
 export type Format = (typeof FORMATS)[number];
@@ -145,6 +149,24 @@ export function controlerFichier(
   return { format };
 }
 
+/** Le titre du front matter pour un Markdown, sinon le nom du fichier sans son extension. */
+export function titreParDefaut(octets: Uint8Array, nom: string, format: Format | null) {
+  const titre =
+    format === "md" ? lireFrontMatter(new TextDecoder().decode(octets)).titre : undefined;
+  return (titre ?? nom.replace(/\.[^.]+$/, "")).replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/** Une source que le compte lit déjà avec les mêmes octets. Les autres n'existent pas pour lui. */
+export const sourceIdentique = (db: Db, compte: Compte, schoolId: string, checksum: string) =>
+  db
+    .prepare(
+      `SELECT s.id, s.titre FROM sources s
+       WHERE s.school_id = ? AND s.checksum = ? AND ${FILTRE_ACCES} ORDER BY s.cree_le LIMIT 1`,
+    )
+    .get(schoolId, checksum, ...parametresAcces(lecteur(compte))) as
+    | { id: string; titre: string }
+    | undefined;
+
 /** Écrit l'original puis ouvre son travail d'ingestion. */
 export async function deposer(
   db: Db,
@@ -162,6 +184,9 @@ export async function deposer(
     audience: Audience;
     reponses: boolean;
     liens?: Affiliation[];
+    /** le lot du dépôt web et la clé qui rend un renvoi inoffensif */
+    lotId?: string;
+    cle?: string;
   },
 ): Promise<{ source_id: string; job_id: string }> {
   const source_id = crypto.randomUUID();
@@ -206,7 +231,8 @@ export async function deposer(
       db.prepare(
         `UPDATE sources SET matiere_id = ?, profil = ?, langue = ?, audience = ?, reponses = ?,
          proprietaire_id = coalesce(?, (SELECT min(id) FROM comptes
-           WHERE role = 'enseignant' AND nom = ? HAVING count(*) = 1)) WHERE id = ?`,
+           WHERE role = 'enseignant' AND nom = ? HAVING count(*) = 1)),
+         lot_id = ?, cle_depot = ? WHERE id = ?`,
       ).run(
         domaine.matiere_id,
         domaine.profil,
@@ -215,6 +241,8 @@ export async function deposer(
         d.reponses ? 1 : 0,
         d.proprietaireId ?? null,
         d.enseignant,
+        d.lotId ?? null,
+        d.cle ?? null,
         source_id,
       );
       if (d.liens !== undefined) affiliations(db, source_id, d.liens);

@@ -111,6 +111,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0011_revisions.sql",
       "0012_reglages.sql",
       "0013_conversations.sql",
+      "0015_lots.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -373,6 +374,7 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
       400,
     );
     form.set(`theme_${c}`, "absent");
+    form.set("fichier", new File(["<p>Un autre texte.</p>"], "autre.html"));
     const refus = await prof.requete("/prof/depot", { method: "POST", body: form });
     assertEquals(refus.status, 400);
     assertStringIncludes(await refus.text(), "Cours ou thème inconnu");

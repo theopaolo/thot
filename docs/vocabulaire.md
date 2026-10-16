@@ -164,6 +164,17 @@ qu'un enseignant certifie la nouvelle. Une réponse garde la version qu'elle cit
 relit comme « version citée par une réponse précédente ». La bibliothèque marque ces sources
 « Nouvelle version à relire » et le filtre « À relire » les retrouve.
 
+**Lot**
+Les fichiers d'un même dépôt web. Chaque fichier devient sa propre ressource, relue et certifiée
+séparément. La bibliothèque affiche un lot par son lien (« Suivre ce lot »), avec l'état
+d'extraction de chaque fichier.
+
+**Reçu, doublon, erreur**
+Le sort d'un fichier au dépôt. « Reçu » : la ressource existe et son extraction commence.
+« Doublon » : un fichier identique est déjà dans une ressource que l'enseignant peut lire, rien
+n'est déposé et le lien mène à cette ressource. « Erreur » : le fichier est refusé, son message dit
+pourquoi et « Réessayer » le renvoie seul.
+
 **Formulaire de dépôt**
 Interface proposée à l'enseignant lors du dépôt d'un document dans la bibliothèque. Il pose une série de questions structurées (discipline, niveau, type, notion centrale, séquence de rattachement) et c'est ce formulaire, une fois rempli, qui indique à Thot comment indexer et ranger le document. La qualité du référencement dépend directement du soin apporté à ce formulaire.
 

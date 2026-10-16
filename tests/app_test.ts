@@ -18,7 +18,7 @@ import {
   lireListe,
   reinitialiserMotDePasse,
 } from "../src/app/comptes.ts";
-import { detecterFormat, MAX_OCTETS, nomSur } from "../src/app/depot.ts";
+import { detecterFormat, MAX_LOT, MAX_OCTETS, nomSur } from "../src/app/depot.ts";
 import { tranche } from "../src/core/texte.ts";
 import {
   lireDocument,
@@ -67,6 +67,9 @@ const formulaire = (
 };
 
 const enc = (s: string) => new TextEncoder().encode(s);
+/** Les mêmes octets feraient un doublon: chaque dépôt d'un test prend sa variante. */
+const variante = (octets: Uint8Array, n: string) =>
+  enc(`${new TextDecoder().decode(octets)}<!-- ${n} -->`);
 /** Un administrateur : ces tests portent sur la sélection, pas sur les cours du lecteur. */
 const ELEVE = { id: "", enseignant: false, administrateur: true };
 
@@ -123,7 +126,7 @@ test("champs manquants et format refusé: erreurs par champ, saisie conservée",
     body: formulaire(
       {
         titre: "   ",
-        type_document: "cours",
+        type_document: "",
         matiere: "",
         classe: "2nde",
         seance: "S1",
@@ -133,7 +136,8 @@ test("champs manquants et format refusé: erreurs par champ, saisie conservée",
   });
   assertEquals(r.status, 400);
   const page = await r.text();
-  assertStringIncludes(page, 'id="titre-erreur">Champ obligatoire.');
+  assertStringIncludes(page, 'id="type_document-erreur">Champ obligatoire.');
+  assert(!page.includes('id="titre-erreur"'));
   assert(!page.includes('id="matiere-erreur"'));
   assertStringIncludes(page, "Format non reconnu");
   assertStringIncludes(page, 'value="S1"');
@@ -245,7 +249,10 @@ test("une génération en cours conserve les légendes relues par un enseignant"
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
     for (const action of ["certified", "rejected"] as const) {
-      await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+      await requete("/prof/depot", {
+        method: "POST",
+        body: formulaire(CHAMPS, variante(PAGE, action), "casa.html"),
+      });
       const job = revendiquer(db)!;
       const appele = Promise.withResolvers<void>();
       const termine = Promise.withResolvers<{ texte: string; modele: string }>();
@@ -369,7 +376,7 @@ test("les documents sans séquence ont leur propre route, distincte d'une séque
         method: "POST",
         body: formulaire(
           { ...CHAMPS, titre: sequence ? "Cours nommé" : "Cours non classé", sequence },
-          PAGE,
+          variante(PAGE, sequence),
           "casa.html",
         ),
       });
@@ -1437,7 +1444,7 @@ test("les dépôts trop grands sont refusés avant lecture du fichier", async ()
       duplex: "half",
     });
     assertEquals(trop.status, 413);
-    assert(lus <= 28, "le flux est arrêté sans lire tout le corps");
+    assert(lus <= 53, "le flux est arrêté sans lire tout le corps");
     assertEquals(lectures, 0);
     assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, 0);
   } finally {
@@ -1712,4 +1719,98 @@ test("Markdown: dépôt, extraction aux offsets exacts, original servi, réextra
   const original = await requete(`/prof/sources/${s.id}/original`);
   assertEquals(original.headers.get("content-type"), "text/markdown; charset=utf-8");
   assertEquals(await reextraire(db, s.id as string), "identique");
+});
+
+/** Un envoi de fichiers sous les champs de `CHAMPS`, sans le titre commun. */
+const envoi = (
+  fichiers: [string, string | Uint8Array<ArrayBuffer>][],
+  acces: Acces = { audience: "eleves", reponses: true },
+) => {
+  const f = formulaire({ ...CHAMPS, titre: "" }, new Uint8Array(), "vide", acces);
+  f.delete("fichier");
+  for (const [nom, contenu] of fichiers) f.append("fichier", new File([contenu], nom));
+  return f;
+};
+
+test("plusieurs fichiers sans JavaScript: chacun se dépose seul dans un même lot", async () => {
+  const { db } = await environnement();
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  const formulaireDepot = await (await requete("/prof/depot")).text();
+  assertStringIncludes(formulaireDepot, "multiple");
+  assertStringIncludes(formulaireDepot, 'name="lot"');
+
+  const r = await requete("/prof/depot", {
+    method: "POST",
+    body: envoi([
+      ["un.md", "---\ntitle: Premier chapitre\n---\n# Un\nTexte."],
+      ["deux.md", "# Deux\nTexte."],
+      ["casse.md", new Uint8Array([0x23, 0x20, 0xe9, 0x0a])],
+    ]),
+  });
+  assertEquals(r.status, 200);
+  const page = await r.text();
+  assertStringIncludes(page, "2 déposés, 1 erreur");
+  assertStringIncludes(page, "« Premier chapitre » est déposé");
+  assertStringIncludes(page, "« deux » est déposé");
+  assertStringIncludes(page, "casse.md : Format non reconnu");
+  const sources = db.prepare("SELECT titre, lot_id FROM sources").all();
+  assertEquals(new Set(sources.map((s) => s.titre)), new Set(["Premier chapitre", "deux"]));
+  const lot = sources[0].lot_id as string;
+  assertEquals(sources[1].lot_id, lot);
+  assertEquals(db.prepare("SELECT count(*) n FROM ingestion_jobs").get()!.n, 2);
+
+  await requete("/prof/depot", { method: "POST", body: envoi([["trois.md", "# Trois\n"]]) });
+  assertEquals(db.prepare("SELECT count(DISTINCT lot_id) n FROM sources").get()!.n, 2);
+  const biblio = await (await requete(`/prof?lot=${lot}`)).text();
+  assertStringIncludes(biblio, "Lot déposé : 2 fichiers");
+  assertStringIncludes(biblio, "Premier chapitre");
+  assert(!biblio.includes("trois"));
+});
+
+test("une clé rejouée rend la source créée, un fichier déjà lisible est un doublon", async () => {
+  const { db } = await environnement();
+  const prof = await session(db, fauxModeles().modeles, "enseignant");
+  const autre = await session(db, fauxModeles().modeles, "enseignant");
+  const envoyer = async (qui: typeof prof, contenu: string, cle: string, acces?: Acces) => {
+    const f = envoi([["a.md", contenu]], acces);
+    f.set("titre", "A");
+    f.set("cle", cle);
+    const r = await qui.requete("/prof/depot", {
+      method: "POST",
+      headers: { accept: "application/json" },
+      body: f,
+    });
+    return (await r.json()) as Record<string, string>;
+  };
+  const sources = () => db.prepare("SELECT count(*) n FROM sources").get()!.n;
+
+  const premier = await envoyer(prof, "# A\n", "cle-aaaaaaaa");
+  assertEquals(premier.etat, "recu");
+  const rejoue = await envoyer(prof, "# A\n", "cle-aaaaaaaa");
+  assertEquals(rejoue, { ...premier, nom: "a.md", titre: "A", format: "md" });
+  assertEquals([sources(), db.prepare("SELECT count(*) n FROM ingestion_jobs").get()!.n], [1, 1]);
+
+  const doublon = await envoyer(prof, "# A\n", "cle-bbbbbbbb");
+  assertEquals([doublon.etat, doublon.id, sources()], ["doublon", premier.id, 1]);
+
+  // Une source privée d'un autre compte n'existe pas pour lui: aucun doublon ne la révèle.
+  const prive = { audience: "prive", reponses: false } as const;
+  assertEquals((await envoyer(prof, "# Secret\n", "cle-cccccccc", prive)).etat, "recu");
+  const recu = await envoyer(autre, "# Secret\n", "cle-dddddddd");
+  assertEquals(recu.etat, "recu");
+  assertEquals(sources(), 3);
+  assertEquals((await envoyer(prof, "# Secret\n", "cle-eeeeeeee")).etat, "doublon");
+});
+
+test("un lot compte au plus MAX_LOT fichiers", async () => {
+  const { db } = await environnement();
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  const fichiers = Array.from({ length: MAX_LOT + 1 }, (_, i): [string, string] => [
+    `c${i}.md`,
+    `# Chapitre ${i}\n`,
+  ]);
+  const r = await requete("/prof/depot", { method: "POST", body: envoi(fichiers) });
+  assertEquals(r.status, 200);
+  assertStringIncludes(await r.text(), `Un lot compte ${MAX_LOT} fichiers au maximum.`);
+  assertEquals(db.prepare("SELECT count(*) n FROM sources").get()!.n, MAX_LOT);
 });

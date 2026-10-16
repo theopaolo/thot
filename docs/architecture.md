@@ -55,6 +55,26 @@ titres ATX (`#`) ouvrent les sections, les marques de lien et d'emphase disparai
 code et `mermaid` restent mot pour mot. Le front matter fournit le titre, ses autres clés sont
 ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
 
+Le dépôt web prend plusieurs fichiers. Chacun passe par `deposer()` seul : une source, un travail
+d'ingestion, aucune dépendance entre fichiers. Avec JavaScript, le navigateur envoie un fichier
+par requête, trois à la fois. Sans JavaScript, le serveur dépose les fichiers d'une requête l'un
+après l'autre et liste le sort de chacun. Les champs communs (matière, cours, lecteurs) valent
+pour tout le lot. Le titre vient du fichier (front matter pour le Markdown, sinon le nom sans
+extension), le nom saisi au formulaire ne vaut que pour un fichier seul.
+
+- Un lot (`sources.lot_id`) groupe les fichiers d'un même formulaire. La bibliothèque le filtre
+  par `/prof?lot=`. Le serveur refuse le fichier qui ferait dépasser `MAX_LOT` sources au lot, et
+  chaque fichier de plus de `MAX_OCTETS`.
+- Une clé de dépôt (`sources.cle_depot`) rend un renvoi inoffensif. Le navigateur en tire une par
+  fichier, le formulaire sans JavaScript la déduit du lot et de la position. La même clé du même
+  compte rend la source déjà créée, sans second travail. Un index unique tranche deux requêtes
+  simultanées.
+- Un fichier dont la somme de contrôle est celle d'une source que le compte peut lire est un
+  doublon : rien n'est écrit et la réponse renvoie cette source. La recherche passe par
+  `FILTRE_ACCES`, donc un fichier identique à une source privée d'un autre compte se dépose
+  normalement et ne révèle pas qu'elle existe. L'import en ligne de commande compare, lui, toute
+  l'instance.
+
 ## Instances
 
 Une installation possède son identité persistante, ses comptes et son répertoire de données.

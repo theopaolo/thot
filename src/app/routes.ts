@@ -43,7 +43,17 @@ import {
 import { enregistrerReglages, libelles, lireInstance, type Reglages } from "./instance.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
-import { audience, controlerFichier, deposer, MAX_OCTETS, valider } from "./depot.ts";
+import {
+  audience,
+  controlerFichier,
+  deposer,
+  MAX_LOT,
+  MAX_OCTETS,
+  sha256,
+  sourceIdentique,
+  titreParDefaut,
+  valider,
+} from "./depot.ts";
 import {
   chunksSource,
   ecarterRevision,
@@ -334,6 +344,7 @@ export function creerApp(db: Db, modeles: Modeles) {
       libelles: libelles(db),
       lecteurs: instance.lecteurs,
       liens: Domaines.liensFormulaire(b),
+      lot: crypto.randomUUID(),
     };
   };
   const pageDomaines = (
@@ -481,7 +492,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND ${FILTRE_ACCES} AND (? = '' OR s.statut = ?)
-         AND (? = '' OR sequence = ?)
+         AND (? = '' OR sequence = ?) AND (? = '' OR s.lot_id = ?)
        ORDER BY sequence, s.titre`,
       )
       .all(
@@ -492,10 +503,13 @@ export function creerApp(db: Db, modeles: Modeles) {
         statut,
         sequence,
         sequence,
+        c.req.query("lot") ?? "",
+        c.req.query("lot") ?? "",
       ) as unknown as Prof.LigneSource[];
   const filtres = (c: Context<Env>) => ({
     statut: c.req.query("statut") ?? "",
     sequence: c.req.query("sequence") ?? "",
+    lot: c.req.query("lot") ?? "",
     vue: c.req.query("vue") === "grille" ? "grille" : "",
     ...Domaines.lireScope(c.req.query()),
   });
@@ -767,69 +781,136 @@ export function creerApp(db: Db, modeles: Modeles) {
   app.get("/prof/depot", (c) =>
     c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query())))),
   );
+  const parCle = (compte: Compte, cle: string) =>
+    db
+      .prepare("SELECT id, titre, format FROM sources WHERE proprietaire_id = ? AND cle_depot = ?")
+      .get(compte.id, cle) as { id: string; titre: string; format: string } | undefined;
+  /**
+   * Dépose un fichier seul: l'échec de l'un ne touche pas les autres. La clé identifie la
+   * tentative, un renvoi rend la source déjà créée. Un fichier que le compte lit déjà n'est pas
+   * déposé deux fois.
+   */
+  const deposerFichier = async (
+    c: Context<Env>,
+    champs: Record<string, string>,
+    b: Record<string, unknown>,
+    fichier: File | undefined,
+    seul: boolean,
+    lotId: string,
+    cle: string,
+  ): Promise<Prof.ResultatDepot> => {
+    const compte = c.get("compte");
+    const nom = fichier?.name ?? "";
+    const erreur = (erreurs: Record<string, string>): Prof.ResultatDepot => ({
+      etat: "erreur",
+      nom,
+      erreurs,
+    });
+    const deja = parCle(compte, cle);
+    if (deja) return { etat: "recu", nom, ...deja };
+    const dansLot = db
+      .prepare("SELECT count(*) n FROM sources WHERE lot_id = ? AND proprietaire_id = ?")
+      .get(lotId, compte.id)!.n as number;
+    if (dansLot >= MAX_LOT) {
+      return erreur({ fichier: `Un lot compte ${MAX_LOT} fichiers au maximum.` });
+    }
+    if (fichier && fichier.size > MAX_OCTETS) {
+      return erreur({ fichier: "Fichier trop lourd, 25 Mo au maximum." });
+    }
+    const octets = fichier ? new Uint8Array(await fichier.arrayBuffer()) : new Uint8Array();
+    const controle = controlerFichier(octets, nom);
+    const format = "format" in controle ? controle.format : null;
+    // Le nom saisi ne vaut que pour un fichier seul, sinon chaque fichier garde son titre.
+    const titre = (seul && champs.titre?.trim()) || titreParDefaut(octets, nom, format);
+    const v = valider(
+      { ...champs, titre },
+      Domaines.catalogueChamps(db).map((x) => x.cle),
+    );
+    if ("erreurs" in v || !format) {
+      return erreur({
+        ...("erreurs" in v ? v.erreurs : {}),
+        ...("erreur" in controle ? { fichier: controle.erreur } : {}),
+      });
+    }
+    const identique = sourceIdentique(db, compte, instance.school_id, await sha256(octets));
+    if (identique) return { etat: "doublon", nom, ...identique };
+    try {
+      const { source_id } = await deposer(db, {
+        meta: v.meta,
+        nomFichier: nom,
+        octets,
+        format,
+        schoolId: instance.school_id,
+        enseignant: compte.nom,
+        proprietaireId: compte.id,
+        par: compte,
+        // Sans le choix des lecteurs, la ressource va aux lecteurs par défaut et sert aux réponses.
+        audience: audience(b.audience ?? lireInstance(db).lecteurs),
+        reponses: b.audience === undefined || Boolean(b.reponses),
+        liens:
+          b.cours !== undefined
+            ? Domaines.liensAutorises(db, compte, Domaines.liensFormulaire(b))
+            : undefined,
+        lotId,
+        cle,
+      });
+      return { etat: "recu", nom, id: source_id, titre: v.meta.titre, format };
+    } catch (e) {
+      // Deux requêtes de même clé arrivées ensemble: la seconde retrouve la source de la première.
+      const creee = parCle(compte, cle);
+      return creee ? { etat: "recu", nom, ...creee } : erreur({ domaine: (e as Error).message });
+    }
+  };
+  // Un identifiant de lot ou de clé venu du navigateur ne sert que s'il a la forme d'un jeton.
+  const jeton = (v: unknown) => (typeof v === "string" && /^[\w-]{8,64}$/.test(v) ? v : undefined);
   app.post(
     "/prof/depot",
     bodyLimit({
-      maxSize: MAX_OCTETS + 128 * 1024,
-      onError: (c) => c.text("Dépôt trop volumineux, 25 Mo au maximum par fichier.", 413),
+      // Sans JavaScript, une requête porte plusieurs fichiers.
+      maxSize: 2 * MAX_OCTETS + 128 * 1024,
+      onError: (c) => c.text("Envoi trop volumineux, 25 Mo par fichier et 50 Mo en tout.", 413),
     }),
     async (c) => {
       const b = await c.req.parseBody({ all: true });
+      const fichiers = [b.fichier ?? []].flat().filter((f) => f instanceof File);
       const champs = Object.fromEntries(
-        Object.entries(b).filter(([k, v]) => k !== "fichier" && typeof v === "string"),
+        Object.entries(b).filter(
+          ([k, v]) => !["fichier", "lot", "cle"].includes(k) && typeof v === "string",
+        ),
       ) as Record<string, string>;
-      const refus = (erreurs: Record<string, string>) =>
-        c.html(rendre(c, "Déposer", Prof.depot({ ...optionsDepot(c, champs, b), erreurs })), 400);
-
-      const v = valider(
-        champs,
-        Domaines.catalogueChamps(db).map((x) => x.cle),
-      );
-      const fichier = b.fichier;
-      if (fichier instanceof File && fichier.size > MAX_OCTETS) {
-        return refus({
-          ...("erreurs" in v ? v.erreurs : {}),
-          fichier: "Fichier trop lourd, 25 Mo au maximum.",
-        });
+      const lot = jeton(b.lot) ?? crypto.randomUUID();
+      const resultats: Prof.ResultatDepot[] = [];
+      for (const [i, f] of (fichiers.length ? fichiers : [undefined]).entries()) {
+        resultats.push(
+          await deposerFichier(
+            c,
+            champs,
+            b,
+            f,
+            fichiers.length <= 1,
+            lot,
+            `${jeton(b.cle) ?? lot}-${i}`,
+          ),
+        );
       }
-      const octets =
-        fichier instanceof File ? new Uint8Array(await fichier.arrayBuffer()) : new Uint8Array();
-      const controle = controlerFichier(octets, fichier instanceof File ? fichier.name : "");
-      const erreurs = {
-        ...("erreurs" in v ? v.erreurs : {}),
-        ...("erreur" in controle ? { fichier: controle.erreur } : {}),
-      };
-      if ("erreurs" in v || "erreur" in controle) return refus(erreurs);
-
-      try {
-        await deposer(db, {
-          meta: v.meta,
-          nomFichier: (fichier as File).name,
-          octets,
-          format: controle.format,
-          schoolId: instance.school_id,
-          enseignant: c.get("compte").nom,
-          proprietaireId: c.get("compte").id,
-          par: c.get("compte"),
-          // Sans le choix des lecteurs, la ressource va aux lecteurs par défaut et sert aux réponses.
-          audience: audience(b.audience ?? lireInstance(db).lecteurs),
-          reponses: b.audience === undefined || Boolean(b.reponses),
-          liens:
-            b.cours !== undefined
-              ? Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b))
-              : undefined,
-        });
-      } catch (e) {
-        return refus({ domaine: (e as Error).message });
+      if (c.req.header("accept")?.includes("application/json")) {
+        return c.json(resultats[0], resultats[0].etat === "erreur" ? 400 : 200);
+      }
+      if (fichiers.length <= 1 && resultats[0].etat === "erreur") {
+        return c.html(
+          rendre(
+            c,
+            "Déposer",
+            Prof.depot({ ...optionsDepot(c, champs, b), erreurs: resultats[0].erreurs }),
+          ),
+          400,
+        );
       }
       return c.html(
         rendre(
           c,
           "Déposer",
-          Prof.depot({
-            ...optionsDepot(c, champs),
-            ok: `« ${v.meta.titre} » est déposé. Son extraction a commencé, il apparaît dans la bibliothèque.`,
-          }),
+          Prof.depot({ ...optionsDepot(c, champs), depose: { lot, resultats } }),
         ),
       );
     },

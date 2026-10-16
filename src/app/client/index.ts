@@ -1,7 +1,9 @@
 import { fermerFeuille, installerEleve } from "./eleve.ts";
+import { installerDepot } from "./depot.ts";
 import { installerProf } from "./prof.ts";
 
 installerEleve();
+installerDepot();
 installerProf();
 
 document.addEventListener("keydown", (event) => {

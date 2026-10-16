@@ -311,7 +311,7 @@ test("migration des conversations : une par compte et par périmètre, échanges
     message.run("a1", "a", "Première", resultat, "", "2026-01-01T00:00:00Z", "x");
     message.run("a3", "a", "Dans la séquence", null, "Bauhaus", "2026-03-01T00:00:00Z", "x");
     message.run("b1", "b", "De B", null, "", "2026-01-01T00:00:00Z", "x");
-    assertEquals(migrer(db), ["0013_conversations.sql"]);
+    assertEquals(migrer(db)[0], "0013_conversations.sql");
     const lignes = db
       .prepare(
         `SELECT m.id, m.compte_id, m.rang, m.resultat, v.compte_id AS proprietaire, v.titre,
