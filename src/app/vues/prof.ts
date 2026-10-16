@@ -36,6 +36,7 @@ export type LigneSource = {
   etat: string;
   erreur: string | null;
   images_a_relire: number;
+  revision_en_attente: number;
   images: number;
   legendes: number;
   image_id: string | null;
@@ -54,6 +55,8 @@ const statutLigne = (l: LigneSource) =>
           l.etat === "enriching" && l.images ? ` ${l.legendes}/${l.images}` : ""
         }…</span>`
       : html`<span class="statut ${l.statut}">${STATUTS[l.statut] ?? l.statut}</span>`;
+const versionLigne = (l: LigneSource) =>
+  l.revision_en_attente ? html`<span class="statut a_relire">Nouvelle version à relire</span>` : "";
 // Seul l'écart à la publication aux élèves est signalé.
 const lecteursLigne = (l: LigneSource) =>
   l.audience && l.audience !== "eleves"
@@ -87,8 +90,8 @@ const carte = (l: LigneSource) => {
         <span class="tuile-titre">${l.titre}</span>
       </a>
       ${
-        ecart || l.images_a_relire
-          ? html`<p class="carte-etat">${ecart ? statutLigne(l) : ""}${
+        ecart || l.images_a_relire || l.revision_en_attente
+          ? html`<p class="carte-etat">${ecart ? statutLigne(l) : ""}${versionLigne(l)}${
               l.images_a_relire
                 ? html`<span class="statut unreviewed">${l.images_a_relire} légende${
                     l.images_a_relire > 1 ? "s" : ""
@@ -144,7 +147,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
                 </div>
               </div>
             </td>
-            <td>${statutLigne(l)} ${lecteursLigne(l)}</td>
+            <td>${statutLigne(l)} ${versionLigne(l)} ${lecteursLigne(l)}</td>
             <td class="statut unreviewed">${nonRelues(l.images_a_relire)}</td>
           </tr>
         `,

@@ -394,6 +394,7 @@ export function creerApp(db: Db, modeles: Modeles) {
          s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
+         EXISTS (SELECT 1 FROM revisions r WHERE r.source_id = s.id AND r.n > s.revision) AS revision_en_attente,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id) AS images,
          (SELECT count(legende) FROM images i WHERE i.source_id = s.id) AS legendes,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
@@ -422,11 +423,13 @@ export function creerApp(db: Db, modeles: Modeles) {
     const f = filtres(c);
     const selection = idsScope(c);
     const ressources = lignes(c, "", "").filter((s) => selection.has(s.id));
+    // Une nouvelle version à relire compte avec les sources à relire.
+    const statut = (s: Prof.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
     const repartition = [
-      ...Map.groupBy(ressources, (s) => `${s.sequence ?? ""}\0${s.statut}`).values(),
+      ...Map.groupBy(ressources, (s) => `${s.sequence ?? ""}\0${statut(s)}`).values(),
     ].map((liste) => ({
       sequence: liste[0].sequence ?? "",
-      statut: liste[0].statut,
+      statut: statut(liste[0]),
       n: liste.length,
     }));
     return c.html(
@@ -436,7 +439,7 @@ export function creerApp(db: Db, modeles: Modeles) {
         html`${DomaineVue.filtre(Domaines.catalogueDe(db, c.get("compte")), scope(c), "/prof")}${Prof.sources(
           ressources.filter(
             (s) =>
-              (!f.statut || s.statut === f.statut) && (!f.sequence || s.sequence === f.sequence),
+              (!f.statut || statut(s) === f.statut) && (!f.sequence || s.sequence === f.sequence),
           ),
           f,
           repartition,

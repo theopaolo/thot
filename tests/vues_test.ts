@@ -120,6 +120,7 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
             etat: "extracting",
             erreur: null,
             images_a_relire: 0,
+            revision_en_attente: 0,
             images: 0,
             legendes: 0,
             image_id: null,

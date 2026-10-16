@@ -1274,12 +1274,21 @@ test("un texte réextrait attend sa certification, une ancienne réponse garde s
       "Nouvelle version à relire",
     );
     assertEquals((await eleve.requete(`/eleve/sources/${id}?revision=2`)).status, 404);
+    const aRelire = await (await prof.requete("/prof?statut=a_relire")).text();
+    assertStringIncludes(aRelire, "Nouvelle version à relire");
+    assertStringIncludes(aRelire, `/prof/sources/${id}"`);
+    assert(
+      !(await (await prof.requete("/prof?statut=certifiee")).text()).includes(
+        `/prof/sources/${id}"`,
+      ),
+    );
 
     const certifier = await prof.requete(`/prof/sources/${id}/revisions/2/certifiee`, {
       method: "POST",
     });
     assertEquals(certifier.status, 303);
     assertEquals(revisions(db, id), { servie: 2, index: [2], enregistrees: [1, 2] });
+    assert(!(await (await prof.requete("/prof")).text()).includes("Nouvelle version à relire"));
 
     assertStringIncludes(
       await (await eleve.requete("/eleve/chat")).text(),

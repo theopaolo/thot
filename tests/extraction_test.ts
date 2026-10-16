@@ -41,6 +41,22 @@ test("PDF: rubriques, lignes recollées, en-têtes répétés retirés, page mue
   );
 });
 
+test("PDF: un mot coupé en deux lignes se recolle si sa forme entière figure ailleurs", () => {
+  const brut = [
+    "Expressionnisme\n\nExpressi\nonnisme\n\nLe courant s'ouvre en Allemagne, l'Expressionnisme\ndéforme le réel.",
+    "Il parle pour tous. Le chat est parti pour\ntant de jours. Pourtant le chat\nrevient.",
+  ].join("\f");
+  const textes = decouperPdf(brut).parties.map((p) => p.texte);
+  assertEquals(textes.filter((t) => t === "Expressionnisme").length, 2, "titre et mot recollé");
+  assert(textes.includes("Le courant s'ouvre en Allemagne, l'Expressionnisme déforme le réel."));
+  // « pour » est un mot du texte: « pourtant » ne le remplace pas.
+  assert(
+    textes.includes(
+      "Il parle pour tous. Le chat est parti pour tant de jours. Pourtant le chat revient.",
+    ),
+  );
+});
+
 test("un PDF de deux pages conserve le texte propre à chaque page", () => {
   const { parties } = decouperPdf(
     "Fiche ATC\n\nLe cubisme transforme la peinture.\f" +

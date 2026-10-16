@@ -101,6 +101,26 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
   });
   const repetee = (l: string) => (vues.get(l) ?? 0) >= Math.max(2, pages.length / 2);
 
+  // Un mot coupé par la mise en page se recolle quand sa forme entière apparaît ailleurs et que
+  // son début n'est pas un mot. Les mots aux jonctions de lignes ne comptent pas: ce sont les
+  // fragments eux-mêmes.
+  // ponytail: un mot qui n'apparaît entier qu'à une jonction de ligne ne recolle pas.
+  const coupe = (a = "", b = "") => /\p{L}$/u.test(a) && /^\p{Ll}/u.test(b);
+  const mots = new Set<string>();
+  for (const lignes of pages) {
+    lignes.forEach((l, i) => {
+      const t = l.match(/\p{L}+/gu) ?? [];
+      if (coupe(l, lignes[i + 1])) t.pop();
+      if (coupe(lignes[i - 1], l)) t.shift();
+      for (const m of t) mots.add(m.toLowerCase());
+    });
+  }
+  const jonction = (a: string, b: string) => {
+    const fin = a.match(/\p{L}+$/u)?.[0].toLowerCase();
+    const debut = b.match(/^\p{Ll}\p{L}*/u)?.[0];
+    return fin && debut && mots.has(fin + debut) && !mots.has(fin) ? "" : " ";
+  };
+
   const parties: Partie[] = [];
   const avertissements: string[] = [];
   let section = "Introduction";
@@ -143,8 +163,9 @@ export function decouperPdf(brut: string, profil: Profil = "general"): Extractio
         continue;
       }
       // pdftotext coupe les lignes à la largeur de la colonne. Une puce ouvre une ligne.
-      if (paragraphe.length && !/^[•·▪◦\-–]/.test(l)) paragraphe[paragraphe.length - 1] += " " + l;
-      else paragraphe.push(l);
+      if (paragraphe.length && !/^[•·▪◦\-–]/.test(l)) {
+        paragraphe[paragraphe.length - 1] += jonction(paragraphe.at(-1)!, l) + l;
+      } else paragraphe.push(l);
     }
     fermer();
   });

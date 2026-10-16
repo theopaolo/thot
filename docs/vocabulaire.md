@@ -130,7 +130,8 @@ Document sans matière attribuée. Il reste visible et peut être organisé plus
 Texte extrait d'un document à un moment donné. Une nouvelle extraction qui change le texte
 devient une « nouvelle version à relire » : élèves et Thot lisent la version actuelle jusqu'à ce
 qu'un enseignant certifie la nouvelle. Une réponse garde la version qu'elle cite, et l'élève la
-relit comme « version citée par une réponse précédente ».
+relit comme « version citée par une réponse précédente ». La bibliothèque marque ces sources
+« Nouvelle version à relire » et le filtre « À relire » les retrouve.
 
 **Formulaire de dépôt**
 Interface proposée à l'enseignant lors du dépôt d'un document dans la bibliothèque. Il pose une série de questions structurées (discipline, niveau, type, notion centrale, séquence de rattachement) et c'est ce formulaire, une fois rempli, qui indique à Thot comment indexer et ranger le document. La qualité du référencement dépend directement du soin apporté à ce formulaire.
