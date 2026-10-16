@@ -535,6 +535,54 @@ test("explication : la réponse vérifiée à l'objectif, dans les sources chois
   }
 });
 
+test("tentatives : les enseignants du cours lisent les réponses de chaque version, un enseignant hors du cours reçoit 404", async () => {
+  const { db, dir, coursId, source, prof, eleve } = await cadre();
+  try {
+    const id = await preparer(prof, coursId, source);
+    await relirePublier(prof, db, id);
+    await envoyer(eleve, `/eleve/activites/${id}/tentatives`, { reponse: "Les angles droits." });
+    const t = db.prepare("SELECT id FROM tentatives").get()!;
+    const coches = `/eleve/activites/${id}/tentatives/${t.id}/criteres`;
+    await envoyer(eleve, coches, { criteres: ["0", "1"] });
+    const modif = formulaire(db, id, { texte_0: "Que refuse Gaudí ?" });
+    assertEquals(await statut(envoyer(prof, `/prof/activites/${id}/modifier`, modif)), 303);
+    await relirePublier(prof, db, id);
+    await envoyer(eleve, `/eleve/activites/${id}/tentatives`, { reponse: "La ligne droite." });
+
+    const collegue = await compte(db, "enseignant");
+    for (const s of [prof, collegue]) {
+      const detail = await page(s, `/prof/activites/${id}`);
+      assertStringIncludes(detail, "<h2>Tentatives</h2>");
+      for (const x of [
+        "<td>Compte eleve</td>",
+        "<td>2</td><td>La ligne droite.</td><td>aucun</td>",
+        "<td>1</td><td>Les angles droits.</td><td>1, 2</td>",
+      ]) {
+        assertStringIncludes(detail, x);
+      }
+    }
+    const etranger = await compte(db, "enseignant", undefined, false);
+    assertEquals(await statut(etranger.requete(`/prof/activites/${id}`)), 404);
+    assert(!(await page(etranger, "/prof/activites")).includes("Par objectif"));
+    // Un administrateur hors du cours ouvre l'exercice, pas les réponses de ses élèves.
+    db.prepare("UPDATE comptes SET administrateur = 1 WHERE id = ?").run(etranger.id);
+    const admin = await page(etranger, `/prof/activites/${id}`);
+    assertStringIncludes(admin, "Que refuse Gaudí ?");
+    assert(!admin.includes("Tentatives") && !admin.includes("Les angles droits."));
+
+    // Par objectif : les activités publiées et les tentatives reçues, sans note.
+    const liste = await page(prof, "/prof/activites");
+    assertStringIncludes(
+      liste,
+      "<td>Expliquer le refus de la ligne droite chez Gaudí</td><td>Design</td><td>1</td><td>2</td>",
+    );
+    assert(!/examen|niveau|réussite/i.test(liste));
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("exercice personnel : privé à son auteur, publié sans relecture indépendante", async () => {
   const { db, dir, coursId, source, prof } = await cadre(true);
   try {

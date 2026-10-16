@@ -480,6 +480,50 @@ export const repondre = (db: Db, c: Compte, a: Activite, reponse: string) =>
     )
     .run(crypto.randomUUID(), a.id, c.id, a.revision, reponse, maintenant());
 
+/**
+ * Qui lit les tentatives d'une activité : les membres de son cours, ou l'auteur d'une activité
+ * privée. Les routes `/prof` ne servent que les enseignants. Être administrateur ne suffit pas.
+ */
+const LIT_TENTATIVES = `(CASE a.audience WHEN 'prive' THEN a.auteur_id = ? ELSE EXISTS (
+  SELECT 1 FROM membres_cours m WHERE m.cours_id = a.cours_id AND m.compte_id = ?) END)`;
+
+export type TentativeLue = {
+  nom: string;
+  cree_le: string;
+  revision: number;
+  reponse: string;
+  /** JSON des indices des critères cochés, dans la version à laquelle elle répondait */
+  criteres: string;
+};
+
+/**
+ * Les tentatives de toutes les versions, des plus récentes aux plus anciennes. `undefined` si le
+ * compte ne les lit pas.
+ */
+export const tentativesLues = (db: Db, c: Compte, a: Activite) =>
+  db.prepare(`SELECT 1 FROM activites a WHERE a.id = ? AND ${LIT_TENTATIVES}`).get(a.id, c.id, c.id)
+    ? (db
+        .prepare(
+          `SELECT co.nom, t.cree_le, t.revision, t.reponse, t.criteres FROM tentatives t
+           JOIN comptes co ON co.id = t.compte_id WHERE t.activite_id = ? ORDER BY t.rowid DESC`,
+        )
+        .all(a.id) as TentativeLue[])
+    : undefined;
+
+/** Par objectif, les activités publiées et les tentatives reçues, pour les cours du compte. */
+export const suiviObjectifs = (db: Db, c: Compte) =>
+  db
+    .prepare(
+      `SELECT o.intitule, co.nom AS cours,
+       count(DISTINCT CASE WHEN a.etat = 'publiee' THEN a.id END) AS publiees,
+       count(t.id) AS tentatives
+       FROM objectifs o JOIN cours co ON co.id = o.cours_id
+       JOIN activites a ON a.objectif_id = o.id AND ${LIT_TENTATIVES}
+       LEFT JOIN tentatives t ON t.activite_id = a.id
+       GROUP BY o.id ORDER BY co.nom, o.intitule`,
+    )
+    .all(c.id, c.id) as { intitule: string; cours: string; publiees: number; tentatives: number }[];
+
 /** Les critères que l'élève coche sur sa tentative de la version actuelle. */
 export function evaluer(db: Db, c: Compte, a: Activite, tentativeId: string, coches: number[]) {
   const n = (JSON.parse(a.contenu) as Contenu).criteres.length;

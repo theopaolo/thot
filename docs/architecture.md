@@ -299,6 +299,12 @@ cités ne sortent du serveur qu'avec une tentative de ce compte sur la version a
 coche ensuite les critères que sa réponse remplit. Thot ne note pas la réponse et ne la compare à
 aucun texte.
 
+Les enseignants membres du cours lisent les tentatives sur la page de l'exercice, toutes versions
+confondues : élève, date, version, réponse et critères cochés. L'auteur d'une activité privée lit
+les siennes. Être administrateur ne suffit pas. La liste des activités compte, par objectif des
+cours de l'enseignant, les activités publiées et les tentatives reçues. Ces nombres comptent ce qui
+a été pratiqué : ils ne mesurent pas un niveau.
+
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
 publiée à ses élèves et utilisée par Thot. `statuer()`, `supprimerSource()` et les changements de
 lecteurs ou de cours d'une source signalent à revoir les activités dont une citation ne tient plus.

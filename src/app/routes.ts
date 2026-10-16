@@ -1171,11 +1171,19 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
 
   // ------------------------------------------------------------ activités
-  app.get("/prof/activites", (c) =>
-    c.html(
-      rendre(c, "Activités", ActiviteVue.listeProf(Activites.activitesProf(db, c.get("compte")))),
-    ),
-  );
+  app.get("/prof/activites", (c) => {
+    const compte = c.get("compte");
+    return c.html(
+      rendre(
+        c,
+        "Activités",
+        ActiviteVue.listeProf(
+          Activites.activitesProf(db, compte),
+          Activites.suiviObjectifs(db, compte),
+        ),
+      ),
+    );
+  });
   const pagePreparation = (
     c: Context<Env>,
     saisie: Record<string, unknown> = {},
@@ -1250,6 +1258,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             String(titre.get(x.source_id)?.titre ?? ""),
           ]),
         ),
+        tentatives: Activites.tentativesLues(db, c.get("compte"), a),
         erreur,
       }),
     );

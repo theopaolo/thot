@@ -207,6 +207,11 @@ Le corrigé d'un exercice. L'élève le lit après avoir envoyé sa réponse, qu
 coche les critères que sa réponse remplit puis « Enregistrer mon auto-évaluation ». Thot ne note
 pas la réponse.
 
+**Tentatives, par objectif**
+« Tentatives » : sur la page d'un exercice, les réponses des élèves du cours, avec leur version et
+les « critères cochés ». « Par objectif » : sous la liste des activités, le nombre d'activités
+publiées et de tentatives de chaque objectif. Seuls les enseignants du cours les lisent.
+
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 

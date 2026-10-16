@@ -8,7 +8,13 @@ import {
   type Explication,
 } from "../../core/activite.ts";
 import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
-import { type Activite, MAX_SOURCES, nomChamp, type Tentative } from "../activites.ts";
+import {
+  type Activite,
+  MAX_SOURCES,
+  nomChamp,
+  type Tentative,
+  type TentativeLue,
+} from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
 import { icone } from "../icones.ts";
 import { panneauSource, reponse } from "./eleve.ts";
@@ -69,7 +75,14 @@ const TYPES: Record<Activite["type"], string> = {
   explication: "Explication",
 };
 
-export const listeProf = (liste: Activite[]) => html`
+export type SuiviObjectif = {
+  intitule: string;
+  cours: string;
+  publiees: number;
+  tentatives: number;
+};
+
+export const listeProf = (liste: Activite[], suivi: SuiviObjectif[]) => html`
   <h1>Bibliothèque</h1>
   ${ongletsBibliotheque("/prof/activites")}
   <p><a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a></p>
@@ -85,6 +98,38 @@ export const listeProf = (liste: Activite[]) => html`
         )}</tbody>
       </table>`
       : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
+  }
+  ${
+    suivi.length
+      ? html`<h2>Par objectif</h2>
+        <p class="discret">Dans vos cours. Une tentative est une réponse envoyée à un exercice, toutes versions confondues. Thot ne la note pas.</p>
+        <table>
+          <thead><tr><th>Objectif</th><th>Cours</th><th>Activités publiées</th><th>Tentatives</th></tr></thead>
+          <tbody>${suivi.map(
+            (o) =>
+              html`<tr><td>${o.intitule}</td><td>${o.cours}</td><td>${o.publiees}</td><td>${o.tentatives}</td></tr>`,
+          )}</tbody>
+        </table>`
+      : ""
+  }
+`;
+
+/** Les réponses des élèves, lues par les enseignants du cours. */
+const tentativesProf = (liste: TentativeLue[]) => html`
+  <h2>Tentatives</h2>
+  ${
+    liste.length
+      ? html`<p class="discret">Toutes versions confondues. Les critères cochés sont ceux que l'élève pense remplir, numérotés dans la version à laquelle il répondait.</p>
+        <table>
+          <thead><tr><th>Élève</th><th>Date</th><th>Version</th><th>Réponse</th><th>Critères cochés</th></tr></thead>
+          <tbody>${liste.map((t) => {
+            const coches = JSON.parse(t.criteres) as number[];
+            return html`<tr><td>${t.nom}</td><td>${jour(t.cree_le)}</td><td>${t.revision}</td><td>${
+              t.reponse
+            }</td><td>${coches.length ? coches.map((i) => i + 1).join(", ") : "aucun"}</td></tr>`;
+          })}</tbody>
+        </table>`
+      : html`<p class="discret">Aucune tentative.</p>`
   }
 `;
 
@@ -204,6 +249,8 @@ export type DetailProf = {
   servies: Map<string, number | undefined>;
   /** le titre de chaque source citée */
   titres: Map<string, string>;
+  /** absentes pour un compte qui ne les lit pas */
+  tentatives?: TentativeLue[];
   erreur?: string;
 };
 
@@ -278,7 +325,15 @@ const corpsExplication = (e: Explication, servies: Servies) => html`
 `;
 
 /** Inspecter les preuves, modifier, relire, publier, avec l'historique de relecture. */
-export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: DetailProf) => {
+export const detailProf = ({
+  a,
+  contenu,
+  relectures,
+  servies,
+  titres,
+  tentatives,
+  erreur,
+}: DetailProf) => {
   const rejets = JSON.parse(a.rejets) as string[];
   const sources = [
     ...new Map(citationsDe(contenu).map((c) => [`${c.source_id}/${c.revision}`, c])).values(),
@@ -351,6 +406,7 @@ export const detailProf = ({ a, contenu, relectures, servies, titres, erreur }: 
         </table>`
         : html`<p class="discret">Pas encore relu.</p>`
     }
+    ${tentatives && a.type === "exercice" ? tentativesProf(tentatives) : ""}
     ${"affirmations" in contenu ? "" : modification(a, contenu, erreur)}
   `;
 };
