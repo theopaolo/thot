@@ -1810,13 +1810,16 @@ test("un refus propose les questions proches de la question, et rien si aucune n
   const f = fauxModeles();
   // Les passages restent sous le seuil, donc les deux questions sont refusées. Seule la suggestion
   // est proche, et seulement de la question qui parle de Gaudí.
-  f.modeles.reclasser = (q, docs) =>
-    Promise.resolve(
+  let appels = 0;
+  f.modeles.reclasser = (q, docs) => {
+    if (docs.includes("Qui est Gaudí ?")) appels++;
+    return Promise.resolve(
       docs.map((d, index) => ({
         index,
         score: q.includes("Gaudí") && d.startsWith("Qui") ? 0.9 : 0.001,
       })),
     );
+  };
   const eleve = await session(db, f.modeles, "eleve");
   const refus = async (texte: string) => {
     const r = await eleve.requete("/eleve/questions", {
@@ -1825,12 +1828,18 @@ test("un refus propose les questions proches de la question, et rien si aucune n
       body: new URLSearchParams({ texte }),
     });
     const id = (await r.text()).match(/messages\/([\w-]+)\/flux/)![1];
-    return (await eleve.requete(`/eleve/messages/${id}/flux`)).text();
+    return { id, html: await (await eleve.requete(`/eleve/messages/${id}/flux`)).text() };
   };
-  const proche = await refus("Où Gaudí a-t-il vécu ?");
+  const { id, html: proche } = await refus("Où Gaudí a-t-il vécu ?");
   assertStringIncludes(proche, "Ce que ton cours couvre");
   assertStringIncludes(proche, "Qui est Gaudí ?");
-  const loin = await refus("Quelle est la capitale du Pérou ?");
+  // Relire le refus ne rappelle pas le reclasseur.
+  assertStringIncludes(
+    await (await eleve.requete(`/eleve/messages/${id}/flux`)).text(),
+    "Qui est Gaudí ?",
+  );
+  assertEquals(appels, 1);
+  const { html: loin } = await refus("Quelle est la capitale du Pérou ?");
   assertStringIncludes(loin, "Je ne trouve pas la réponse");
   assert(!loin.includes("Ce que ton cours couvre"));
 });

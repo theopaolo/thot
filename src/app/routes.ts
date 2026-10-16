@@ -1551,6 +1551,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     });
   };
 
+  // Un refus rechargé ne repaie pas le reclasseur : ses questions proches restent en mémoire.
+  // ponytail: perdues au redémarrage, le premier affichage suivant les recalcule.
+  const proches = new Map<string, string[]>();
   const ideesPour = async (l: Lecteur, r: Resultat, question = "", messageId = "") => {
     const m = messageId
       ? db
@@ -1569,7 +1572,15 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             Infinity,
           )
         : [...suggestionsParChapitre(db, l, Infinity).values()].flat();
-      return questionsProches(modeles, question, candidates, config.seuil);
+      const connues = proches.get(messageId);
+      // Un droit retiré depuis retire aussi la question.
+      if (connues) return connues.filter((q) => candidates.includes(q));
+      const idees = await questionsProches(modeles, question, candidates, config.seuil);
+      if (messageId) {
+        proches.set(messageId, idees);
+        if (proches.size > 1000) proches.delete(proches.keys().next().value!);
+      }
+      return idees;
     }
     if (cadre) {
       return suggestionsDuPerimetre(
