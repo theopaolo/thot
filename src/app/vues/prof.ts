@@ -31,7 +31,8 @@ export type LigneSource = {
   id: string;
   titre: string;
   profil?: Profil;
-  sequence: string;
+  /** le nom du thème, le premier si la source en a plusieurs */
+  theme: string | null;
   format: string;
   statut: string;
   etat: string;
@@ -113,16 +114,14 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
     `
     : "";
   if (grille) {
-    const groupes = Map.groupBy(lignes, (l) => l.sequence ?? "");
+    const groupes = Map.groupBy(lignes, (l) => l.theme ?? "");
     return html`
       <div id="lignes" ${rafraichir}>
-        ${[...groupes].map(([sequence, liste]) =>
+        ${[...groupes].map(([theme, liste]) =>
           groupes.size > 1
             ? html`
               <section class="seance">
-                <h2>${sequence || "Autres documents"} <span class="discret">${
-                  liste.length
-                }</span></h2>
+                <h2>${theme || "Autres documents"} <span class="discret">${liste.length}</span></h2>
                 <ul class="tuiles grille-sources">${liste.map(carte)}</ul>
               </section>
             `
@@ -143,7 +142,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
                 ${apercu(l)}
                 <div>
                   <a href="/prof/sources/${l.id}">${l.titre}</a>
-                  <small>${l.sequence} · ${l.format}</small>
+                  <small>${l.theme ?? ""} · ${l.format}</small>
                 </div>
               </div>
             </td>
@@ -158,7 +157,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
 
 type Filtres = {
   statut: string;
-  sequence: string;
+  theme: string;
   lot: string;
   vue: string;
   matiere_id?: string;
@@ -172,7 +171,7 @@ const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
 export const sources = (
   lignes: LigneSource[],
   f: Filtres,
-  repartition: { sequence: string; statut: string; n: number }[],
+  repartition: { theme: string; statut: string; n: number }[],
   l: Libelles,
   general = false,
   supprimee = false,
@@ -180,11 +179,11 @@ export const sources = (
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
     repartition.filter(garde).reduce((t, r) => t + r.n, 0);
-  const parSequence = (v: string) =>
-    somme((r) => (!v || r.sequence === v) && (!f.statut || r.statut === f.statut));
+  const parTheme = (v: string) =>
+    somme((r) => (!v || r.theme === v) && (!f.statut || r.statut === f.statut));
   const parStatut = (v: string) =>
-    somme((r) => (!v || r.statut === v) && (!f.sequence || r.sequence === f.sequence));
-  const sequences = [...new Set(repartition.map((r) => r.sequence))].filter(Boolean).sort();
+    somme((r) => (!v || r.statut === v) && (!f.theme || r.theme === f.theme));
+  const themes = [...new Set(repartition.map((r) => r.theme))].filter(Boolean).sort();
   const requete = new URLSearchParams(f).toString();
   const grille = f.vue === "grille";
   return html`
@@ -206,13 +205,13 @@ export const sources = (
       general
         ? ""
         : html`<nav class="onglets" aria-label="${l.regroupements}">
-      ${[["", "Tout"], ...sequences.map((s) => [s, s])].map(
+      ${[["", "Tout"], ...themes.map((t) => [t, t])].map(
         ([v, l]) =>
           html`
-          <a href="${lienFiltres(f, { sequence: v })}"
+          <a href="${lienFiltres(f, { theme: v })}"
             aria-current="${String(
-              v === f.sequence,
-            )}">${l} <span class="nombre">${parSequence(v)}</span></a>
+              v === f.theme,
+            )}">${l} <span class="nombre">${parTheme(v)}</span></a>
         `,
       )}
     </nav>`
@@ -821,14 +820,9 @@ export const depot = (s: {
           nom: "sous_matiere",
           label: s.libelles.sousRegroupement,
           valeur: c.sous_matiere,
-        })} ${champ({
-          nom: "sequence",
-          label: s.libelles.regroupement,
-          valeur: c.sequence,
-          aide: "Choisir le rattachement au cours ci-dessous.",
         })} ${champ({ nom: "seance", label: s.libelles.seance, valeur: c.seance })}
       </div>
-      ${s.catalogue ? Domaines.liens(s.catalogue, s.liens) : ""}
+      ${s.catalogue ? Domaines.liens(s.catalogue, s.liens, s.libelles.regroupement) : ""}
       ${Domaines.langue(c.langue)}
       <div class="deux">${Domaines.informations(s.informations, c)}</div>
       ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })} ${champ({
@@ -966,11 +960,6 @@ export const detailSource = (d: Detail) => {
       }
       <div class="deux">
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
-        ${champ({
-          nom: "sequence",
-          label: d.libelles.regroupement,
-          valeur: String(d.meta.sequence ?? ""),
-        })}
         ${Domaines.informations(d.informations, d.meta, propositions)}
       </div>
       ${
@@ -978,7 +967,7 @@ export const detailSource = (d: Detail) => {
           ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
           : ""
       }
-      ${d.catalogue ? Domaines.liens(d.catalogue, d.affiliations) : ""}
+      ${d.catalogue ? Domaines.liens(d.catalogue, d.affiliations, d.libelles.regroupement) : ""}
       ${Domaines.langue(d.source.langue)}
       ${lecteurs(d.source.audience, d.source.reponses === 1)}
       <button>Enregistrer</button>

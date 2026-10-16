@@ -65,6 +65,7 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
       "0015_lots.sql",
       "0016_comparaison.sql",
       "0017_suppression.sql",
+      "0018_themes.sql",
       "0020_credits.sql",
     ]);
     const instance = lireInstance(db);

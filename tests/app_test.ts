@@ -35,10 +35,10 @@ import {
   faitAuHasard,
   genererSuggestions,
   sourceSansSuggestions,
-  suggestionsParChapitre,
+  suggestionsDuPerimetre,
 } from "../src/app/suggestions.ts";
 import { config } from "../src/app/config.ts";
-import { cours, matiere } from "../src/app/domaines.ts";
+import { affiliations, cours, matiere, theme } from "../src/app/domaines.ts";
 import { reponse } from "../src/app/vues/eleve.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
@@ -48,6 +48,15 @@ const CHAMPS = {
   matiere: "arts-appliques",
   classe: "2nde",
   sequence: "ATC Art Nouveau",
+};
+
+/** Suit la redirection d'une ancienne adresse de séquence vers la page de son thème. */
+const suivre = async (
+  s: { requete: (chemin: string) => Promise<Response> | Response },
+  chemin: string,
+) => {
+  const r = await s.requete(chemin);
+  return r.status === 302 ? s.requete(r.headers.get("location")!) : r;
 };
 
 type Acces = { audience: "prive" | "collegues" | "eleves"; reponses: boolean };
@@ -366,9 +375,10 @@ test("un échec d'indexation annule aussi la certification", async () => {
   }
 });
 
-test("les documents sans séquence ont leur propre route, distincte d'une séquence homonyme", async () => {
+test("les documents sans thème ont leur propre route, distincte d'un thème homonyme", async () => {
   const { db, dir } = await environnement();
   try {
+    cours(db, matiere(db, "Arts appliqués", "arts-appliques"), "Arts appliqués");
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
     const ids: string[] = [];
     for (const sequence of ["", "Sans séquence"]) {
@@ -387,12 +397,15 @@ test("les documents sans séquence ont leur propre route, distincte d'une séque
     }
     const eleve = await session(db, fauxModeles().modeles, "eleve");
     const accueil = await (await eleve.requete("/eleve")).text();
-    const chemins = ["/eleve/sans-sequence", "/eleve/sequences/Sans%20s%C3%A9quence"];
+    const theme = db
+      .prepare("SELECT theme_id FROM source_cours WHERE source_id = ?")
+      .get(ids[1])!.theme_id;
+    // L'ancienne adresse de la séquence mène au thème du même nom.
+    const ancienne = await eleve.requete(`/eleve/sequences/Sans%20s%C3%A9quence?doc=${ids[1]}`);
+    assertEquals(ancienne.headers.get("location"), `/eleve/themes/${theme}?doc=${ids[1]}`);
+    const chemins = ["/eleve/sans-sequence", `/eleve/themes/${theme}`];
     for (const [i, chemin] of chemins.entries()) {
-      const theme = db
-        .prepare("SELECT theme_id FROM source_cours WHERE source_id = ?")
-        .get(ids[i])?.theme_id;
-      assertStringIncludes(accueil, `href="${theme ? `/eleve/themes/${theme}` : chemin}"`);
+      assertStringIncludes(accueil, `href="${chemin}"`);
       const r = await eleve.requete(`${chemin}?doc=${ids[i]}`);
       assertEquals(r.status, 200);
       const page = await r.text();
@@ -426,7 +439,7 @@ test("sans public Élèves, une source certifiée reste invisible aux élèves e
     `/eleve/sources/${id}`,
     `/media/${id}-0`,
   ])
-    assertEquals((await eleve.requete(chemin)).status, 404, chemin);
+    assertEquals((await suivre(eleve, chemin)).status, 404, chemin);
   assertEquals(
     (
       await eleve.requete("/eleve/questions", {
@@ -849,10 +862,10 @@ test("une question proposée n'est gardée que si Thot y répond avec une citati
       .map((l) => l.question),
     ["Pourquoi Gaudí refuse-t-il la ligne droite ?"],
   );
-  assertEquals([...suggestionsParChapitre(db, ELEVE).values()].flat().length, 1);
+  assertEquals(suggestionsDuPerimetre(db, ELEVE, new Set([id])).length, 1);
   statuer(db, id, "rejetee", "test");
   assertEquals(
-    suggestionsParChapitre(db, ELEVE).size,
+    suggestionsDuPerimetre(db, ELEVE, new Set([id])).length,
     0,
     "une source rejetée ne propose plus rien",
   );
@@ -933,6 +946,10 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
   const { db } = await environnement();
   const source = await sourceTraitee(db);
   statuer(db, source, "certifiee", "test");
+  // L'ancien chapitre « ATC Art Nouveau » est le thème de même nom de la source.
+  const c = cours(db, db.prepare("SELECT id FROM matieres").get()!.id as string, "Design");
+  const t = theme(db, c, CHAMPS.sequence);
+  affiliations(db, source, [{ cours_id: c, theme_id: t }]);
   const bonne = JSON.stringify({
     affirmations: [
       {
@@ -962,8 +979,16 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
     await (await eleve.requete(`/eleve/messages/${id1}/flux`)).text(),
     "Gaudí refuse",
   );
+  // Une page d'avant les thèmes envoie un chapitre : la question part dans son thème.
   const conversation = db.prepare("SELECT conversation_id FROM messages WHERE id = ?").get(id1)!
     .conversation_id as string;
+  const portee = db
+    .prepare(
+      `SELECT m.theme_id || ' ' || v.theme_id AS t FROM messages m
+       JOIN conversations v ON v.id = m.conversation_id WHERE m.id = ?`,
+    )
+    .get(id1)!.t;
+  assertEquals(portee, `${t} ${t}`);
   const second = await eleve.requete("/eleve/questions", {
     method: "POST",
     headers: { "HX-Request": "true" },
@@ -1051,11 +1076,6 @@ test("chapitre, suivi, avis et revue enseignant restent liés à la question", a
     200,
     "une panne sans résultat enregistré reste relançable",
   );
-  assertEquals(
-    chercherFts(db, "Gaudí", { lecteur: null, schoolId: "pilote", chapitre: "Chapitre absent" })
-      .length,
-    0,
-  );
 });
 
 test("Thot propose date, artiste et mouvement, l'enseignant les valide", async () => {
@@ -1085,7 +1105,7 @@ test("Thot propose date, artiste et mouvement, l'enseignant les valide", async (
   assert(!fiche.includes('value="1906"'), "une date absente de la fiche n'est pas proposée");
   const eleve = await session(db, fauxModeles().modeles, "eleve");
   const chapitre = `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`;
-  assert(!(await (await eleve.requete(chapitre)).text()).includes("data-verifier-quiz"));
+  assert(!(await (await suivre(eleve, chapitre)).text()).includes("data-verifier-quiz"));
 
   await prof.requete(`/prof/sources/${id}/modifier`, {
     method: "POST",
@@ -1099,7 +1119,7 @@ test("Thot propose date, artiste et mouvement, l'enseignant les valide", async (
   });
   assert(!(await (await prof.requete(`/prof/sources/${id}`)).text()).includes("Proposé par Thot"));
   assertStringIncludes(
-    await (await eleve.requete(chapitre)).text(),
+    await (await suivre(eleve, chapitre)).text(),
     'data-answer="Antoni Gaudí|Art nouveau"',
   );
   assertEquals(sourceSansInformations(db), undefined);
@@ -1112,17 +1132,11 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
   statuer(db, id, "certifiee", "test");
   const r = await prof.requete(`/prof/sources/${id}/modifier`, {
     method: "POST",
-    body: new URLSearchParams({
-      titre: "Casa Batlló corrigée",
-      sequence: "Architecture",
-      date: "1906",
-      artiste: "Gaudí",
-    }),
+    body: new URLSearchParams({ titre: "Casa Batlló corrigée", date: "1906", artiste: "Gaudí" }),
   });
   assertEquals(r.status, 303);
   assertStringIncludes(
-    chercherFts(db, "corrigée", { lecteur: null, schoolId: "pilote", chapitre: "Architecture" })[0]
-      .titre,
+    chercherFts(db, "corrigée", { lecteur: null, schoolId: "pilote" })[0].titre,
     "corrigée",
   );
   relireLegende(db, `${id}-0`, "certified", "", "test");
@@ -1167,7 +1181,10 @@ test("titre édité réindexé, image certifiée liée à la réponse et message
   const eleve = await session(db, fauxModeles().modeles, "eleve");
   const accueil = await (await eleve.requete("/eleve")).text();
   assertStringIncludes(accueil, "Casa Batlló corrigée");
-  assertStringIncludes(await (await eleve.requete("/eleve/sequences/Architecture")).text(), "1906");
+  assertStringIncludes(
+    await (await suivre(eleve, `/eleve/sequences/${encodeURIComponent(CHAMPS.sequence)}`)).text(),
+    "1906",
+  );
   const compte = db
     .prepare("SELECT id FROM comptes WHERE role = 'eleve' ORDER BY rowid DESC LIMIT 1")
     .get()!.id;

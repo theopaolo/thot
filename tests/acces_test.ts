@@ -13,11 +13,7 @@ import { chercherFts, type Lecteur } from "../src/core/recherche.ts";
 import { actualiserResultat, demander } from "../src/core/reponse.ts";
 import { cleLegende, type Modeles } from "../src/core/modeles.ts";
 import type { Profil } from "../src/core/profils.ts";
-import {
-  faitAuHasard,
-  suggestionsDuPerimetre,
-  suggestionsParChapitre,
-} from "../src/app/suggestions.ts";
+import { faitAuHasard, suggestionsDuPerimetre } from "../src/app/suggestions.ts";
 import { creerCompte } from "../src/app/comptes.ts";
 import {
   affiliations,
@@ -154,17 +150,16 @@ test("lecture : propriétaire, collègue, élève et administrateur", async () =
     );
     db.prepare("UPDATE sources SET audience = 'eleves' WHERE id = ?").run(eleves);
 
-    // La revue des questions ne nomme pas la séquence d'une source que l'enseignant ne lit pas.
-    db.prepare(
-      "UPDATE sources SET metadonnees = json_set(metadonnees, '$.sequence', 'Séquence secrète') WHERE id = ?",
-    ).run(prive);
+    // La revue des questions ne nomme pas le thème d'une source que l'enseignant ne lit pas.
+    const secret = cours(db, matiere(db, "Secrets"), "Cours secret");
+    affiliations(db, prive, [{ cours_id: secret, theme_id: theme(db, secret, "Thème secret") }]);
     db.prepare(
       `INSERT INTO messages (id, compte_id, question, etat, resultat, cree_le, maj_le)
        VALUES ('m', ?, 'Une question', 'answered', ?, '2026-10-10T08:00:00Z', '2026-10-10T08:00:00Z')`,
     ).run(eleve.id, JSON.stringify({ affirmations: [{ source_id: prive }] }));
-    assertStringIncludes(await (await a.requete("/prof/questions")).text(), "Séquence secrète");
+    assertStringIncludes(await (await a.requete("/prof/questions")).text(), "Thème secret");
     const questions = await (await b.requete("/prof/questions")).text();
-    assert(questions.includes("Une question") && !questions.includes("Séquence secrète"));
+    assert(questions.includes("Une question") && !questions.includes("Thème secret"));
 
     // Les questions suggérées sont communes à tous : seules celles des sources publiées restent.
     const commeEleve = { id: eleve.id, enseignant: false, administrateur: false };
@@ -174,7 +169,6 @@ test("lecture : propriétaire, collègue, élève et administrateur", async () =
     assertEquals(suggestionsDuPerimetre(db, commeEleve, new Set([prive, collegues, eleves])), [
       `Q ${eleves}`,
     ]);
-    assertEquals([...suggestionsParChapitre(db, commeEleve).values()].flat(), [`Q ${eleves}`]);
 
     const trouve = (l: Lecteur | null) =>
       new Set(
@@ -470,6 +464,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0015_lots.sql",
       "0016_comparaison.sql",
       "0017_suppression.sql",
+      "0018_themes.sql",
       "0020_credits.sql",
     ]);
     assertEquals(
@@ -668,6 +663,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       "0015_lots.sql",
       "0016_comparaison.sql",
       "0017_suppression.sql",
+      "0018_themes.sql",
       "0020_credits.sql",
     ]);
     assertEquals(
@@ -719,21 +715,13 @@ function poserQuestion(
   id: string,
   eleveId: string,
   texte: string,
-  o: { chapitre?: string; matiere_id?: string; cours_id?: string; theme_id?: string } = {},
+  o: { matiere_id?: string; cours_id?: string; theme_id?: string } = {},
 ) {
   db.prepare(
-    `INSERT INTO messages (id, compte_id, question, etat, chapitre, matiere_id, cours_id, theme_id,
+    `INSERT INTO messages (id, compte_id, question, etat, matiere_id, cours_id, theme_id,
        cree_le, maj_le)
-     VALUES (?, ?, ?, 'answered', ?, ?, ?, ?, '2026-10-10T08:00:00Z', '2026-10-10T08:00:00Z')`,
-  ).run(
-    id,
-    eleveId,
-    texte,
-    o.chapitre ?? "",
-    o.matiere_id ?? "",
-    o.cours_id ?? "",
-    o.theme_id ?? "",
-  );
+     VALUES (?, ?, ?, 'answered', ?, ?, ?, '2026-10-10T08:00:00Z', '2026-10-10T08:00:00Z')`,
+  ).run(id, eleveId, texte, o.matiere_id ?? "", o.cours_id ?? "", o.theme_id ?? "");
 }
 
 test("élèves : seuls les administrateurs gèrent ceux sans cours", async () => {
@@ -794,46 +782,21 @@ test("élèves : seuls les administrateurs gèrent ceux sans cours", async () =>
   }
 });
 
-test("modifier : un changement de séquence range la source dans un cours de l'enseignant", async () => {
-  const { db, dir, m, c1, c2, profA, profB, publie } = await deuxCours();
+test("modifier : la séquence d'une ancienne source reste lisible et ne la range plus", async () => {
+  const { db, dir, c1, profA, publie } = await deuxCours();
   try {
-    const autre = await autreMatiere(db);
-    // Le troisième cours de profB vient après c2 mais le précède par ordre alphabétique.
-    const c3 = cours(db, m, "Atelier");
-    inscrire(db, c3, profB.id);
-    db.prepare("UPDATE sources SET matiere_id = ? WHERE id = ?").run(m, publie);
-    affiliations(db, publie, [
-      { cours_id: c1, theme_id: null },
-      { cours_id: c2, theme_id: null },
-    ]);
-    const nCours = () => db.prepare("SELECT count(*) AS n FROM cours").get()!.n;
-    const nombreDeCours = nCours();
-    const theme_ = (coursId: string, nom: string) =>
-      db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = ?").get(coursId, nom)
-        ?.id as string;
-    const modifier = (qui: Qui, id: string, sequence: string) =>
-      statut(envoyer(qui, `/prof/sources/${id}/modifier`, { titre: "Cours du design", sequence }));
-
-    // profB a c2 et c3 dans la matière : c1 vient en premier dans la matière, c2 dans ses cours.
-    assertEquals(await modifier(profB, publie, "Lumière"), 303);
-    assertEquals(liens(db, publie), { [c1]: null, [c2]: theme_(c2, "Lumière") });
-    assertEquals(db.prepare("SELECT count(*) AS n FROM themes WHERE cours_id = ?").get(c1)!.n, 0);
-    assertEquals(db.prepare("SELECT count(*) AS n FROM themes WHERE cours_id = ?").get(c3)!.n, 0);
-
-    // profA range dans c1 et garde le rattachement de c2, thème compris.
-    assertEquals(await modifier(profA, publie, "Couleur"), 303);
-    assertEquals(liens(db, publie), {
-      [c1]: theme_(c1, "Couleur"),
-      [c2]: theme_(c2, "Lumière"),
-    });
-
-    // Sans cours à lui dans la matière, un enseignant ne range nulle part et ne crée rien.
-    const note = await source(db, "Note du soir", "eleves", autre.prof.id, c1);
-    db.prepare("UPDATE sources SET matiere_id = ? WHERE id = ?").run(m, note);
-    assertEquals(await modifier(autre.prof, note, "Nuit"), 303);
-    assertEquals(liens(db, note), { [c1]: null });
-    assertEquals(nCours(), nombreDeCours);
-    assertEquals(theme_(c1, "Nuit"), undefined);
+    db.prepare(
+      "UPDATE sources SET metadonnees = json_set(metadonnees, '$.sequence', 'Lumière') WHERE id = ?",
+    ).run(publie);
+    const fiche = await texteDe(profA, `/prof/sources/${publie}`);
+    assert(!fiche.includes('name="sequence"'), "le formulaire montre encore le champ libre");
+    assertStringIncludes(fiche, "Lumière");
+    // Un formulaire ouvert avant les thèmes envoie encore une séquence : elle ne change rien.
+    const corps = { titre: "Cours du design", sequence: "Couleur" };
+    assertEquals(await statut(envoyer(profA, `/prof/sources/${publie}/modifier`, corps)), 303);
+    assertEquals(liens(db, publie), { [c1]: null });
+    const meta = db.prepare("SELECT metadonnees FROM sources WHERE id = ?").get(publie)!;
+    assertEquals(JSON.parse(meta.metadonnees as string).sequence, "Lumière");
   } finally {
     db.close();
     await rm(dir, { recursive: true });
@@ -913,36 +876,34 @@ test("modifier : décocher tous les cours est refusé pour tout compte", async (
   }
 });
 
-test("questions des élèves : la séquence mémorisée n'est montrée qu'à qui lit une source qui la porte", async () => {
-  const { db, dir, profA, profB, profC, prive, partage, libre } = await deuxCours();
+test("questions des élèves : le thème d'une source citée n'est montré qu'à qui la lit", async () => {
+  const { db, dir, c1, c2, profA, profB, profC, prive, partage, libre } = await deuxCours();
   try {
-    const [secrete, collegues, ouverte] = [
-      "Séquence secrète",
-      "Séquence des collègues",
-      "Séquence ouverte",
-    ];
-    for (const [id, sequence] of [
-      [prive, secrete],
-      [partage, collegues],
-      [libre, ouverte],
+    const [secrete, collegues, ouverte] = ["Thème secret", "Thème des collègues", "Thème ouvert"];
+    for (const [id, c, nom] of [
+      [prive, c1, secrete],
+      [partage, c1, collegues],
+      [libre, c2, ouverte],
     ]) {
-      db.prepare(
-        "UPDATE sources SET metadonnees = json_set(metadonnees, '$.sequence', ?) WHERE id = ?",
-      ).run(sequence, id);
+      affiliations(db, id, [{ cours_id: c, theme_id: theme(db, c, nom) }]);
     }
     // Sans cours, cet élève pose des questions que tous les enseignants lisent.
     const eleve = await compte(db, "eleve");
     const questions = ["Question un", "Question deux", "Question trois"];
-    [secrete, collegues, ouverte].forEach((chapitre, i) =>
-      poserQuestion(db, `q${i}`, eleve.id, questions[i], { chapitre }),
-    );
+    [prive, partage, libre].forEach((source, i) => {
+      poserQuestion(db, `q${i}`, eleve.id, questions[i]);
+      db.prepare("UPDATE messages SET resultat = ? WHERE id = ?").run(
+        JSON.stringify({ affirmations: [{ source_id: source }] }),
+        `q${i}`,
+      );
+    });
     const vues = async (qui: Qui) => {
       const page = await texteDe(qui, "/prof/questions");
       for (const q of questions) assertStringIncludes(page, q);
       return [secrete, collegues, ouverte].filter((s) => page.includes(s));
     };
     assertEquals(await vues(profA), [secrete, collegues, ouverte]);
-    assertEquals(await vues(profC), [collegues, ouverte]);
+    assertEquals(await vues(profC), [collegues]);
     assertEquals(await vues(profB), [ouverte]);
     assertStringIncludes(await texteDe(profB, "/prof/questions"), "Autres questions");
   } finally {
@@ -1042,7 +1003,7 @@ test("suggestions : un élève ne reçoit ni question ni fait d'une source hors 
       );
     }
     const questions = (id: string) =>
-      [...suggestionsParChapitre(db, commeEleve(id)).values()].flat().sort();
+      suggestionsDuPerimetre(db, commeEleve(id), new Set([publie, libre, faits])).sort();
     assertEquals(questions(eleveA.id), ["Q s1", "Q s2", "Q s3"]);
     assertEquals(questions(eleveB.id), ["Q s2"]);
 

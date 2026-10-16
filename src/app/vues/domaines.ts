@@ -20,8 +20,14 @@ export const selectionProfil = (valeur = "general") =>
     ([id, p]) => html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`,
   )}</select></label>`;
 const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème", champ: "champ" };
-const ligne = (genre: keyof typeof LIBELLES, id: string, nom: string, contexte = "") => {
-  const libelle = `Nom (${LIBELLES[genre]})`;
+const ligne = (
+  genre: keyof typeof LIBELLES,
+  id: string,
+  nom: string,
+  contexte = "",
+  terme = LIBELLES[genre],
+) => {
+  const libelle = `Nom (${terme})`;
   return html`
     <form method="post" action="/administration/domaines/renommer" class="barre">
       <input type="hidden" name="genre" value="${genre}"><input type="hidden" name="id" value="${id}">
@@ -180,7 +186,7 @@ export const gestion = (
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     ${controleProfil}
     <p>Renommer garde les rattachements. Supprimer est refusé tant qu'une ressource ou une question
-    d'élève utilise l'entrée. Une matière ou un cours emporte ses cours et ses thèmes.</p>
+    d'élève utilise l'entrée. Une matière ou un cours emporte tout ce qu'il contient.</p>
     <h2>Matières</h2>
     ${cat.matieres.map(
       (m) =>
@@ -212,7 +218,7 @@ export const gestion = (
       class="etroit"><label>Matière <select name="matiere_id" required>${options(
         cat.matieres,
       )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>
-    <h2>Thèmes</h2>${cat.themes.map((t) =>
+    <h2>${l.regroupements}</h2>${cat.themes.map((t) =>
       ligne(
         "theme",
         t.id,
@@ -221,6 +227,7 @@ export const gestion = (
           cat.matieres.find((m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id)
             ?.nom
         } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom}`,
+        l.regroupement,
       ),
     )}
     <form method="post" action="/administration/domaines/theme"
@@ -229,7 +236,7 @@ export const gestion = (
           id: c.id,
           nom: `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`,
         })),
-      )}</select></label><label>Nouveau thème <input type="text" name="nom" required maxlength="200"></label><button>Créer le thème</button></form>
+      )}</select></label><label>${l.regroupement} <input type="text" name="nom" required maxlength="200"></label><button>Créer</button></form>
     <h2>Champs personnalisés</h2>
     <p>Un champ se coche ensuite dans les champs du dépôt de chaque matière. Renommer garde ses
     valeurs. Son type ne change plus après sa création.</p>
@@ -335,7 +342,7 @@ export const choixMatiere = (cat: Catalogue, id = "") =>
         id,
       )}</select></label><button>Choisir les champs</button></form>
   `;
-export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
+export const liens = (cat: Catalogue, valeurs: Affiliation[] = [], regroupement: string) =>
   html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${cat.cours.map(
     (c) =>
       html`
@@ -344,9 +351,9 @@ export const liens = (cat: Catalogue, valeurs: Affiliation[] = []) =>
             c.id
           }" ${valeurs.some((v) => v.cours_id === c.id) ? "checked" : ""}> ${
             cat.matieres.find((m) => m.id === c.matiere_id)?.nom
-          } / ${c.nom}</label><label>Thème <select name="theme_${
+          } / ${c.nom}</label><label>${regroupement} <select name="theme_${
             c.id
-          }"><option value="">Sans thème</option>${options(
+          }"><option value="">Directement dans le cours</option>${options(
             cat.themes.filter((t) => t.cours_id === c.id),
             valeurs.find((v) => v.cours_id === c.id)?.theme_id ?? "",
           )}</select></label></div>

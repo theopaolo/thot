@@ -115,6 +115,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0015_lots.sql",
       "0016_comparaison.sql",
       "0017_suppression.sql",
+      "0018_themes.sql",
       "0020_credits.sql",
     ]);
     assertEquals(migrer(db), []);
@@ -705,7 +706,8 @@ test("renommer : le cours pilote et un thème gardent leurs rattachements et les
     const prof = await session(db, fauxModeles().modeles, "enseignant");
 
     renommer(db, "cours", c.id, "Histoire de l’art");
-    renommer(db, "theme", t.id, "Art nouveau et Arts and Crafts");
+    const nouveau = "Art nouveau et Arts and Crafts";
+    renommer(db, "theme", t.id, nouveau);
     assertEquals(liens(), avant);
     assertEquals(catalogue(db).cours[0].matiere_id, m.id);
     assertEquals(catalogue(db).themes[0].cours_id, c.id);
@@ -722,12 +724,41 @@ test("renommer : le cours pilote et un thème gardent leurs rattachements et les
       await (await eleve.requete("/eleve")).text(),
       "Art nouveau et Arts and Crafts",
     );
-    // Les métadonnées gardent le nom du dossier d’origine: les anciennes adresses répondent.
-    assertEquals((await eleve.requete("/eleve/sequences/Art%20Nouveau")).status, 200);
+    // Les métadonnées gardent le nom du dossier d’origine : l'ancienne adresse mène au thème
+    // renommé.
+    assertEquals(
+      (await eleve.requete("/eleve/sequences/Art%20Nouveau")).headers.get("location"),
+      `/eleve/themes/${t.id}`,
+    );
     assertStringIncludes(
-      await (await prof.requete("/prof?sequence=Art%20Nouveau")).text(),
+      await (await prof.requete(`/prof?theme=${encodeURIComponent(nouveau)}`)).text(),
       `/prof/sources/${id}`,
     );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("import CLI : un cours choisi sans thème range la source dans le thème du nom de son dossier", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const c = cours(db, matiere(db, "Physique"), "Optique");
+    const ids = [
+      await ressource(db, { sequence: "Lumière" }, [{ cours_id: c, theme_id: null }]),
+      await ressource(db, { sequence: "Lumière" }, [{ cours_id: c, theme_id: null }]),
+      await ressource(db, {}, [{ cours_id: c, theme_id: null }]),
+    ];
+    const themes = ids.map(
+      (id) =>
+        db
+          .prepare(
+            "SELECT t.nom FROM source_cours sc LEFT JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = ?",
+          )
+          .get(id)!.nom,
+    );
+    assertEquals(themes, ["Lumière", "Lumière", null]);
+    assertEquals(catalogue(db).themes.length, 1);
   } finally {
     db.close();
     await rm(dir, { recursive: true });
@@ -1387,7 +1418,8 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     assertEquals(lireInstance(db).nom, "Thot");
 
     for (const [qui, chemin, attendu] of [
-      [admin, "/prof/depot", '<label for="sequence">Module</label>'],
+      [admin, "/prof/depot", `<label>Module <select name="theme_${t.cours_id}">`],
+      [admin, "/administration/domaines", "<h2>Modules</h2>"],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
       [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],
@@ -1395,6 +1427,8 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     ] as const) {
       assertStringIncludes(await (await qui.requete(chemin)).text(), attendu);
     }
+    // Le thème est le seul regroupement : le champ libre a quitté le dépôt.
+    assert(!(await (await admin.requete("/prof/depot")).text()).includes('name="sequence"'));
     assertEquals(await echanges(), avant);
 
     // Les ressources déposées gardent leurs lecteurs, le dépôt suivant prend les nouveaux.

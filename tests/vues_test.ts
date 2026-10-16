@@ -62,7 +62,7 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'�
     ],
     archivees: 0,
     suite: "",
-    perimetre: { chapitre: "", matiere_id: "", cours_id: "", theme_id: "" },
+    perimetre: { matiere_id: "", cours_id: "", theme_id: "" },
     catalogue: { matieres: [], cours: [], themes: [] },
     theme: "Thème",
     indisponible: false,
@@ -227,7 +227,7 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
         [
           {
             ...source,
-            sequence: "Arts",
+            theme: "Arts",
             etat: "extracting",
             erreur: null,
             images_a_relire: 0,

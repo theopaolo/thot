@@ -271,6 +271,16 @@ test("migrations des conversations et des réponses : échanges intacts, génér
     }
     db.exec(`INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le)
       VALUES ('a', 'a', 'A', 'eleve', '', '', 'x'), ('b', 'b', 'B', 'eleve', '', '', 'x')`);
+    // La séquence « Bauhaus » est rangée dans un thème renommé. Un autre cours a un thème
+    // « Bauhaus » sans ces sources. « Lumière » est rattachée à un cours sans thème.
+    db.exec(`INSERT INTO matieres (id, nom, profil) VALUES ('m', 'Arts', 'arts-appliques');
+      INSERT INTO cours (id, matiere_id, nom) VALUES ('c', 'm', 'Design'), ('c2', 'm', 'Autre');
+      INSERT INTO themes VALUES ('t', 'c', 'Bauhaus 1919'), ('t2', 'c2', 'Bauhaus');
+      INSERT INTO sources (id, school_id, titre, metadonnees, fichier, format, checksum, octets,
+        enseignant, cree_le) VALUES
+        ('s', 'pilote', 'S', '{"sequence":"Bauhaus"}', 's.html', 'html', 's', 1, 'P', 'x'),
+        ('s2', 'pilote', 'S2', '{"sequence":"Lumière"}', 's2.html', 'html', 's2', 1, 'P', 'x');
+      INSERT INTO source_cours VALUES ('s', 'c', 't'), ('s2', 'c', NULL);`);
     const resultat = JSON.stringify({
       etat: "answered",
       affirmations: [{ texte: "T", citation: "C", source_id: "source-citee", titre: "S" }],
@@ -308,6 +318,26 @@ test("migrations des conversations et des réponses : échanges intacts, génér
         ["a3", "a", 1, "Anciennes questions", "Bauhaus"],
         ["b1", "b", 1, "Anciennes questions", ""],
       ],
+    );
+    // Le chapitre devient le thème où sont rangées les sources de la séquence.
+    assertEquals(
+      {
+        ...db
+          .prepare(
+            `SELECT m.theme_id, v.theme_id AS conversation FROM messages m
+             JOIN conversations v ON v.id = m.conversation_id WHERE m.id = 'a3'`,
+          )
+          .get(),
+      },
+      { theme_id: "t", conversation: "t" },
+    );
+    assertEquals(
+      db
+        .prepare(
+          "SELECT t.nom FROM source_cours sc JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = 's2'",
+        )
+        .get()!.nom,
+      "Lumière",
     );
     assertEquals(lignes[0].conversation, lignes[1].conversation);
     assertEquals(new Set(lignes.map((l) => l.conversation)).size, 3);

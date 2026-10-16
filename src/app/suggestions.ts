@@ -61,29 +61,6 @@ export const sourceSansSuggestions = (db: Db) =>
 export const marquerSuggestions = (db: Db, sourceId: string) =>
   db.prepare("UPDATE sources SET suggestions_le = ? WHERE id = ?").run(maintenant(), sourceId);
 
-export type Suggestion = { question: string; chapitre: string };
-
-/** Quelques questions par chapitre, tirées au hasard parmi celles des sources certifiées. */
-export function suggestionsParChapitre(db: Db, l: Lecteur, parChapitre = 3): Map<string, string[]> {
-  const lignes = db
-    .prepare(
-      `SELECT sg.question, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS chapitre
-     FROM suggestions sg JOIN sources s ON s.id = sg.source_id
-     WHERE s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}
-       AND s.audience = 'eleves'
-       AND s.reponses = 1
-     ORDER BY random()`,
-    )
-    .all(lireInstance(db).school_id, ...parametresAcces(l)) as Suggestion[];
-  const out = new Map<string, string[]>();
-  for (const l of lignes) {
-    const liste = out.get(l.chapitre) ?? [];
-    if (liste.length < parChapitre) liste.push(l.question);
-    out.set(l.chapitre, liste);
-  }
-  return out;
-}
-
 // Une phrase qui commence par un connecteur ou un pronom renvoie à la précédente: seule, elle
 // ne dit rien.
 const DEPENDANTE =

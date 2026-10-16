@@ -31,7 +31,6 @@ export type Candidat = ChunkIndexe & { rang_fts: number; score?: number; matiere
 
 export type Perimetre = {
   schoolId: string;
-  chapitre?: string;
   matiereId?: string;
   /** comparaison : deux matières ou plus, qui remplacent `matiereId` */
   matieres?: string[];
@@ -133,7 +132,6 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
      JOIN sources s ON s.id = c.source_id
      WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
        AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-       AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
        AND (? = '' OR s.id = ?)
        AND ${FILTRE_DOMAINE}
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
@@ -143,8 +141,6 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
       p.schoolId,
       ...parametresAcces(p.lecteur),
       p.bibliotheque ? 1 : 0,
-      p.chapitre ?? "",
-      p.chapitre ?? "",
       p.sourceId ?? "",
       p.sourceId ?? "",
       ...parametresDomaine(p),
@@ -155,14 +151,11 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
 
 /** Une source que le périmètre peut citer: certifiée, lisible par son lecteur, dans son domaine. */
 const CITABLE = `s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-  AND (? = '' OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
   AND (? = '' OR s.id = ?) AND ${FILTRE_DOMAINE}`;
 const parametresCitable = (p: Perimetre) => [
   p.schoolId,
   ...parametresAcces(p.lecteur),
   p.bibliotheque ? 1 : 0,
-  p.chapitre ?? "",
-  p.chapitre ?? "",
   p.sourceId ?? "",
   p.sourceId ?? "",
   ...parametresDomaine(p),

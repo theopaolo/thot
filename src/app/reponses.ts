@@ -3,11 +3,10 @@ import type { Modeles } from "../core/modeles.ts";
 import { actualiserResultat, demander, journalSans, type Resultat } from "../core/reponse.ts";
 import { transaction } from "../core/recherche.ts";
 import { lecteur, lireCompte } from "./comptes.ts";
-import { idsMatieres } from "./domaines.ts";
+import { idsMatieres, type Scope } from "./domaines.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { lireInstance } from "./instance.ts";
-import type { Perimetre } from "./vues/eleve.ts";
 
 /** Un serveur arrêté pendant une réponse la laisse reprendre une fois ce verrou expiré. */
 export const VERROU_MS = 60_000;
@@ -17,8 +16,7 @@ const SIMULTANEES = 4;
 
 export const ARRETEE: Resultat = { etat: "failed", code: "CANCELLED", message: "Réponse arrêtée." };
 
-export const memePerimetre = (a: Perimetre, b: Perimetre) =>
-  a.chapitre === b.chapitre &&
+export const memePerimetre = (a: Scope, b: Scope) =>
   a.matiere_id === b.matiere_id &&
   a.cours_id === b.cours_id &&
   a.theme_id === b.theme_id &&
@@ -40,7 +38,7 @@ export const attendreChangement = (id: string, ms: number) =>
     changements.on(id, finir);
   });
 
-type Travail = Perimetre & {
+type Travail = Scope & {
   id: string;
   compte_id: string;
   question: string;
@@ -79,8 +77,8 @@ export function revendiquerReponse(db: Db, ms = Date.now()): Travail | undefined
      WHERE id = (SELECT id FROM messages
                  WHERE etat = 'en_attente' OR (etat = 'en_cours' AND verrou_expire_le < ?)
                  ORDER BY cree_le, rowid LIMIT 1)
-     RETURNING id, compte_id, question, conversation_id, rang, chapitre, matiere_id, cours_id,
-       theme_id, matieres, generation_id, tentatives, journal`,
+     RETURNING id, compte_id, question, conversation_id, rang, matiere_id, cours_id, theme_id,
+       matieres, generation_id, tentatives, journal`,
     )
     .get(crypto.randomUUID(), maintenant(ms + VERROU_MS), t, t) as Travail | undefined;
 }
@@ -112,14 +110,13 @@ export function boucleReponses(db: Db, modeles: Modeles) {
       // périmètre. Un changement de périmètre repart de zéro.
       const avant = db
         .prepare(
-          `SELECT question, chapitre, matiere_id, cours_id, theme_id, matieres FROM messages
+          `SELECT question, matiere_id, cours_id, theme_id, matieres FROM messages
            WHERE conversation_id = ? AND rang < ? ORDER BY rang DESC LIMIT 1`,
         )
-        .get(t.conversation_id, t.rang) as (Perimetre & { question: string }) | undefined;
+        .get(t.conversation_id, t.rang) as (Scope & { question: string }) | undefined;
       const p = {
         schoolId,
         lecteur: lecteur(lireCompte(db, t.compte_id)!),
-        chapitre: t.chapitre || undefined,
         matiereId: t.matiere_id,
         matieres: idsMatieres(t.matieres),
         coursId: t.cours_id,

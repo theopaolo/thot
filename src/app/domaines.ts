@@ -373,10 +373,35 @@ export function liensFormulaire(b: Record<string, unknown>): Affiliation[] {
     theme_id: String(b[`theme_${id}`] ?? "") || null,
   }));
 }
+/** Le thème de ce nom dans le cours, créé s'il manque. Sans nom, aucun thème. */
+export const themeNomme = (db: Db, coursId: string, nom = "") =>
+  nom
+    ? ((db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = ?").get(coursId, nom)?.id as
+        | string
+        | undefined) ?? theme(db, coursId, nom))
+    : null;
 /**
- * Range une source sans cours choisi dans le premier cours de sa matière, sous le thème de sa
- * séquence. L'import CLI et un administrateur créent ce cours s'il manque. Un enseignant ne range
- * que dans ses propres cours : sans cours à lui dans la matière, la source reste non classée.
+ * Le thème qui remplace un ancien chapitre, c'est-à-dire une séquence : celui où sont rangées le
+ * plus de sources de cette séquence, dans un cours du compte d'abord. Vide si aucun ne convient.
+ * La migration 0018 fait le même choix pour les conversations.
+ */
+export const themeDuChapitre = (db: Db, nom: string, compteId: string) =>
+  (db
+    .prepare(
+      `SELECT sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
+       JOIN themes t ON t.id = sc.theme_id
+     WHERE json_extract(s.metadonnees, '$.sequence') = ?
+     GROUP BY sc.theme_id
+     ORDER BY EXISTS (SELECT 1 FROM membres_cours m WHERE m.cours_id = t.cours_id
+       AND m.compte_id = ?) DESC, count(*) DESC
+     LIMIT 1`,
+    )
+    .get(nom, compteId)?.theme_id as string | undefined) ?? "";
+/**
+ * Range une source sans cours choisi dans le premier cours de sa matière, sous le thème du nom de
+ * sa séquence. Seul l'import CLI remplit encore la séquence, avec le nom du dossier. L'import et un
+ * administrateur créent ce cours s'il manque. Un enseignant ne range que dans ses propres cours :
+ * sans cours à lui dans la matière, la source reste non classée.
  */
 export function rangerLegacy(
   db: Db,
@@ -404,12 +429,7 @@ export function rangerLegacy(
     matiereId,
     db.prepare("SELECT nom FROM matieres WHERE id = ?").get(matiereId)!.nom as string,
   );
-  const t = sequence
-    ? ((db.prepare("SELECT id FROM themes WHERE cours_id = ? AND nom = ?").get(c, sequence)?.id as
-        | string
-        | undefined) ?? theme(db, c, sequence))
-    : null;
-  const lien = [{ cours_id: c, theme_id: t }];
+  const lien = [{ cours_id: c, theme_id: themeNomme(db, c, sequence) }];
   affiliations(db, sourceId, par ? liensAutorises(db, par, lien, sourceId) : lien);
 }
 

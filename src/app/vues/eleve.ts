@@ -20,7 +20,6 @@ export type ChapitreVue = {
 export type SourceChapitre = {
   id: string;
   titre: string;
-  sequence?: string;
   seance: string;
   date: string;
   quiz_reponse: string;
@@ -43,14 +42,7 @@ export const cleEnvoi = () => html`<input type="hidden" name="cle" value="${cryp
  * Une question proposée: un bouton qui l'envoie telle quelle, sans passer par la saisie. Dans le
  * chat, elle continue la conversation ouverte. Ailleurs, elle en commence une.
  */
-const idee = (
-  q: string,
-  htmx: boolean,
-  libelle = q,
-  chapitre = "",
-  themeId = "",
-  scope: Partial<Scope> = {},
-) =>
+const idee = (q: string, htmx: boolean, libelle = q, themeId = "", scope: Partial<Scope> = {}) =>
   htmx
     ? html`
       <button
@@ -65,7 +57,7 @@ const idee = (
     `
     : html`
       <form method="post" action="/eleve/questions" class="idee-form">
-        ${champsScope({ ...scope, theme_id: themeId || scope.theme_id || "", texte: q, chapitre })}${cleEnvoi()}<button class="idee">${icone(
+        ${champsScope({ ...scope, theme_id: themeId || scope.theme_id || "", texte: q })}${cleEnvoi()}<button class="idee">${icone(
           "arrow-right",
         )}${libelle}</button>
       </form>
@@ -105,13 +97,9 @@ export const accueilEleve = (
                 html`
                 <li class="chapitre">
                   <div class="chapitre-tete">
-                    <h3><a href="${
-                      c.themeId
-                        ? `/eleve/themes/${c.themeId}`
-                        : c.coursId && c.nom
-                          ? `/eleve?cours_id=${c.coursId}`
-                          : lienChapitre(c.nom)
-                    }">${nomChapitre(c.nom || "Autres documents")}</a></h3>
+                    <h3><a href="${lienTheme(c.themeId)}">${nomChapitre(
+                      c.nom || "Autres documents",
+                    )}</a></h3>
                     <span class="discret">${c.sources.length} documents${
                       chapitres.some((autre) => autre.nom === c.nom && autre.coursId !== c.coursId)
                         ? ` / ${c.cours}`
@@ -125,11 +113,9 @@ export const accueilEleve = (
                       (s) =>
                         html`
                         <a class="passe-partout"
-                          href="${
-                            c.themeId
-                              ? `/eleve/themes/${c.themeId}?doc=${s.id}`
-                              : lienChapitre(s.sequence ?? c.nom, s.id)
-                          }"><img src="/media/${s.image_id}" alt="${s.titre}" loading="lazy"></a>
+                          href="${lienTheme(c.themeId, s.id)}"><img src="/media/${
+                            s.image_id
+                          }" alt="${s.titre}" loading="lazy"></a>
                       `,
                     )}</div>
                   ${
@@ -137,17 +123,11 @@ export const accueilEleve = (
                       ? html`
                       <div class="idees">${c.questions
                         .slice(0, 2)
-                        .map((q) => idee(q, false, q, c.themeId ? "" : c.nom, c.themeId))}</div>
+                        .map((q) => idee(q, false, q, c.themeId))}</div>
                     `
                       : ""
                   }
-                  <a class="bouton" href="${
-                    c.themeId
-                      ? `/eleve/themes/${c.themeId}`
-                      : c.coursId && c.nom
-                        ? `/eleve?cours_id=${c.coursId}`
-                        : lienChapitre(c.nom)
-                  }" aria-label="Ouvrir ${nomChapitre(c.nom || "Autres documents")}">${icone(
+                  <a class="bouton" href="${lienTheme(c.themeId)}" aria-label="Ouvrir ${nomChapitre(c.nom || "Autres documents")}">${icone(
                     "arrow-right",
                   )}Ouvrir</a>
                 </li>
@@ -196,6 +176,30 @@ export const accueilEleve = (
     </div>
   `;
 
+/**
+ * La liste des ressources, rangée par cours puis par thème. Les ressources d'un cours sans thème
+ * viennent sous le nom du cours, celles sans cours sous « Autres documents ».
+ */
+export const ressourcesParCours = (chapitres: ChapitreVue[], grille: boolean) =>
+  [...Map.groupBy(chapitres, (ch) => ch.coursId ?? "").values()].map(
+    (groupe) => html`
+      <h2>${groupe[0].cours ?? "Autres documents"}</h2>
+      ${groupe.map(
+        (ch) => html`
+          ${ch.themeId ? html`<h3><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h3>` : ""}
+          <ul class="${grille ? "tuiles" : ""}">${ch.sources.map(
+            (r) =>
+              html`<li><a class="${grille ? "tuile" : ""}" href="/eleve/sources/${r.id}">${
+                grille && r.image_id
+                  ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
+                  : ""
+              }${r.titre}</a></li>`,
+          )}</ul>
+        `,
+      )}
+    `,
+  );
+
 const formRecherche = (q: string, p?: Scope) =>
   html`
     <form method="get" action="/eleve/recherche" class="question-rapide" role="search">
@@ -212,11 +216,12 @@ const formRecherche = (q: string, p?: Scope) =>
 export type Trouve = {
   id: string;
   titre: string;
-  sequence: string;
+  /** le nom du thème */
+  theme: string;
   date: string;
   image_id: string | null;
   profil?: Profil;
-  theme_id?: string;
+  theme_id: string;
   /** début du passage trouvé, sans le titre */
   extrait: string;
 };
@@ -239,11 +244,7 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
           (s) =>
             html`
             <a class="tuile" href="${
-              s.profil === "general"
-                ? `/eleve/sources/${s.id}`
-                : s.theme_id
-                  ? `/eleve/themes/${s.theme_id}?doc=${s.id}`
-                  : lienChapitre(s.sequence, s.id)
+              s.profil === "general" ? `/eleve/sources/${s.id}` : lienTheme(s.theme_id, s.id)
             }">
               <span class="passe-partout">${
                 s.image_id
@@ -252,7 +253,7 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
               }</span>
               <span class="tuile-titre">${s.titre}</span>
               <span class="discret">${[
-                s.profil === "general" ? s.sequence : nomChapitre(s.sequence),
+                s.profil === "general" ? s.theme : nomChapitre(s.theme),
                 s.date,
               ]
                 .filter(Boolean)
@@ -269,10 +270,9 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
     }
   `;
 
-const lienChapitre = (nom: string, doc?: string) =>
-  `${nom ? `/eleve/sequences/${encodeURIComponent(nom)}` : "/eleve/sans-sequence"}${
-    doc ? `?doc=${doc}` : ""
-  }`;
+/** La page d'un thème, ou celle des documents sans thème. */
+const lienTheme = (themeId?: string | null, doc?: string) =>
+  `${themeId ? `/eleve/themes/${themeId}` : "/eleve/sans-sequence"}${doc ? `?doc=${doc}` : ""}`;
 
 /** Ce que le lecteur montre d'un document choisi dans le mur. */
 /** « 2 sur $ »: compteur de diapositive resté dans deux exports HTML, sans valeur pour un élève. */
@@ -286,7 +286,9 @@ export type SourceLue = {
   matiere_id: string | null;
   langue?: string;
   metadonnees?: string;
-  sequence: string;
+  /** le thème dans un cours du lecteur, vide sans thème */
+  theme_id: string;
+  theme: string;
   seance: string;
   date: string;
   /** la révision servie */
@@ -297,7 +299,7 @@ export type SourceLue = {
 const cartel = (
   d: {
     seance: string;
-    chapitre: string;
+    theme: string;
     date: string;
     enseignant: string;
     profil?: Profil;
@@ -323,10 +325,10 @@ const cartel = (
           : ""
       }
       ${
-        d.chapitre
+        d.theme
           ? html`
           <dt>${l.regroupement}</dt>
-          <dd>${d.profil === "general" ? d.chapitre : nomChapitre(d.chapitre)}</dd>
+          <dd>${d.profil === "general" ? d.theme : nomChapitre(d.theme)}</dd>
         `
           : ""
       }
@@ -338,7 +340,9 @@ export type Apercu = {
   id: string;
   titre: string;
   enseignant: string;
-  chapitre: string;
+  profil?: Profil;
+  theme_id: string;
+  theme: string;
   seance: string;
   date: string;
   image_id: string | null;
@@ -384,7 +388,7 @@ export const lecteur = (d: Apercu | undefined, l: Libelles) =>
           <form method="post" action="/eleve/questions">
             ${cleEnvoi()}
             <input type="hidden" name="texte" value="Que dit le cours sur « ${d.titre} » ?">
-            <input type="hidden" name="chapitre" value="${d.chapitre}">
+            <input type="hidden" name="theme_id" value="${d.theme_id}">
             <button>${icone("chat-circle")}Poser une question dessus</button>
           </form>
         </div>
@@ -396,17 +400,17 @@ export const lecteur = (d: Apercu | undefined, l: Libelles) =>
       </aside>
     `;
 
-const tuile = (s: SourceChapitre, nom: string, choisi: boolean, themeId?: string) =>
+const tuile = (s: SourceChapitre, choisi: boolean, themeId?: string) =>
   html`
     <a
       class="tuile"
-      href="${themeId ? `/eleve/themes/${themeId}?doc=${s.id}` : lienChapitre(nom, s.id)}"
+      href="${lienTheme(themeId, s.id)}"
       aria-current="${String(choisi)}"
       hx-get="/eleve/documents/${s.id}/apercu"
       hx-target="#lecteur"
       hx-swap="outerHTML"
       hx-sync="closest .mur-lecteur:replace"
-      hx-push-url="${themeId ? `/eleve/themes/${themeId}?doc=${s.id}` : lienChapitre(nom, s.id)}"
+      hx-push-url="${lienTheme(themeId, s.id)}"
       data-ouvrir-feuille
     >
       <span class="passe-partout">${
@@ -440,14 +444,12 @@ export const pageChapitre = (
           <form method="post" action="/eleve/questions"
         class="question-rapide">${cleEnvoi()}<label for="texte">${surQuoi(nom)}</label><div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><input type="hidden" name="theme_id" value="${
           themeId ?? ""
-        }"><input type="hidden" name="chapitre" value="${
-          themeId ? "" : nom
         }"><button>Demander</button></div>${quiLit}</form>
           <ul>${sources.map(
             (s) => html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`,
           )}</ul>${
             questions.length
-              ? html`<div class="idees">${questions.map((q) => idee(q, false, q, "", themeId))}</div>`
+              ? html`<div class="idees">${questions.map((q) => idee(q, false, q, themeId))}</div>`
               : ""
           }
     `;
@@ -468,11 +470,7 @@ export const pageChapitre = (
       <div class="saisie">
         <input type="text" id="texte" name="texte" required maxlength="1000"
           placeholder="Pose ta question">
-        ${
-          themeId
-            ? html`<input type="hidden" name="theme_id" value="${themeId}">`
-            : html`<input type="hidden" name="chapitre" value="${nom}">`
-        }
+        <input type="hidden" name="theme_id" value="${themeId ?? ""}">
         <button class="principal">${icone("arrow-up")}Demander</button>
       </div>
       ${quiLit}
@@ -481,7 +479,7 @@ export const pageChapitre = (
       questions.length
         ? html`<div class="idees">${questions
             .slice(0, 3)
-            .map((q) => idee(q, false, q, themeId ? "" : nom, themeId))}</div>`
+            .map((q) => idee(q, false, q, themeId))}</div>`
         : ""
     }
         ${[...seances].map(
@@ -491,9 +489,7 @@ export const pageChapitre = (
               <h2 id="seance-${docs[0].id}">${seance} <span class="discret">${
                 docs.length
               }</span></h2>
-              <div class="tuiles">${docs.map((s) =>
-                tuile(s, nom, s.id === choisi?.id, themeId),
-              )}</div>
+              <div class="tuiles">${docs.map((s) => tuile(s, s.id === choisi?.id, themeId))}</div>
             </section>
           `,
         )}
@@ -532,10 +528,10 @@ export const lectureSource = (
 ) =>
   html`
     <a class="bouton retour" href="${
-      s.profil === "general" ? "/eleve" : lienChapitre(s.sequence, s.id)
+      s.profil === "general" ? "/eleve" : lienTheme(s.theme_id, s.id)
     }">${icone(
       "arrow-left",
-    )}${s.profil === "general" ? "Ressources" : nomChapitre(s.sequence || "Autres documents")}</a>
+    )}${s.profil === "general" ? "Ressources" : nomChapitre(s.theme || "Autres documents")}</a>
     <article class="document">
       <h1>${s.titre}</h1>
       ${
@@ -565,11 +561,11 @@ export const lectureSource = (
           : ""
       }
       <div class="document-tete">
-        ${cartel({ ...s, chapitre: s.sequence }, l)}
+        ${cartel(s, l)}
         <form method="post" action="/eleve/questions">
           ${cleEnvoi()}
           <input type="hidden" name="texte" value="Que dit le cours sur « ${s.titre} » ?">
-          <input type="hidden" name="chapitre" value="${s.sequence}">
+          <input type="hidden" name="theme_id" value="${s.theme_id}">
           <button>${icone("chat-circle")}Poser une question dessus</button>
         </form>
       </div>
@@ -888,14 +884,12 @@ export type MessageVue = {
   perimetre?: string;
 };
 
-export type Perimetre = Scope & { chapitre: string };
-
 const LISTE = new Intl.ListFormat("fr");
 /**
  * « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. Une
  * comparaison nomme ses matières : « Histoire de l'art et Physique ».
  */
-export const nomPerimetre = (cat: Catalogue, p: Perimetre, theme = "Thème") => {
+export const nomPerimetre = (cat: Catalogue, p: Scope, theme = "Thème") => {
   if (p.matieres) {
     return LISTE.format(
       idsMatieres(p.matieres)
@@ -910,7 +904,6 @@ export const nomPerimetre = (cat: Catalogue, p: Perimetre, theme = "Thème") => 
     m?.nom ?? (p.matiere_id ? "Matière indisponible" : ""),
     c?.nom ?? (p.cours_id ? "Cours indisponible" : ""),
     t?.nom ?? (p.theme_id ? `${theme} indisponible` : ""),
-    nomChapitre(p.chapitre),
   ]
     .filter(Boolean)
     .join(" / ");
@@ -1022,7 +1015,7 @@ export type Fil = {
   liste: ConversationVue[];
   archivees: number;
   suite: string;
-  perimetre: Perimetre;
+  perimetre: Scope;
   catalogue: Catalogue;
   theme: string;
   indisponible: boolean;
@@ -1195,7 +1188,7 @@ export const chat = (f: Fil) => {
               ${
                 !conv && f.idees.length
                   ? html`<div class="idees">${f.idees.map((q) =>
-                      idee(q, false, q, f.perimetre.chapitre, "", f.perimetre),
+                      idee(q, false, q, "", f.perimetre),
                     )}</div>`
                   : ""
               }

@@ -66,7 +66,7 @@ import {
 } from "./ingestion.ts";
 import { ARRETEE, attendreChangement, boucleReponses, memePerimetre } from "./reponses.ts";
 import { questionsProches } from "../core/suggestions.ts";
-import { faitAuHasard, suggestionsDuPerimetre, suggestionsParChapitre } from "./suggestions.ts";
+import { faitAuHasard, suggestionsDuPerimetre } from "./suggestions.ts";
 import {
   administration,
   connexion as formulaireConnexion,
@@ -86,6 +86,9 @@ const SESSION_MS = 12 * 3600_000;
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
 const QUIZ = `CASE WHEN s.profil = 'arts-appliques' THEN trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
   coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') ELSE '' END AS quiz_reponse`;
+/** Le nom du thème d'une source, le premier par ordre alphabétique si elle en a plusieurs. */
+const nomTheme = (s: string) =>
+  `(SELECT min(t.nom) FROM source_cours sc JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = ${s}.id)`;
 
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
@@ -317,8 +320,16 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     return c.redirect("/eleve", 303);
   });
 
+  /** Une page ou un lien d'avant les thèmes nomme encore un chapitre : son thème le remplace. */
+  const scopeChapitre = (c: Context<Env>, champs: Record<string, unknown>) => {
+    const p = Domaines.lireScope(champs);
+    if (champs.chapitre && !p.theme_id) {
+      p.theme_id = Domaines.themeDuChapitre(db, String(champs.chapitre), c.get("compte").id);
+    }
+    return p;
+  };
   const scope = (c: Context<Env>) =>
-    Domaines.lireScope({ ...c.req.query(), matieres: c.req.queries("matieres") });
+    scopeChapitre(c, { ...c.req.query(), matieres: c.req.queries("matieres") });
   const idsScope = (c: Context<Env>) => Domaines.sourcesPerimetre(db, scope(c));
   const optionsDepot = (
     c: Context<Env>,
@@ -483,10 +494,10 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
 
   // ------------------------------------------------------------ enseignant
-  const lignes = (c: Context<Env>, statut: string, sequence: string) =>
+  const lignes = (c: Context<Env>, statut: string, theme: string) =>
     db
       .prepare(
-        `SELECT s.id, s.titre, s.profil, json_extract(s.metadonnees, '$.sequence') AS sequence, s.format, s.statut,
+        `SELECT s.id, s.titre, s.profil, ${nomTheme("s")} AS theme, s.format, s.statut,
          s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
@@ -496,8 +507,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE s.school_id = ? AND ${FILTRE_ACCES} AND (? = '' OR s.statut = ?)
-         AND (? = '' OR sequence = ?) AND (? = '' OR s.lot_id = ?)
-       ORDER BY sequence, s.titre`,
+         AND (? = '' OR theme = ?) AND (? = '' OR s.lot_id = ?)
+       ORDER BY theme, s.titre`,
       )
       .all(
         ...parametresModification(c.get("compte")),
@@ -505,14 +516,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         ...parametresAcces(lu(c)),
         statut,
         statut,
-        sequence,
-        sequence,
+        theme,
+        theme,
         c.req.query("lot") ?? "",
         c.req.query("lot") ?? "",
       ) as unknown as Prof.LigneSource[];
   const filtres = (c: Context<Env>) => ({
     statut: c.req.query("statut") ?? "",
-    sequence: c.req.query("sequence") ?? "",
+    theme: c.req.query("theme") ?? "",
     lot: c.req.query("lot") ?? "",
     vue: c.req.query("vue") === "grille" ? "grille" : "",
     ...Domaines.lireScope(c.req.query()),
@@ -525,9 +536,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     // Une nouvelle version à relire compte avec les sources à relire.
     const statut = (s: Prof.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
     const repartition = [
-      ...Map.groupBy(ressources, (s) => `${s.sequence ?? ""}\0${statut(s)}`).values(),
+      ...Map.groupBy(ressources, (s) => `${s.theme ?? ""}\0${statut(s)}`).values(),
     ].map((liste) => ({
-      sequence: liste[0].sequence ?? "",
+      theme: liste[0].theme ?? "",
       statut: statut(liste[0]),
       n: liste.length,
     }));
@@ -544,8 +555,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           libelles(db).regroupement,
         )}${Prof.sources(
           ressources.filter(
-            (s) =>
-              (!f.statut || statut(s) === f.statut) && (!f.sequence || s.sequence === f.sequence),
+            (s) => (!f.statut || statut(s) === f.statut) && (!f.theme || s.theme === f.theme),
           ),
           f,
           repartition,
@@ -721,12 +731,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       .prepare(
         `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
          json_extract(m.resultat, '$.code') AS code,
-         coalesce(
-           CASE WHEN EXISTS (SELECT 1 FROM sources s3
-             WHERE json_extract(s3.metadonnees, '$.sequence') = m.chapitre AND ${filtreAcces("s3")})
-           THEN nullif(m.chapitre, '') END,
-           json_extract(s.metadonnees, '$.sequence'),
-           json_extract(s2.metadonnees, '$.sequence'), '') AS chapitre
+         coalesce((SELECT nom FROM themes WHERE id = m.theme_id), ${nomTheme("s")},
+           ${nomTheme("s2")}, '') AS chapitre
        FROM messages m JOIN comptes c ON c.id = m.compte_id
        LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
          AND ${FILTRE_ACCES}
@@ -750,7 +756,6 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       .all(
         ...parametresAcces(l),
         ...parametresAcces(l),
-        ...parametresAcces(l),
         l.administrateur ? 1 : 0,
         l.id,
         l.id,
@@ -765,7 +770,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const selection = idsScope(c);
     return c.html(
       Prof.lignesSources(
-        lignes(c, f.statut, f.sequence).filter((s) => selection.has(s.id)),
+        lignes(c, f.statut, f.theme).filter((s) => selection.has(s.id)),
         new URLSearchParams(f).toString(),
         f.vue === "grille",
       ),
@@ -1003,19 +1008,17 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     const b = await c.req.parseBody({ all: true });
     const titre = String(b.titre ?? "").trim();
-    const sequence = String(b.sequence ?? "").trim();
     const date = String(b.date ?? "").trim();
     const artiste = String(b.artiste ?? "").trim();
     const mouvement = String(b.mouvement ?? "").trim();
     if (
       !titre ||
       titre.length > 200 ||
-      sequence.length > 120 ||
       date.length > 40 ||
       artiste.length > 120 ||
       mouvement.length > 120
     ) {
-      return c.text("Titre ou séquence invalide.", 400);
+      return c.text("Titre ou champ invalide.", 400);
     }
     // Enregistrer valide ce que Thot proposait: la proposition n'a plus d'objet.
     let informations: Record<string, string>;
@@ -1032,7 +1035,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     } catch (e) {
       return c.text((e as Error).message, 400);
     }
-    const meta: Record<string, unknown> = { ...d.meta, ...informations, titre, sequence, langue };
+    // Une ancienne séquence reste dans les métadonnées : le formulaire ne la montre plus.
+    const meta: Record<string, unknown> = { ...d.meta, ...informations, titre, langue };
     delete meta.propositions;
     delete meta.quiz_reponse;
     try {
@@ -1042,15 +1046,6 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             db,
             d.source.id,
             Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b), d.source.id),
-          );
-        } else if (sequence !== d.meta.sequence) {
-          Domaines.rangerLegacy(
-            db,
-            d.source.id,
-            db.prepare("SELECT matiere_id FROM sources WHERE id = ?").get(d.source.id)!
-              .matiere_id as string | null,
-            sequence,
-            c.get("compte"),
           );
         }
         db.prepare(
@@ -1132,7 +1127,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const i = db
       .prepare(
         `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
-       ORDER BY (i.id = ?) DESC, json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 1`,
+       ORDER BY (i.id = ?) DESC, ${nomTheme("s")}, s.titre, i.position LIMIT 1`,
       )
       .get(...file(c), imageId ?? "") as Prof.ALegender | undefined;
     return i && { ...i, restantes };
@@ -1142,7 +1137,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     db
       .prepare(
         `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
-       ORDER BY json_extract(s.metadonnees, '$.sequence'), s.titre, i.position LIMIT 12`,
+       ORDER BY ${nomTheme("s")}, s.titre, i.position LIMIT 12`,
       )
       .all(...file(c)) as { id: string; titre: string }[];
   app.get("/prof/legendes", (c) =>
@@ -1169,27 +1164,35 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
 
   // ------------------------------------------------------------ élève
-  type Perimetre = Eleve.Perimetre;
+  type Perimetre = Domaines.Scope;
+  // Le thème `t` d'une source `s`, pris dans un cours du lecteur : il ouvre la page et le
+  // périmètre de ce thème. Paramètres : `Domaines.mesCours()`.
+  const THEME_LU = `LEFT JOIN themes t ON t.id = (SELECT sc.theme_id FROM source_cours sc
+    WHERE sc.source_id = s.id AND sc.theme_id IS NOT NULL AND ${Domaines.MES_COURS}
+    ORDER BY sc.theme_id LIMIT 1)`;
   const sourceCertifiee = (id: string, l: Lecteur) =>
     db
       .prepare(
-        `SELECT id, titre, enseignant, profil, matiere_id, langue, metadonnees, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
-         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
-         coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
+        `SELECT s.id, s.titre, s.enseignant, s.profil, s.matiere_id, s.langue, s.metadonnees, s.revision,
+         coalesce(t.id, '') AS theme_id, coalesce(t.nom, '') AS theme,
+         coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
+         coalesce(json_extract(s.metadonnees, '$.date'), '') AS date
+       FROM sources s ${THEME_LU}
+       WHERE s.id = ? AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
       )
-      .get(id, instance.school_id, ...parametresAcces(l)) as Eleve.SourceLue | undefined;
+      .get(...Domaines.mesCours(l), id, instance.school_id, ...parametresAcces(l)) as
+      | Eleve.SourceLue
+      | undefined;
 
   app.get("/eleve", (c) => {
     const rangs = db
       .prepare(
-        `SELECT id, titre, profil, coalesce(json_extract(metadonnees, '$.sequence'), '') AS sequence,
-         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
+        `SELECT id, titre, profil, coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}
-       ORDER BY sequence, seance, titre`,
+       ORDER BY seance, titre`,
       )
       .all(instance.school_id, ...parametresAcces(lu(c))) as Eleve.SourceChapitre[];
     const selection = idsScope(c);
@@ -1207,7 +1210,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       for (const lien of liens.length ? liens : [undefined]) {
         const themeId = lien?.theme_id as string | undefined;
         const coursId = lien?.cours_id as string | undefined;
-        const nom = (lien?.theme ?? r.sequence ?? "") as string;
+        const nom = (lien?.theme ?? "") as string;
         let ch = chapitres.find(
           (ch) => ch.themeId === themeId && ch.coursId === coursId && ch.nom === nom,
         );
@@ -1225,16 +1228,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         ch.sources.push(r);
       }
     }
-    for (const ch of chapitres) {
-      const ids = Domaines.sourcesPerimetre(db, {
-        matiere_id: "",
-        cours_id: ch.coursId ?? "",
-        theme_id: ch.themeId ?? "",
-      });
-      ch.questions = ch.coursId
-        ? suggestionsDuPerimetre(db, lu(c), ids)
-        : (suggestionsParChapitre(db, lu(c)).get(ch.nom) ?? []);
-    }
+    // Par cours, les sources hors cours en dernier. Dans un cours, celles sans thème d'abord.
+    chapitres.sort(
+      (a, b) =>
+        Number(!a.cours) - Number(!b.cours) ||
+        (a.cours ?? "").localeCompare(b.cours ?? "", "fr") ||
+        (a.coursId ?? "").localeCompare(b.coursId ?? "") ||
+        a.nom.localeCompare(b.nom, "fr", { numeric: true }),
+    );
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db, lu(c));
     const filtresDomaines = DomaineVue.filtre(
@@ -1260,19 +1261,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
           </form>
-          <ul class="${c.req.query("vue") === "grille" ? "tuiles" : ""}">${visibles.map(
-            (r) =>
-              html`<li><a class="${
-                c.req.query("vue") === "grille" ? "tuile" : ""
-              }" href="/eleve/sources/${r.id}">${
-                c.req.query("vue") === "grille" && r.image_id
-                  ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
-                  : ""
-              }${r.titre}</a></li>`,
-          )}</ul>
+          ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille")}
           ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}`,
         ),
       );
+    }
+    for (const ch of chapitres) {
+      ch.questions = suggestionsDuPerimetre(db, lu(c), new Set(ch.sources.map((s) => s.id)));
     }
     // Une vignette de vidéo n'est pas une œuvre: elle reste dans son chapitre, pas dans « Le saviez-vous ».
     const oeuvres = visibles.filter(
@@ -1301,12 +1296,23 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     );
   });
 
-  app.on("GET", ["/eleve/sans-sequence", "/eleve/sequences/:nom", "/eleve/themes/:theme"], (c) => {
-    const themeId = c.req.param("theme");
+  // Un lien partagé avant les thèmes nomme une séquence : il mène au thème de ses sources.
+  app.get("/eleve/sequences/:nom", (c) => {
+    const id = Domaines.themeDuChapitre(db, c.req.param("nom"), c.get("compte").id);
+    const doc = c.req.query("doc");
+    return c.redirect(
+      `${id ? `/eleve/themes/${id}` : "/eleve/sans-sequence"}${
+        doc ? `?doc=${encodeURIComponent(doc)}` : ""
+      }`,
+    );
+  });
+  // Sans thème : les sources qui n'ont de thème dans aucun cours du lecteur.
+  app.on("GET", ["/eleve/sans-sequence", "/eleve/themes/:theme"], (c) => {
+    const themeId = c.req.param("theme") ?? "";
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = themeId ? cat.themes.find((t) => t.id === themeId) : undefined;
     if (themeId && !theme) return c.notFound();
-    const nom = theme?.nom ?? c.req.param("nom") ?? "";
+    const nom = theme?.nom ?? "";
     const cours = cat.cours.find((c) => c.id === theme?.cours_id);
     const matiere = cat.matieres.find((m) => m.id === cours?.matiere_id);
     const sources = db
@@ -1316,17 +1322,17 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES}
-         AND (? OR coalesce(json_extract(s.metadonnees, '$.sequence'), '') = ?)
-         AND (? = '' OR EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = s.id AND sc.theme_id = ?))
+         AND CASE WHEN ? = '' THEN NOT EXISTS (SELECT 1 FROM source_cours sc
+             WHERE sc.source_id = s.id AND sc.theme_id IS NOT NULL AND ${Domaines.MES_COURS})
+           ELSE EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = s.id AND sc.theme_id = ?) END
        ORDER BY seance = '', seance, s.titre`,
       )
       .all(
         instance.school_id,
         ...parametresAcces(lu(c)),
-        themeId ? 1 : 0,
-        nom,
-        themeId ?? "",
-        themeId ?? "",
+        themeId,
+        ...Domaines.mesCours(lu(c)),
+        themeId,
       ) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
@@ -1341,13 +1347,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         Eleve.pageChapitre(
           nom,
           sources,
-          themeId
-            ? suggestionsDuPerimetre(
-                db,
-                lu(c),
-                Domaines.sourcesPerimetre(db, { matiere_id: "", cours_id: "", theme_id: themeId }),
-              )
-            : (suggestionsParChapitre(db, lu(c)).get(nom) ?? []),
+          suggestionsDuPerimetre(db, lu(c), new Set(sources.map((s) => s.id))),
           apercu(doc.id, lu(c)),
           themeId,
           theme ? `${matiere?.nom} / ${cours?.nom} / ${nom}` : "",
@@ -1359,18 +1359,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
 
   const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
-    const s = db
-      .prepare(
-        `SELECT id, titre, enseignant, revision, coalesce(json_extract(metadonnees, '$.sequence'), '') AS chapitre,
-         coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
-         coalesce(json_extract(metadonnees, '$.date'), '') AS date
-       FROM sources s WHERE id = ? AND statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
-      )
-      .get(id, instance.school_id, ...parametresAcces(l)) as
-      | (Omit<Eleve.Apercu, "image_id" | "legende" | "credit" | "images" | "extrait"> & {
-          revision: number;
-        })
-      | undefined;
+    const s = sourceCertifiee(id, l);
     if (!s) return undefined;
     const images = db
       .prepare(
@@ -1476,13 +1465,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const sources = new Map(
       db
         .prepare(
-          `SELECT s.id, s.titre, s.profil, (SELECT theme_id FROM source_cours WHERE source_id = s.id AND theme_id IS NOT NULL LIMIT 1) AS theme_id, coalesce(json_extract(s.metadonnees, '$.sequence'), '') AS sequence,
+          `SELECT s.id, s.titre, s.profil, coalesce(t.id, '') AS theme_id, coalesce(t.nom, '') AS theme,
            coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
            (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-         FROM sources s WHERE s.id IN (${ids.map(() => "?").join(",")})
+         FROM sources s ${THEME_LU} WHERE s.id IN (${ids.map(() => "?").join(",")})
            AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
         )
-        .all(...ids, instance.school_id, ...parametresAcces(lu(c)))
+        .all(...Domaines.mesCours(lu(c)), ...ids, instance.school_id, ...parametresAcces(lu(c)))
         .map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
     );
     const trouves = ids
@@ -1530,7 +1519,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
     const lignes = db
       .prepare(
-        `SELECT id, question, etat, etape, resultat, avis, chapitre, matiere_id, cours_id, theme_id, matieres
+        `SELECT id, question, etat, etape, resultat, avis, matiere_id, cours_id, theme_id, matieres
          FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
       )
       .all(conversationId, compte.id) as (Eleve.MessageVue & Perimetre)[];
@@ -1557,15 +1546,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const cadre = m && Object.values(m).some(Boolean);
     // Après un refus, seules les questions proches du sens de la question, dans le cadre posé.
     if (r.etat === "out_of_corpus") {
-      const candidates = cadre
-        ? suggestionsDuPerimetre(
-            db,
-            l,
-            Domaines.sourcesPerimetre(db, Domaines.lireScope(m)),
-            question,
-            Infinity,
-          )
-        : [...suggestionsParChapitre(db, l, Infinity).values()].flat();
+      const candidates = suggestionsDuPerimetre(
+        db,
+        l,
+        Domaines.sourcesPerimetre(db, Domaines.lireScope(m ?? {})),
+        question,
+        Infinity,
+      );
       const connues = proches.get(messageId);
       // Un droit retiré depuis retire aussi la question.
       if (connues) return connues.filter((q) => candidates.includes(q));
@@ -1584,6 +1571,18 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         question,
       );
     }
+    // Sans périmètre : les questions du thème d'une source, dans un cours du lecteur.
+    const duTheme = (sourceId: unknown) => {
+      const theme = sourceId ? sourceCertifiee(String(sourceId), l)?.theme_id : "";
+      return theme
+        ? suggestionsDuPerimetre(
+            db,
+            l,
+            Domaines.sourcesPerimetre(db, { matiere_id: "", cours_id: "", theme_id: theme }),
+            question,
+          )
+        : [];
+    };
     if (r.etat !== "answered") return [];
     const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
     if (!ids.length) return [];
@@ -1597,15 +1596,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       )
       .all(...ids, instance.school_id, question, ...parametresAcces(l))
       .map((x) => x.question as string);
-    if (memesSources.length) return memesSources;
-    const chapitre = db
-      .prepare(
-        "SELECT json_extract(metadonnees, '$.sequence') AS nom FROM sources WHERE id = ? AND school_id = ?",
-      )
-      .get(ids[0], instance.school_id)?.nom as string | undefined;
-    return chapitre
-      ? (suggestionsParChapitre(db, l).get(chapitre) ?? []).filter((q) => q !== question)
-      : [];
+    return memesSources.length ? memesSources : duTheme(ids[0]);
   };
 
   // ------------------------------------------------------------ conversations
@@ -1626,8 +1617,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   const libelleTheme = () => libelles(db).regroupement;
 
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
-  const perimetreRefuse = (c: Context<Env>, { chapitre, ...reste }: Perimetre) => {
-    const p = Domaines.lireScope(reste);
+  const perimetreRefuse = (c: Context<Env>, perimetre: Perimetre) => {
+    const p = Domaines.lireScope(perimetre);
     const comparees = Domaines.idsMatieres(p.matieres);
     if (comparees.length > MAX_MATIERES) return `Compare ${MAX_MATIERES} matières au plus.`;
     if (Object.values(p).some(Boolean)) {
@@ -1656,17 +1647,6 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       )
         return "Périmètre indisponible.";
     }
-    if (
-      chapitre &&
-      !db
-        .prepare(
-          `SELECT id FROM sources s WHERE school_id = ? AND statut = 'certifiee'
-           AND json_extract(metadonnees, '$.sequence') = ? AND ${FILTRE_ACCES}
-         LIMIT 1`,
-        )
-        .get(instance.school_id, chapitre, ...parametresAcces(lu(c)))
-    )
-      return "Séquence indisponible.";
   };
 
   // L'état du dernier échange, et une réponse terminée que l'élève n'a pas encore ouverte.
@@ -1677,7 +1657,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const theme = libelleTheme();
     const lignes = db
       .prepare(
-        `SELECT id, titre, chapitre, matiere_id, cours_id, theme_id, matieres, active_le, ${ETAT_CONVERSATION}
+        `SELECT id, titre, matiere_id, cours_id, theme_id, matieres, active_le, ${ETAT_CONVERSATION}
          FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
          ORDER BY active_le DESC, rowid DESC LIMIT ?`,
       )
@@ -1706,14 +1686,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
     const p: Perimetre = conv ??
       (Object.hasOwn(c.req.query(), "matiere_id") || Object.hasOwn(c.req.query(), "matieres")
-        ? { ...scope(c), chapitre: "" }
+        ? scope(c)
         : (db
             .prepare(
-              `SELECT chapitre, matiere_id, cours_id, theme_id, matieres FROM conversations
+              `SELECT matiere_id, cours_id, theme_id, matieres FROM conversations
                WHERE compte_id = ? ORDER BY active_le DESC, rowid DESC LIMIT 1`,
             )
             .get(compte.id) as Perimetre | undefined)) ?? {
-        chapitre: "",
         matiere_id: "",
         cours_id: "",
         theme_id: "",
@@ -1744,7 +1723,6 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           archivees: nombreArchivees(c),
           suite: plus ? "/eleve/conversations?toutes=1" : "",
           perimetre: {
-            chapitre: p.chapitre,
             matiere_id: p.matiere_id,
             cours_id: p.cours_id,
             theme_id: p.theme_id,
@@ -1836,11 +1814,11 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     if (!Object.hasOwn(b, "matiere_id") && !Object.hasOwn(b, "matieres")) {
       return c.text("Coche les matières à comparer.", 400);
     }
-    const p = { ...Domaines.lireScope(b), chapitre: "" };
+    const p = Domaines.lireScope(b);
     const refus = perimetreRefuse(c, p);
     if (refus) return c.text(refus, 400);
     db.prepare(
-      "UPDATE conversations SET chapitre = '', matiere_id = ?, cours_id = ?, theme_id = ?, matieres = ? WHERE id = ?",
+      "UPDATE conversations SET matiere_id = ?, cours_id = ?, theme_id = ?, matieres = ? WHERE id = ?",
     ).run(p.matiere_id, p.cours_id, p.theme_id, p.matieres ?? "", conv.id);
     return c.redirect(`/eleve/chat/${conv.id}`, 303);
   });
@@ -1889,7 +1867,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         return c.text("Une réponse est déjà en cours dans cette conversation.", 409);
       }
     }
-    const p: Perimetre = conv ?? { ...Domaines.lireScope(b), chapitre: String(b.chapitre ?? "") };
+    const p: Perimetre = conv ?? scopeChapitre(c, b);
+    // Un chapitre qu'aucun thème ne remplace n'élargit pas la question à toutes les ressources.
+    if (!conv && b.chapitre && !p.theme_id) return c.text("Périmètre indisponible.", 400);
     const refus = perimetreRefuse(c, p);
     if (refus) return c.text(refus, 400);
     const id = crypto.randomUUID();
@@ -1909,13 +1889,12 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
                 .slice(0, 80)
             : ligne;
         db.prepare(
-          `INSERT INTO conversations (id, compte_id, titre, chapitre, matiere_id, cours_id, theme_id,
-           matieres, active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO conversations (id, compte_id, titre, matiere_id, cours_id, theme_id,
+           matieres, active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(
           conversationId,
           compte.id,
           titre,
-          p.chapitre,
           p.matiere_id,
           p.cours_id,
           p.theme_id,
@@ -1926,10 +1905,10 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       }
       // Le journal garde l'heure de la demande : la boucle en tire le temps d'attente.
       db.prepare(
-        `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question, chapitre,
+        `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question,
          matiere_id, cours_id, theme_id, matieres, etat, journal, cree_le, maj_le)
          VALUES (?, ?, ?, (SELECT coalesce(max(rang), 0) + 1 FROM messages WHERE conversation_id = ?),
-         ?, ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
+         ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
       ).run(
         id,
         compte.id,
@@ -1937,7 +1916,6 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         conversationId,
         cle,
         texte,
-        p.chapitre,
         p.matiere_id,
         p.cours_id,
         p.theme_id,

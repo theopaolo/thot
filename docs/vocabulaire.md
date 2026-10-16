@@ -127,10 +127,11 @@ crée son compte ou se connecte au sien. Le lien expire à une date choisie, com
 enseignant de ses cours peut le révoquer.
 
 **Thème**
-Regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours différents
-restent distincts. L'administration les nomme « thèmes ». Les autres pages emploient le terme de
+Seul regroupement de ressources dans un cours. Deux thèmes portant le même nom dans des cours
+différents restent distincts. Toutes les pages, administration comprise, emploient le terme de
 regroupement de l'instance : « Thème » par défaut, « Séquence » pour le profil arts, ou le terme
-choisi par un administrateur, comme « Module ».
+choisi par un administrateur, comme « Module ». Le dépôt range une ressource sans thème
+« Directement dans le cours ».
 
 **Niveau**
 Public d'un cours ou d'une ressource : « Niveau » par défaut, « Classe » pour le profil arts, ou
@@ -196,7 +197,7 @@ n'est déposé et le lien mène à cette ressource. « Erreur » : le fichier es
 pourquoi et « Réessayer » le renvoie seul.
 
 **Formulaire de dépôt**
-Interface proposée à l'enseignant lors du dépôt d'un document dans la bibliothèque. Il pose une série de questions structurées (discipline, niveau, type, notion centrale, séquence de rattachement) et c'est ce formulaire, une fois rempli, qui indique à Thot comment indexer et ranger le document. La qualité du référencement dépend directement du soin apporté à ce formulaire.
+Interface proposée à l'enseignant lors du dépôt d'un document dans la bibliothèque. Il pose une série de questions structurées (discipline, niveau, type, notion centrale, cours et thème de rattachement) et c'est ce formulaire, une fois rempli, qui indique à Thot comment indexer et ranger le document. La qualité du référencement dépend directement du soin apporté à ce formulaire.
 
 **État de l'art**
 Dans le contexte du mémoire DNMADE : revue des travaux, références et ressources existants sur un sujet de recherche, constituant le socle bibliographique du mémoire. Dans Thot, l'état de l'art peut être constitué collaborativement entre l'enseignant et l'étudiant, à partir du corpus certifié par l'équipe.

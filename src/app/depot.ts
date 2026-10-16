@@ -10,6 +10,7 @@ import {
   champsMatiere,
   domaineSource,
   rangerLegacy,
+  themeNomme,
 } from "./domaines.ts";
 import { CHAMPS, validerInformations } from "../core/profils.ts";
 
@@ -245,8 +246,17 @@ export async function deposer(
         d.cle ?? null,
         source_id,
       );
-      if (d.liens !== undefined) affiliations(db, source_id, d.liens);
-      else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence, d.par);
+      // Un cours sans thème choisi prend le thème du nom de la séquence, celle de l'import CLI.
+      if (d.liens !== undefined) {
+        affiliations(
+          db,
+          source_id,
+          d.liens.map((l) => ({
+            ...l,
+            theme_id: l.theme_id ?? themeNomme(db, l.cours_id, d.meta.sequence),
+          })),
+        );
+      } else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence, d.par);
       db.prepare(
         "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
       ).run(job_id, source_id, t, t);

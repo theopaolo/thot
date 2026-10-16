@@ -117,6 +117,14 @@ matière, un cours ou un thème ne se supprime que si ni une ressource ni une qu
 l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
 
+Le thème est le seul regroupement des ressources. Le dépôt choisit un thème pour chaque cours
+coché. Les formulaires n'ont pas de champ libre « séquence ». La séquence reste lisible dans les
+métadonnées des anciennes sources, et l'import CLI la remplit avec le nom du dossier. Elle range
+la source dans le thème de même nom du cours, créé s'il manque. Le périmètre d'une question est
+un thème, pas une séquence. Une adresse ou une page d'avant les thèmes qui nomme une séquence
+mène au thème où sont rangées le plus de sources de cette séquence, dans un cours du compte
+d'abord. Une question posée dans une séquence qu'aucun thème ne remplace est refusée.
+
 Rattacher une source à plusieurs cours ne copie ni son original ni ses informations relues.
 Son propriétaire, sa certification et ses lecteurs restent ceux de la source. Un rattachement
 ouvre la source aux membres du cours, dans la limite de ses lecteurs. Un enseignant ne rattache
@@ -142,7 +150,7 @@ en code, avec sa propre évaluation.
 Les termes de niveau et de regroupement appartiennent à l'instance, pas à la matière : l'accueil
 de l'élève et la bibliothèque montrent plusieurs matières sur une page. Un terme se règle au
 singulier et au pluriel, sans genre. L'interface ne l'accorde donc avec aucun article ni
-adjectif.
+adjectif. Le terme de regroupement nomme les thèmes partout, administration comprise.
 
 Les champs du dépôt appartiennent à chaque matière. Une matière coche des champs prédéfinis et
 des champs personnalisés de l'instance, de type texte, date ou mots-clés. La valeur d'un champ
@@ -344,7 +352,7 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-  Q[Question] --> F[FTS5 racinisé, top 20<br/>filtré par établissement, chapitre et public]
+  Q[Question] --> F[FTS5 racinisé, top 20<br/>filtré par établissement, périmètre et public]
   F -- aucun résultat --> HC[out_of_corpus]
   F --> RR[Reclasseur]
   RR -- score sous le seuil --> HC
