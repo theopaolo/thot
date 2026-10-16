@@ -19,7 +19,7 @@
   { "qid": "P11", "type": "paraphrase", "q": "décrire une règle du métier dans un texte que le client lit et que la machine exécute", "gold": ["documentation/09-documentation-vivante.md#Formuler un scénario lisible", "documentation/09-documentation-vivante.md#Relier le texte au logiciel"] },
   { "qid": "P12", "type": "paraphrase", "q": "deux solutions ont presque le même score, comment trancher", "gold": ["architecture-logicielle/04-criteres.md#Éliminer les options incompatibles puis comparer"] },
 
-  { "qid": "C01", "type": "code", "q": "RUN npm ci --omit=dev COPY --from=build /app/dist", "gold": ["docker/01-dockerfile-multi-stage.md#Stage production"] },
+  { "qid": "C01", "type": "code", "q": "RUN npm ci --omit=dev COPY --from=build /app/dist", "gold": ["docker/01-dockerfile-multi-stage.md#Stage production"] },
   { "qid": "C02", "type": "code", "q": "pg_isready -U POSTGRES_USER interval timeout retries", "gold": ["docker/index.md#Healthchecks", "docker/03-cheat-sheet.md#Avec healthcheck"] },
   { "qid": "C03", "type": "code", "q": "x-api: &api <<: *api command migrate", "gold": ["docker/03-cheat-sheet.md#Extensions / anchors Compose"] },
   { "qid": "C04", "type": "code", "q": "assert.throws decrire voler TypeError", "gold": ["poo-patterns-frameworks/01-fondations.md#Duck typing et typage structurel"] },

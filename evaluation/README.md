@@ -53,7 +53,7 @@ rapports y sont.
 `--requetes=<fichier>` remplace le jeu du pilote dans les deux commandes `thot eval`. Une cible
 nomme une source par `<dossier du cours>/<fichier>`, par exemple
 `docker/index.md`, car plusieurs cours ont un `index.md`. `#<section>` exige en plus le titre
-d'une section, tel que l'extraction l'écrit, espaces insécables compris. Une requête réussit si
+d'une section, tel que l'extraction l'écrit. Une requête réussit si
 une cible figure parmi les cinq premiers passages. Une requête sans cible est un piège : elle
 sort des taux et le rapport compte les pièges qui reçoivent encore un résultat
 (`hors_corpus.avec_resultat`). Le rapport prend le nom du dossier du jeu en suffixe

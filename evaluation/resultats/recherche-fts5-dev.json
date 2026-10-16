@@ -1,5 +1,5 @@
 {
- "date": "2026-10-16T17:16:55.536Z",
+ "date": "2026-10-16T17:19:51.172Z",
  "moteur": "fts5",
  "tous": {
   "n": 36,
@@ -48,11 +48,11 @@
    "rang": 1,
    "cibles": 2,
    "trouves": [
-    "Dockerfile multi-stage : Stage build",
-    "Dockerfile multi-stage : Stage production",
+    "Dockerfile multi-stage : Stage build",
+    "Dockerfile multi-stage : Stage production",
     "Docker Cheat-Sheet : Multi-stage Dockerfile",
     "Dockerfile multi-stage : Exemple Node : le Dockerfile en un seul stage",
-    "Dockerfile multi-stage : Stage dev"
+    "Dockerfile multi-stage : Stage dev"
    ]
   },
   {
@@ -282,11 +282,11 @@
    "rang": 1,
    "cibles": 1,
    "trouves": [
-    "Dockerfile multi-stage : Stage production",
-    "Dockerfile multi-stage : Stage build",
+    "Dockerfile multi-stage : Stage production",
+    "Dockerfile multi-stage : Stage build",
     "Docker Cheat-Sheet : Multi-stage Dockerfile",
     "Dockerfile multi-stage : Exemple Python (FastAPI)",
-    "Dockerfile multi-stage : Stage dev"
+    "Dockerfile multi-stage : Stage dev"
    ]
   },
   {
@@ -517,7 +517,7 @@
    "cibles": 0,
    "trouves": [
     "Vérifier et maintenir : Préparer la maintenance",
-    "Exercice : justifier ses choix : 2\\. Inventorier les choix existants",
+    "Exercice : justifier ses choix : 2. Inventorier les choix existants",
     "Docker Cheat-Sheet : Rappels mentaux",
     "Docker : Écrire un bon Compose",
     "Docker, Git et les environnements : CI/CD"
@@ -542,11 +542,11 @@
    "rang": 0,
    "cibles": 0,
    "trouves": [
+    "Repères AI Act et RGPD : Les chiffres",
     "Le RGPD pour les développeur·euses : Choisir la bonne base légale",
-    "Repères AI Act et RGPD : Les chiffres",
-    "Repères AI Act et RGPD : Les chiffres",
     "Le RGPD pour les développeur·euses : Définir une durée de conservation",
-    "Repères AI Act et RGPD : Les six bases légales RGPD, article 6"
+    "Repères AI Act et RGPD : Les six bases légales RGPD, article 6",
+    "Le RGPD pour les développeur·euses : Prévoir les droits des utilisateurs"
    ]
   },
   {

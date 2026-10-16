@@ -1,4 +1,5 @@
 import type { Extraction, Partie } from "./document.ts";
+import { decoder } from "./html.ts";
 
 /** Front matter YAML en tête de fichier. Seul `title` est lu, `corps` est le reste. */
 export function lireFrontMatter(md: string): { titre?: string; corps: string } {
@@ -12,7 +13,10 @@ export function lireFrontMatter(md: string): { titre?: string; corps: string } {
 const RE_IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)[^)]*\)/g;
 const RELATIF = /^(?![a-z][a-z\d+.-]*:|\/\/)/i;
 
-/** Le texte qu'un lecteur voit: liens, emphases et code en ligne réduits à leur contenu. */
+/**
+ * Le texte qu'un lecteur voit: liens, emphases et code en ligne réduits à leur contenu, balises
+ * HTML retirées (une cellule de tableau devient « | »), échappements et entités résolus.
+ */
 function lisible(s: string, images: string[]) {
   const sansLiens = s
     .replace(RE_IMAGE, (_, url: string) => {
@@ -26,14 +30,19 @@ function lisible(s: string, images: string[]) {
     .map((p, i) =>
       i % 2
         ? p.slice(1, -1)
-        : p
-            .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
-            .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, "$1")
-            .replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1")
-            .replace(/(?<![\p{L}\p{N}])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}])/gu, "$1"),
+        : decoder(
+            p
+              .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, " | ")
+              .replace(/<!--.*?-->|<\/?[a-z][^>]*>/gi, " ")
+              .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
+              .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, "$1")
+              .replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1")
+              .replace(/(?<![\p{L}\p{N}])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}])/gu, "$1")
+              .replace(/\\([!-/:-@[-`{-~])/g, "$1"),
+          ),
     )
     .join("")
-    .replace(/[ \t]+/g, " ")
+    .replace(/[ \t\u00a0\u202f]+/g, " ")
     .trim();
 }
 
@@ -42,7 +51,8 @@ function lisible(s: string, images: string[]) {
  * les blocs de code gardent leurs lignes telles quelles, une liste ou un tableau garde une ligne
  * par entrée. Les images ne sont pas jointes, un avertissement nomme celles d'un chemin relatif.
  */
-// ponytail: titres ATX seulement (`#`), ni titres soulignés, ni HTML brut, ni notes de bas de page.
+// ponytail: titres ATX seulement (`#`), ni titres soulignés, ni notes de bas de page. Le contenu
+// d'un `<style>` ou `<script>` hors bloc de code resterait du texte.
 export function extraireMarkdown(md: string, titreParDefaut: string): Extraction {
   const { titre: titreFm, corps } = lireFrontMatter(md);
   const titre = titreFm ?? titreParDefaut;

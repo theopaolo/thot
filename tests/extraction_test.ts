@@ -222,6 +222,29 @@ test("Markdown: une image relative est nommée dans un avertissement, son alt n'
   assertEquals(ext.images, []);
 });
 
+test("Markdown: HTML brut, échappements et espaces insécables réduits au texte lu", () => {
+  const ext = extraireMarkdown(
+    [
+      "## 3\\. Stage\u00a0production",
+      "",
+      '<div class="cell" role="cell"><b>RIA seul</b>Pilotage &amp; contrôle</div>',
+      "<tr><th>Objet</th><td>Un système</td></tr>",
+      "",
+      "Le code `<div>&amp;` reste tel quel.",
+    ].join("\n"),
+    "repli",
+  );
+  assertEquals(
+    ext.parties.slice(1).map((p) => p.texte),
+    [
+      "3. Stage production",
+      "RIA seul Pilotage & contrôle Objet | Un système",
+      "Le code <div>&amp; reste tel quel.",
+    ],
+  );
+  assertEquals(ext.parties[1].section, "3. Stage production");
+});
+
 test("Markdown: les offsets assemblés retrouvent chaque bloc", () => {
   const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
   for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);
