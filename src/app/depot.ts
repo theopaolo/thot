@@ -2,6 +2,7 @@ import { writeFile, mkdir, rename, rm } from "node:fs/promises";
 import { contenu } from "./config.ts";
 import { FILTRE_ACCES, parametresAcces, transaction } from "../core/recherche.ts";
 import { lireFrontMatter } from "../core/markdown.ts";
+import { detecterOffice } from "../core/ooxml.ts";
 import { type Compte, lecteur } from "./comptes.ts";
 import { type Db, maintenant } from "./db.ts";
 import {
@@ -18,7 +19,7 @@ export const MAX_OCTETS = 25 * 1024 * 1024;
 /** Fichiers par lot. Les requêtes d'un lot arrivent une à une : le serveur compte les sources. */
 export const MAX_LOT = 50;
 
-export const FORMATS = ["pdf", "html", "png", "jpg", "md"] as const;
+export const FORMATS = ["pdf", "html", "png", "jpg", "md", "docx", "pptx"] as const;
 export type Format = (typeof FORMATS)[number];
 
 // ponytail: listes en dur. Elles viendront du catalogue de l'établissement.
@@ -145,6 +146,9 @@ export function controlerFichier(
   if (octets.length > MAX_OCTETS) {
     return { erreur: `Fichier trop lourd, ${MAX_OCTETS / 1024 / 1024} Mo au maximum.` };
   }
+  // Un zip ou un conteneur OLE se juge à son contenu : Word, PowerPoint, ou un refus motivé.
+  const office = detecterOffice(octets);
+  if (office) return office;
   const format = detecterFormat(octets, nom);
   if (!format) return { erreur: `Format non reconnu. Acceptés : ${FORMATS.join(", ")}.` };
   return { format };

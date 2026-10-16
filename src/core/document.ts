@@ -1,11 +1,15 @@
 import { longueur } from "./texte.ts";
 
-/** Un passage extrait, avant assemblage. `code` marque un bloc de code, rendu dans un `<pre>`. */
+/**
+ * Un passage extrait, avant assemblage. `page` situe le passage dans l'original : page d'un PDF,
+ * diapositive d'une présentation. `code` marque un bloc de code, rendu dans un `<pre>`.
+ */
 export type Partie = { texte: string; section: string; page?: number; code?: true };
 
 export type Bloc = Partie & { id: string; debut: number; fin: number };
 
-export type Image = { octets: Uint8Array; mime: string; extension: string };
+/** `section` : la section du texte où l'image apparaît, quand l'extracteur la connaît. */
+export type Image = { octets: Uint8Array; mime: string; extension: string; section?: string };
 
 export type Extraction = { parties: Partie[]; images: Image[]; avertissements: string[] };
 

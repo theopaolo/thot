@@ -8,10 +8,12 @@ import {
   type Document,
   type Extraction,
 } from "../core/document.ts";
+import { extraireDocx } from "../core/docx.ts";
 import { extraireHtml } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
 import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
+import { extrairePptx } from "../core/pptx.ts";
 import { type ChunkIndexe, indexerSource, retirerSource, transaction } from "../core/recherche.ts";
 import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
 import { oublierSource, revoirActivites } from "./activites.ts";
@@ -80,6 +82,11 @@ async function extraire(s: Source): Promise<Extraction> {
   if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
   if (s.format === "html") return extraireHtml(await readFile(chemin, "utf8"), s.titre);
   if (s.format === "md") return extraireMarkdown(await readFile(chemin, "utf8"), s.titre);
+  if (s.format === "docx") return await extraireDocx(await readFile(chemin), s.titre);
+  if (s.format === "pptx") {
+    const meta = JSON.parse(s.metadonnees) as { diapositives_masquees?: boolean };
+    return extrairePptx(await readFile(chemin), meta.diapositives_masquees === true);
+  }
   const extension = s.format;
   return {
     parties: [{ texte: s.titre, section: s.titre }],
@@ -136,9 +143,13 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
          relu_le = NULL, credit = NULL
        WHERE checksum != excluded.checksum`,
     );
+    const section = db.prepare(
+      "UPDATE images SET section = ? WHERE source_id = ? AND position = ?",
+    );
     for (const [i, img] of ext.images.entries()) {
       const fichier = `image-${i}.${img.extension}`;
       ins.run(`${s.id}-${i}`, s.id, i, fichier, img.mime, await sha256(img.octets));
+      section.run(img.section ?? null, s.id, i);
       await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
     }
     etat(db, job, "enriching", avertissements);
@@ -259,7 +270,10 @@ export async function ecarterRevision(db: Db, sourceId: string, n: number) {
 export async function reextraire(db: Db, sourceId: string) {
   const s = lireSource(db, sourceId);
   const job = db.prepare("SELECT etat FROM ingestion_jobs WHERE source_id = ?").get(sourceId);
-  if (!["html", "pdf", "md"].includes(s.format) || job?.etat !== "awaiting_review") {
+  if (
+    !["html", "pdf", "md", "docx", "pptx"].includes(s.format) ||
+    job?.etat !== "awaiting_review"
+  ) {
     return "ignoree";
   }
   const ext = await extraire(s);
@@ -318,14 +332,17 @@ export function chunksSource(db: Db, sourceId: string, revision?: number): Chunk
     .join(" / ");
   const images = db
     .prepare(
-      `SELECT legende, legende_statut FROM images
+      `SELECT legende, legende_statut, section FROM images
      WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
     )
-    .all(sourceId) as { legende: string; legende_statut: string }[];
+    .all(sourceId) as { legende: string; legende_statut: string; section: string | null }[];
   const chunks = decouper(lireDocument(sourceId, n));
+  // Une image accompagne le premier passage de sa section, une diapositive par exemple. Sans
+  // section connue, ou si la révision n'a plus cette section, le premier passage du document.
+  const place = (section: string | null) =>
+    Math.max(0, section === null ? 0 : chunks.findIndex((c) => c.section === section));
   return chunks.map((c, i) => {
-    // Les images d'une page accompagnent son premier passage.
-    const legendes = i === 0 ? images : [];
+    const legendes = images.filter((l) => place(l.section) === i);
     const titre =
       c.section && c.section !== s.titre && c.section !== "Introduction"
         ? `${s.titre} : ${c.section}`

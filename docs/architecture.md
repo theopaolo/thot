@@ -61,12 +61,50 @@ l'élève. Une réponse interrompue plusieurs fois échoue avec la cause `INTERR
 (`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
 
-Le dépôt accepte PDF, HTML, PNG, JPEG et Markdown. Le type vient du contenu, sauf le Markdown
-qui n'a pas de signature : il demande l'extension `.md` ou `.markdown`, des octets UTF-8 valides
-et aucun NUL. Son texte de preuve est celui que le lecteur voit une fois la page rendue : les
-titres ATX (`#`) ouvrent les sections, les marques de lien et d'emphase disparaissent, les blocs de
-code et `mermaid` restent mot pour mot. Le front matter fournit le titre, ses autres clés sont
-ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
+Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et Markdown. Le type
+vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou
+`.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur
+voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
+d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le front matter
+fournit le titre, ses autres clés sont ignorées. Les images liées ne sont pas jointes, un
+avertissement les nomme.
+
+Un zip est un document Word quand `[Content_Types].xml` déclare `word/document.xml` comme document
+principal, une présentation quand il déclare ainsi `ppt/presentation.xml`. Le dépôt refuse avec
+sa raison un conteneur OLE (document chiffré, ancien `.doc` ou `.ppt`), un paquet à macros
+(`vbaProject.bin` ou type `macroEnabled`) et tout autre zip. L'extraction ne lit aucun fichier ni
+aucune adresse extérieurs au paquet. Ses bornes sont décrites dans
+[l'exploitation](exploitation.md#extraction-word-et-powerpoint).
+
+Mammoth lit un document Word. Son HTML devient des passages et n'atteint aucune page. Les titres
+ouvrent les sections, une liste garde une ligne par élément, un tableau une ligne par rangée avec
+ses cellules séparées par « | », ce qui garde chaque cellule citable. Les notes de bas de page se
+lisent à la fin, sous « Notes ». Un lien garde son texte, sans son adresse. Une citation nomme sa
+section et cite son paragraphe, sans numéro de page : la pagination d'un document Word dépend de
+l'affichage. Le texte inséré en modification suivie se lit comme accepté, le texte supprimé est
+écarté, et un avertissement signale ces modifications. Les commentaires n'entrent pas dans le
+texte. Équations, zones de texte, objets intégrés, graphiques et SmartArt donnent un
+avertissement.
+
+Une présentation se lit dans l'ordre de sa liste de diapositives (`p:sldIdLst`), pas dans celui
+des fichiers. Chaque diapositive ouvre la section « Diapositive n : titre », et le champ `page` de
+ses blocs porte son numéro. Ses formes se lisent dans l'ordre du fichier, qui est l'ordre de
+superposition et pas forcément l'ordre de lecture, titre en tête. Les groupes se lisent à leur
+place. Pied de page, date et numéro venus du masque sont écartés. Graphiques, SmartArt,
+équations, objets, sons, vidéos et animations donnent un avertissement qui nomme leurs
+diapositives. Une diapositive masquée reste hors du texte et un avertissement la nomme. Sur la
+page de la source, « Les inclure » relance l'extraction : le texte changé devient une version à
+relire, comme toute réextraction.
+
+L'extraction ne lit pas les notes de l'orateur. Ni `document.txt`, ni l'index, ni les réponses,
+ni les pages élèves ne les contiennent. La page de la source les relit dans l'original pour ceux
+qui la modifient, et l'original d'une présentation ne se télécharge que par eux. Un élève ne
+télécharge aucun original.
+
+Une image d'un document Word ou d'une présentation garde la section où elle apparaît
+(`images.section`), et sa légende accompagne le premier passage de cette section. Une image
+répétée sur plusieurs diapositives entre une fois, avec la première. Seuls PNG, JPEG et GIF sont
+importés, sous une borne de pixels. Les autres formats (EMF, WMF, SVG…) donnent un avertissement.
 
 Le dépôt web prend plusieurs fichiers. Chacun passe par `deposer()` seul : une source, un travail
 d'ingestion, aucune dépendance entre fichiers. Avec JavaScript, le navigateur envoie un fichier
@@ -511,4 +549,4 @@ modèle et ne prouve pas la matière.
 
 Une instance sert un établissement, un département ou un usage personnel. Restent hors périmètre :
 index vectoriel approximatif, contexte complet envoyé au modèle, base ou file distribuée, consensus entre modèles à
-l'extraction, recherche web, mode hors ligne, DOCX et PPTX tant que personne n'en dépose.
+l'extraction, recherche web, mode hors ligne, sons et vidéos.

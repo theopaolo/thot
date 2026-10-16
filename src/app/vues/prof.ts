@@ -782,8 +782,8 @@ export const depot = (s: {
       })}
       <div class="champ">
         <label for="fichier">Fichiers *</label>
-        <p class="aide">PDF, HTML, Markdown, PNG ou JPEG, 25 Mo au maximum par fichier, ${MAX_LOT} fichiers par lot. Le type est lu dans le contenu.</p>
-        ${champFichier(".pdf,.html,.htm,.md,.markdown,.png,.jpg,.jpeg", true)}
+        <p class="aide">PDF, Word, PowerPoint, HTML, Markdown, PNG ou JPEG, 25 Mo au maximum par fichier, ${MAX_LOT} fichiers par lot. Le type est lu dans le contenu.</p>
+        ${champFichier(".pdf,.docx,.pptx,.html,.htm,.md,.markdown,.png,.jpg,.jpeg", true)}
         ${
           e.fichier
             ? html`
@@ -879,6 +879,8 @@ export type Detail = {
   blocs: Bloc[];
   /** une extraction plus récente, dont le texte a changé */
   attente?: { n: number; cree_le: string; avertissements: string[]; blocs: Bloc[] };
+  /** notes de l'orateur d'une présentation, pour qui relit la source, ou l'erreur de lecture */
+  notes?: { diapositive: number; texte: string }[] | string;
   catalogue?: Catalogue;
   affiliations?: Affiliation[];
 };
@@ -888,6 +890,8 @@ export type ImageVue = {
   legende: string | null;
   legende_statut: string;
   legende_origine: string | null;
+  /** la section du texte où l'image apparaît */
+  section?: string | null;
   modele: string | null;
 };
 
@@ -953,7 +957,11 @@ export const detailSource = (d: Detail) => {
         ? html`
         <p><a href="/prof/sources/${d.source.id}/original" target="_blank">Ouvrir le ${d.source.format === "pdf" ? "PDF" : "Markdown"}</a></p>
       `
-        : ""
+        : d.source.format === "docx" || (d.source.format === "pptx" && d.modifiable)
+          ? html`
+        <p><a href="/prof/sources/${d.source.id}/original">Télécharger l'original ${d.source.format === "docx" ? "Word" : "PowerPoint"}</a></p>
+      `
+          : ""
     }
     ${
       d.modifiable
@@ -1013,7 +1021,7 @@ export const detailSource = (d: Detail) => {
         </p>
       `
           : ""
-    } ${avertissements(d.job?.avertissements ?? [])} ${
+    } ${avertissements(d.job?.avertissements ?? [])} ${diapositivesMasquees(d)} ${
       d.attente
         ? html`
         <section aria-labelledby="revision-attente">
@@ -1052,6 +1060,7 @@ export const detailSource = (d: Detail) => {
             <figure>
               <img src="/media/${i.id}" alt="Image de ${d.source.titre}" loading="lazy">
               <figcaption>
+                ${i.section ? html`<small>${i.section}</small>` : ""}
                 <span class="statut ${i.legende_statut}">${LEGENDES[i.legende_statut]}</span>
                 ${i.legende ?? "Pas de légende."} ${
                   d.modifiable && i.legende_statut === "unreviewed"
@@ -1070,6 +1079,7 @@ export const detailSource = (d: Detail) => {
     <h2>${d.attente ? "Texte actuel" : "Texte extrait"}</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
     </div>
+    ${d.notes === undefined ? "" : notesOrateur(d.notes)}
     ${
       d.supprimable
         ? html`<form method="post" action="/prof/sources/${d.source.id}/supprimer"
@@ -1094,6 +1104,40 @@ const avertissements = (liste: string[]) =>
         (a) => html`<li>${a}</li>`,
       )}</ul></div>`
     : "";
+
+/** Le choix d'inclure les diapositives masquées, quand la présentation en a. */
+const diapositivesMasquees = (d: Detail) => {
+  const incluses = d.meta.diapositives_masquees === true;
+  return d.modifiable &&
+    d.job?.etat === "awaiting_review" &&
+    d.job.avertissements.some((a) => a.startsWith("Diapositives masquées"))
+    ? html`<form method="post" action="/prof/sources/${d.source.id}/diapositives-masquees" class="barre">
+        <span>Diapositives masquées : ${incluses ? "incluses dans la dernière extraction" : "exclues du texte, de la recherche et des réponses"}.</span>
+        <input type="hidden" name="inclure" value="${incluses ? "0" : "1"}">
+        <button>${incluses ? "Les exclure" : "Les inclure"}</button>
+      </form>`
+    : "";
+};
+
+/** Les notes de l'orateur, lues dans l'original. Elles restent hors du texte extrait. */
+const notesOrateur = (notes: { diapositive: number; texte: string }[] | string) => html`
+  <section aria-labelledby="notes-orateur">
+    <h2 id="notes-orateur">Notes de l'orateur</h2>
+    <p class="discret">
+      Visibles par ceux qui relisent la source. Elles n'entrent ni dans le texte, ni dans la
+      recherche, ni dans les réponses, et les élèves ne les voient pas.
+    </p>
+    ${
+      typeof notes === "string"
+        ? html`<p role="alert">Notes illisibles : ${notes}</p>`
+        : notes.length
+          ? notes.map(
+              (n) => html`<h3>Diapositive ${n.diapositive}</h3><p class="passage">${n.texte}</p>`,
+            )
+          : html`<p>Aucune note.</p>`
+    }
+  </section>
+`;
 
 const LEGENDES: Record<string, string> = {
   unreviewed: "non relue",

@@ -141,6 +141,8 @@ const FORMATS_ACCEPTES = new Set([
   ".htm",
   ".md",
   ".markdown",
+  ".docx",
+  ".pptx",
   ".png",
   ".jpg",
   ".jpeg",

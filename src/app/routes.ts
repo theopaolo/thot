@@ -21,6 +21,7 @@ import {
   transaction,
 } from "../core/recherche.ts";
 import { citationsDe, type Explication } from "../core/activite.ts";
+import { notesPptx } from "../core/pptx.ts";
 import { contexte } from "../core/texte.ts";
 import {
   authentifier,
@@ -989,24 +990,73 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     };
   };
 
-  app.get("/prof/sources/:id", (c) => {
+  const original = (d: Prof.Detail) => readFile(contenu(d.source.id, "original", d.source.fichier));
+  app.get("/prof/sources/:id", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
-    return d ? c.html(rendre(c, d.source.titre, Prof.detailSource(d))) : c.notFound();
+    if (!d) return c.notFound();
+    // Les notes de l'orateur se lisent dans l'original, par ceux qui relisent la source seulement.
+    let notes: Prof.Detail["notes"];
+    if (d.modifiable && d.source.format === "pptx") {
+      try {
+        notes = notesPptx(await original(d));
+      } catch (e) {
+        notes = (e as Error).message;
+      }
+    }
+    return c.html(rendre(c, d.source.titre, Prof.detailSource({ ...d, notes })));
   });
-  // Un original HTML ne s'ouvre pas: il lancerait ses scripts sur l'origine de Thot.
+  // Un original HTML ne s'ouvre pas: il lancerait ses scripts sur l'origine de Thot. Word et
+  // PowerPoint se téléchargent. Une présentation peut porter des notes de l'orateur : son
+  // original ne va qu'à ceux qui relisent la source.
   const TYPES_ORIGINAL: Record<string, string> = {
     pdf: "application/pdf",
     md: "text/markdown; charset=utf-8",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   };
   app.get("/prof/sources/:id/original", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     const type = d && TYPES_ORIGINAL[d.source.format];
     if (!d || !type) return c.notFound();
-    return c.body(await readFile(contenu(d.source.id, "original", d.source.fichier)), 200, {
+    if (d.source.format === "pptx" && !d.modifiable) {
+      return c.text("L'original d'une présentation va à ceux qui relisent la source.", 403);
+    }
+    const office = d.source.format === "docx" || d.source.format === "pptx";
+    return c.body(await original(d), 200, {
       "content-type": type,
-      "content-disposition": "inline",
+      "content-disposition": office
+        ? `attachment; filename*=UTF-8''${encodeURIComponent(d.source.fichier)}`
+        : "inline",
       "x-content-type-options": "nosniff",
     });
+  });
+  // Inclure ou exclure les diapositives masquées relance l'extraction. Un texte changé devient
+  // une version à relire, comme toute réextraction.
+  app.post("/prof/sources/:id/diapositives-masquees", async (c) => {
+    const d = detail(c.req.param("id"), c.get("compte"));
+    if (!d || d.source.format !== "pptx") return c.notFound();
+    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    const inclure = (await c.req.parseBody()).inclure === "1";
+    const relancee = transaction(db, () => {
+      const { changes } = db
+        .prepare(
+          `UPDATE ingestion_jobs SET etat = 'received', tentatives = 0, erreur = NULL,
+           verrou_expire_le = NULL, maj_le = ?
+         WHERE source_id = ? AND etat IN ('awaiting_review', 'failed')`,
+        )
+        .run(maintenant(), d.source.id);
+      if (changes) {
+        db.prepare(
+          `UPDATE sources SET metadonnees = json_set(metadonnees, '$.diapositives_masquees', json(?))
+         WHERE id = ?`,
+        ).run(JSON.stringify(inclure), d.source.id);
+      }
+      return changes > 0;
+    });
+    if (!relancee) {
+      return c.text("Extraction en cours : réessayer une fois le traitement terminé.", 409);
+    }
+    return c.redirect(`/prof/sources/${d.source.id}`, 303);
   });
   app.post("/prof/sources/:id/modifier", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));

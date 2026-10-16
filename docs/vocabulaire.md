@@ -223,6 +223,20 @@ qu'un enseignant certifie la nouvelle. Une réponse garde la version qu'elle cit
 relit comme « version citée par une réponse précédente ». La bibliothèque marque ces sources
 « Nouvelle version à relire » et le filtre « À relire » les retrouve.
 
+**Diapositive**
+Une page d'une présentation PowerPoint. Le texte d'une présentation se lit par diapositive, sous
+l'intertitre « Diapositive n : titre », et une citation nomme sa diapositive.
+
+**Diapositive masquée**
+Une diapositive que la présentation ne projette pas. Elle reste hors du texte, de la recherche et
+des réponses, sauf si un enseignant choisit « Les inclure » sur la page de la ressource : la
+nouvelle extraction devient une version à relire.
+
+**Notes de l'orateur**
+Le texte qu'une présentation réserve à qui la projette, consignes ou corrigé. Seuls ceux qui
+relisent la ressource les lisent, sur sa page. Elles n'entrent ni dans le texte, ni dans la
+recherche, ni dans les réponses.
+
 **Rejeter, supprimer définitivement**
 « Rejeter » retire une ressource aux élèves et à Thot et la garde : elle peut être certifiée de
 nouveau. « Supprimer définitivement » l'efface avec ses versions, ses images et les passages que
