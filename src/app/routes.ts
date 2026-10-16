@@ -533,7 +533,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
       rendre(
         c,
         "Bibliothèque",
-        html`${DomaineVue.filtre(Domaines.catalogueDe(db, c.get("compte")), scope(c), "/prof")}${Prof.sources(
+        html`${DomaineVue.filtre(
+          Domaines.catalogueDe(db, c.get("compte")),
+          scope(c),
+          "/prof",
+          "",
+          "",
+          libelles(db).regroupement,
+        )}${Prof.sources(
           ressources.filter(
             (s) =>
               (!f.statut || statut(s) === f.statut) && (!f.sequence || s.sequence === f.sequence),
@@ -1206,7 +1213,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     }
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db, lu(c));
-    const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", "", c.req.query("vue"));
+    const filtresDomaines = DomaineVue.filtre(
+      cat,
+      scope(c),
+      "/eleve",
+      "",
+      c.req.query("vue"),
+      libelles(db).regroupement,
+    );
     const generique =
       visibles.every((r) => r.profil === "general") || Object.values(scope(c)).some(Boolean);
     const mention = mentionLecteurs(c);
@@ -1414,6 +1428,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             Domaines.catalogueVisible(db, lu(c)),
             scope(c),
             "/eleve/recherche",
+            "",
+            "",
+            libelles(db).regroupement,
           )}${Eleve.recherche("", [], scope(c))}`,
         ),
       );
@@ -1470,6 +1487,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
           scope(c),
           "/eleve/recherche",
           q,
+          "",
+          libelles(db).regroupement,
         )}${Eleve.recherche(q, trouves, scope(c))}`,
       ),
     );

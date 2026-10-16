@@ -290,10 +290,17 @@ const TOUS: Record<string, string> = {
   Séquence: "Toutes les séquences",
 };
 
-export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "") =>
+export const filtre = (
+  cat: Catalogue,
+  p: Scope,
+  action: string,
+  q = "",
+  vue = "",
+  theme = "Thème",
+) =>
   html`
     <form method="get" action="${action}" class="biblio-outils" aria-label="Périmètre des ressources">
-      ${selectsPerimetre(cat, p)}
+      ${selectsPerimetre(cat, p, theme)}
       ${
         action === "/eleve/recherche"
           ? html`<input type="text" name="q" value="${q}" aria-label="Recherche" maxlength="300">`
@@ -316,7 +323,7 @@ export const filtre = (cat: Catalogue, p: Scope, action: string, q = "", vue = "
       (p.cours_id ? "Cours indisponible" : "tous les cours")
     } / ${
       cat.themes.find((t) => t.id === p.theme_id)?.nom ??
-      (p.theme_id ? "Thème indisponible" : "tous les thèmes")
+      (p.theme_id ? `${theme} indisponible` : (TOUS[theme] ?? "Tous").toLowerCase())
     }.</p>
   `;
 
