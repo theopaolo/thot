@@ -177,7 +177,7 @@ rules of [SRC-002](src-002.md).
 
 ## Code touchpoints
 
-[Message routes and history](../../src/app/routes.ts), [chat views](../../src/app/vues/eleve.ts),
+[Message routes and history](../../src/app/routes/chat.ts), [chat views](../../src/app/vues/eleve.ts),
 [chat client](../../src/app/client/eleve.ts), [retention](../../src/app/db.ts),
 [reformulation](../../src/core/modeles.ts), [answer entry](../../src/core/reponse.ts),
 [migrations](../../migrations/), [application tests](../../tests/app_test.ts).

@@ -1,7 +1,7 @@
 # Architecture
 
 Ce document garde les règles que le code ne dit pas de lui-même. Les routes, le schéma, les
-modèles et leurs réglages se lisent dans `src/app/routes.ts`, `migrations/` et
+modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
 `src/app/config.ts`.
 
 ## Règles du produit
@@ -60,6 +60,12 @@ l'élève. Une réponse interrompue plusieurs fois échoue avec la cause `INTERR
 `src/core/` porte l'ingestion, la recherche et la réponse. Il n'importe rien de `src/app/`
 (`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
+
+Chaque fichier de `src/app/routes/` sert une partie de l'application, et `routes.ts` les monte
+derrière la session et la protection CSRF. Une route lit la requête, appelle les modules de
+`src/app/` et rend une vue de `vues/`. Les règles de la conversation vivent dans
+`conversations.ts`, hors des routes. D'autres routes écrivent encore leur SQL elles-mêmes
+([ARC-101](../tasks/ensuite/arc-101.md)).
 
 Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et Markdown. Le type
 vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou

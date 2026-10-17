@@ -57,7 +57,7 @@ No knowledge graph is required for the first comparison workflow.
 ## Code touchpoints
 
 [Retrieval](../../src/core/recherche.ts), [indexed context](../../src/app/ingestion.ts),
-[response verification](../../src/core/reponse.ts), [scope routes](../../src/app/routes.ts),
+[response verification](../../src/core/reponse.ts), [scope routes](../../src/app/routes/chat.ts),
 [teacher views](../../src/app/vues/prof.ts), [conversation views](../../src/app/vues/eleve.ts),
 [retrieval evaluation](../../evaluation/README.md).
 
