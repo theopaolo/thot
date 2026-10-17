@@ -2,27 +2,22 @@ import { type Context, Hono } from "hono";
 import {
   creerEleves,
   creerLien,
+  eleveGere,
   eleveSaisi,
+  elevesSansCours,
+  estEleveDuCours,
   importerEleves,
+  liensGeres,
   reinitialiserMotDePasse,
+  revoquerLien,
 } from "../comptes.ts";
 import { lireInstance } from "../instance.ts";
-import { maintenant } from "../db.ts";
 import * as Prof from "../vues/prof.ts";
 import * as Domaines from "../domaines.ts";
 import type { Env, Web } from "./web.ts";
 
 export function routesProfEleves(app: Hono<Env>, w: Web) {
-  const { db, rendre, lu } = w;
-  // Réinitialiser ouvre le compte : seuls les administrateurs gèrent les élèves sans cours.
-  const ELEVES_GERES = `role = 'eleve' AND (? OR EXISTS (SELECT 1 FROM membres_cours lui
-      JOIN membres_cours moi ON moi.cours_id = lui.cours_id
-      WHERE lui.compte_id = comptes.id AND moi.compte_id = ?))`;
-  const elevesGeres = (c: Context<Env>) => [lu(c).administrateur ? 1 : 0, lu(c).id];
-  // Un enseignant voit et révoque les liens qui ouvrent un de ses cours.
-  const LIENS_GERES = `(? OR EXISTS (SELECT 1 FROM liens_cours x
-      JOIN membres_cours m ON m.cours_id = x.cours_id
-      WHERE x.jeton = liens.jeton AND m.compte_id = ?))`;
+  const { db, rendre } = w;
   // Les élèves de chaque cours de l'enseignant. Ceux sans cours ne se montrent qu'aux
   // administrateurs, seuls à les gérer.
   const pageEleves = (c: Context<Env>, erreur?: string) => {
@@ -31,31 +26,9 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       cours,
       eleves: Domaines.membres(db, cours.id).filter((m) => m.role === "eleve"),
     }));
-    const sansCours = lu(c).administrateur
-      ? (db
-          .prepare(
-            `SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve'
-             AND NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = comptes.id) ORDER BY nom`,
-          )
-          .all() as Prof.Eleve[])
-      : undefined;
+    const sansCours = elevesSansCours(db, c.get("compte"));
     const liens =
-      lireInstance(db).mode === "personal"
-        ? undefined
-        : (
-            db
-              .prepare(
-                `SELECT liens.jeton, places, expire_le, a.nom AS createur,
-                   json_group_array(lc.cours_id) AS cours
-                 FROM liens JOIN comptes a ON a.id = liens.createur_id
-                 JOIN liens_cours lc ON lc.jeton = liens.jeton
-                 WHERE revoque_le IS NULL AND expire_le > ? AND ${LIENS_GERES}
-                 GROUP BY liens.jeton ORDER BY liens.cree_le DESC`,
-              )
-              .all(maintenant(), ...elevesGeres(c)) as (Omit<Prof.Lien, "cours"> & {
-              cours: string;
-            })[]
-          ).map((l) => ({ ...l, cours: JSON.parse(l.cours) as string[] }));
+      lireInstance(db).mode === "personal" ? undefined : liensGeres(db, c.get("compte"));
     return rendre(
       c,
       "Élèves",
@@ -130,33 +103,24 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     return c.redirect("/prof/eleves#liens", 303);
   });
   // Révoquer garde les élèves que le lien a inscrits.
-  app.post("/prof/eleves/liens/:jeton/revoquer", (c) => {
-    const { changes } = db
-      .prepare(
-        `UPDATE liens SET revoque_le = ? WHERE jeton = ? AND revoque_le IS NULL AND ${LIENS_GERES}`,
-      )
-      .run(maintenant(), c.req.param("jeton"), ...elevesGeres(c));
-    return changes ? c.redirect("/prof/eleves#liens", 303) : c.notFound();
-  });
+  app.post("/prof/eleves/liens/:jeton/revoquer", (c) =>
+    revoquerLien(db, c.get("compte"), c.req.param("jeton"))
+      ? c.redirect("/prof/eleves#liens", 303)
+      : c.notFound(),
+  );
   // Retirer d'un cours laisse le compte. Un enseignant ne retire que des élèves de ses cours.
   app.post("/prof/eleves/:id/retirer", async (c) => {
     const id = c.req.param("id");
     const coursId = String((await c.req.parseBody()).cours_id ?? "");
-    const eleve = db
-      .prepare(
-        `SELECT 1 FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
-         WHERE m.cours_id = ? AND m.compte_id = ? AND a.role = 'eleve'`,
-      )
-      .get(coursId, id);
-    if (!eleve || !coursCoches(c, { cours: coursId })) return c.notFound();
+    if (!estEleveDuCours(db, coursId, id) || !coursCoches(c, { cours: coursId })) {
+      return c.notFound();
+    }
     Domaines.desinscrire(db, coursId, id);
     return c.redirect(`/prof/eleves#cours-${coursId}`, 303);
   });
   app.post("/prof/eleves/:id/reinitialiser", async (c) => {
     const id = c.req.param("id");
-    const eleve = db
-      .prepare(`SELECT identifiant, nom FROM comptes WHERE id = ? AND ${ELEVES_GERES}`)
-      .get(id, ...elevesGeres(c)) as { identifiant: string; nom: string } | undefined;
+    const eleve = eleveGere(db, c.get("compte"), id);
     if (!eleve) return c.notFound();
     const motDePasse = await reinitialiserMotDePasse(db, id);
     c.header("Cache-Control", "no-store");

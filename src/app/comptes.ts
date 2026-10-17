@@ -289,6 +289,76 @@ export async function inscrireParLien(
   });
 }
 
+// Réinitialiser ouvre le compte : seuls les administrateurs gèrent les élèves sans cours.
+const ELEVES_GERES = `role = 'eleve' AND ($administrateur OR EXISTS (SELECT 1 FROM membres_cours lui
+      JOIN membres_cours moi ON moi.cours_id = lui.cours_id
+      WHERE lui.compte_id = comptes.id AND moi.compte_id = $lecteur))`;
+// Un enseignant voit et révoque les liens qui ouvrent un de ses cours.
+const LIENS_GERES = `($administrateur OR EXISTS (SELECT 1 FROM liens_cours x
+      JOIN membres_cours m ON m.cours_id = x.cours_id
+      WHERE x.jeton = liens.jeton AND m.compte_id = $lecteur))`;
+const parametresGeres = (c: Compte) => ({
+  administrateur: c.administrateur === 1 ? 1 : 0,
+  lecteur: c.id,
+});
+
+/** Les élèves sans cours, que seuls les administrateurs gèrent. `undefined` pour un enseignant. */
+export function elevesSansCours(db: Db, compte: Compte) {
+  if (compte.administrateur !== 1) return undefined;
+  return db
+    .prepare(
+      `SELECT id, identifiant, nom FROM comptes WHERE role = 'eleve'
+       AND NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = comptes.id) ORDER BY nom`,
+    )
+    .all() as { id: string; identifiant: string; nom: string }[];
+}
+
+/** Les liens actifs que le compte gère, avec leurs cours décodés. */
+export function liensGeres(db: Db, compte: Compte) {
+  const liens = db
+    .prepare(
+      `SELECT liens.jeton, places, expire_le, a.nom AS createur,
+         json_group_array(lc.cours_id) AS cours
+       FROM liens JOIN comptes a ON a.id = liens.createur_id
+       JOIN liens_cours lc ON lc.jeton = liens.jeton
+       WHERE revoque_le IS NULL AND expire_le > ? AND ${LIENS_GERES}
+       GROUP BY liens.jeton ORDER BY liens.cree_le DESC`,
+    )
+    .all(parametresGeres(compte), maintenant()) as {
+    jeton: string;
+    places: number;
+    expire_le: string;
+    createur: string;
+    cours: string;
+  }[];
+  return liens.map((l) => ({ ...l, cours: JSON.parse(l.cours) as string[] }));
+}
+
+/** Révoque un lien que le compte gère. Rend `false` si aucun lien ne correspond. */
+export function revoquerLien(db: Db, compte: Compte, jeton: string) {
+  const { changes } = db
+    .prepare(
+      `UPDATE liens SET revoque_le = ? WHERE jeton = ? AND revoque_le IS NULL AND ${LIENS_GERES}`,
+    )
+    .run(parametresGeres(compte), maintenant(), jeton);
+  return !!changes;
+}
+
+/** Vrai si le compte est élève du cours donné. */
+export const estEleveDuCours = (db: Db, coursId: string, eleveId: string) =>
+  db
+    .prepare(
+      `SELECT 1 FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
+       WHERE m.cours_id = ? AND m.compte_id = ? AND a.role = 'eleve'`,
+    )
+    .get(coursId, eleveId) !== undefined;
+
+/** L'élève que le compte gère, ou `undefined`. */
+export const eleveGere = (db: Db, compte: Compte, id: string) =>
+  db
+    .prepare(`SELECT identifiant, nom FROM comptes WHERE id = ? AND ${ELEVES_GERES}`)
+    .get(parametresGeres(compte), id) as { identifiant: string; nom: string } | undefined;
+
 export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "eleve") {
   const compte = db.prepare("SELECT role FROM comptes WHERE id = ?").get(id);
   if (compte?.role !== role) return undefined;
