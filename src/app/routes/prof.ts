@@ -1,13 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
-import {
-  FILTRE_ACCES,
-  filtreAcces,
-  indexerSource,
-  parametresAcces,
-  transaction,
-} from "../../core/recherche.ts";
+import { FILTRE_ACCES, filtreAcces, parametresAcces } from "../../core/recherche.ts";
 import { notesPptx } from "../../core/pptx.ts";
 import {
   type Compte,
@@ -18,12 +12,13 @@ import {
 } from "../comptes.ts";
 import { libelles } from "../instance.ts";
 import { contenu } from "../config.ts";
-import { maintenant } from "../db.ts";
 import { audience } from "../depot.ts";
 import {
-  chunksSource,
+  changerLecteurs,
   ecarterRevision,
+  inclureDiapositivesMasquees,
   lireDocument,
+  modifierSource,
   relireLegende,
   revisionEnAttente,
   statuer,
@@ -33,7 +28,6 @@ import { validerInformations } from "../../core/profils.ts";
 import * as Prof from "../vues/prof.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
-import * as Activites from "../activites.ts";
 import type { Env, Web } from "./web.ts";
 
 /** Le nom du thème d'une source, le premier par ordre alphabétique si elle en a plusieurs. */
@@ -184,10 +178,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
       } catch (e) {
         return c.text((e as Error).message, 400);
       }
-      for (const id of ids) {
-        db.prepare("UPDATE sources SET audience = ? WHERE id = ?").run(lecteurs, id);
-        Activites.revoirActivites(db, id);
-      }
+      for (const id of ids) changerLecteurs(db, id, lecteurs);
     } else {
       const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
       for (const id of ids) statuer(db, id, statut, c.get("compte").nom);
@@ -287,23 +278,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     if (!d || d.source.format !== "pptx") return c.notFound();
     if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
     const inclure = (await c.req.parseBody()).inclure === "1";
-    const relancee = transaction(db, () => {
-      const { changes } = db
-        .prepare(
-          `UPDATE ingestion_jobs SET etat = 'received', tentatives = 0, erreur = NULL,
-           verrou_expire_le = NULL, maj_le = ?
-         WHERE source_id = ? AND etat IN ('awaiting_review', 'failed')`,
-        )
-        .run(maintenant(), d.source.id);
-      if (changes) {
-        db.prepare(
-          `UPDATE sources SET metadonnees = json_set(metadonnees, '$.diapositives_masquees', json(?))
-         WHERE id = ?`,
-        ).run(JSON.stringify(inclure), d.source.id);
-      }
-      return changes > 0;
-    });
-    if (!relancee) {
+    if (!inclureDiapositivesMasquees(db, d.source.id, inclure)) {
       return c.text("Extraction en cours : réessayer une fois le traitement terminé.", 409);
     }
     return c.redirect(`/prof/sources/${d.source.id}`, 303);
@@ -346,31 +321,15 @@ export function routesProf(app: Hono<Env>, w: Web) {
     delete meta.propositions;
     delete meta.quiz_reponse;
     try {
-      transaction(db, () => {
-        if (b.affiliations_presentes) {
-          Domaines.affiliations(
-            db,
-            d.source.id,
-            Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b), d.source.id),
-          );
-        }
-        db.prepare(
-          `UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, audience = ?, reponses = ?,
-           suggestions_le = NULL WHERE id = ? AND school_id = ?`,
-        ).run(
-          titre,
-          JSON.stringify(meta),
-          langue,
-          lecteurs,
-          b.audience === undefined ? d.source.reponses : b.reponses ? 1 : 0,
-          d.source.id,
-          instance.school_id,
-        );
-        const statut = db
-          .prepare("SELECT statut FROM sources WHERE id = ?")
-          .get(d.source.id)!.statut;
-        indexerSource(db, d.source.id, statut === "certifiee" ? chunksSource(db, d.source.id) : []);
-        Activites.revoirActivites(db, d.source.id);
+      modifierSource(db, d.source.id, {
+        titre,
+        meta,
+        langue,
+        audience: lecteurs,
+        reponses: b.audience === undefined ? d.source.reponses : b.reponses ? 1 : 0,
+        liens: b.affiliations_presentes
+          ? Domaines.liensAutorises(db, c.get("compte"), Domaines.liensFormulaire(b), d.source.id)
+          : undefined,
       });
     } catch (e) {
       if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;

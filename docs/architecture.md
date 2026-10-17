@@ -363,8 +363,9 @@ cours de l'enseignant, les activités publiées et les tentatives reçues. Ces n
 a été pratiqué : ils ne mesurent pas un niveau.
 
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
-publiée à ses élèves et utilisée par Thot. `statuer()`, `supprimerSource()` et les changements de
-lecteurs ou de cours d'une source signalent à revoir les activités dont une citation ne tient plus.
+publiée à ses élèves et utilisée par Thot. Chaque changement d'une source passe par
+`src/app/ingestion.ts`, par le web comme par la CLI : la même transaction écrit, réindexe et
+signale à revoir les activités dont une citation ne tient plus.
 La page de l'élève revérifie les citations à chaque affichage. Une activité à revoir n'est plus
 servie. L'enseignant enregistre de nouveau un exercice, ce qui recherche chaque passage dans la
 révision servie, puis le relit. Une tentative garde la version de l'exercice à laquelle elle

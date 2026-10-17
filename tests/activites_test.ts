@@ -4,7 +4,13 @@ import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/a
 import { contenu as chemin } from "../src/app/config.ts";
 import type { Db } from "../src/app/db.ts";
 import { cours, matiere, supprimer } from "../src/app/domaines.ts";
-import { lireDocument, reextraire, statuer, supprimerSource } from "../src/app/ingestion.ts";
+import {
+  lireDocument,
+  rattacher,
+  reextraire,
+  statuer,
+  supprimerSource,
+} from "../src/app/ingestion.ts";
 import { configurerInstance } from "../src/app/instance.ts";
 import type { Contenu, Explication } from "../src/core/activite.ts";
 import type { Modeles } from "../src/core/modeles.ts";
@@ -399,6 +405,21 @@ test("exercice : nouvelle version, lecteurs retirés, rejet et suppression de la
       await page(prof, `/prof/activites/${id}`),
       "Vide : sa source a été supprimée.",
     );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("exercice : retirer le cours de sa source le signale à revoir, sans passer par une route", async () => {
+  const { db, dir, coursId, source, prof } = await cadre();
+  try {
+    const id = await preparer(prof, coursId, source);
+    await relirePublier(prof, db, id);
+    rattacher(db, source, [{ cours_id: coursId, theme_id: null }]);
+    assertEquals(ligne(db, id).etat, "publiee", "le même cours garde la preuve");
+    rattacher(db, source, []);
+    assertEquals(ligne(db, id).etat, "a_revoir");
   } finally {
     db.close();
     await rm(dir, { recursive: true });

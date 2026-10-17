@@ -424,8 +424,8 @@ export const publier = (db: Db, compte: Compte, id: string, revision: number) =>
 
 /**
  * Signale à revoir les exercices qui citent la source et dont une preuve ne tient plus : nouvelle
- * révision servie, rejet, lecteurs ou cours retirés. `statuer()` l'appelle, comme les routes qui
- * changent les lecteurs ou les cours d'une source. La page de l'élève revérifie aussi à chaque affichage.
+ * révision servie, rejet, lecteurs ou cours retirés. Les changements d'une source dans
+ * `ingestion.ts` l'appellent. La page de l'élève revérifie aussi à chaque affichage.
  */
 export function revoirActivites(db: Db, sourceId: string) {
   const liste = db

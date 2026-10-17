@@ -1,6 +1,6 @@
 import { type Context, Hono } from "hono";
 import { libelles } from "../instance.ts";
-import { indexerTheme } from "../ingestion.ts";
+import { renommerEntree } from "../ingestion.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import type { Env, Web } from "./web.ts";
@@ -89,8 +89,7 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
           Domaines.changerProfil(db, String(b.profil ?? ""));
           break;
         case "renommer":
-          Domaines.renommer(db, String(b.genre ?? ""), String(b.id ?? ""), String(b.nom ?? ""));
-          if (b.genre === "theme") indexerTheme(db, String(b.id));
+          renommerEntree(db, String(b.genre ?? ""), String(b.id ?? ""), String(b.nom ?? ""));
           break;
         case "supprimer":
           Domaines.supprimer(db, String(b.genre ?? ""), String(b.id ?? ""));

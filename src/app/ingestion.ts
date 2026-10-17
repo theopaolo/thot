@@ -25,7 +25,8 @@ import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
 import { oublierSource, revoirActivites } from "./activites.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
-import { sha256 } from "./depot.ts";
+import { type Audience, sha256 } from "./depot.ts";
+import { type Affiliation, affiliations, renommer } from "./domaines.ts";
 import type { Profil } from "../core/profils.ts";
 
 const VERROU_MS = 5 * 60_000;
@@ -306,10 +307,17 @@ function regroupement(db: Db, s: Source) {
   return noms.length ? noms.join(" / ") : (JSON.parse(s.metadonnees) as Meta).sequence;
 }
 
-/** Réindexe les sources d'un thème : l'en-tête de leurs passages porte son nom. */
-export function indexerTheme(db: Db, themeId: string) {
-  const ids = db.prepare("SELECT source_id FROM source_cours WHERE theme_id = ?").all(themeId);
-  for (const { source_id } of ids) indexer(db, source_id as string);
+/**
+ * Renomme une matière, un cours, un thème ou un champ. L'en-tête des passages porte le nom de
+ * leurs thèmes : les sources d'un thème renommé se réindexent dans la même transaction.
+ */
+export function renommerEntree(db: Db, genre: string, id: string, nom: string) {
+  transaction(db, () => {
+    renommer(db, genre, id, nom);
+    if (genre !== "theme") return;
+    const ids = db.prepare("SELECT source_id FROM source_cours WHERE theme_id = ?").all(id);
+    for (const { source_id } of ids) reindexer(db, source_id as string);
+  });
 }
 
 export function lireDocument(sourceId: string, revision: number): Document {
@@ -463,13 +471,13 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
   ).run(JSON.stringify(propositions), sourceId);
 }
 
-/** Seule une source certifiée entre dans l'index. Toute autre en sort. */
-export function indexer(db: Db, sourceId: string) {
-  transaction(db, () => {
-    const s = lireSource(db, sourceId);
-    indexerSource(db, sourceId, s.statut === "certifiee" ? chunksSource(db, sourceId) : []);
-  });
+/** Seule une source certifiée entre dans l'index. Toute autre en sort. Sans transaction. */
+function reindexer(db: Db, sourceId: string) {
+  const s = lireSource(db, sourceId);
+  indexerSource(db, sourceId, s.statut === "certifiee" ? chunksSource(db, sourceId) : []);
 }
+
+export const indexer = (db: Db, sourceId: string) => transaction(db, () => reindexer(db, sourceId));
 
 /**
  * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
@@ -507,8 +515,85 @@ export function statuer(
       maintenant(),
       sourceId,
     );
-    indexerSource(db, sourceId, statut === "certifiee" ? chunksSource(db, sourceId) : []);
+    reindexer(db, sourceId);
     revoirActivites(db, sourceId);
+  });
+}
+
+// Chaque changement d'une source écrit, réindexe et signale les activités à revoir dans une seule
+// transaction, comme `statuer()`. Les routes et la CLI l'appellent sans rien ajouter.
+
+/**
+ * Change les lecteurs d'une source. Un exercice dont les élèves perdent l'accès devient à revoir.
+ * L'index ne porte pas les lecteurs, et les questions suggérées ne dépendent pas d'eux.
+ */
+export function changerLecteurs(db: Db, sourceId: string, lecteurs: Audience) {
+  transaction(db, () => {
+    db.prepare("UPDATE sources SET audience = ? WHERE id = ?").run(lecteurs, sourceId);
+    revoirActivites(db, sourceId);
+  });
+}
+
+/**
+ * Rattache une source à `liens`, à la place de ses cours et thèmes précédents. L'en-tête de ses
+ * passages porte le nom de ses thèmes : elle se réindexe. Un exercice d'un cours retiré devient
+ * à revoir.
+ */
+export function rattacher(db: Db, sourceId: string, liens: Affiliation[]) {
+  transaction(db, () => {
+    affiliations(db, sourceId, liens);
+    reindexer(db, sourceId);
+    revoirActivites(db, sourceId);
+  });
+}
+
+/**
+ * Enregistre les informations et les lecteurs d'une source, et ses cours quand `liens` est
+ * donné. Les questions suggérées reprennent le titre et les informations : elles se régénèrent.
+ */
+export function modifierSource(
+  db: Db,
+  sourceId: string,
+  m: {
+    titre: string;
+    meta: Record<string, unknown>;
+    langue: string;
+    audience: Audience;
+    reponses: number;
+    liens?: Affiliation[];
+  },
+) {
+  transaction(db, () => {
+    if (m.liens) affiliations(db, sourceId, m.liens);
+    db.prepare(
+      `UPDATE sources SET titre = ?, metadonnees = ?, langue = ?, audience = ?, reponses = ?,
+       suggestions_le = NULL WHERE id = ?`,
+    ).run(m.titre, JSON.stringify(m.meta), m.langue, m.audience, m.reponses, sourceId);
+    reindexer(db, sourceId);
+    revoirActivites(db, sourceId);
+  });
+}
+
+/**
+ * Relance l'extraction d'une présentation avec ou sans ses diapositives masquées. Rend `false`
+ * pendant une extraction : le worker réécrirait la révision en cours.
+ */
+export function inclureDiapositivesMasquees(db: Db, sourceId: string, inclure: boolean) {
+  return transaction(db, () => {
+    const { changes } = db
+      .prepare(
+        `UPDATE ingestion_jobs SET etat = 'received', tentatives = 0, erreur = NULL,
+         verrou_expire_le = NULL, maj_le = ?
+         WHERE source_id = ? AND etat IN ('awaiting_review', 'failed')`,
+      )
+      .run(maintenant(), sourceId);
+    if (changes) {
+      db.prepare(
+        `UPDATE sources SET metadonnees = json_set(metadonnees, '$.diapositives_masquees', json(?))
+         WHERE id = ?`,
+      ).run(JSON.stringify(inclure), sourceId);
+    }
+    return changes > 0;
   });
 }
 
@@ -614,7 +699,6 @@ export function relireLegende(
       credit.trim() || null,
       imageId,
     );
-    const s = lireSource(db, img.source_id);
-    indexerSource(db, s.id, s.statut === "certifiee" ? chunksSource(db, s.id) : []);
+    reindexer(db, img.source_id);
   });
 }

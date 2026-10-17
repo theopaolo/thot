@@ -7,7 +7,7 @@ import { lireFrontMatter } from "./core/markdown.ts";
 import { openrouter } from "./core/modeles.ts";
 import { demander, profilSources, SEUIL_SOUTIEN } from "./core/reponse.ts";
 import type { Profil } from "./core/profils.ts";
-import { candidatsFts, chercher, documentsProches, transaction } from "./core/recherche.ts";
+import { candidatsFts, chercher, documentsProches } from "./core/recherche.ts";
 import {
   creerAdministrateur,
   creerCompte,
@@ -20,7 +20,8 @@ import { cacheModeles, connexion, migrer } from "./app/db.ts";
 import { controlerFichier, deposer, nomSur, sha256 } from "./app/depot.ts";
 import {
   indexer,
-  indexerTheme,
+  rattacher,
+  renommerEntree,
   lireDocument,
   reextraire,
   revendiquer,
@@ -773,8 +774,7 @@ switch (commande) {
     console.log(`Profil de l'instance : ${reste[0]}.`);
     break;
   case "renommer":
-    Domaines.renommer(db, reste[0], reste[1], reste.slice(2).join(" "));
-    if (reste[0] === "theme") indexerTheme(db, reste[1]);
+    renommerEntree(db, reste[0], reste[1], reste.slice(2).join(" "));
     break;
   case "supprimer":
     if (reste[0] === "source") {
@@ -784,21 +784,10 @@ switch (commande) {
     break;
   case "rattacher": {
     const [sourceId, coursId] = reste;
-    transaction(db, () => {
-      const liens = db
-        .prepare(
-          "SELECT cours_id, theme_id FROM source_cours WHERE source_id = ? AND cours_id != ?",
-        )
-        .all(sourceId, coursId) as Domaines.Affiliation[];
-      Domaines.affiliations(db, sourceId, [
-        ...liens,
-        {
-          cours_id: coursId,
-          theme_id: args["theme-id"] ?? null,
-        },
-      ]);
-    });
-    indexer(db, sourceId);
+    const liens = db
+      .prepare("SELECT cours_id, theme_id FROM source_cours WHERE source_id = ? AND cours_id != ?")
+      .all(sourceId, coursId) as Domaines.Affiliation[];
+    rattacher(db, sourceId, [...liens, { cours_id: coursId, theme_id: args["theme-id"] ?? null }]);
     break;
   }
   case "membre":
