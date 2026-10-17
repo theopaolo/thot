@@ -1154,6 +1154,10 @@ test("CLI : configurer des collections, changer le profil, importer, rattacher, 
     assert(inconnu.status !== 0);
     assertStringIncludes(inconnu.stderr, "Compte introuvable");
     assert(lancer("membre", "absent", "lea").status !== 0);
+    // Une commande refuse l'option d'une autre.
+    const etrangere = lancer("matiere", "Chimie", "--niveau=1");
+    assert(etrangere.status !== 0);
+    assertStringIncludes(etrangere.stderr, "--niveau");
     assertEquals(await effectif(), 1);
     await cli("retirer-membre", c, "lea");
     assertEquals(await effectif(), 0);
