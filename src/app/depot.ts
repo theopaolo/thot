@@ -168,7 +168,7 @@ export const sourceIdentique = (db: Db, compte: Compte, schoolId: string, checks
       `SELECT s.id, s.titre FROM sources s
        WHERE s.school_id = ? AND s.checksum = ? AND ${FILTRE_ACCES} ORDER BY s.cree_le LIMIT 1`,
     )
-    .get(schoolId, checksum, ...parametresAcces(lecteur(compte))) as
+    .get(parametresAcces(lecteur(compte)), schoolId, checksum) as
     | { id: string; titre: string }
     | undefined;
 

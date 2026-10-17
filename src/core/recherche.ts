@@ -59,42 +59,42 @@ export type Lecteur = { id: string; enseignant: boolean; administrateur: boolean
  * Sources lisibles par le lecteur. Un administrateur lit tout, chacun ses propres sources. Une
  * source partagée ou publiée se lit par les membres de ses cours, ou par tous si elle n'a pas de
  * cours. Avec un lecteur null, le système voit ce qui est publié aux élèves, tous cours confondus.
+ * Un élève, comme le système, ne lit que les sources certifiées.
  */
 export const filtreAcces = (s = "s") =>
-  `(? OR ${s}.proprietaire_id = ?
-  OR ((${s}.audience = 'eleves' OR (? AND ${s}.audience = 'collegues'))
-    AND (? OR NOT EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = ${s}.id)
+  `(($enseignant OR ${s}.statut = 'certifiee') AND ($administrateur OR ${s}.proprietaire_id = $lecteur
+  OR ((${s}.audience = 'eleves' OR ($enseignant AND ${s}.audience = 'collegues'))
+    AND ($systeme OR NOT EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = ${s}.id)
       OR EXISTS (SELECT 1 FROM source_cours sc JOIN membres_cours mc ON mc.cours_id = sc.cours_id
-        WHERE sc.source_id = ${s}.id AND mc.compte_id = ?))))`;
+        WHERE sc.source_id = ${s}.id AND mc.compte_id = $lecteur)))))`;
 export const FILTRE_ACCES = filtreAcces();
-export const parametresAcces = (l: Lecteur | null) => [
-  l?.administrateur ? 1 : 0,
-  l?.id ?? "",
-  l?.enseignant ? 1 : 0,
-  l ? 0 : 1,
-  l?.id ?? "",
-];
+export const parametresAcces = (l: Lecteur | null) => ({
+  administrateur: l?.administrateur ? 1 : 0,
+  lecteur: l?.id ?? "",
+  enseignant: l?.enseignant ? 1 : 0,
+  systeme: l ? 0 : 1,
+});
 
 /** Les matières passent en liste JSON : une seule, ou celles d'une comparaison. */
-export const FILTRE_DOMAINE = `((? = '' AND ? = '' AND ? = '')
-  OR (? != '' AND ? = '' AND ? = '' AND s.matiere_id IN (SELECT value FROM json_each(?)))
+export const FILTRE_DOMAINE = `(($matieres = '' AND $cours = '' AND $theme = '')
+  OR ($matieres != '' AND $cours = '' AND $theme = '' AND s.matiere_id IN (SELECT value FROM json_each($matieres)))
   OR EXISTS (SELECT 1 FROM source_cours sc JOIN cours co ON co.id = sc.cours_id
-    WHERE sc.source_id = s.id AND (? = '' OR co.matiere_id IN (SELECT value FROM json_each(?)))
-      AND (? = '' OR sc.cours_id = ?) AND (? = '' OR sc.theme_id = ?)))`;
+    WHERE sc.source_id = s.id AND ($matieres = '' OR co.matiere_id IN (SELECT value FROM json_each($matieres)))
+      AND ($cours = '' OR sc.cours_id = $cours) AND ($theme = '' OR sc.theme_id = $theme)))`;
 export const parametresDomaine = (p: Perimetre) => {
   const ids = p.matieres?.length ? p.matieres : p.matiereId ? [p.matiereId] : [];
-  const m = ids.length ? JSON.stringify(ids) : "",
-    c = p.coursId ?? "",
-    t = p.themeId ?? "";
-  return [m, c, t, m, c, t, m, m, m, c, c, t, t];
+  return {
+    matieres: ids.length ? JSON.stringify(ids) : "",
+    cours: p.coursId ?? "",
+    theme: p.themeId ?? "",
+  };
 };
 
 /** `sourceId` ou `sources`, en liste JSON. Vide : toutes les sources. */
-const FILTRE_SOURCES = "(? = '' OR s.id IN (SELECT value FROM json_each(?)))";
+const FILTRE_SOURCES = "($sources = '' OR s.id IN (SELECT value FROM json_each($sources)))";
 const parametresSources = (p: Perimetre) => {
   const ids = p.sources ?? (p.sourceId ? [p.sourceId] : []);
-  const j = ids.length ? JSON.stringify(ids) : "";
-  return [j, j];
+  return { sources: ids.length ? JSON.stringify(ids) : "" };
 };
 
 export type Recherche = {
@@ -159,7 +159,7 @@ const anglaisCitable = (db: DatabaseSync, p: Perimetre) =>
     .prepare(
       `SELECT 1 FROM sources s WHERE ${CITABLE} AND (s.langue = 'en' OR s.langue LIKE 'en-%') LIMIT 1`,
     )
-    .get(...parametresCitable(p)) !== undefined;
+    .get(parametresCitable(p)) !== undefined;
 
 /**
  * Cherche les racines françaises de la question. Si le périmètre contient une source anglaise, ses
@@ -176,34 +176,35 @@ export function chercherFts(db: DatabaseSync, question: string, p: Perimetre, k 
     .prepare(
       `SELECT c.* FROM chunks_fts f JOIN chunks c ON c.n = f.rowid
      JOIN sources s ON s.id = c.source_id
-     WHERE chunks_fts MATCH ? AND c.school_id = ? AND s.statut = 'certifiee'
-       AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-       AND ${FILTRE_SOURCES}
-       AND ${FILTRE_DOMAINE}
+     WHERE chunks_fts MATCH ? AND c.school_id = $etablissement AND ${CITABLE}
      ORDER BY bm25(chunks_fts, 3.0, 1.0) LIMIT ?`,
     )
-    .all(
-      termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "),
-      p.schoolId,
-      ...parametresAcces(p.lecteur),
-      p.bibliotheque ? 1 : 0,
-      ...parametresSources(p),
-      ...parametresDomaine(p),
-      k,
-    );
+    .all(parametresCitable(p), termes.map((t) => `"${t.replaceAll('"', "")}"`).join(" OR "), k);
   return lignes.map((l, i) => ({ ...(l as unknown as ChunkIndexe), rang_fts: i + 1 }));
 }
 
 /** Une source que le périmètre peut citer: certifiée, lisible par son lecteur, dans son domaine. */
-const CITABLE = `s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES} AND (? OR s.reponses = 1)
-  AND ${FILTRE_SOURCES} AND ${FILTRE_DOMAINE}`;
-const parametresCitable = (p: Perimetre) => [
-  p.schoolId,
+export const CITABLE = `s.school_id = $etablissement AND s.statut = 'certifiee' AND ${FILTRE_ACCES}
+  AND ($bibliotheque OR s.reponses = 1) AND ${FILTRE_SOURCES} AND ${FILTRE_DOMAINE}`;
+export const parametresCitable = (p: Perimetre) => ({
+  etablissement: p.schoolId,
+  bibliotheque: p.bibliotheque ? 1 : 0,
   ...parametresAcces(p.lecteur),
-  p.bibliotheque ? 1 : 0,
   ...parametresSources(p),
   ...parametresDomaine(p),
-];
+});
+
+/** Une source que le lecteur peut lire, sans statut imposé à l'enseignant: bibliothèque, images. */
+export const LISIBLE = `s.school_id = $etablissement AND ${FILTRE_ACCES}`;
+export const parametresLisible = (schoolId: string, l: Lecteur | null) => ({
+  etablissement: schoolId,
+  ...parametresAcces(l),
+});
+
+/** Vrai si le périmètre contient une source citable, ou seulement lisible avec `bibliotheque`. */
+export const offreSourceLisible = (db: DatabaseSync, p: Perimetre) =>
+  db.prepare(`SELECT 1 FROM sources s WHERE ${CITABLE} LIMIT 1`).get(parametresCitable(p)) !==
+  undefined;
 
 export const lireChunk = (db: DatabaseSync, sourceId: string, id: string, p: Perimetre) =>
   db
@@ -211,13 +212,13 @@ export const lireChunk = (db: DatabaseSync, sourceId: string, id: string, p: Per
       `SELECT c.* FROM chunks c JOIN sources s ON s.id = c.source_id
      WHERE c.source_id = ? AND c.id = ? AND ${CITABLE}`,
     )
-    .get(sourceId, id, ...parametresCitable(p)) as ChunkIndexe | undefined;
+    .get(parametresCitable(p), sourceId, id) as ChunkIndexe | undefined;
 
 /** La révision servie d'une source que le périmètre peut citer, sinon `undefined`. */
 export const revisionCitable = (db: DatabaseSync, sourceId: string, p: Perimetre) =>
   db
     .prepare(`SELECT s.revision FROM sources s WHERE s.id = ? AND ${CITABLE}`)
-    .get(sourceId, ...parametresCitable(p))?.revision as number | undefined;
+    .get(parametresCitable(p), sourceId)?.revision as number | undefined;
 
 /** Matières comparées au plus : une colonne de tableau et un des cinq extraits chacune. */
 export const MAX_MATIERES = 4;

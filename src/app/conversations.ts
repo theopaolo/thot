@@ -1,8 +1,15 @@
 import { actualiserResultat, type Resultat } from "../core/reponse.ts";
-import { type Perimetre, transaction } from "../core/recherche.ts";
+import {
+  FILTRE_ACCES,
+  filtreAcces,
+  type Lecteur,
+  type Perimetre,
+  parametresAcces,
+  transaction,
+} from "../core/recherche.ts";
 import { type Compte, lecteur } from "./comptes.ts";
 import { type Db, maintenant } from "./db.ts";
-import type { Scope } from "./domaines.ts";
+import { nomTheme, type Scope } from "./domaines.ts";
 import { chunksSource } from "./ingestion.ts";
 import { lireInstance } from "./instance.ts";
 
@@ -298,3 +305,45 @@ export const donnerAvis = (db: Db, compte: Compte, id: string, avis: string) =>
   db
     .prepare("UPDATE messages SET avis = ? WHERE id = ? AND compte_id = ? AND etat = 'answered'")
     .run(avis, id, compte.id).changes > 0;
+
+export type QuestionDesEleves = {
+  id: string;
+  question: string;
+  etat: string;
+  code: string | null;
+  avis: string | null;
+  cree_le: string;
+  nom: string;
+  chapitre: string;
+};
+
+// Un enseignant lit les questions posées dans ses cours. Sans cours choisi, celles des élèves
+// avec qui il partage un cours, ou de tout élève qui n'a aucun cours. Un administrateur lit tout.
+export const questionsDesEleves = (db: Db, l: Lecteur) =>
+  db
+    .prepare(
+      `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
+         json_extract(m.resultat, '$.code') AS code,
+         coalesce((SELECT nom FROM themes WHERE id = m.theme_id), ${nomTheme("s")},
+           ${nomTheme("s2")}, '') AS chapitre
+       FROM messages m JOIN comptes c ON c.id = m.compte_id
+       LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
+         AND ${FILTRE_ACCES}
+       LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
+         AND ${filtreAcces("s2")}
+       WHERE c.role = 'eleve' AND ($administrateur OR CASE
+         WHEN m.cours_id != '' THEN m.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = $lecteur)
+         WHEN m.theme_id != '' THEN EXISTS (SELECT 1 FROM themes t JOIN membres_cours mc
+           ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = $lecteur)
+         WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = $lecteur)
+         WHEN m.matieres != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE instr(',' || m.matieres || ',', ',' || co.matiere_id || ',')
+           AND mc.compte_id = $lecteur)
+         ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
+           OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
+             ON lui.cours_id = moi.cours_id WHERE moi.compte_id = $lecteur AND lui.compte_id = m.compte_id)
+         END)
+       ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
+    )
+    .all(parametresAcces(l)) as QuestionDesEleves[];

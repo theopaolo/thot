@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import type { Modeles } from "../../core/modeles.ts";
 import type { Affirmation } from "../../core/reponse.ts";
-import { FILTRE_ACCES, type Lecteur, parametresAcces } from "../../core/recherche.ts";
+import { CITABLE, type Lecteur, parametresCitable } from "../../core/recherche.ts";
 import { contexte } from "../../core/texte.ts";
 import { type Compte, lecteur } from "../comptes.ts";
 import { lireInstance } from "../instance.ts";
@@ -62,11 +62,15 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
          coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date
        FROM sources s ${THEME_LU}
-       WHERE s.id = ? AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
+       WHERE s.id = ? AND ${CITABLE}`,
       )
-      .get(...Domaines.mesCours(l), id, instance.school_id, ...parametresAcces(l)) as
-      | Eleve.SourceLue
-      | undefined;
+      .get(
+        {
+          ...parametresCitable({ schoolId: instance.school_id, lecteur: l, bibliotheque: true }),
+          ...Domaines.mesCours(l),
+        },
+        id,
+      ) as Eleve.SourceLue | undefined;
   /** La feuille du passage `:n` d'une réponse ou d'une explication `id`, s'il est lisible. */
   const feuilleCitation = (c: Context<Env>, affirmations: Affirmation[], id: string) => {
     const n = Number(c.req.param("n"));

@@ -1,15 +1,15 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import {
+  CITABLE,
   chercher,
   documentsProches,
-  FILTRE_ACCES,
   type Lecteur,
-  parametresAcces,
+  parametresCitable,
 } from "../../core/recherche.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { config } from "../config.ts";
-import { lireDocument } from "../ingestion.ts";
+import { imagesLues, lireDocument } from "../ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Eleve from "../vues/eleve.ts";
 import * as Domaines from "../domaines.ts";
@@ -42,10 +42,12 @@ export function routesEleve(app: Hono<Env>, w: Web) {
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-       FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}
+       FROM sources s WHERE ${CITABLE}
        ORDER BY seance, titre`,
       )
-      .all(instance.school_id, ...parametresAcces(lu(c))) as Eleve.SourceChapitre[];
+      .all(
+        parametresCitable({ schoolId: instance.school_id, lecteur: lu(c), bibliotheque: true }),
+      ) as Eleve.SourceChapitre[];
     const selection = idsScope(c);
     const visibles = rangs.filter((r) => selection.has(r.id));
     const chapitres: Eleve.ChapitreVue[] = [];
@@ -55,7 +57,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id
       WHERE ${Domaines.MES_COURS}`,
       )
-      .all(...Domaines.mesCours(lu(c)));
+      .all(Domaines.mesCours(lu(c)));
     for (const r of visibles) {
       const liens = rattachements.filter((l) => l.source_id === r.id);
       for (const lien of liens.length ? liens : [undefined]) {
@@ -180,19 +182,20 @@ export function routesEleve(app: Hono<Env>, w: Web) {
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-       FROM sources s WHERE s.school_id = ? AND s.statut = 'certifiee' AND ${FILTRE_ACCES}
-         AND CASE WHEN ? = '' THEN NOT EXISTS (SELECT 1 FROM source_cours sc
-             WHERE sc.source_id = s.id AND sc.theme_id IS NOT NULL AND ${Domaines.MES_COURS})
-           ELSE EXISTS (SELECT 1 FROM source_cours sc WHERE sc.source_id = s.id AND sc.theme_id = ?) END
+       FROM sources s WHERE ${CITABLE}
+         AND ($theme != '' OR NOT EXISTS (SELECT 1 FROM source_cours sc
+           WHERE sc.source_id = s.id AND sc.theme_id IS NOT NULL AND ${Domaines.MES_COURS}))
        ORDER BY seance = '', seance, s.titre`,
       )
-      .all(
-        instance.school_id,
-        ...parametresAcces(lu(c)),
-        themeId,
+      .all({
+        ...parametresCitable({
+          schoolId: instance.school_id,
+          lecteur: lu(c),
+          bibliotheque: true,
+          themeId,
+        }),
         ...Domaines.mesCours(lu(c)),
-        themeId,
-      ) as Eleve.SourceChapitre[];
+      }) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
     const doc =
@@ -220,12 +223,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
     const s = sourceCertifiee(id, l);
     if (!s) return undefined;
-    const images = db
-      .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
-       FROM images WHERE source_id = ? ORDER BY position`,
-      )
-      .all(id) as { id: string; legende: string | null; credit: string | null }[];
+    const images = imagesLues(db, id);
     let extrait = "";
     try {
       const texte = lireDocument(id, s.revision)
@@ -256,12 +254,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   app.get("/eleve/sources/:id", (c) => {
     const s = sourceCertifiee(c.req.param("id"), lu(c));
     if (!s) return c.notFound();
-    const images = db
-      .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
-       FROM images WHERE source_id = ? ORDER BY position`,
-      )
-      .all(s.id) as { id: string; legende: string | null; credit: string | null }[];
+    const images = imagesLues(db, s.id);
     const debut = Number(c.req.query("debut"));
     const fin = Number(c.req.query("fin"));
     const marque =
@@ -326,10 +319,19 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           `SELECT s.id, s.titre, s.profil, coalesce(t.id, '') AS theme_id, coalesce(t.nom, '') AS theme,
            coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
            (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
-         FROM sources s ${THEME_LU} WHERE s.id IN (${ids.map(() => "?").join(",")})
-           AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
+         FROM sources s ${THEME_LU} WHERE s.id IN (${ids.map(() => "?").join(",")}) AND ${CITABLE}`,
         )
-        .all(...Domaines.mesCours(lu(c)), ...ids, instance.school_id, ...parametresAcces(lu(c)))
+        .all(
+          {
+            ...parametresCitable({
+              schoolId: instance.school_id,
+              lecteur: lu(c),
+              bibliotheque: true,
+            }),
+            ...Domaines.mesCours(lu(c)),
+          },
+          ...ids,
+        )
         .map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
     );
     const trouves = ids

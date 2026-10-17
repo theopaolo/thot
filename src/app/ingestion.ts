@@ -26,7 +26,9 @@ import { oublierSource, revoirActivites } from "./activites.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { type Audience, sha256 } from "./depot.ts";
-import { type Affiliation, affiliations, renommer } from "./domaines.ts";
+import { filtreModification, parametresModification, type Compte } from "./comptes.ts";
+import { type Affiliation, affiliations, nomTheme, renommer } from "./domaines.ts";
+import { lireInstance } from "./instance.ts";
 import type { Profil } from "../core/profils.ts";
 
 const VERROU_MS = 5 * 60_000;
@@ -702,3 +704,54 @@ export function relireLegende(
     reindexer(db, img.source_id);
   });
 }
+
+/** Les images d'une source. Une légende ne se montre qu'une fois relue. */
+export const imagesLues = (db: Db, sourceId: string) =>
+  db
+    .prepare(
+      `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
+       FROM images WHERE source_id = ? ORDER BY position`,
+    )
+    .all(sourceId) as { id: string; legende: string | null; credit: string | null }[];
+
+export type ImageALegender = {
+  id: string;
+  legende: string | null;
+  legende_statut: string;
+  legende_origine: string | null;
+  modele: string | null;
+  source_id: string;
+  titre: string;
+  credit: string | null;
+  restantes: number;
+};
+
+// La file ne propose que les images des sources que le compte peut relire.
+const FILE = `i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = $etablissement
+  AND ${filtreModification()}`;
+const parametresFile = (db: Db, compte: Compte) => ({
+  ...parametresModification(compte),
+  etablissement: lireInstance(db).school_id,
+});
+
+export const aLegender = (db: Db, compte: Compte, imageId = "") => {
+  const restantes = db
+    .prepare(`SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`)
+    .get(parametresFile(db, compte))!.n as number;
+  const i = db
+    .prepare(
+      `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
+       ORDER BY (i.id = ?) DESC, ${nomTheme("s")}, s.titre, i.position LIMIT 1`,
+    )
+    .get(parametresFile(db, compte), imageId) as Omit<ImageALegender, "restantes"> | undefined;
+  return i && { ...i, restantes };
+};
+
+// Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
+export const fileLegendes = (db: Db, compte: Compte) =>
+  db
+    .prepare(
+      `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
+       ORDER BY ${nomTheme("s")}, s.titre, i.position LIMIT 12`,
+    )
+    .all(parametresFile(db, compte)) as { id: string; titre: string }[];

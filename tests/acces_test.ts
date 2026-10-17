@@ -9,13 +9,13 @@ import { config, RACINE } from "../src/app/config.ts";
 import { type Audience, deposer, valider } from "../src/app/depot.ts";
 import { configurerInstance, lireInstance } from "../src/app/instance.ts";
 import { reextraire, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
-import { chercherFts, type Lecteur } from "../src/core/recherche.ts";
+import { chercherFts, LISIBLE, type Lecteur, parametresLisible } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
 import { resultatActuel } from "../src/app/conversations.ts";
 import { cleLegende, type Modeles } from "../src/core/modeles.ts";
 import type { Profil } from "../src/core/profils.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../src/app/suggestions.ts";
-import { creerCompte } from "../src/app/comptes.ts";
+import { creerCompte, lecteur, lireCompte } from "../src/app/comptes.ts";
 import {
   affiliations,
   cours,
@@ -411,6 +411,25 @@ test("instance personnelle : le propriétaire étudie ses ressources privées", 
     const lecture = cours(db, matiere(db, "Notes"), "Lecture");
     const corps = { cours: lecture, jours: "14", places: "40" };
     assertEquals(await statut(envoyer(moi, "/prof/eleves/liens", corps)), 404);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lecture : un élève ne lit pas une source publiée qui n'est pas certifiée", async () => {
+  const { db, dir, a, eleve, eleves } = await instance();
+  try {
+    db.prepare("UPDATE sources SET statut = 'a_relire' WHERE id = ?").run(eleves);
+    const lisible = (compte: { id: string }) =>
+      db
+        .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${LISIBLE}`)
+        .get(
+          parametresLisible(lireInstance(db).school_id, lecteur(lireCompte(db, compte.id)!)),
+          eleves,
+        ) !== undefined;
+    assertEquals(lisible(eleve), false);
+    assertEquals(lisible(a), true);
   } finally {
     db.close();
     await rm(dir, { recursive: true });

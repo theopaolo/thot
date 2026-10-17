@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
-import { FILTRE_ACCES, parametresAcces } from "../../core/recherche.ts";
+import { LISIBLE, parametresLisible } from "../../core/recherche.ts";
 import { contenu } from "../config.ts";
 import type { Env, Web } from "./web.ts";
 
@@ -11,14 +11,11 @@ export function routesMedia(app: Hono<Env>, w: Web) {
     const i = db
       .prepare(
         `SELECT i.fichier, i.mime, i.source_id, i.checksum FROM images i JOIN sources s ON s.id = i.source_id
-       WHERE i.id = ? AND s.school_id = ? AND ${FILTRE_ACCES} AND (s.statut = 'certifiee' OR ?)`,
+       WHERE i.id = ? AND ${LISIBLE}`,
       )
-      .get(
-        c.req.param("id"),
-        instance.school_id,
-        ...parametresAcces(lu(c)),
-        lu(c).enseignant ? 1 : 0,
-      ) as { fichier: string; mime: string; source_id: string; checksum: string } | undefined;
+      .get(parametresLisible(instance.school_id, lu(c)), c.req.param("id")) as
+      | { fichier: string; mime: string; source_id: string; checksum: string }
+      | undefined;
     if (!i) return c.notFound();
     // Le navigateur revalide à chaque affichage : une source devenue privée cesse aussitôt de servir.
     const entetes = { "cache-control": "private, no-cache", etag: `"${i.checksum}"` };

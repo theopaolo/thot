@@ -1,21 +1,24 @@
 import { readFile } from "node:fs/promises";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
-import { FILTRE_ACCES, filtreAcces, parametresAcces } from "../../core/recherche.ts";
+import { LISIBLE, parametresLisible } from "../../core/recherche.ts";
 import { notesPptx } from "../../core/pptx.ts";
 import {
   type Compte,
   filtreModification,
+  lecteur,
   parametresModification,
-  peutLire,
   peutModifier,
 } from "../comptes.ts";
 import { libelles } from "../instance.ts";
 import { contenu } from "../config.ts";
 import { audience } from "../depot.ts";
+import { questionsDesEleves } from "../conversations.ts";
 import {
+  aLegender,
   changerLecteurs,
   ecarterRevision,
+  fileLegendes,
   inclureDiapositivesMasquees,
   lireDocument,
   modifierSource,
@@ -30,10 +33,6 @@ import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import type { Env, Web } from "./web.ts";
 
-/** Le nom du thème d'une source, le premier par ordre alphabétique si elle en a plusieurs. */
-const nomTheme = (s: string) =>
-  `(SELECT min(t.nom) FROM source_cours sc JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = ${s}.id)`;
-
 const MODIFICATION_REFUSEE =
   "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.";
 
@@ -43,7 +42,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
   const lignes = (c: Context<Env>, statut: string, theme: string) =>
     db
       .prepare(
-        `SELECT s.id, s.titre, s.profil, ${nomTheme("s")} AS theme, s.format, s.statut,
+        `SELECT s.id, s.titre, s.profil, ${Domaines.nomTheme("s")} AS theme, s.format, s.statut,
          s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
@@ -52,14 +51,15 @@ export function routesProf(app: Hono<Env>, w: Web) {
          (SELECT count(legende) FROM images i WHERE i.source_id = s.id) AS legendes,
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
-       WHERE s.school_id = ? AND ${FILTRE_ACCES} AND (? = '' OR s.statut = ?)
+       WHERE ${LISIBLE} AND (? = '' OR s.statut = ?)
          AND (? = '' OR theme = ?) AND (? = '' OR s.lot_id = ?)
        ORDER BY theme, s.titre`,
       )
       .all(
-        ...parametresModification(c.get("compte")),
-        instance.school_id,
-        ...parametresAcces(lu(c)),
+        {
+          ...parametresModification(c.get("compte")),
+          ...parametresLisible(instance.school_id, lu(c)),
+        },
         statut,
         statut,
         theme,
@@ -112,48 +112,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
       ),
     );
   });
-  // Un enseignant lit les questions posées dans ses cours. Sans cours choisi, celles des élèves
-  // avec qui il partage un cours, ou de tout élève qui n'a aucun cours. Un administrateur lit tout.
-  app.get("/prof/questions", (c) => {
-    const l = lu(c);
-    const messages = db
-      .prepare(
-        `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
-         json_extract(m.resultat, '$.code') AS code,
-         coalesce((SELECT nom FROM themes WHERE id = m.theme_id), ${nomTheme("s")},
-           ${nomTheme("s2")}, '') AS chapitre
-       FROM messages m JOIN comptes c ON c.id = m.compte_id
-       LEFT JOIN sources s ON s.id = json_extract(m.resultat, '$.affirmations[0].source_id')
-         AND ${FILTRE_ACCES}
-       LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
-         AND ${filtreAcces("s2")}
-       WHERE c.role = 'eleve' AND (? OR CASE
-         WHEN m.cours_id != '' THEN m.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = ?)
-         WHEN m.theme_id != '' THEN EXISTS (SELECT 1 FROM themes t JOIN membres_cours mc
-           ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = ?)
-         WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
-           ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = ?)
-         WHEN m.matieres != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
-           ON mc.cours_id = co.id WHERE instr(',' || m.matieres || ',', ',' || co.matiere_id || ',')
-           AND mc.compte_id = ?)
-         ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
-           OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
-             ON lui.cours_id = moi.cours_id WHERE moi.compte_id = ? AND lui.compte_id = m.compte_id)
-         END)
-       ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
-      )
-      .all(
-        ...parametresAcces(l),
-        ...parametresAcces(l),
-        l.administrateur ? 1 : 0,
-        l.id,
-        l.id,
-        l.id,
-        l.id,
-        l.id,
-      ) as Prof.QuestionProf[];
-    return c.html(rendre(c, "Questions des élèves", Prof.questionsProf(messages)));
-  });
+  app.get("/prof/questions", (c) =>
+    c.html(rendre(c, "Questions des élèves", Prof.questionsProf(questionsDesEleves(db, lu(c))))),
+  );
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
     const selection = idsScope(c);
@@ -187,15 +148,15 @@ export function routesProf(app: Hono<Env>, w: Web) {
   });
   const detail = (id: string, compte: Compte): Prof.Detail | undefined => {
     const source = db
-      .prepare("SELECT * FROM sources WHERE id = ? AND school_id = ?")
-      .get(id, instance.school_id) as
+      .prepare(`SELECT * FROM sources s WHERE s.id = ? AND ${LISIBLE}`)
+      .get(parametresLisible(instance.school_id, lecteur(compte)), id) as
       | (Prof.Detail["source"] & {
           metadonnees: string;
           revision: number;
           proprietaire_id: string | null;
         })
       | undefined;
-    if (!source || !peutLire(db, compte, id)) return undefined;
+    if (!source) return undefined;
     const job = db
       .prepare("SELECT etat, erreur, avertissements FROM ingestion_jobs WHERE source_id = ?")
       .get(id) as { etat: string; erreur: string | null; avertissements: string } | undefined;
@@ -379,36 +340,16 @@ export function routesProf(app: Hono<Env>, w: Web) {
     return c.redirect(`/prof/sources/${id}`, 303);
   });
 
-  // La file ne propose que les images des sources que le compte peut relire.
-  const FILE = `i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
-    AND ${filtreModification()}`;
-  const file = (c: Context<Env>) => [
-    instance.school_id,
-    ...parametresModification(c.get("compte")),
-  ];
-  const aLegender = (c: Context<Env>, imageId?: string) => {
-    const restantes = db
-      .prepare(`SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`)
-      .get(...file(c))!.n as number;
-    const i = db
-      .prepare(
-        `SELECT i.*, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
-       ORDER BY (i.id = ?) DESC, ${nomTheme("s")}, s.titre, i.position LIMIT 1`,
-      )
-      .get(...file(c), imageId ?? "") as Prof.ALegender | undefined;
-    return i && { ...i, restantes };
-  };
-  // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
-  const fileLegendes = (c: Context<Env>) =>
-    db
-      .prepare(
-        `SELECT i.id, s.titre FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}
-       ORDER BY ${nomTheme("s")}, s.titre, i.position LIMIT 12`,
-      )
-      .all(...file(c)) as { id: string; titre: string }[];
   app.get("/prof/legendes", (c) =>
     c.html(
-      rendre(c, "Légendes", Prof.pageLegendes(aLegender(c, c.req.query("image")), fileLegendes(c))),
+      rendre(
+        c,
+        "Légendes",
+        Prof.pageLegendes(
+          aLegender(db, c.get("compte"), c.req.query("image")),
+          fileLegendes(db, c.get("compte")),
+        ),
+      ),
     ),
   );
   app.post("/prof/legendes/:action{(?:certified|rejected)}", async (c) => {
@@ -426,6 +367,6 @@ export function routesProf(app: Hono<Env>, w: Web) {
       c.get("compte").nom,
       String(b.credit ?? ""),
     );
-    return c.html(Prof.legende(aLegender(c), fileLegendes(c)));
+    return c.html(Prof.legende(aLegender(db, c.get("compte")), fileLegendes(db, c.get("compte"))));
   });
 }
