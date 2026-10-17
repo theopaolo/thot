@@ -9,7 +9,7 @@ import {
 } from "../../core/recherche.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { config } from "../config.ts";
-import { lireDocument } from "../ingestion.ts";
+import { imagesLues, lireDocument } from "../ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Eleve from "../vues/eleve.ts";
 import * as Domaines from "../domaines.ts";
@@ -223,12 +223,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
     const s = sourceCertifiee(id, l);
     if (!s) return undefined;
-    const images = db
-      .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
-       FROM images WHERE source_id = ? ORDER BY position`,
-      )
-      .all(id) as { id: string; legende: string | null; credit: string | null }[];
+    const images = imagesLues(db, id);
     let extrait = "";
     try {
       const texte = lireDocument(id, s.revision)
@@ -259,12 +254,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   app.get("/eleve/sources/:id", (c) => {
     const s = sourceCertifiee(c.req.param("id"), lu(c));
     if (!s) return c.notFound();
-    const images = db
-      .prepare(
-        `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
-       FROM images WHERE source_id = ? ORDER BY position`,
-      )
-      .all(s.id) as { id: string; legende: string | null; credit: string | null }[];
+    const images = imagesLues(db, s.id);
     const debut = Number(c.req.query("debut"));
     const fin = Number(c.req.query("fin"));
     const marque =

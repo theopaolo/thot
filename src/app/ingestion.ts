@@ -705,6 +705,15 @@ export function relireLegende(
   });
 }
 
+/** Les images d'une source. Une légende ne se montre qu'une fois relue. */
+export const imagesLues = (db: Db, sourceId: string) =>
+  db
+    .prepare(
+      `SELECT id, CASE WHEN legende_statut = 'certified' THEN legende END AS legende, credit
+       FROM images WHERE source_id = ? ORDER BY position`,
+    )
+    .all(sourceId) as { id: string; legende: string | null; credit: string | null }[];
+
 export type ImageALegender = {
   id: string;
   legende: string | null;
