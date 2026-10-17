@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../core/recherche.ts";
+import { type Lecteur, transaction } from "../core/recherche.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { coursDuCompte, inscrire } from "./domaines.ts";
@@ -475,10 +475,6 @@ export const lecteur = (c: Compte): Lecteur => ({
   enseignant: c.role === "enseignant",
   administrateur: c.administrateur === 1,
 });
-export const peutLire = (db: Db, c: Compte, sourceId: string) =>
-  db
-    .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
-    .get(parametresAcces(lecteur(c)), sourceId) !== undefined;
 /**
  * Modifient, certifient et relisent une source : son propriétaire, les administrateurs, et les
  * enseignants de ses cours quand elle n'est pas privée.

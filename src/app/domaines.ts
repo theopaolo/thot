@@ -385,6 +385,9 @@ export const themeNomme = (db: Db, coursId: string, nom = "") =>
         | string
         | undefined) ?? theme(db, coursId, nom))
     : null;
+/** Le nom du thème d'une source, le premier par ordre alphabétique si elle en a plusieurs. */
+export const nomTheme = (s: string) =>
+  `(SELECT min(t.nom) FROM source_cours sc JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = ${s}.id)`;
 /**
  * Le thème qui remplace un ancien chapitre, c'est-à-dire une séquence : celui où sont rangées le
  * plus de sources de cette séquence, dans un cours du compte d'abord. Vide si aucun ne convient.
