@@ -532,7 +532,7 @@ cite une affirmation vérifiée. Un nœud peut citer une autre affirmation, qui 
 des nœuds et le type d'une relation viennent du modèle sans preuve : le fait est l'affirmation
 citée, que le texte du schéma affiche avec la relation. Une relation proposée sans preuve n'existe
 pas encore. Le texte Mermaid sort de `texteMermaid()` dans `src/core/notation.ts`, pas du modèle :
-un nom n'y garde que lettres, chiffres et espaces, le reste passe en entités. La liste des
+un nom y garde ses caractères, sauf les signes qui ont un rôle dans sa syntaxe. La liste des
 relations citées s'affiche toujours. Le navigateur dessine le schéma au-dessus, avec Mermaid en
 mode strict puis DOMPurify sur le SVG. Un échec laisse la liste.
 

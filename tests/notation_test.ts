@@ -16,7 +16,11 @@ test("le texte Mermaid d'un schéma ne laisse passer aucune syntaxe venue des no
   ];
   const schema: Schema = {
     type: "schema",
-    noeuds: [...pieges.map((titre) => ({ titre })), { titre: "Éléphant 2", affirmation: 0 }],
+    noeuds: [
+      ...pieges.map((titre) => ({ titre })),
+      { titre: "Éléphant 2", affirmation: 0 },
+      { titre: "x < 0 & y ≥ 0, −5 °C, C#, 20 %" },
+    ],
     relations: [
       { de: 0, vers: 1, lien: "cause", affirmation: 1 },
       { de: 1, vers: 2, lien: "suite", affirmation: 2 },
@@ -26,18 +30,21 @@ test("le texte Mermaid d'un schéma ne laisse passer aucune syntaxe venue des no
   // Le `;` sépare les lignes même quand le flux SSE remplace les sauts de ligne.
   const lignes = texteMermaid(schema).split(";\n");
   assertEquals(lignes[0], "flowchart TD");
-  // Chaque ligne suit la grammaire écrite par le code, et un nom n'y garde que lettres,
-  // chiffres, espaces et une ponctuation sans rôle dans la syntaxe.
-  const nom = String.raw`"[\p{L}\p{N} ().,:'’?!+=/-]*"`;
-  const forme = new RegExp(`^(?:n\\d\\[${nom}\\]|n\\d (?:-->|==>|-\\.-)\\|${nom}\\| n\\d)$`, "u");
+  // Chaque ligne suit la grammaire écrite par le code, avec un nom jamais vide.
+  const nom = String.raw`"[^"\n]+"`;
+  const forme = new RegExp(`^(?:n\\d\\[${nom}\\]|n\\d (?:-->|==>|-\\.-)\\|${nom}\\| n\\d);?$`, "u");
   for (const ligne of lignes.slice(1)) assert(forme.test(ligne), ligne);
-  assertEquals(lignes.length, 1 + 9 + 3);
-  assertEquals(lignes[9], 'n8["Éléphant 2 (1)"]');
-  assertEquals(lignes[10], 'n0 -->|"entraîne (2)"| n1');
-  assertEquals(lignes[11], 'n1 ==>|"précède (3)"| n2');
-  assertEquals(lignes[12], 'n2 -.-|"est lié à (4)"| n8');
-  const noms = [...lignes.join("\n").matchAll(/"([^"]*)"/g)].map((m) => m[1]).join("");
-  for (const interdit of ["<", ">", "%", "$", "`", "\\", "\n", "°", "¶", "|", "[", "#", "{", ";"]) {
+  assertEquals(lignes.length, 1 + 10 + 3);
+  assertEquals(lignes[9], 'n8["Éléphant 2 [1]"]');
+  assertEquals(lignes[10], 'n9["x #lt; 0 #amp; y ≥ 0, −5 °C, C#, 20 %"]');
+  assertEquals(lignes[11], 'n0 -->|"entraîne [2]"| n1');
+  assertEquals(lignes[12], 'n1 ==>|"précède [3]"| n2');
+  assertEquals(lignes[13], 'n2 -.-|"est lié à [4]"| n8;');
+  // Hors des entités que Mermaid décode, un nom n'a aucun signe de sa syntaxe.
+  const noms = [...lignes.join("\n").matchAll(/"([^"]*)"/g)]
+    .map((m) => m[1].replace(/#(?:lt|gt|amp);/g, ""))
+    .join("");
+  for (const interdit of ["<", ">", "&", ";", "%%", "$$", "`", "\n", "ﬂ"]) {
     assert(!noms.includes(interdit), interdit);
   }
 });

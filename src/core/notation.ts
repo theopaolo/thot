@@ -21,28 +21,41 @@ export type Schema = {
 // aussi sans la couleur.
 const TRAITS: Record<Lien, string> = { cause: "-->", suite: "==>", theme: "-.-" };
 
+// Les signes d'un nom qui ont un rôle dans une chaîne Mermaid. `<`, `>` et `&` passent par les
+// seules entités qu'une étiquette SVG décode, `ﬂ` ouvrirait une entité codée par Mermaid.
+const SIGNES: Record<string, string> = {
+  '"': "'",
+  "`": "'",
+  ";": ",",
+  "<": "#lt;",
+  ">": "#gt;",
+  "&": "#amp;",
+  ﬂ: "fl",
+};
+
 /**
- * Le texte Mermaid d'un schéma validé. Seul ce code écrit la syntaxe : un nom ne garde que ses
- * lettres, chiffres, espaces et une ponctuation sans rôle dans la syntaxe, le reste devient une
- * espace. Une entité Mermaid (`#40;`) s'afficherait telle quelle, les étiquettes n'étant pas en
- * HTML. Aucune directive, aucun lien, aucun clic. Les numéros sont ceux des citations.
+ * Le texte Mermaid d'un schéma validé. Seul ce code écrit la syntaxe : un nom garde ses
+ * caractères, sauf les `SIGNES` et les doubles `%%` et `$$` d'une directive ou d'une formule.
+ * Aucune directive, aucun lien, aucun clic. Les numéros entre crochets sont ceux des citations.
  */
 export function texteMermaid(s: Schema) {
   const texte = (t: string) =>
     `"${t
-      .replace(/[^\p{L}\p{N} ().,:'’?!+=/-]/gu, " ")
-      .replace(/ {2,}/g, " ")
-      .trim()}"`;
-  const numero = (n?: number) => (n === undefined ? "" : ` (${n + 1})`);
+      .replace(/\s+/g, " ")
+      .replace(/%{2,}/g, "%")
+      .replace(/\${2,}/g, "$")
+      .replace(/["`;<>&ﬂ]/g, (c) => SIGNES[c])}"`;
+  const numero = (n?: number) => (n === undefined ? "" : ` [${n + 1}]`);
   // Le flux SSE remplace les sauts de ligne par des espaces : le `;` sépare encore les lignes.
-  return [
+  // Mermaid retire le dernier `;` d'une ligne où il lit `style…:…#`, d'où le `;` final.
+  return `${[
     "flowchart TD",
     ...s.noeuds.map((n, i) => `n${i}[${texte(n.titre + numero(n.affirmation))}]`),
     ...s.relations.map(
       (r) =>
         `n${r.de} ${TRAITS[r.lien]}|${texte(LIENS[r.lien] + numero(r.affirmation))}| n${r.vers}`,
     ),
-  ].join(";\n");
+  ].join(";\n")};`;
 }
 
 // `$$…$$` en bloc, `$…$` dans la ligne. Un `$` suivi d'une espace n'ouvre rien, un `$` suivi d'un

@@ -233,9 +233,9 @@ test("un schéma se lit toujours en liste citée, son texte Mermaid voyage écha
   const mermaid = rendu.match(/data-mermaid="([^"]*)"/)![1];
   assertStringIncludes(
     mermaid,
-    "flowchart TD;\nn0[&quot;script alert(1) /script (1)&quot;];\nn1[&quot;init&quot;]",
+    "flowchart TD;\nn0[&quot;#lt;script#gt;alert(1)#lt;/script#gt;&#39; [1]&quot;];\nn1[&quot;%{init}%&quot;]",
   );
-  assertStringIncludes(mermaid, "n0 --&gt;|&quot;entraîne (2)&quot;| n1");
+  assertStringIncludes(mermaid, "n0 --&gt;|&quot;entraîne [2]&quot;| n1");
   // Une formule que sa citation écrit se rend, l'autre reste du texte.
   assertStringIncludes(
     rendu,
