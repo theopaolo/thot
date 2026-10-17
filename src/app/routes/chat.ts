@@ -100,7 +100,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
          AND ${FILTRE_ACCES}
        ORDER BY random() LIMIT 3`,
       )
-      .all(...ids, instance.school_id, question, ...parametresAcces(l))
+      .all(parametresAcces(l), ...ids, instance.school_id, question)
       .map((x) => x.question as string);
     return memesSources.length ? memesSources : duTheme(ids[0]);
   };
@@ -134,7 +134,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
         .prepare(
           `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
         )
-        .all(instance.school_id, ...parametresAcces(lu(c)));
+        .all(parametresAcces(lu(c)), instance.school_id);
       const visible = (q: Domaines.Scope) => {
         const disponibles = Domaines.sourcesPerimetre(db, q);
         return lisibles.some((s) => disponibles.has(s.id as string));

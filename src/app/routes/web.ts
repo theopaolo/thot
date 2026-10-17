@@ -64,7 +64,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
        FROM sources s ${THEME_LU}
        WHERE s.id = ? AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
       )
-      .get(...Domaines.mesCours(l), id, instance.school_id, ...parametresAcces(l)) as
+      .get({ ...Domaines.mesCours(l), ...parametresAcces(l) }, id, instance.school_id) as
       | Eleve.SourceLue
       | undefined;
   /** La feuille du passage `:n` d'une réponse ou d'une explication `id`, s'il est lisible. */

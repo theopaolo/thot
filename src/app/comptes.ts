@@ -478,25 +478,24 @@ export const lecteur = (c: Compte): Lecteur => ({
 export const peutLire = (db: Db, c: Compte, sourceId: string) =>
   db
     .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${FILTRE_ACCES}`)
-    .get(sourceId, ...parametresAcces(lecteur(c))) !== undefined;
+    .get(parametresAcces(lecteur(c)), sourceId) !== undefined;
 /**
  * Modifient, certifient et relisent une source : son propriétaire, les administrateurs, et les
  * enseignants de ses cours quand elle n'est pas privée.
  */
 export const filtreModification = (s = "s") =>
-  `(? OR ${s}.proprietaire_id = ? OR (? AND ${s}.audience != 'prive'
+  `($administrateur OR ${s}.proprietaire_id = $lecteur OR ($enseignant AND ${s}.audience != 'prive'
     AND EXISTS (SELECT 1 FROM source_cours sc JOIN membres_cours mc ON mc.cours_id = sc.cours_id
-      WHERE sc.source_id = ${s}.id AND mc.compte_id = ?)))`;
-export const parametresModification = (c: Compte) => [
-  c.administrateur === 1 ? 1 : 0,
-  c.id,
-  c.role === "enseignant" ? 1 : 0,
-  c.id,
-];
+      WHERE sc.source_id = ${s}.id AND mc.compte_id = $lecteur)))`;
+export const parametresModification = (c: Compte) => ({
+  administrateur: c.administrateur === 1 ? 1 : 0,
+  lecteur: c.id,
+  enseignant: c.role === "enseignant" ? 1 : 0,
+});
 export const peutModifier = (db: Db, c: Compte, sourceId: string) =>
   db
     .prepare(`SELECT 1 FROM sources s WHERE s.id = ? AND ${filtreModification()}`)
-    .get(sourceId, ...parametresModification(c)) !== undefined;
+    .get(parametresModification(c), sourceId) !== undefined;
 
 /** Secret de signature des cookies. Créé au premier lancement, conservé avec les données. */
 export function secretSession(): string {

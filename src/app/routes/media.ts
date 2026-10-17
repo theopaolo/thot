@@ -11,14 +11,11 @@ export function routesMedia(app: Hono<Env>, w: Web) {
     const i = db
       .prepare(
         `SELECT i.fichier, i.mime, i.source_id, i.checksum FROM images i JOIN sources s ON s.id = i.source_id
-       WHERE i.id = ? AND s.school_id = ? AND ${FILTRE_ACCES} AND (s.statut = 'certifiee' OR ?)`,
+       WHERE i.id = ? AND s.school_id = ? AND ${FILTRE_ACCES}`,
       )
-      .get(
-        c.req.param("id"),
-        instance.school_id,
-        ...parametresAcces(lu(c)),
-        lu(c).enseignant ? 1 : 0,
-      ) as { fichier: string; mime: string; source_id: string; checksum: string } | undefined;
+      .get(parametresAcces(lu(c)), c.req.param("id"), instance.school_id) as
+      | { fichier: string; mime: string; source_id: string; checksum: string }
+      | undefined;
     if (!i) return c.notFound();
     // Le navigateur revalide à chaque affichage : une source devenue privée cesse aussitôt de servir.
     const entetes = { "cache-control": "private, no-cache", etag: `"${i.checksum}"` };

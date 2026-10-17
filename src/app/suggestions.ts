@@ -100,7 +100,7 @@ export function faitAuHasard(db: Db, l: Lecteur): Fait | undefined {
        AND s.audience = 'eleves' AND ${FILTRE_ACCES}
      ORDER BY random() LIMIT 10`,
     )
-    .all(lireInstance(db).school_id, ...parametresAcces(l)) as {
+    .all(parametresAcces(l), lireInstance(db).school_id) as {
     source_id: string;
     titre: string;
     texte: string;
@@ -142,7 +142,7 @@ export function suggestionsDuPerimetre(
       AND s.reponses = 1
     ORDER BY random()`,
     )
-    .all(question, ...parametresAcces(l))
+    .all(parametresAcces(l), question)
     .filter((s) => ids.has(s.source_id as string))
     .slice(0, limite)
     .map((s) => s.question as string);

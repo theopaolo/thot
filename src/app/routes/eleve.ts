@@ -45,7 +45,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
        FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}
        ORDER BY seance, titre`,
       )
-      .all(instance.school_id, ...parametresAcces(lu(c))) as Eleve.SourceChapitre[];
+      .all(parametresAcces(lu(c)), instance.school_id) as Eleve.SourceChapitre[];
     const selection = idsScope(c);
     const visibles = rangs.filter((r) => selection.has(r.id));
     const chapitres: Eleve.ChapitreVue[] = [];
@@ -55,7 +55,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id
       WHERE ${Domaines.MES_COURS}`,
       )
-      .all(...Domaines.mesCours(lu(c)));
+      .all(Domaines.mesCours(lu(c)));
     for (const r of visibles) {
       const liens = rattachements.filter((l) => l.source_id === r.id);
       for (const lien of liens.length ? liens : [undefined]) {
@@ -187,10 +187,9 @@ export function routesEleve(app: Hono<Env>, w: Web) {
        ORDER BY seance = '', seance, s.titre`,
       )
       .all(
+        { ...parametresAcces(lu(c)), ...Domaines.mesCours(lu(c)) },
         instance.school_id,
-        ...parametresAcces(lu(c)),
         themeId,
-        ...Domaines.mesCours(lu(c)),
         themeId,
       ) as Eleve.SourceChapitre[];
     if (!sources.length) return c.notFound();
@@ -329,7 +328,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
          FROM sources s ${THEME_LU} WHERE s.id IN (${ids.map(() => "?").join(",")})
            AND s.statut = 'certifiee' AND s.school_id = ? AND ${FILTRE_ACCES}`,
         )
-        .all(...Domaines.mesCours(lu(c)), ...ids, instance.school_id, ...parametresAcces(lu(c)))
+        .all({ ...Domaines.mesCours(lu(c)), ...parametresAcces(lu(c)) }, ...ids, instance.school_id)
         .map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
     );
     const trouves = ids

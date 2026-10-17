@@ -57,9 +57,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
        ORDER BY theme, s.titre`,
       )
       .all(
-        ...parametresModification(c.get("compte")),
+        { ...parametresModification(c.get("compte")), ...parametresAcces(lu(c)) },
         instance.school_id,
-        ...parametresAcces(lu(c)),
         statut,
         statut,
         theme,
@@ -143,8 +142,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
        ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
       )
       .all(
-        ...parametresAcces(l),
-        ...parametresAcces(l),
+        parametresAcces(l),
         l.administrateur ? 1 : 0,
         l.id,
         l.id,
@@ -382,10 +380,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
   // La file ne propose que les images des sources que le compte peut relire.
   const FILE = `i.legende_statut = 'unreviewed' AND s.statut != 'rejetee' AND s.school_id = ?
     AND ${filtreModification()}`;
-  const file = (c: Context<Env>) => [
-    instance.school_id,
-    ...parametresModification(c.get("compte")),
-  ];
+  const file = (c: Context<Env>) =>
+    [parametresModification(c.get("compte")), instance.school_id] as const;
   const aLegender = (c: Context<Env>, imageId?: string) => {
     const restantes = db
       .prepare(`SELECT count(*) n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`)

@@ -15,7 +15,7 @@ import { resultatActuel } from "../src/app/conversations.ts";
 import { cleLegende, type Modeles } from "../src/core/modeles.ts";
 import type { Profil } from "../src/core/profils.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../src/app/suggestions.ts";
-import { creerCompte } from "../src/app/comptes.ts";
+import { creerCompte, lireCompte, peutLire } from "../src/app/comptes.ts";
 import {
   affiliations,
   cours,
@@ -411,6 +411,18 @@ test("instance personnelle : le propriétaire étudie ses ressources privées", 
     const lecture = cours(db, matiere(db, "Notes"), "Lecture");
     const corps = { cours: lecture, jours: "14", places: "40" };
     assertEquals(await statut(envoyer(moi, "/prof/eleves/liens", corps)), 404);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lecture : un élève ne lit pas une source publiée qui n'est pas certifiée", async () => {
+  const { db, dir, a, eleve, eleves } = await instance();
+  try {
+    db.prepare("UPDATE sources SET statut = 'a_relire' WHERE id = ?").run(eleves);
+    assertEquals(peutLire(db, lireCompte(db, eleve.id)!, eleves), false);
+    assertEquals(peutLire(db, lireCompte(db, a.id)!, eleves), true);
   } finally {
     db.close();
     await rm(dir, { recursive: true });

@@ -459,7 +459,7 @@ export function sourcesPerimetre(db: Db, p: Scope) {
     db
       .prepare(`SELECT s.id FROM sources s WHERE ${FILTRE_DOMAINE}`)
       .all(
-        ...parametresDomaine({
+        parametresDomaine({
           schoolId: "",
           lecteur: null,
           matiereId: p.matiere_id,
@@ -474,8 +474,11 @@ export function sourcesPerimetre(db: Db, p: Scope) {
 
 /** Un rattachement ne nomme un cours qu'à ses membres et aux administrateurs. */
 export const MES_COURS =
-  "(? OR sc.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = ?))";
-export const mesCours = (l: Lecteur) => [l.administrateur ? 1 : 0, l.id];
+  "($administrateur OR sc.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = $lecteur))";
+export const mesCours = (l: Lecteur) => ({
+  administrateur: l.administrateur ? 1 : 0,
+  lecteur: l.id,
+});
 export function catalogueVisible(db: Db, l: Lecteur): Catalogue {
   const cat = catalogue(db);
   const liens = db
@@ -483,7 +486,7 @@ export function catalogueVisible(db: Db, l: Lecteur): Catalogue {
       `SELECT sc.cours_id, sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
     WHERE s.statut = 'certifiee' AND ${FILTRE_ACCES} AND ${MES_COURS}`,
     )
-    .all(...parametresAcces(l), ...mesCours(l));
+    .all({ ...parametresAcces(l), ...mesCours(l) });
   const ids = new Set(liens.map((s) => s.cours_id));
   const themes = new Set(liens.map((s) => s.theme_id));
   cat.cours = cat.cours.filter((c) => ids.has(c.id));
