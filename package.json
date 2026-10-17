@@ -8,7 +8,7 @@
     "thot": "node --env-file-if-exists=.env src/cli.ts",
     "test": "vp test run",
     "check": "vp check && vp build && pnpm frontiere && vp test run",
-    "frontiere": "! grep -rnE \"from ['\\\"](\\\\.\\\\./)+app/\" src/core/",
+    "frontiere": "! grep -rnE \"from ['\\\"](\\\\.\\\\./)+app/\" src/core/ && ! grep -rnE \"FILTRE_ACCES|filtreAcces|parametresAcces|statut = 'certifiee'|legende_statut = 'certified'|school_id =|membres_cours|role = '\" src/app/routes/",
     "board": "npx -y github:theopaolo/repoboard"
   },
   "dependencies": {

@@ -64,8 +64,9 @@ ni session ni requête HTTP.
 Chaque fichier de `src/app/routes/` sert une partie de l'application, et `routes.ts` les monte
 derrière la session et la protection CSRF. Une route lit la requête, appelle les modules de
 `src/app/` et rend une vue de `vues/`. Les règles de la conversation vivent dans
-`conversations.ts`, hors des routes. D'autres routes écrivent encore leur SQL elles-mêmes
-([ARC-101](../tasks/ensuite/arc-101.md)).
+`conversations.ts`, hors des routes. Aucune route n'écrit de règle d'accès, de statut ou de
+compte dans son SQL. Elle lit par `LISIBLE` ou `CITABLE` de `src/core/recherche.ts`, ou appelle
+le module qui porte la règle. `pnpm frontiere` le vérifie.
 
 Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et Markdown. Le type
 vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou
@@ -249,7 +250,9 @@ se lit par les enseignants membres de ses cours, une source publiée aux élève
 membres. Une source sans cours garde l'audience de toute l'instance. Le propriétaire et les
 administrateurs lisent sans être membres.
 
-`FILTRE_ACCES` dans `src/core/recherche.ts` porte cette règle. La recherche, les pages de lecture,
+`FILTRE_ACCES` dans `src/core/recherche.ts` porte cette règle, avec le statut certifié exigé de
+l'élève. Les pages élève passent par `CITABLE`, qui exige aussi la certification quand un
+enseignant les ouvre. La recherche, les pages de lecture,
 les images, les filtres de cours et la relecture des réponses l'appliquent avec le compte qui lit.
 Retirer un membre retire l'accès à la prochaine requête, y compris à la revalidation des preuves
 d'une ancienne réponse. Un appel avec `lecteur: null`, comme la génération de suggestions par le
