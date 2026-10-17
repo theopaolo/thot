@@ -8,7 +8,7 @@ import { deleteCookie, getCookie, getSignedCookie, setSignedCookie } from "hono/
 import { serveStatic } from "@hono/node-server/serve-static";
 import { streamSSE } from "hono/streaming";
 import { type Modeles, PanneModele } from "../core/modeles.ts";
-import { actualiserResultat, type Affirmation, type Resultat } from "../core/reponse.ts";
+import type { Affirmation, Resultat } from "../core/reponse.ts";
 import {
   chercher,
   documentsProches,
@@ -67,7 +67,7 @@ import {
   statuer,
   supprimerSource,
 } from "./ingestion.ts";
-import { ARRETEE, attendreChangement, boucleReponses, memePerimetre } from "./reponses.ts";
+import { attendreChangement, boucleReponses } from "./reponses.ts";
 import { questionsProches } from "../core/suggestions.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "./suggestions.ts";
 import {
@@ -79,6 +79,7 @@ import {
 } from "./vues/page.ts";
 import * as Prof from "./vues/prof.ts";
 import * as Eleve from "./vues/eleve.ts";
+import * as Conversations from "./conversations.ts";
 import * as Domaines from "./domaines.ts";
 import * as DomaineVue from "./vues/domaines.ts";
 import * as Activites from "./activites.ts";
@@ -1772,34 +1773,14 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     );
   });
 
-  // La relecture d'une réponse revérifie ses preuves avec les droits actuels du lecteur, dans la
-  // révision qu'elle cite.
-  // ponytail: une révision qui ne sert plus se relit et se redécoupe à chaque affichage. Garder ses
-  // chunks en mémoire si le chat ralentit.
-  const resultatActuel = (texte: string, l: Lecteur) =>
-    actualiserResultat(
-      db,
-      JSON.parse(texte),
-      { schoolId: instance.school_id, lecteur: l },
-      (id, n) => chunksSource(db, id, n),
-    );
-
+  // Un échange nomme son périmètre quand il diffère de celui de l'échange précédent.
   const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
-    const lignes = db
-      .prepare(
-        `SELECT id, question, etat, etape, resultat, avis, matiere_id, cours_id, theme_id, matieres
-         FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
-      )
-      .all(conversationId, compte.id) as (Eleve.MessageVue & Perimetre)[];
-    return lignes.map((m, i): Eleve.MessageVue => {
-      const vue = {
-        ...m,
-        perimetre: i && !memePerimetre(lignes[i - 1], m) ? nomme(m) : undefined,
-      };
-      if (!m.resultat) return vue;
-      const r = resultatActuel(m.resultat, lecteur(compte));
-      return { ...vue, etat: r.etat, resultat: JSON.stringify(r) };
-    });
+    const lignes = Conversations.echanges(db, compte, conversationId);
+    return lignes.map((m, i): Eleve.MessageVue => ({
+      ...m,
+      resultat: m.resultat && JSON.stringify(m.resultat),
+      perimetre: i && !Conversations.memePerimetre(lignes[i - 1], m) ? nomme(m) : undefined,
+    }));
   };
 
   // Un refus rechargé ne repaie pas le reclasseur : ses questions proches restent en mémoire.
@@ -1868,20 +1849,23 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   };
 
   // ------------------------------------------------------------ conversations
-  // Une conversation appartient à son compte : un identifiant d'un autre compte reçoit le même 404
-  // qu'un identifiant inconnu.
-  type Conversation = Perimetre & { id: string; titre: string; archivee_le: string | null };
+  // Les règles de la conversation vivent dans `conversations.ts`. Ces routes traduisent ses refus :
+  // un identifiant d'un autre compte reçoit le même 404 qu'un identifiant inconnu.
   const conversationDe = (c: Context<Env>, id: string) =>
-    db
-      .prepare("SELECT * FROM conversations WHERE id = ? AND compte_id = ?")
-      .get(id, c.get("compte").id) as Conversation | undefined;
-  /** Une question attend la boucle de réponses, ou sa réponse tourne : une réponse à la fois. */
-  const reponseEnCours = (conversationId: string) =>
-    !!db
-      .prepare(
-        "SELECT 1 FROM messages WHERE conversation_id = ? AND etat IN ('en_attente', 'en_cours')",
-      )
-      .get(conversationId);
+    Conversations.conversationDe(db, c.get("compte"), id);
+  const refuser = (
+    c: Context<Env>,
+    refus: Conversations.Refus,
+    archivee = "Cette conversation est archivée.",
+  ) =>
+    refus === "introuvable"
+      ? c.notFound()
+      : c.text(
+          refus === "archivee"
+            ? archivee
+            : "Une réponse est déjà en cours dans cette conversation.",
+          409,
+        );
   const libelleTheme = () => libelles(db).regroupement;
 
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
@@ -1917,60 +1901,27 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     }
   };
 
-  // L'état du dernier échange, et une réponse terminée que l'élève n'a pas encore ouverte.
-  const ETAT_CONVERSATION = `(SELECT etat FROM messages WHERE conversation_id = v.id ORDER BY rang DESC LIMIT 1) AS etat,
-    EXISTS (SELECT 1 FROM messages WHERE conversation_id = v.id AND nouvelle) AS nouvelle`;
   const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean, q = "") => {
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = libelleTheme();
-    // Le titre ou l'une des questions contient le texte cherché, ses jokers LIKE neutralisés.
-    const motif = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-    const lignes = db
-      .prepare(
-        `SELECT id, titre, matiere_id, cours_id, theme_id, matieres, active_le, ${ETAT_CONVERSATION}
-         FROM conversations v WHERE compte_id = ? AND (archivee_le IS NOT NULL) = ?
-         AND (? = '' OR titre LIKE ? ESCAPE '\\' OR EXISTS (SELECT 1 FROM messages m
-           WHERE m.conversation_id = v.id AND m.question LIKE ? ESCAPE '\\'))
-         ORDER BY active_le DESC, rowid DESC LIMIT ?`,
-      )
-      .all(
-        c.get("compte").id,
-        archivees ? 1 : 0,
-        q,
-        motif,
-        motif,
-        toutes ? -1 : 51,
-      ) as (Eleve.ConversationVue & Perimetre)[];
+    const { lignes, plus } = Conversations.lister(db, c.get("compte"), archivees, toutes, q);
     return {
-      liste: (toutes ? lignes : lignes.slice(0, 50)).map((l) => ({
-        ...l,
-        perimetre: Eleve.nomPerimetre(cat, l, theme),
-      })),
-      plus: !toutes && lignes.length > 50,
+      liste: lignes.map((l) => ({ ...l, perimetre: Eleve.nomPerimetre(cat, l, theme) })),
+      plus,
     };
   };
-  const nombreArchivees = (c: Context<Env>) =>
-    db
-      .prepare(
-        "SELECT count(*) AS n FROM conversations WHERE compte_id = ? AND archivee_le IS NOT NULL",
-      )
-      .get(c.get("compte").id)!.n as number;
+  const nombreArchivees = (c: Context<Env>) => Conversations.nombreArchivees(db, c.get("compte"));
 
-  const pageChat = async (c: Context<Env>, conv?: Conversation) => {
+  const pageChat = async (c: Context<Env>, conv?: Conversations.Conversation) => {
     const compte = c.get("compte");
-    if (conv) db.prepare("UPDATE messages SET nouvelle = 0 WHERE conversation_id = ?").run(conv.id);
+    if (conv) Conversations.conversationLue(db, compte, conv.id);
     const cat = Domaines.catalogueVisible(db, lu(c));
     const theme = libelleTheme();
     // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
     const p: Perimetre = conv ??
       (Object.hasOwn(c.req.query(), "matiere_id") || Object.hasOwn(c.req.query(), "matieres")
         ? scope(c)
-        : (db
-            .prepare(
-              `SELECT matiere_id, cours_id, theme_id, matieres FROM conversations
-               WHERE compte_id = ? ORDER BY active_le DESC, rowid DESC LIMIT 1`,
-            )
-            .get(compte.id) as Perimetre | undefined)) ?? {
+        : Conversations.dernierPerimetre(db, compte)) ?? {
         matiere_id: "",
         cours_id: "",
         theme_id: "",
@@ -2018,15 +1969,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     );
   };
 
-  app.get("/eleve/chat", (c) => {
-    const id = db
-      .prepare(
-        `SELECT id FROM conversations WHERE compte_id = ? AND archivee_le IS NULL
-         ORDER BY active_le DESC, rowid DESC LIMIT 1`,
-      )
-      .get(c.get("compte").id)?.id as string | undefined;
-    return pageChat(c, id ? conversationDe(c, id) : undefined);
-  });
+  app.get("/eleve/chat", (c) => pageChat(c, Conversations.derniereOuverte(db, c.get("compte"))));
   app.get("/eleve/chat/nouvelle", (c) => pageChat(c));
   app.get("/eleve/chat/:id", (c) => {
     const conv = conversationDe(c, c.req.param("id"));
@@ -2055,43 +1998,35 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
   // La liste suit une réponse qui tourne dans une autre conversation, sans toucher au focus.
   app.get("/eleve/conversations/:id/etat", (c) => {
-    const conv = db
-      .prepare(
-        `SELECT id, ${ETAT_CONVERSATION} FROM conversations v WHERE id = ? AND compte_id = ?`,
-      )
-      .get(c.req.param("id"), c.get("compte").id) as Eleve.ConversationVue | undefined;
+    const conv = Conversations.etatDe(db, c.get("compte"), c.req.param("id"));
     return conv
       ? c.html(Eleve.statutConversation(conv, c.req.query("ouverte") === "1"))
       : c.notFound();
   });
-  // Le dernier titre enregistré l'emporte : un titre ne justifie pas un conflit.
   app.post("/eleve/chat/:id/renommer", async (c) => {
     const titre = String((await c.req.parseBody()).titre ?? "")
       .replace(/\s+/g, " ")
       .trim();
     if (!titre || titre.length > 120) return c.text("Titre attendu : 1 à 120 caractères.", 400);
-    const r = db
-      .prepare("UPDATE conversations SET titre = ? WHERE id = ? AND compte_id = ?")
-      .run(titre, c.req.param("id"), c.get("compte").id);
-    return r.changes ? c.redirect(`/eleve/chat/${c.req.param("id")}`, 303) : c.notFound();
+    return Conversations.renommer(db, c.get("compte"), c.req.param("id"), titre)
+      ? c.redirect(`/eleve/chat/${c.req.param("id")}`, 303)
+      : c.notFound();
   });
   // Archiver ouvre la conversation la plus récente qui reste, ou une nouvelle.
   app.post("/eleve/chat/:id/:action{(?:archiver|desarchiver)}", (c) => {
     const archiver = c.req.param("action") === "archiver";
-    const r = db
-      .prepare("UPDATE conversations SET archivee_le = ? WHERE id = ? AND compte_id = ?")
-      .run(archiver ? maintenant() : null, c.req.param("id"), c.get("compte").id);
-    if (!r.changes) return c.notFound();
+    if (!Conversations.archiver(db, c.get("compte"), c.req.param("id"), archiver)) {
+      return c.notFound();
+    }
     return c.redirect(
       archiver ? "/eleve/chat?archivee=1" : `/eleve/chat/${c.req.param("id")}`,
       303,
     );
   });
-  // Le nouveau périmètre vaut pour les questions suivantes. Les échanges passés gardent le leur.
   app.post("/eleve/chat/:id/perimetre", async (c) => {
     const conv = conversationDe(c, c.req.param("id"));
     if (!conv) return c.notFound();
-    if (conv.archivee_le) return c.text("Cette conversation est archivée.", 409);
+    if (conv.archivee_le) return refuser(c, "archivee");
     const b = await c.req.parseBody({ all: true });
     // Le formulaire de comparaison n'envoie que ses cases : vide, il ne vaut pas « tout ».
     if (!Object.hasOwn(b, "matiere_id") && !Object.hasOwn(b, "matieres")) {
@@ -2100,9 +2035,8 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     const p = Domaines.lireScope(b);
     const refus = perimetreRefuse(c, p);
     if (refus) return c.text(refus, 400);
-    db.prepare(
-      "UPDATE conversations SET matiere_id = ?, cours_id = ?, theme_id = ?, matieres = ? WHERE id = ?",
-    ).run(p.matiere_id, p.cours_id, p.theme_id, p.matieres ?? "", conv.id);
+    const ecriture = Conversations.changerPerimetre(db, c.get("compte"), conv.id, p);
+    if (ecriture) return refuser(c, ecriture);
     return c.redirect(`/eleve/chat/${conv.id}`, 303);
   });
 
@@ -2126,140 +2060,41 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         : c.html(html`
             ${Eleve.question(question)}${Eleve.attente(id)}
           `);
-    const deja = cle
-      ? (db
-          .prepare(
-            "SELECT id, conversation_id, question FROM messages WHERE compte_id = ? AND cle = ?",
-          )
-          .get(compte.id, cle) as
-          | { id: string; conversation_id: string; question: string }
-          | undefined)
-      : undefined;
+    const deja = cle ? Conversations.echangeParCle(db, compte, cle) : undefined;
     if (deja) return envoye(deja.conversation_id, deja.id, deja.question);
-    let conv: Conversation | undefined;
-    if (b.conversation) {
-      conv = conversationDe(c, String(b.conversation));
-      if (!conv) return c.notFound();
-      if (conv.archivee_le) {
-        return c.text(
-          "Cette conversation a été archivée dans un autre onglet. Ta question est conservée.",
-          409,
-        );
-      }
-      if (reponseEnCours(conv.id)) {
-        return c.text("Une réponse est déjà en cours dans cette conversation.", 409);
-      }
-    }
+    const conv = b.conversation ? conversationDe(c, String(b.conversation)) : undefined;
+    if (b.conversation && !conv) return c.notFound();
     const p: Perimetre = conv ?? scopeChapitre(c, b);
     // Un chapitre qu'aucun thème ne remplace n'élargit pas la question à toutes les ressources.
     if (!conv && b.chapitre && !p.theme_id) return c.text("Périmètre indisponible.", 400);
     const refus = perimetreRefuse(c, p);
     if (refus) return c.text(refus, 400);
-    const id = crypto.randomUUID();
-    const conversationId = conv?.id ?? crypto.randomUUID();
-    const t = maintenant();
-    transaction(db, () => {
-      if (conv) {
-        db.prepare("UPDATE conversations SET active_le = ? WHERE id = ?").run(t, conv.id);
-      } else {
-        // Le titre reprend la question, coupée à 80 caractères sur une fin de mot.
-        const ligne = texte.replace(/\s+/g, " ");
-        const titre =
-          ligne.length > 80
-            ? ligne
-                .slice(0, 81)
-                .replace(/\s+\S*$/, "")
-                .slice(0, 80)
-            : ligne;
-        db.prepare(
-          `INSERT INTO conversations (id, compte_id, titre, matiere_id, cours_id, theme_id,
-           matieres, active_le, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).run(
-          conversationId,
-          compte.id,
-          titre,
-          p.matiere_id,
-          p.cours_id,
-          p.theme_id,
-          p.matieres ?? "",
-          t,
-          t,
-        );
-      }
-      // Le journal garde l'heure de la demande : la boucle en tire le temps d'attente.
-      db.prepare(
-        `INSERT INTO messages (id, compte_id, conversation_id, rang, cle, question,
-         matiere_id, cours_id, theme_id, matieres, etat, journal, cree_le, maj_le)
-         VALUES (?, ?, ?, (SELECT coalesce(max(rang), 0) + 1 FROM messages WHERE conversation_id = ?),
-         ?, ?, ?, ?, ?, ?, 'en_attente', json_object('demande_ms', ?), ?, ?)`,
-      ).run(
-        id,
-        compte.id,
-        conversationId,
-        conversationId,
-        cle,
-        texte,
-        p.matiere_id,
-        p.cours_id,
-        p.theme_id,
-        p.matieres ?? "",
-        Date.now(),
-        t,
-        t,
+    const r = Conversations.poser(db, compte, { texte, cle, perimetre: p, conversation: conv?.id });
+    if (typeof r === "string") {
+      return refuser(
+        c,
+        r,
+        "Cette conversation a été archivée dans un autre onglet. Ta question est conservée.",
       );
-    });
+    }
     reponses.reveiller();
-    return envoye(conversationId, id, texte);
+    return envoye(r.conversation, r.echange, texte);
   });
 
   app.post("/eleve/messages/:id/relancer", (c) => {
-    const m = db
-      .prepare(
-        `SELECT m.etat, m.resultat, m.conversation_id, v.archivee_le FROM messages m
-         LEFT JOIN conversations v ON v.id = m.conversation_id WHERE m.id = ? AND m.compte_id = ?`,
-      )
-      .get(c.req.param("id"), c.get("compte").id);
-    if (
-      !m ||
-      (m.etat !== "failed" &&
-        (!m.resultat || resultatActuel(m.resultat as string, lu(c)).etat !== "failed"))
-    )
-      return c.notFound();
-    if (m.archivee_le) return c.text("Cette conversation est archivée.", 409);
-    if (reponseEnCours(m.conversation_id as string)) {
-      return c.text("Une réponse est déjà en cours dans cette conversation.", 409);
-    }
-    const r = db
-      .prepare(
-        `UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL,
-         tentatives = 0, journal = json_object('demande_ms', ?), maj_le = ?
-         WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered', 'annule')`,
-      )
-      .run(Date.now(), maintenant(), c.req.param("id"), c.get("compte").id);
-    if (!r.changes) return c.notFound();
+    const refus = Conversations.relancer(db, c.get("compte"), c.req.param("id"));
+    if (refus) return refuser(c, refus);
     reponses.reveiller();
     return c.html(Eleve.attente(c.req.param("id")));
   });
 
-  // « Arrêter » : la question reste, sa réponse ne sera pas publiée et peut se relancer.
   app.post("/eleve/messages/:id/arreter", (c) => {
     const id = c.req.param("id");
     const compte = c.get("compte");
-    const r = db
-      .prepare(
-        `UPDATE messages SET etat = 'annule', resultat = ?, etape = NULL, verrou_expire_le = NULL,
-         generation_id = NULL, maj_le = ?
-         WHERE id = ? AND compte_id = ? AND etat IN ('en_attente', 'en_cours')`,
-      )
-      .run(JSON.stringify(ARRETEE), maintenant(), id, compte.id);
-    if (r.changes) reponses.annuler(id);
+    if (Conversations.arreter(db, compte, id)) reponses.annuler(id);
     // Une réponse publiée juste avant l'arrêt s'affiche telle quelle.
-    const m = db
-      .prepare("SELECT resultat, avis FROM messages WHERE id = ? AND compte_id = ?")
-      .get(id, compte.id) as { resultat: string | null; avis: string | null } | undefined;
-    return m?.resultat
-      ? c.html(Eleve.reponse(id, resultatActuel(m.resultat, lu(c)), m.avis))
-      : c.notFound();
+    const m = Conversations.echange(db, compte, id);
+    return m?.resultat ? c.html(Eleve.reponse(id, m.resultat, m.avis)) : c.notFound();
   });
 
   /**
@@ -2269,22 +2104,16 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   app.get("/eleve/messages/:id/flux", (c) => {
     const id = c.req.param("id");
     const compte = c.get("compte");
-    if (!db.prepare("SELECT 1 FROM messages WHERE id = ? AND compte_id = ?").get(id, compte.id)) {
-      return c.notFound();
-    }
+    if (!Conversations.echange(db, compte, id)) return c.notFound();
     return streamSSE(c, async (flux) => {
       let annoncee = "";
       // Au bout de dix minutes, le flux se ferme et le navigateur se reconnecte.
       for (let i = 0; i < 600 && !flux.aborted; i++) {
-        const m = db
-          .prepare("SELECT question, etape, resultat FROM messages WHERE id = ? AND compte_id = ?")
-          .get(id, compte.id) as
-          | { question: string; etape: string | null; resultat: string | null }
-          | undefined;
+        const m = Conversations.echange(db, compte, id);
         if (!m) return;
         if (m.resultat) {
-          db.prepare("UPDATE messages SET nouvelle = 0 WHERE id = ?").run(id);
-          const r = resultatActuel(m.resultat, lecteur(compte));
+          Conversations.echangeLu(db, compte, id);
+          const r = m.resultat;
           await flux.writeSSE({
             event: "reponse",
             data: String(
@@ -2312,18 +2141,15 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   app.post("/eleve/messages/:id/avis", async (c) => {
     const avis = String((await c.req.parseBody()).avis ?? "");
     if (!["utile", "confus", "faux"].includes(avis)) return c.text("Avis invalide.", 400);
-    const r = db
-      .prepare("UPDATE messages SET avis = ? WHERE id = ? AND compte_id = ? AND etat = 'answered'")
-      .run(avis, c.req.param("id"), c.get("compte").id);
-    return r.changes ? c.html(Eleve.avis(c.req.param("id"), avis)) : c.notFound();
+    return Conversations.donnerAvis(db, c.get("compte"), c.req.param("id"), avis)
+      ? c.html(Eleve.avis(c.req.param("id"), avis))
+      : c.notFound();
   });
 
   app.get("/eleve/messages/:id/citations/:n", (c) => {
-    const m = db
-      .prepare("SELECT resultat FROM messages WHERE id = ? AND compte_id = ?")
-      .get(c.req.param("id"), c.get("compte").id) as { resultat: string | null } | undefined;
+    const m = Conversations.echange(db, c.get("compte"), c.req.param("id"));
     if (!m) return c.notFound();
-    const r = m.resultat ? resultatActuel(m.resultat, lu(c)) : undefined;
+    const r = m.resultat;
     return feuilleCitation(c, r?.etat === "answered" ? r.affirmations : [], c.req.param("id"));
   });
 

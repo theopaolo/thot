@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { creerCompte, lireCompte } from "../src/app/comptes.ts";
 import { config, RACINE } from "../src/app/config.ts";
+import * as Conversations from "../src/app/conversations.ts";
 import { connexion, type Db, migrer, purgerMessages } from "../src/app/db.ts";
 import { cours, desinscrire, inscrire, matiere } from "../src/app/domaines.ts";
 import { quand } from "../src/app/vues/eleve.ts";
@@ -186,6 +188,48 @@ test("envoi : clé rejouée, une réponse à la fois, conversation archivée en 
     assertStringIncludes(await texteDe(eleve, "/eleve/conversations/archivees"), premiere.texte);
     await envoyer(eleve, `/eleve/chat/${conv}/desarchiver`, {});
     assertStringIncludes(await texteDe(eleve, `/eleve/chat/${conv}`), 'id="envoi"');
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("module : un autre compte n'atteint rien, une seule réponse en file par conversation", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const compte = async (identifiant: string) => {
+      await creerCompte(db, identifiant, identifiant, "eleve");
+      const id = db.prepare("SELECT id FROM comptes WHERE identifiant = ?").get(identifiant)!.id;
+      return lireCompte(db, id as string)!;
+    };
+    const [a, b] = [await compte("eleve-a"), await compte("eleve-b")];
+    const vide = { matiere_id: "", cours_id: "", theme_id: "" };
+    const r = Conversations.poser(db, a, { texte: "Une question", cle: null, perimetre: vide });
+    assert(typeof r !== "string");
+    const suite = { texte: "Une autre", cle: null, perimetre: vide, conversation: r.conversation };
+    assertEquals(Conversations.poser(db, a, suite), "en_cours");
+
+    assertEquals(Conversations.poser(db, b, suite), "introuvable");
+    assertEquals(Conversations.relancer(db, b, r.echange), "introuvable");
+    assertEquals(Conversations.changerPerimetre(db, b, r.conversation, vide), "introuvable");
+    assertEquals(
+      [
+        Conversations.arreter(db, b, r.echange),
+        Conversations.renommer(db, b, r.conversation, "Autre titre"),
+        Conversations.archiver(db, b, r.conversation, true),
+        Conversations.donnerAvis(db, b, r.echange, "utile"),
+      ],
+      [false, false, false, false],
+    );
+    assertEquals(Conversations.conversationDe(db, b, r.conversation), undefined);
+    assertEquals(Conversations.echange(db, b, r.echange), undefined);
+    assertEquals(Conversations.echanges(db, b, r.conversation), []);
+
+    // Arrêtée, la réponse libère la conversation. Une question en file empêche de relancer.
+    assert(Conversations.arreter(db, a, r.echange));
+    assertEquals(Conversations.echange(db, a, r.echange)?.resultat, Conversations.ARRETEE);
+    assert(typeof Conversations.poser(db, a, suite) !== "string");
+    assertEquals(Conversations.relancer(db, a, r.echange), "en_cours");
   } finally {
     db.close();
     await rm(dir, { recursive: true });

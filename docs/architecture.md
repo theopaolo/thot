@@ -378,7 +378,8 @@ Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, s
 actions et ses échanges répondent 404, comme un identifiant inconnu : afficher, renommer,
 archiver, désarchiver, changer de périmètre, envoyer, relancer, arrêter, donner un avis, suivre le
 flux et ouvrir une citation. Son titre reste privé : `/prof/questions` liste les échanges un par
-un, selon les cours de l'enseignant, sans passer par la conversation.
+un, selon les cours de l'enseignant, sans passer par la conversation. Ces règles vivent dans
+`src/app/conversations.ts`, et les routes traduisent ses refus en 404 ou 409.
 
 La liste se filtre par le titre ou le texte d'une question (`?q=`, LIKE sans joker). Les
 conversations archivées ne sortent que de leur propre vue. Le navigateur garde, par compte et par
@@ -396,11 +397,12 @@ Un périmètre peut aussi comparer deux à quatre matières entières, cochées 
 offrir au lecteur une source lisible, sinon le périmètre est refusé. La conversation et chacun de
 ses échanges gardent la liste des matières comparées.
 
-Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. Un envoi pendant
-une réponse, ou dans une conversation archivée, reçoit 409 et l'élève garde sa saisie. Un envoi
-rejoué avec la même clé retrouve son premier échange. Une conversation vidée par la purge
-disparaît avec son titre, qui reprend souvent une question. Une réponse en cours perd alors sa
-ligne : sa tentative s'interrompt et ne recrée rien.
+Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. L'envoi et la
+relance le vérifient dans la transaction qui met la question en file : deux onglets n'en mettent
+pas deux. Un envoi pendant une réponse, ou dans une conversation archivée, reçoit 409 et l'élève
+garde sa saisie. Un envoi rejoué avec la même clé retrouve son premier échange. Une conversation
+vidée par la purge disparaît avec son titre, qui reprend souvent une question. Une réponse en
+cours perd alors sa ligne : sa tentative s'interrompt et ne recrée rien.
 
 La réponse continue quand l'élève ferme la page. Le flux SSE lit l'étape enregistrée, puis la
 réponse : le fermer n'arrête ni ne relance le calcul, et une reconnexion repart de l'état

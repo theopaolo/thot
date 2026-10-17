@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
 import type { Modeles } from "../core/modeles.ts";
-import { actualiserResultat, demander, journalSans, type Resultat } from "../core/reponse.ts";
+import { demander, journalSans } from "../core/reponse.ts";
 import { transaction } from "../core/recherche.ts";
 import { lecteur, lireCompte } from "./comptes.ts";
 import { idsMatieres, type Scope } from "./domaines.ts";
 import { config } from "./config.ts";
+import { memePerimetre, resultatActuel } from "./conversations.ts";
 import { type Db, maintenant } from "./db.ts";
-import { chunksSource } from "./ingestion.ts";
 import { lireInstance } from "./instance.ts";
 
 /** Un serveur arrêté pendant une réponse la laisse reprendre une fois ce verrou expiré. */
@@ -14,14 +14,6 @@ export const VERROU_MS = 60_000;
 const MAX_TENTATIVES = 3;
 /** Réponses calculées en même temps. L'extraction tourne dans le worker et ne les retarde pas. */
 const SIMULTANEES = 4;
-
-export const ARRETEE: Resultat = { etat: "failed", code: "CANCELLED", message: "Réponse arrêtée." };
-
-export const memePerimetre = (a: Scope, b: Scope) =>
-  a.matiere_id === b.matiere_id &&
-  a.cours_id === b.cours_id &&
-  a.theme_id === b.theme_id &&
-  a.matieres === b.matieres;
 
 // Le flux SSE attend ce signal entre deux lectures de la base, qui reste la référence : un
 // changement venu d'un autre processus se lit au tour suivant.
@@ -145,12 +137,10 @@ export function boucleReponses(db: Db, modeles: Modeles) {
       // étrangère garde tant qu'elle a des échanges. Une source supprimée pendant le calcul perd
       // ses citations ici, et ses extraits quittent le journal.
       transaction(db, () => {
-        const actuel = actualiserResultat(
-          db,
-          resultat,
-          { ...p, lecteur: lecteur(lireCompte(db, t.compte_id)!) },
-          (id, n) => chunksSource(db, id, n),
-        );
+        const actuel = resultatActuel(db, resultat, {
+          ...p,
+          lecteur: lecteur(lireCompte(db, t.compte_id)!),
+        });
         const supprimee = (id: string) => !db.prepare("SELECT 1 FROM sources WHERE id = ?").get(id);
         db.prepare(
           `UPDATE messages SET etat = ?, resultat = ?, journal = ?, etape = NULL,
