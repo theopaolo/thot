@@ -201,6 +201,11 @@ export const parametresLisible = (schoolId: string, l: Lecteur | null) => ({
   ...parametresAcces(l),
 });
 
+/** Vrai si le périmètre contient une source citable, ou seulement lisible avec `bibliotheque`. */
+export const offreSourceLisible = (db: DatabaseSync, p: Perimetre) =>
+  db.prepare(`SELECT 1 FROM sources s WHERE ${CITABLE} LIMIT 1`).get(parametresCitable(p)) !==
+  undefined;
+
 export const lireChunk = (db: DatabaseSync, sourceId: string, id: string, p: Perimetre) =>
   db
     .prepare(

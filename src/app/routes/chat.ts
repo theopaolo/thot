@@ -2,7 +2,7 @@ import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { streamSSE } from "hono/streaming";
 import type { Resultat } from "../../core/reponse.ts";
-import { FILTRE_ACCES, type Lecteur, MAX_MATIERES, parametresAcces } from "../../core/recherche.ts";
+import { type Lecteur, MAX_MATIERES, offreSourceLisible } from "../../core/recherche.ts";
 import { type Compte, lecteur } from "../comptes.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { config } from "../config.ts";
@@ -92,16 +92,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     if (r.etat !== "answered") return [];
     const ids = [...new Set(r.affirmations.map((a) => a.source_id))];
     if (!ids.length) return [];
-    const memesSources = db
-      .prepare(
-        `SELECT sg.question FROM suggestions sg JOIN sources s ON s.id = sg.source_id
-       WHERE sg.source_id IN (${ids.map(() => "?").join(",")}) AND s.statut = 'certifiee'
-         AND s.school_id = ? AND sg.question != ? AND s.audience = 'eleves' AND s.reponses = 1
-         AND ${FILTRE_ACCES}
-       ORDER BY random() LIMIT 3`,
-      )
-      .all(parametresAcces(l), ...ids, instance.school_id, question)
-      .map((x) => x.question as string);
+    const memesSources = suggestionsDuPerimetre(db, l, new Set(ids), question);
     return memesSources.length ? memesSources : duTheme(ids[0]);
   };
 
@@ -130,15 +121,16 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const comparees = Domaines.idsMatieres(p.matieres);
     if (comparees.length > MAX_MATIERES) return `Compare ${MAX_MATIERES} matières au plus.`;
     if (Object.values(p).some(Boolean)) {
-      const lisibles = db
-        .prepare(
-          `SELECT id FROM sources s WHERE statut = 'certifiee' AND school_id = ? AND ${FILTRE_ACCES}`,
-        )
-        .all(parametresAcces(lu(c)), instance.school_id);
-      const visible = (q: Domaines.Scope) => {
-        const disponibles = Domaines.sourcesPerimetre(db, q);
-        return lisibles.some((s) => disponibles.has(s.id as string));
-      };
+      const visible = (q: Domaines.Scope) =>
+        offreSourceLisible(db, {
+          schoolId: instance.school_id,
+          lecteur: lu(c),
+          bibliotheque: true,
+          matiereId: q.matiere_id,
+          matieres: Domaines.idsMatieres(q.matieres),
+          coursId: q.cours_id,
+          themeId: q.theme_id,
+        });
       // Chaque matière comparée offre une source lisible, comme une matière seule.
       const matieres = comparees.map((m) => ({ matiere_id: m, cours_id: "", theme_id: "" }));
       if (![p, ...matieres].every(visible)) return "Périmètre indisponible.";
