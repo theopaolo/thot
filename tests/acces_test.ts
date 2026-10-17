@@ -8,7 +8,7 @@ import { connexion, type Db, maintenant, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { type Audience, deposer, valider } from "../src/app/depot.ts";
 import { configurerInstance, lireInstance } from "../src/app/instance.ts";
-import { reextraire, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
+import { chunksSource, reextraire, revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import { chercherFts, type Lecteur } from "../src/core/recherche.ts";
 import { actualiserResultat, demander } from "../src/core/reponse.ts";
 import { cleLegende, type Modeles } from "../src/core/modeles.ts";
@@ -273,7 +273,9 @@ test("réponses : preuves lisibles par le lecteur, retrait pendant la générati
     }
     // Relue par un élève, la même réponse perd sa preuve.
     assertEquals(
-      actualiserResultat(db, pourProf.resultat, { schoolId, lecteur: null }).etat,
+      actualiserResultat(db, pourProf.resultat, { schoolId, lecteur: null }, (id, n) =>
+        chunksSource(db, id, n),
+      ).etat,
       "failed",
     );
     assertEquals(

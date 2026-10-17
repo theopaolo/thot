@@ -6,6 +6,7 @@ import { lecteur, lireCompte } from "./comptes.ts";
 import { idsMatieres, type Scope } from "./domaines.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
+import { chunksSource } from "./ingestion.ts";
 import { lireInstance } from "./instance.ts";
 
 /** Un serveur arrêté pendant une réponse la laisse reprendre une fois ce verrou expiré. */
@@ -144,10 +145,12 @@ export function boucleReponses(db: Db, modeles: Modeles) {
       // étrangère garde tant qu'elle a des échanges. Une source supprimée pendant le calcul perd
       // ses citations ici, et ses extraits quittent le journal.
       transaction(db, () => {
-        const actuel = actualiserResultat(db, resultat, {
-          ...p,
-          lecteur: lecteur(lireCompte(db, t.compte_id)!),
-        });
+        const actuel = actualiserResultat(
+          db,
+          resultat,
+          { ...p, lecteur: lecteur(lireCompte(db, t.compte_id)!) },
+          (id, n) => chunksSource(db, id, n),
+        );
         const supprimee = (id: string) => !db.prepare("SELECT 1 FROM sources WHERE id = ?").get(id);
         db.prepare(
           `UPDATE messages SET etat = ?, resultat = ?, journal = ?, etape = NULL,

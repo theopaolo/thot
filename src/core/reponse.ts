@@ -337,14 +337,14 @@ export function ranger(brutes: unknown, parRang: (Affirmation | undefined)[]): R
 
 /**
  * Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. Une
- * citation d'une révision qui ne sert plus se revérifie dans les chunks que `ancienne` recalcule
- * pour cette révision, avec les titres et légendes actuels.
+ * citation d'une révision qui ne sert plus se revérifie dans les chunks que `ancienne` rend pour
+ * cette révision.
  */
 export function actualiserResultat(
   db: DatabaseSync,
   resultat: Resultat,
   p: Perimetre,
-  ancienne: (sourceId: string, revision: number) => ChunkIndexe[] = () => [],
+  ancienne: (sourceId: string, revision: number) => ChunkIndexe[],
 ): Resultat {
   if (resultat.etat !== "answered") return resultat;
   for (const a of resultat.affirmations) {
@@ -479,6 +479,7 @@ export async function demander(
   const journal: Journal = { seuil };
   let gardees: Repondue = { affirmations: [] };
   let sansPassage: string[] = [];
+  let retenus: ChunkIndexe[] = [];
   const repondre = (reponse: Repondue, partielle = false) => {
     for (const a of reponse.affirmations) {
       const images = db
@@ -508,6 +509,9 @@ export async function demander(
           ...(sansPassage.length > 0 && { sans_passage: sansPassage }),
         },
         p,
+        // Une révision certifiée pendant le calcul : la citation se revérifie dans les extraits
+        // lus au départ.
+        (id, n) => retenus.filter((c) => c.source_id === id && c.revision === n),
       ),
       journal,
     };
@@ -537,6 +541,7 @@ export async function demander(
       matieres: c.matieres,
     }));
     sansPassage = r.sansPassage ?? [];
+    retenus = r.retenus;
     if (sansPassage.length) journal.sans_passage = sansPassage;
     if (r.horsCorpus) return { resultat: { etat: "out_of_corpus", raison: "seuil" }, journal };
 

@@ -1,9 +1,18 @@
-import { rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { config } from "../src/app/config.ts";
 import { type Db, maintenant, purgerMessages } from "../src/app/db.ts";
 import { deposer, valider } from "../src/app/depot.ts";
-import { revendiquer, supprimerSource, traiter } from "../src/app/ingestion.ts";
+import {
+  reextraire,
+  revendiquer,
+  statuer,
+  supprimerSource,
+  traiter,
+} from "../src/app/ingestion.ts";
 import { lireInstance } from "../src/app/instance.ts";
 import { boucleReponses, revendiquerReponse, VERROU_MS } from "../src/app/reponses.ts";
 import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
@@ -164,6 +173,31 @@ test("une source supprimée pendant le calcul ne publie ni sa citation ni ses ex
     assertEquals(JSON.parse(m.resultat as string).code, "EVIDENCE_WITHDRAWN");
     assert(!`${m.resultat}${m.journal}`.includes("refuse la ligne droite"), "texte publié");
     assertEquals(JSON.parse(m.journal as string).candidats, []);
+  } finally {
+    g.libre.resolve();
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("une révision certifiée pendant le calcul laisse publier la réponse qui cite l'ancienne", async () => {
+  const { db, dir } = await environnement();
+  const g = bloque();
+  try {
+    const source = await publier(db, "Casa Batlló");
+    const eleve = await session(db, g.modeles, "eleve");
+    const id = await poser(eleve);
+    await attendre(() => g.signaux.length);
+    const original = join(config.donnees, "content", source, "original", "cours.html");
+    const page = readFileSync(original, "utf8");
+    await writeFile(original, page.replace("<p>", "<p>Une phrase ajoutée.</p><p>"));
+    assertEquals(await reextraire(db, source), "revision");
+    statuer(db, source, "certifiee", "Test", 2);
+    g.libre.resolve();
+    await attendre(() => ligne(db, id).resultat);
+    assertEquals(ligne(db, id).etat, "answered");
+    const flux = await lire(eleve, `/eleve/messages/${id}/flux`);
+    assertStringIncludes(flux, "Gaudí refuse la ligne droite.");
   } finally {
     g.libre.resolve();
     db.close();
