@@ -10,7 +10,12 @@ const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 const reponses = boucleReponses(db, modeles);
 const app = creerApp(db, modeles, reponses);
-serve({ fetch: app.fetch, port: config.port, hostname: process.env["THOT_HOST"] ?? "127.0.0.1" });
+const hote = process.env["THOT_HOST"] ?? "127.0.0.1";
+// `pnpm dev` ouvre tous les comptes sans mot de passe : il n'écoute que cette machine.
+if (config.dev && !["127.0.0.1", "::1", "localhost"].includes(hote)) {
+  throw new Error(`pnpm dev ouvre tous les comptes sans mot de passe : THOT_HOST=${hote} refusé.`);
+}
+serve({ fetch: app.fetch, port: config.port, hostname: hote });
 // Les questions restées en file repartent, et une réponse qu'un arrêt a interrompue reprend une
 // fois son verrou expiré.
 reponses.reveiller();

@@ -236,7 +236,7 @@ export const connexion = (erreur?: string, identifiant = "", retour = "") =>
           id="mot_de_passe"
           name="mot_de_passe"
           autocomplete="current-password"
-          ${config.dev ? html`placeholder="Facultatif sauf administrateur"` : html`required`}
+          ${config.dev ? html`placeholder="Facultatif en développement"` : html`required`}
         >
       </div>
       <button class="principal">Se connecter</button>
