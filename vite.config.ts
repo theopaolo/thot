@@ -3,8 +3,9 @@ import { defineConfig } from "vite-plus";
 const ignores = ["static/vendor/**", "static/dist/**", ".claude/**"];
 
 export default defineConfig({
-  // Le JavaScript du navigateur: un module ES servi tel quel sous /static/dist/. Mermaid et KaTeX
-  // y ajoutent des morceaux chargés à la demande, et KaTeX sa feuille de style et ses polices.
+  // Le JavaScript du navigateur: un module ES servi tel quel sous /static/dist/. Mermaid, KaTeX et
+  // Shiki y ajoutent des morceaux chargés à la demande, Shiki une grammaire par langage, et KaTeX
+  // sa feuille de style et ses polices.
   base: "/static/dist/",
   plugins: [
     {

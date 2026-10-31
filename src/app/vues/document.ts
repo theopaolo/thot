@@ -40,11 +40,16 @@ export const texteDocument = (blocs: Bloc[], marque?: [number, number], niveau: 
         .join("")}</mark>${t.slice(z).join("")}`;
     }
     // Pas d'espace dans le <pre>: il s'afficherait. Le code d'un schéma reste visible sous son
-    // dessin, et le remplace si le dessin échoue.
-    const schema = b.langage === "mermaid" ? html` data-mermaid="${sansDirectives(b.texte)}"` : "";
+    // dessin, et le remplace si le dessin échoue. Les autres langages sont colorés.
+    const langage =
+      b.langage === "mermaid"
+        ? html` data-mermaid="${sansDirectives(b.texte)}"`
+        : b.langage
+          ? html` data-langage="${b.langage}"`
+          : "";
     return b.code
       ? html`
-      ${titre}<pre id="${b.id}"${schema}><code>${corps}</code></pre>
+      ${titre}<pre id="${b.id}"${langage}><code>${corps}</code></pre>
     `
       : html`
       ${titre}<p id="${b.id}">${corps}</p>

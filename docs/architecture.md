@@ -74,7 +74,8 @@ vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'exten
 voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
 d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le langage nommé
 par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `mermaid` au-dessus
-de son code, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Le
+de son code, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Il
+colore le code des autres langages que Shiki connaît, sans changer le texte du bloc. Le
 front matter fournit le titre, ses autres clés sont ignorées. Les images liées ne sont pas
 jointes, un avertissement les nomme.
 

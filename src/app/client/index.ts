@@ -6,13 +6,16 @@ installerEleve();
 installerDepot();
 installerProf();
 
-// Mermaid et KaTeX ne se chargent que pour un contenu qui a un schéma ou une formule : la page,
-// ou une réponse que htmx vient de poser.
+// Mermaid, KaTeX et Shiki ne se chargent que pour un contenu qui a un schéma, une formule ou du
+// code dans un langage nommé : la page, ou une réponse que htmx vient de poser.
 document.addEventListener("htmx:load", (event) => {
   const racine = event.target;
   if (!(racine instanceof Element)) return;
   if (racine.querySelector("[data-mermaid]")) {
     void import("./schemas.ts").then((m) => m.dessiner(racine));
+  }
+  if (racine.querySelector("[data-langage]")) {
+    void import("./coloration.ts").then((m) => m.colorer(racine));
   }
   if (racine.querySelector("[data-tex]")) {
     void import("./formules.ts").then((m) => m.ecrire(racine));

@@ -861,9 +861,11 @@ kbd {
 }
 .document pre {
   margin: var(--s4) 0;
-  padding: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4);
   overflow-x: auto;
-  background: var(--surface-tinted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
   font:
     0.9375rem/1.5 ui-monospace,
     "SF Mono",

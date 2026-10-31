@@ -265,7 +265,7 @@ test("un bloc mermaid du lecteur garde son code, sans front matter ni directive"
     String(await schema),
     '<pre id="b1" data-mermaid="\ngraph TD\n  A[&quot;&lt;b&gt;A&lt;/b&gt;&quot;] --&gt; B\n"><code>---\nconfig:',
   );
-  assertStringIncludes(String(await autre), '<pre id="b2"><code>---');
+  assertStringIncludes(String(await autre), '<pre id="b2" data-langage="yaml"><code>---');
 });
 
 test("le rafraîchissement enseignant exclut le formulaire et conserve les sélections", async () => {
