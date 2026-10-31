@@ -854,18 +854,27 @@ kbd {
 
 /* ------------------------------------------------------------ documents */
 
+.document {
+  counter-reset: figure;
+}
 .document p {
   max-width: var(--measure);
   font-size: 1.125rem;
-  line-height: 1.5;
+  line-height: 1.65;
+}
+/* Une liste extraite garde une entrée par ligne. */
+.document p.lignes {
+  white-space: pre-line;
 }
 .document pre {
   margin: var(--s4) 0;
-  padding: var(--s2) var(--s3);
+  padding: var(--s4) var(--s5);
   overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: var(--surface-tinted);
   font:
-    0.9375rem/1.5 ui-monospace,
+    0.875rem/1.6 ui-monospace,
     "SF Mono",
     Menlo,
     Consolas,
@@ -875,10 +884,131 @@ kbd {
 .document pre code {
   font: inherit;
 }
-.document h3,
-.document .intertitre {
+/* Le bouton « Copier » reste en haut à droite pendant que le code défile en largeur. */
+.bloc-code {
+  position: relative;
+  margin: var(--s4) 0;
+}
+.bloc-code pre {
+  margin: 0;
+}
+.bloc-code .copier {
+  position: absolute;
+  top: var(--s2);
+  right: var(--s2);
+  min-height: 28px;
+  padding: 0 var(--s2);
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+.document h3 {
   margin-top: var(--s5);
   font-size: 1.125rem;
+}
+.document .intertitre {
+  margin-top: var(--s6);
+  scroll-margin-top: var(--s5);
+}
+.document .cadre-tableau {
+  margin: var(--s4) 0 var(--s5);
+}
+.document table {
+  background: none;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+/* La première colonne s'aligne sur le texte. */
+.document :is(th, td) {
+  padding: var(--s2) var(--s4) var(--s2) 0;
+}
+/* Un schéma Mermaid en figure : le dessin, sa légende numérotée, puis son code replié. */
+.figure-schema {
+  margin: var(--s5) 0;
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.figure-schema > pre {
+  margin-top: 0;
+}
+.figure-schema .schema {
+  margin: 0;
+}
+.figure-schema .schema svg {
+  margin-inline: auto;
+}
+.figure-schema figcaption {
+  max-width: none;
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  counter-increment: figure;
+}
+.figure-schema figcaption::before {
+  content: "Fig. " counter(figure);
+  margin-right: var(--s2);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+}
+.figure-schema figcaption strong {
+  color: var(--ink);
+}
+.code-schema {
+  margin-top: var(--s3);
+}
+.code-schema summary {
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+.code-schema pre {
+  margin-bottom: 0;
+}
+/* Le sommaire suit la lecture à droite du texte, sur un écran assez large pour deux colonnes. */
+/* `minmax(0, …)` : un tableau ou un bloc de code défile dans son cadre sans élargir la page. */
+.lecture-colonnes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.sommaire {
+  display: none;
+}
+@media (min-width: 75rem) {
+  .lecture-colonnes {
+    grid-template-columns: minmax(0, 52rem) minmax(12rem, 16rem);
+    gap: var(--s7);
+  }
+  .sommaire {
+    display: block;
+    position: sticky;
+    top: var(--s5);
+    align-self: start;
+    max-height: calc(100dvh - 2 * var(--s5));
+    overflow-y: auto;
+  }
+}
+.sommaire h2 {
+  margin-bottom: var(--s2);
+  font-size: 1rem;
+}
+.sommaire ol {
+  margin: 0;
+  padding: 0 0 0 var(--s3);
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+.sommaire a {
+  display: block;
+  padding: var(--s1) 0;
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.sommaire a:hover {
+  color: var(--ink);
+  text-decoration: underline;
 }
 .fichier {
   display: inline-flex;

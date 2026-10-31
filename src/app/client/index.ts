@@ -6,11 +6,38 @@ installerEleve();
 installerDepot();
 installerProf();
 
+/**
+ * Un bouton « Copier » sur chaque bloc de code d'un document. Il vit hors du `<pre>`, qui défile
+ * en largeur. Sans presse-papiers, le code reste sélectionnable à la main.
+ */
+function boutonsCopier(racine: Element) {
+  if (!navigator.clipboard) return;
+  for (const pre of racine.querySelectorAll<HTMLElement>(".document pre:not([data-mermaid])")) {
+    if (pre.parentElement?.classList.contains("bloc-code")) continue;
+    const cadre = document.createElement("div");
+    cadre.className = "bloc-code";
+    const bouton = document.createElement("button");
+    bouton.type = "button";
+    bouton.className = "copier";
+    bouton.textContent = "Copier";
+    bouton.addEventListener("click", () => {
+      navigator.clipboard.writeText(pre.textContent ?? "").then(
+        () => (bouton.textContent = "Copié"),
+        () => (bouton.textContent = "Copie refusée"),
+      );
+      setTimeout(() => (bouton.textContent = "Copier"), 2000);
+    });
+    pre.before(cadre);
+    cadre.append(pre, bouton);
+  }
+}
+
 // Mermaid et KaTeX ne se chargent que pour un contenu qui a un schéma ou une formule : la page,
 // ou une réponse que htmx vient de poser.
 document.addEventListener("htmx:load", (event) => {
   const racine = event.target;
   if (!(racine instanceof Element)) return;
+  boutonsCopier(racine);
   if (racine.querySelector("[data-mermaid]")) {
     void import("./schemas.ts").then((m) => m.dessiner(racine));
   }

@@ -3,7 +3,12 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
 import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource, reponse } from "../src/app/vues/eleve.ts";
-import { sansDirectives, texteDocument } from "../src/app/vues/document.ts";
+import {
+  legendeSchema,
+  sansDirectives,
+  sections,
+  texteDocument,
+} from "../src/app/vues/document.ts";
 import type { BlocReponse } from "../src/core/reponse.ts";
 
 const LIBELLES = {
@@ -138,8 +143,64 @@ test("un bloc de code se rend en pre avec son surlignage, un ancien bloc reste u
   assertEquals(String(await texteDocument([blocs[0]])[0]).includes("<mark"), false);
   assertStringIncludes(
     String(await ancien),
-    '<p id="b2">FROM node:26\n  RUN &lt;b&gt;x&lt;/b&gt;</p>',
+    '<p id="b2" class="lignes">FROM node:26\n  RUN &lt;b&gt;x&lt;/b&gt;</p>',
   );
+});
+
+test("un bloc tableau se rend en tableau, un passage à cheval sur deux cellules garde une ancre", async () => {
+  const texte = "Smell | Action\nNom opaque | Renommer\nCode dupliqué | Extraire";
+  const [tableau] = texteDocument(
+    [{ id: "b1", texte, section: "S", debut: 10, fin: 10 + texte.length }],
+    // « opaque | Renom » : la fin d'une cellule et le début de la suivante.
+    [10 + texte.indexOf("opaque"), 10 + texte.indexOf("mer")],
+    2,
+    "S",
+  );
+  const rendu = String(await tableau);
+  assertStringIncludes(rendu, '<th scope="col">Smell</th><th scope="col">Action</th>');
+  assertStringIncludes(rendu, '<td>Nom <mark id="passage">opaque</mark></td>');
+  assertStringIncludes(rendu, "<td><mark>Renom</mark>mer</td>");
+  assertStringIncludes(rendu, "<td>Code dupliqué</td><td>Extraire</td>");
+  // Une ligne dont le nombre de cellules diffère n'est pas un tableau.
+  const [liste] = texteDocument([
+    { id: "b2", texte: "un | deux\ntrois | quatre | cinq", section: "", debut: 0, fin: 30 },
+  ]);
+  assertStringIncludes(String(await liste), '<p id="b2" class="lignes">un | deux\ntrois');
+});
+
+test("un schéma du lecteur devient une figure légendée, le sommaire ancre chaque section", async () => {
+  const code =
+    "flowchart TB\n  accTitle: Les couches\n  accDescr: Le harness <b>appelle</b>\n  A --> B";
+  const blocs = [
+    { id: "b0", texte: "Intro.", section: "Titre", debut: 0, fin: 6 },
+    { id: "b1", texte: "Couches", section: "Couches", debut: 8, fin: 15 },
+    {
+      id: "b2",
+      texte: code,
+      section: "Couches",
+      debut: 17,
+      fin: 90,
+      code: true as const,
+      langage: "mermaid",
+    },
+    { id: "b3", texte: "Suite.", section: "Pages", debut: 92, fin: 98 },
+  ];
+  const rendu = texteDocument(blocs, undefined, 2, "Titre").join("");
+  assertEquals(rendu.includes(">Titre</h2>"), false);
+  assertStringIncludes(rendu, '<figure class="figure-schema"><pre id="b2" data-mermaid=');
+  assertStringIncludes(
+    rendu,
+    "<figcaption><strong>Les couches</strong> Le harness &lt;b&gt;appelle&lt;/b&gt;</figcaption></figure>",
+  );
+  assertEquals(sections(blocs, "Titre"), [
+    { titre: "Couches", ancre: "b1" },
+    { titre: "Pages", ancre: "s-b3" },
+  ]);
+  assertStringIncludes(rendu, '<h2 class="intertitre"  id="s-b3">Pages</h2>');
+  assertEquals(legendeSchema("graph TD\n  accDescr {\n  Deux\n  lignes\n  }"), {
+    titre: undefined,
+    description: "Deux lignes",
+  });
 });
 
 test("une réponse en blocs passe par les gabarits de l'application, chaque phrase avec sa citation", async () => {

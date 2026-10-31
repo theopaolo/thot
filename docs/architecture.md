@@ -73,10 +73,15 @@ vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'exten
 `.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur
 voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
 d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le langage nommé
-par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `mermaid` au-dessus
-de son code, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Le
-front matter fournit le titre, ses autres clés sont ignorées. Les images liées ne sont pas
-jointes, un avertissement les nomme.
+par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `mermaid` en
+figure, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Sa
+légende reprend l'`accTitle` et l'`accDescr` du code, et le code se replie sous la légende. Un
+dessin qui échoue laisse le code déplié. Le front matter fournit le titre, ses autres clés sont
+ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
+
+Le lecteur garde les lignes d'un bloc : une liste extraite garde une entrée par ligne. Un bloc
+dont toutes les lignes ont le même nombre de cellules séparées par « | » s'affiche en tableau,
+sa première ligne en en-tête. Le texte du bloc et ses offsets ne changent pas.
 
 Un zip est un document Word quand `[Content_Types].xml` déclare `word/document.xml` comme document
 principal, une présentation quand il déclare ainsi `ppt/presentation.xml`. Le dépôt refuse avec
