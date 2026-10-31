@@ -111,7 +111,6 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
 
 test("administrateur personnel : code à usage unique, changement obligatoire, récupération", async () => {
   const { db, dir } = await environnement();
-  const dev = config.dev;
   try {
     const app = creerApp(db, fauxModeles().modeles);
     configurerInstance(db, "Mon étude <privée>", "personal");
@@ -123,9 +122,6 @@ test("administrateur personnel : code à usage unique, changement obligatoire, r
         headers: { origin: ORIGINE },
         body: new URLSearchParams({ identifiant: "owner", mot_de_passe }),
       });
-    config.dev = true;
-    assertEquals((await login("mauvais")).status, 401);
-    config.dev = false;
     const entree = await login(code);
     assertEquals(entree.headers.get("location"), "/mot-de-passe");
     const provisoire = entree.headers.get("set-cookie")!.split(";")[0];
@@ -191,6 +187,23 @@ test("administrateur personnel : code à usage unique, changement obligatoire, r
     assertEquals((await get("/administration")).headers.get("location"), "/connexion");
     assertEquals((await login("mot-de-passe-long")).status, 401);
     assertEquals((await login(recuperation!)).headers.get("location"), "/mot-de-passe");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("en développement, un administrateur se connecte sans mot de passe", async () => {
+  const { db, dir } = await environnement();
+  const dev = config.dev;
+  try {
+    await creerCompte(db, "admin", "Admin", "enseignant");
+    db.prepare("UPDATE comptes SET administrateur = 1 WHERE identifiant = 'admin'").run();
+    config.dev = true;
+    assertEquals((await authentifier(db, "admin", ""))?.administrateur, 1);
+    assertEquals(await authentifier(db, "inconnu", ""), null);
+    config.dev = false;
+    assertEquals(await authentifier(db, "admin", ""), null);
   } finally {
     config.dev = dev;
     db.close();

@@ -22,8 +22,8 @@ pnpm thot administrateur prof "M. Detienne"  # code de connexion à usage unique
 pnpm dev                                     # serveur et worker, http://127.0.0.1:8000
 ```
 
-- `pnpm dev` accepte n'importe quel mot de passe pour les comptes ordinaires. Un
-  administrateur garde une authentification complète.
+- `pnpm dev` connecte tout compte sans vérifier son mot de passe, administrateur compris. Le
+  serveur refuse alors un `THOT_HOST` autre que la machine locale.
 - `pnpm check` : format, lint et types (`vp check`), build, frontière `core/`/`app/`, tests
 - `pnpm thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
 - `pnpm board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878

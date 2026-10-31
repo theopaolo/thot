@@ -54,6 +54,21 @@ DOMPurify.addHook("uponSanitizeElement", (noeud, data) => {
 let compteur = 0;
 
 /**
+ * Dans le lecteur, le code d'un schéma dessiné passe sous la légende, replié. Il reste ouvert
+ * quand il contient le passage cité.
+ */
+function replier(pre: HTMLElement) {
+  const details = document.createElement("details");
+  details.className = "code-schema";
+  details.open = pre.querySelector("mark") !== null;
+  const resume = document.createElement("summary");
+  resume.textContent = "Code du schéma";
+  pre.replaceWith(details);
+  details.append(resume, pre);
+  details.parentElement?.append(details);
+}
+
+/**
  * Dessine une fois chaque schéma de `racine`, au-dessus de l'élément qui porte son texte. Le SVG
  * de Mermaid repasse par DOMPurify, en SVG seul, sans lien ni HTML : un `click` du texte d'un
  * auteur reste sans effet. Un échec, ou un élément retiré pendant le rendu, laisse le texte seul.
@@ -78,6 +93,7 @@ export async function dessiner(racine: Element) {
       cadre.setAttribute("aria-hidden", "true");
       cadre.append(propre);
       el.before(cadre);
+      if (el.matches(".figure-schema > pre")) replier(el);
     } catch {
       /* Le texte reste. */
     }

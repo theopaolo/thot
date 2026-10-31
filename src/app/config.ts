@@ -35,7 +35,7 @@ export const fournisseurs = {
 };
 
 export const config = {
-  // Posé par `pnpm dev` (src/main.ts). Les mots de passe ordinaires ne sont plus vérifiés.
+  // Posé par `pnpm dev` (src/main.ts). Aucun mot de passe n'est vérifié.
   dev: process.env["THOT_DEV"] === "1",
   donnees: resolve(env("THOT_DATA_DIR", join(RACINE, "data"))),
   origine,

@@ -8,7 +8,7 @@ import type { Champ, Profil } from "../../core/profils.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
-import { texteDocument } from "./document.ts";
+import { sections, texteDocument } from "./document.ts";
 
 export type ChapitreVue = {
   nom: string;
@@ -551,13 +551,16 @@ export const lectureSource = (
   marque?: [number, number],
   /** les blocs viennent d'une révision qui ne sert plus */
   ancienne = false,
-) =>
-  html`
+) => {
+  const texte = blocs.filter((b, n) => !(n === 0 && b.texte === s.titre));
+  const plan = sections(texte, s.titre);
+  return html`
     <a class="bouton retour" href="${
       s.profil === "general" ? "/eleve" : lienTheme(s.theme_id, s.id)
     }">${icone(
       "arrow-left",
     )}${s.profil === "general" ? "Ressources" : nomChapitre(s.theme || "Autres documents")}</a>
+    <div class="lecture-colonnes">
     <article class="document">
       <h1>${s.titre}</h1>
       ${
@@ -608,13 +611,21 @@ export const lectureSource = (
               : ""
           }</figure>
         `,
-      )} ${texteDocument(
-        blocs.filter((b, n) => !(n === 0 && b.texte === s.titre)),
-        marque,
-        2,
-      )}
+      )} ${texteDocument(texte, marque, 2, s.titre)}
     </article>
+    ${
+      plan.length > 1
+        ? html`
+          <nav class="sommaire" aria-labelledby="sommaire-titre">
+            <h2 id="sommaire-titre">Sommaire</h2>
+            <ol>${plan.map((p) => html`<li><a href="#${p.ancre}">${p.titre}</a></li>`)}</ol>
+          </nav>
+        `
+        : ""
+    }
+    </div>
   `;
+};
 
 export const question = (texte: string) =>
   html`

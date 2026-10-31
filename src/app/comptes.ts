@@ -444,23 +444,25 @@ export async function authentifier(db: Db, identifiant: string, motDePasse: stri
     | undefined;
   // Une dérivation a lieu même sans compte: la durée ne révèle pas quels identifiants existent.
   const empreinte = await deriver(motDePasse, l?.sel ?? "absent");
-  if (!l || empreinte.length !== l.empreinte.length) return null;
-  let diff = 0;
-  for (let i = 0; i < empreinte.length; i++) {
-    diff |= empreinte.charCodeAt(i) ^ l.empreinte.charCodeAt(i);
+  if (!l) return null;
+  // En développement, aucun mot de passe n'est vérifié, administrateur compris.
+  if (!config.dev) {
+    if (empreinte.length !== l.empreinte.length) return null;
+    let diff = 0;
+    for (let i = 0; i < empreinte.length; i++) {
+      diff |= empreinte.charCodeAt(i) ^ l.empreinte.charCodeAt(i);
+    }
+    if (diff !== 0) return null;
   }
-  // Le contournement en développement exclut les administrateurs.
-  return diff === 0 || (config.dev && !l.administrateur)
-    ? {
-        id: l.id,
-        identifiant: l.identifiant,
-        nom: l.nom,
-        role: l.role,
-        session_version: l.session_version,
-        administrateur: l.administrateur,
-        renouveler_mdp: l.renouveler_mdp,
-      }
-    : null;
+  return {
+    id: l.id,
+    identifiant: l.identifiant,
+    nom: l.nom,
+    role: l.role,
+    session_version: l.session_version,
+    administrateur: l.administrateur,
+    renouveler_mdp: l.renouveler_mdp,
+  };
 }
 
 export const lireCompte = (db: Db, id: string) =>
