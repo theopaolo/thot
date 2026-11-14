@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vp build && node src/main.ts --watch",
-    "start": "vp build && node src/main.ts",
+    "dev": "vp build && node --env-file-if-exists=.env src/main.ts --watch",
+    "start": "vp build && node --env-file-if-exists=.env src/main.ts",
     "thot": "node --env-file-if-exists=.env src/cli.ts",
     "test": "vp test run",
     "check": "vp check && vp build && pnpm frontiere && vp test run",

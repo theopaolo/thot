@@ -31,10 +31,12 @@ const lancer = (args: string[]) =>
     stdio: ["ignore", "inherit", "inherit"],
   });
 
-const commun = ["--env-file-if-exists=.env", ...surveiller];
+// Le .env se charge dans ce processus (package.json) et passe aux enfants par l'environnement.
+// Donné aux enfants, --env-file ferait surveiller toute la racine, data/ compris : chaque
+// écriture SQLite relancerait le serveur.
 const processus = [
-  lancer([...droits, ...commun, "src/server.ts"]),
-  lancer([...droits, "--allow-child-process", ...commun, "src/worker.ts"]),
+  lancer([...droits, ...surveiller, "src/server.ts"]),
+  lancer([...droits, "--allow-child-process", ...surveiller, "src/worker.ts"]),
 ];
 if (dev)
   processus.push(lancer([join(RACINE, "node_modules/vite-plus/bin/vp"), "build", "--watch"]));
