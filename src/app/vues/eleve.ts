@@ -10,6 +10,7 @@ import type { Libelles } from "../instance.ts";
 import type { Avancement } from "../activites.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { sections, texteDocument } from "./document.ts";
+import { type Etape, dossier, fichier, fil } from "./bureau.ts";
 
 export type ChapitreVue = {
   nom: string;
@@ -30,6 +31,7 @@ export type SourceChapitre = {
   quiz_reponse: string;
   profil?: Profil;
   image_id: string | null;
+  format?: string;
 };
 
 export type FaitVue = {
@@ -181,6 +183,11 @@ export const accueilEleve = (
     </div>
   `;
 
+const statutActivite = (a: ActiviteListee) =>
+  a.avancement
+    ? html`<span class="statut ${AVANCEMENTS[a.avancement][1]}">${AVANCEMENTS[a.avancement][0]}</span>`
+    : "";
+
 /**
  * La liste des ressources, rangée par matière, puis par cours, puis par thème. Les ressources d'un
  * cours sans thème viennent sous le nom du cours, celles sans cours sous « Autres documents ». Les
@@ -221,6 +228,86 @@ export const ressourcesParCours = (
       )}
     `,
   );
+
+/**
+ * La vue « Dossiers » de l'élève : à la racine, un dossier par cours, dans un cours, un dossier
+ * par thème, puis les ressources sans thème et les activités du cours en fichiers.
+ */
+export const bureauEleve = (chapitres: ChapitreVue[], activites: ActiviteListee[], p: Scope) => {
+  const lien = (q: Record<string, string>) =>
+    `/eleve?${new URLSearchParams({ ...q, vue: "grille" })}`;
+  const uniques = (liste: ChapitreVue[]) => [
+    ...new Map(liste.flatMap((ch) => ch.sources).map((s) => [s.id, s])).values(),
+  ];
+  const documents = (n: number) => `${n} document${n > 1 ? "s" : ""}`;
+  const ressource = (s: SourceChapitre) =>
+    fichier({
+      href: `/eleve/sources/${s.id}`,
+      titre: s.titre,
+      format: s.format,
+      image_id: s.image_id,
+    });
+  const activite = (a: ActiviteListee) =>
+    fichier({
+      href: `/eleve/activites/${a.id}`,
+      titre: a.titre,
+      activite: true,
+      apres: statutActivite(a),
+    });
+  const grille = (dossiers: unknown[], fichiers: unknown[]) =>
+    html`${dossiers.length ? html`<ul class="bureau">${dossiers}</ul>` : ""}${
+      fichiers.length ? html`<ul class="bureau">${fichiers}</ul>` : ""
+    }`;
+  const racine: Etape = { nom: "Ressources", href: lien({ cours_id: "" }) };
+  const ducours = chapitres.filter((ch) => ch.coursId === p.cours_id);
+  const etapeCours: Etape[] = ducours[0]
+    ? [{ nom: ducours[0].cours ?? "", href: lien({ cours_id: p.cours_id }) }]
+    : [];
+  // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, reste à plat.
+  const enDossier = (ch: ChapitreVue) => ch.themeId && ch.nom !== ch.cours;
+  if (p.theme_id) {
+    const du = ducours.filter((ch) => ch.themeId === p.theme_id);
+    return html`${fil([racine, ...etapeCours, { nom: du[0]?.nom ?? "", href: "" }])}${grille(
+      [],
+      uniques(du).map(ressource),
+    )}`;
+  }
+  if (p.cours_id) {
+    return html`${fil([racine, ...etapeCours])}${grille(
+      ducours.filter(enDossier).map((ch) =>
+        dossier({
+          href: lien({ cours_id: p.cours_id, theme_id: ch.themeId ?? "" }),
+          nom: ch.nom,
+          detail: documents(ch.sources.length),
+        }),
+      ),
+      [
+        ...uniques(ducours.filter((ch) => !enDossier(ch))).map(ressource),
+        ...activites.filter((a) => a.cours_id === p.cours_id).map(activite),
+      ],
+    )}`;
+  }
+  const cours = [
+    ...Map.groupBy(
+      chapitres.filter((ch) => ch.coursId),
+      (ch) => ch.coursId,
+    ).values(),
+  ];
+  return grille(
+    cours.map((liste) => {
+      const aFaire = activites.filter(
+        (a) => a.cours_id === liste[0].coursId && a.avancement === "a_faire",
+      ).length;
+      return dossier({
+        href: lien({ cours_id: liste[0].coursId ?? "" }),
+        nom: liste[0].cours ?? "",
+        detail: documents(uniques(liste).length),
+        signal: aFaire ? `${aFaire} à faire` : "",
+      });
+    }),
+    uniques(chapitres.filter((ch) => !ch.coursId)).map(ressource),
+  );
+};
 
 export type ActiviteListee = {
   id: string;

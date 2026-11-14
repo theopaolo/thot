@@ -7,6 +7,7 @@ import type { Champ, Profil } from "../../core/profils.ts";
 import type { Libelles } from "../instance.ts";
 import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";
+import { type Dossier, type Etape, dossier, fichier, fil } from "./bureau.ts";
 
 type Option = { value: string; label: string };
 
@@ -86,29 +87,33 @@ const caseSource = (l: LigneSource, classe = "") =>
 /** Une carte ne signale que l'écart: « certifiée » sur chaque œuvre ne dirait rien. */
 const carte = (l: LigneSource) => {
   const ecart = l.etat === "failed" || JOBS_ACTIFS.includes(l.etat) || l.statut !== "certifiee";
-  return html`
-    <li class="carte ${l.statut === "rejetee" ? "rejetee" : ""}">
-      ${caseSource(l, "carte-case")}
-      <a class="tuile" href="/prof/sources/${l.id}">
-        ${apercu(l)}
-        <span class="tuile-titre">${l.titre}</span>
-      </a>
-      ${
-        ecart || l.images_a_relire || l.revision_en_attente
-          ? html`<p class="carte-etat">${ecart ? statutLigne(l) : ""}${versionLigne(l)}${
-              l.images_a_relire
-                ? html`<span class="statut unreviewed">${l.images_a_relire} légende${
-                    l.images_a_relire > 1 ? "s" : ""
-                  } non relue${l.images_a_relire > 1 ? "s" : ""}</span>`
-                : ""
-            }</p>`
-          : ""
-      }
-    </li>
-  `;
+  return fichier({
+    href: `/prof/sources/${l.id}`,
+    titre: l.titre,
+    format: l.format,
+    image_id: l.image_id,
+    classe: `carte ${l.statut === "rejetee" ? "rejetee" : ""}`,
+    avant: caseSource(l, "carte-case"),
+    apres:
+      ecart || l.images_a_relire || l.revision_en_attente
+        ? html`<p class="carte-etat">${ecart ? statutLigne(l) : ""}${versionLigne(l)}${
+            l.images_a_relire
+              ? html`<span class="statut unreviewed">${l.images_a_relire} légende${
+                  l.images_a_relire > 1 ? "s" : ""
+                } non relue${l.images_a_relire > 1 ? "s" : ""}</span>`
+              : ""
+          }</p>`
+        : "",
+  });
 };
 
-export const lignesSources = (lignes: LigneSource[], requete: string, grille = false) => {
+/** `coursId` ouvre la vue « Dossiers » sur ce cours : elle finit par « Déposer ici ». */
+export const lignesSources = (
+  lignes: LigneSource[],
+  requete: string,
+  grille = false,
+  coursId = "",
+) => {
   const actifs = lignes.some((l) => JOBS_ACTIFS.includes(l.etat));
   const rafraichir = actifs
     ? html`
@@ -116,21 +121,13 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
     `
     : "";
   if (grille) {
-    const groupes = Map.groupBy(lignes, (l) => l.theme ?? "");
-    return html`
-      <div id="lignes" ${rafraichir}>
-        ${[...groupes].map(([theme, liste]) =>
-          groupes.size > 1
-            ? html`
-              <section class="seance">
-                <h2>${theme || "Autres documents"} <span class="discret">${liste.length}</span></h2>
-                <ul class="tuiles grille-sources">${liste.map(carte)}</ul>
-              </section>
-            `
-            : html`<ul class="tuiles grille-sources">${liste.map(carte)}</ul>`,
-        )}
-      </div>
-    `;
+    return html`<ul id="lignes" class="bureau" ${rafraichir}>${lignes.map(carte)}${
+      coursId
+        ? html`<li class="dossier deposer"><a href="/prof/depot?cours=${coursId}"><span
+            class="pictogramme">${icone("upload-simple")}</span><span class="nom"
+            >Déposer ici</span></a></li>`
+        : ""
+    }</ul>`;
   }
   return html`
     <tbody id="lignes" ${rafraichir}>
@@ -171,6 +168,33 @@ type Filtres = {
 
 const lienFiltres = (f: Filtres, change: Partial<Filtres>) =>
   `/prof?${new URLSearchParams({ ...f, ...change })}`;
+
+/**
+ * Le niveau ouvert dans la vue « Dossiers », que la route calcule : le chemin depuis la racine, et
+ * les dossiers de ce niveau, un par cours à la racine, un par thème dans un cours.
+ */
+export type Rangement = {
+  fil: { nom: string; portee: Partial<Filtres> }[];
+  dossiers: { nom: string; portee: Partial<Filtres>; n: number; aRelire: number }[];
+  /** le cours ouvert, où « Déposer ici » range les fichiers déposés */
+  coursId?: string;
+};
+
+const bureauBibliotheque = (f: Filtres, r: Rangement) => html`
+  ${fil(r.fil.map((e): Etape => ({ nom: e.nom, href: lienFiltres(f, e.portee) })))}
+  ${
+    r.dossiers.length
+      ? html`<ul class="bureau">${r.dossiers.map((d) =>
+          dossier({
+            href: lienFiltres(f, d.portee),
+            nom: d.nom,
+            detail: nombre(d.n, "ressource"),
+            signal: d.aRelire ? `${d.aRelire} à relire` : "",
+          } satisfies Dossier),
+        )}</ul>`
+      : ""
+  }
+`;
 
 /** La bibliothèque range les ressources et les activités préparées d'après elles. */
 export const ongletsBibliotheque = (chemin: string) =>
@@ -283,6 +307,7 @@ export const sources = (
   general = false,
   supprimee = false,
   debut?: Debut,
+  rangement?: Rangement,
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
@@ -368,7 +393,7 @@ export const sources = (
         ${(
           [
             ["", "Liste", "list"],
-            ["grille", "Grille", "squares-four"],
+            ["grille", "Dossiers", "squares-four"],
           ] as const
         ).map(
           ([v, l, i]) =>
@@ -381,13 +406,14 @@ export const sources = (
         )}
       </nav>
     </div>
+    ${grille && rangement ? bureauBibliotheque(f, rangement) : ""}
     ${
-      lignes.length
+      lignes.length || (grille && rangement?.coursId)
         ? html`
         <form method="post" action="/prof/sources/statut?${requete}">
           ${
             grille
-              ? lignesSources(lignes, requete, true)
+              ? lignesSources(lignes, requete, true, rangement?.coursId)
               : html`
             <table class="biblio">
               <thead>
@@ -428,11 +454,13 @@ export const sources = (
           </div>
         </form>
       `
-        : repartition.length
-          ? html`
+        : grille && rangement?.dossiers.length
+          ? ""
+          : repartition.length
+            ? html`
         <p>Aucun document pour ce filtre.</p>
       `
-          : html`
+            : html`
         <p>Aucun document. <a href="/prof/depot">Déposer le premier</a>.</p>
       `
     }
@@ -441,38 +469,55 @@ export const sources = (
 
 export type Eleve = { id: string; identifiant: string; nom: string };
 
-const choixCours = (cat: Catalogue, aide: string, legende: string) =>
-  cat.cours.length
-    ? html`
-      <fieldset>
-        <legend>${legende}</legend>
-        <p class="discret">${aide}</p>
-        ${cat.cours.map(
+/** « Matière / cours », la matière seulement quand l'instance en a plusieurs. */
+const nomCours = (cat: Catalogue, c: Catalogue["cours"][number]) =>
+  cat.matieres.length > 1
+    ? `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`
+    : c.nom;
+
+type Cours = Catalogue["cours"][number];
+
+/**
+ * Le cours ouvert est celui des nouveaux comptes. Les autres cours de l'enseignant restent repliés.
+ */
+const choixCours = (cat: Catalogue, l: Libelles, actuel?: Cours) => {
+  if (!actuel) return "";
+  const autres = cat.cours.filter((c) => c.id !== actuel.id);
+  return html`<input type="hidden" name="cours" value="${actuel.id}">${
+    autres.length
+      ? html`<details class="cours-ajout"><summary>Aussi dans d'autres ${l.cours_pluriel.toLowerCase()}</summary>${autres.map(
           (c) =>
-            html`<label><input type="checkbox" name="cours" value="${c.id}" checked> ${
-              cat.matieres.find((m) => m.id === c.matiere_id)?.nom
-            } / ${c.nom}</label>`,
-        )}
-      </fieldset>
-    `
-    : "";
+            html`<label><input type="checkbox" name="cours" value="${c.id}"> ${nomCours(cat, c)}</label>`,
+        )}</details>`
+      : ""
+  }`;
+};
 
 const reinitialiser = (e: Eleve) =>
-  html`<form method="post" action="/prof/eleves/${e.id}/reinitialiser"><button aria-label="Réinitialiser le mot de passe de ${e.nom}">Réinitialiser le mot de passe</button></form>`;
+  html`<form method="post" action="/prof/eleves/${e.id}/reinitialiser"><button aria-label="Nouveau mot de passe pour ${e.nom}">Nouveau mot de passe</button></form>`;
 
-const tableEleves = (liste: Eleve[], action: (e: Eleve) => unknown) =>
+/** Le nom se lit, l'identifiant se recopie : chasse fixe pour distinguer l, I et 1. */
+const tableEleves = (
+  liste: Eleve[],
+  action: (e: Eleve) => unknown,
+  cours?: (e: Eleve) => unknown,
+) =>
   html`
     <table class="eleves">
       <thead>
         <tr>
-          <th>Nom</th>
-          <th>Identifiant</th>
+          <th>Élève</th>
+          ${cours ? html`<th class="cours-eleve">Cours</th>` : ""}
           <th><span class="visuellement-cache">Actions</span></th>
         </tr>
       </thead>
       <tbody>${liste.map(
         (e) =>
-          html`<tr><td>${e.nom}</td><td>${e.identifiant}</td><td><div class="barre">${action(e)}</div></td></tr>`,
+          html`<tr>
+            <td><span class="nom">${e.nom}</span> <span class="identifiant">${e.identifiant}</span></td>
+            ${cours ? html`<td class="cours-eleve">${cours(e)}</td>` : ""}
+            <td><div class="barre">${action(e)}</div></td>
+          </tr>`,
       )}</tbody>
     </table>
   `;
@@ -485,150 +530,220 @@ export type Lien = {
   cours: string[];
 };
 
-/** Les liens d'inscription actifs. Un cours du lien ne se nomme qu'à ses enseignants. */
-const sectionLiens = (cat: Catalogue, liens: Lien[], adresse: string, termes: Libelles) =>
+/** Les liens actifs. Un cours du lien ne se nomme qu'à ses enseignants. */
+const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Cours) =>
   html`
-    <h2 id="liens">Lien d'inscription</h2>
-    <p>L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint les cours du lien. Vérifiez ensuite la liste de chaque cours et retirez les comptes qui ne sont pas ceux de vos élèves.</p>
-    <details>
-      <summary>Créer un lien</summary>
-      <form method="post" action="/prof/eleves/liens">
-        ${choixCours(
-          cat,
-          "Les élèves qui suivent le lien rejoignent ces cours.",
-          `${termes.cours_pluriel} du lien`,
-        )}
-        <div class="deux">
-          <div class="champ">
-            <label for="jours">Jours de validité</label>
-            <input id="jours" type="number" name="jours" min="1" max="365" value="14" required>
-          </div>
-          <div class="champ">
-            <label for="places">Places</label>
-            <input id="places" type="number" name="places" min="1" max="1000" value="40" required>
-          </div>
-        </div>
-        <div class="barre"><button class="principal">Créer le lien</button></div>
-      </form>
-    </details>
+    <h3 id="liens">Liens actifs</h3>
     ${
       liens.length
-        ? html`
-          <table class="eleves">
-            <thead>
-              <tr>
-                <th>${termes.cours_pluriel}</th>
-                <th><span class="visuellement-cache">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody>${liens.map((l) => {
-              const noms = cat.cours
-                .filter((c) => l.cours.includes(c.id))
-                .map((c) => `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`)
-                .join(", ");
-              return html`<tr>
-                <td>${noms}<br><span class="discret">${l.places} place${l.places > 1 ? "s" : ""} restante${l.places > 1 ? "s" : ""}, expire le ${jour(l.expire_le)}. Créé par ${l.createur}.</span></td>
-                <td><div class="barre">
-                  <button type="button" data-copier="${adresse}/inscription/${l.jeton}" aria-label="Copier le lien pour ${noms}">Copier le lien</button>
-                  <form method="post" action="/prof/eleves/liens/${l.jeton}/revoquer">
-                    <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs cours.">Révoquer</button>
-                  </form>
-                </div></td>
-              </tr>`;
-            })}</tbody>
-          </table>
-        `
+        ? html`<ul class="liens-actifs">${liens.map((l) => {
+            const noms = cat.cours
+              .filter((c) => l.cours.includes(c.id))
+              .map((c) => nomCours(cat, c))
+              .join(", ");
+            return html`<li>
+              <p>${l.places} place${l.places > 1 ? "s" : ""} restante${l.places > 1 ? "s" : ""}, expire le ${jour(l.expire_le)}.</p>
+              <p class="discret">${!actuel || l.cours.length > 1 ? `${noms}. ` : ""}Créé par ${l.createur}.</p>
+              <div class="barre">
+                <button type="button" data-copier="${adresse}/inscription/${l.jeton}" aria-label="Copier le lien pour ${noms}">Copier le lien</button>
+                <form method="post" action="/prof/eleves/liens/${l.jeton}/revoquer">
+                  <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs cours.">Révoquer</button>
+                </form>
+              </div>
+            </li>`;
+          })}</ul>`
         : html`<p class="discret">Aucun lien actif.</p>`
     }
   `;
 
 /**
- * Les élèves de chaque cours de l'enseignant, et ceux sans cours pour un administrateur. Retirer
- * un élève lui retire les ressources du cours sans supprimer son compte. Une instance personnelle
- * n'a pas de liens d'inscription.
+ * Les trois façons d'ajouter des élèves, une seule ouverte à la fois. Hors d'un cours, on ouvre
+ * d'abord celui qui les accueille. Un administrateur sans cours crée des élèves sans cours. Une
+ * instance personnelle n'a pas de lien d'inscription, et un lien demande un cours.
  */
-export const eleves = (
+const ajoutEleves = (
   cat: Catalogue,
-  groupes: { cours: Catalogue["cours"][number]; eleves: Eleve[] }[],
-  sansCours: Eleve[] | undefined,
+  l: Libelles,
+  groupes: { cours: Cours; eleves: Eleve[] }[],
   liens: Lien[] | undefined,
   adresse: string,
-  l: Libelles,
-  erreur?: string,
+  actuel?: Cours,
 ) =>
-  html`
-    <h1>Élèves</h1>
-    ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
-    ${
-      // Un enseignant inscrit chaque élève qu'il crée à un de ses cours. Un administrateur peut
-      // créer un élève sans cours.
-      !cat.cours.length && !sansCours
-        ? html`<p>Vous n'avez pas encore de cours. Un administrateur vous inscrit à un cours, puis vous y ajoutez vos élèves.</p>`
-        : html`
-    <h2>Ajouter un élève</h2>
-    <form method="post" action="/prof/eleves/ajouter">
-      ${choixCours(
-        cat,
-        "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.",
-        `${l.cours_pluriel} des nouveaux comptes`,
-      )}
-      <div class="champ">
-        <label for="identifiant">Identifiant</label>
-        <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas. Un élève qui a déjà un compte rejoint vos cours par un <a href="#liens">lien d'inscription</a>.</p>
-        <input id="identifiant" type="text" name="identifiant" required minlength="3" maxlength="40" pattern="[a-z0-9._\\-]+" autocomplete="off" spellcheck="false" aria-describedby="format-identifiant">
-      </div>
-      <div class="champ">
-        <label for="nom">Nom</label>
-        <input id="nom" type="text" name="nom" required maxlength="100" autocomplete="off">
-      </div>
-      <button class="principal">Créer et afficher le mot de passe</button>
-    </form>
-    <details>
-      <summary>Importer une classe depuis un CSV</summary>
-    <p>Un CSV UTF-8 avec les colonnes <code>identifiant,nom</code>. Les identifiants doivent être uniques.</p>
-    <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data">
-      ${choixCours(
-        cat,
-        "Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.",
-        `${l.cours_pluriel} des nouveaux comptes`,
-      )}
-      <div class="barre">
-        <label for="fichier">Liste CSV</label>
-        ${champFichier(".csv,text/csv")}
-        <button class="principal">Importer et afficher les mots de passe</button>
-      </div>
-    </form>
-    </details>
-    ${liens && cat.cours.length ? sectionLiens(cat, liens, adresse, l) : ""}
-    `
-    }
-    ${groupes.map(
-      ({ cours, eleves }) => html`
-        <h2 id="cours-${cours.id}">${cat.matieres.find((m) => m.id === cours.matiere_id)?.nom} / ${cours.nom}</h2>
-        ${
-          eleves.length
-            ? tableEleves(
-                eleves,
-                (e) => html`${reinitialiser(e)}
-                  <form method="post" action="/prof/eleves/${e.id}/retirer">
-                    <input type="hidden" name="cours_id" value="${cours.id}">
-                    <button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? L'élève garde son compte. Un lien d'inscription encore actif lui permet de revenir.">Retirer du cours</button>
-                  </form>`,
-              )
-            : html`<p class="discret">Aucun élève dans ce cours.</p>`
-        }
-      `,
-    )}
-    ${
-      sansCours
-        ? html`
-        <h2>Sans cours</h2>
-        <p class="discret">Ces élèves ne lisent que les ressources sans cours. Seuls les administrateurs les voient et les gèrent.</p>
-        ${sansCours.length ? tableEleves(sansCours, reinitialiser) : html`<p class="discret">Aucun élève sans cours.</p>`}
+  !actuel && cat.cours.length
+    ? html`
+    <section class="ajout" aria-labelledby="titre-ajout">
+      <h2 id="titre-ajout">Ajouter des élèves</h2>
+      <ul class="cours-eleves">${groupes.map(
+        (g) =>
+          html`<li><a href="/prof/eleves?cours_id=${g.cours.id}">${nomCours(cat, g.cours)}</a> <span class="nombre">${g.eleves.length}</span></li>`,
+      )}</ul>
+      ${liens ? liensActifs(cat, liens, adresse) : ""}
+    </section>
+  `
+    : html`
+    <section class="ajout" aria-labelledby="titre-ajout">
+      <h2 id="titre-ajout">Ajouter des élèves</h2>
+      <details name="ajout" open>
+        <summary>Un élève</summary>
+        <form method="post" action="/prof/eleves/ajouter">
+          <div class="champ">
+            <label for="nom">Nom</label>
+            <input id="nom" type="text" name="nom" required maxlength="100" autocomplete="off">
+          </div>
+          <div class="champ">
+            <label for="identifiant">Identifiant</label>
+            <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas.</p>
+            <input id="identifiant" type="text" name="identifiant" required minlength="3" maxlength="40" pattern="[a-z0-9._\\-]+" autocomplete="off" spellcheck="false" aria-describedby="format-identifiant">
+          </div>
+          ${choixCours(cat, l, actuel)}
+          <button class="principal">Créer et afficher le mot de passe</button>
+        </form>
+      </details>
+      <details name="ajout">
+        <summary>Une classe depuis un CSV</summary>
+        <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data">
+          <div class="champ">
+            <p class="aide">Un CSV UTF-8 aux colonnes <code>identifiant,nom</code>.</p>
+            ${champFichier(".csv,text/csv")}
+          </div>
+          ${choixCours(cat, l, actuel)}
+          <button class="principal">Importer et afficher les mots de passe</button>
+        </form>
+      </details>
+      ${
+        liens && actuel
+          ? html`
+        <details name="ajout">
+          <summary>Un lien d'inscription</summary>
+          <form method="post" action="/prof/eleves/liens">
+            <p class="aide">L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint le cours. Retirez ensuite les comptes qui ne sont pas ceux de vos élèves.</p>
+            <div class="deux">
+              <div class="champ">
+                <label for="jours">Jours de validité</label>
+                <input id="jours" type="number" name="jours" min="1" max="365" value="14" required>
+              </div>
+              <div class="champ">
+                <label for="places">Places</label>
+                <input id="places" type="number" name="places" min="1" max="1000" value="40" required>
+              </div>
+            </div>
+            ${choixCours(cat, l, actuel)}
+            <button class="principal">Créer le lien</button>
+          </form>
+        </details>
+        ${liensActifs(cat, liens, adresse, actuel)}
       `
+          : ""
+      }
+    </section>
+  `;
+
+/**
+ * La page d'un cours liste ses élèves, qu'on retire du cours sans supprimer leur compte. Sans cours
+ * choisi, la page liste tous les élèves avec leurs cours, et ceux sans cours pour un
+ * administrateur.
+ */
+export const eleves = (o: {
+  cat: Catalogue;
+  actuel?: Cours;
+  groupes: { cours: Cours; eleves: Eleve[] }[];
+  sansCours?: Eleve[];
+  liens?: Lien[];
+  adresse: string;
+  l: Libelles;
+  matiere?: string;
+  erreur?: string;
+}) => {
+  const { cat, actuel, l } = o;
+  // Un élève de plusieurs cours n'a qu'une ligne, avec chacun de ses cours.
+  const parEleve = new Map<string, { eleve: Eleve; cours: Cours[] }>();
+  for (const g of o.groupes) {
+    for (const e of g.eleves) {
+      const ligne = parEleve.get(e.id) ?? { eleve: e, cours: [] };
+      ligne.cours.push(g.cours);
+      parEleve.set(e.id, ligne);
+    }
+  }
+  const lignes = [...parEleve.values()].sort((a, b) =>
+    a.eleve.nom.localeCompare(b.eleve.nom, "fr"),
+  );
+  const n = lignes.length;
+  const compte = `${n} élève${n > 1 ? "s" : ""}`;
+  const choix =
+    cat.cours.length > 1
+      ? Domaines.filtre(
+          cat,
+          { matiere_id: o.matiere ?? "", cours_id: actuel?.id ?? "", theme_id: "" },
+          "/prof/eleves",
+          l,
+          {},
+          { tout: `Tous les ${l.cours_pluriel.toLowerCase()}`, themes: false },
+        )
+      : "";
+  // Un enseignant inscrit chaque élève qu'il crée à un de ses cours. Un administrateur peut
+  // créer un élève sans cours.
+  if (!cat.cours.length && !o.sansCours) {
+    return html`
+      <h1>Élèves</h1>
+      <p>Vous n'avez pas encore de cours. Un administrateur vous inscrit à un cours, puis vous y ajoutez vos élèves.</p>
+    `;
+  }
+  const vide = html`
+    <div class="vide">
+      <p><strong>${actuel ? `Aucun élève dans ${nomCours(cat, actuel)}.` : "Aucun élève dans vos cours."}</strong></p>
+      <p>Créez les comptes un par un, importez la classe depuis un CSV${o.liens && actuel ? " ou partagez un lien d'inscription" : ""}.</p>
+    </div>
+  `;
+  const liste = actuel
+    ? tableEleves(
+        lignes.map((x) => x.eleve),
+        (e) => html`${reinitialiser(e)}
+          <form method="post" action="/prof/eleves/${e.id}/retirer">
+            <input type="hidden" name="cours_id" value="${actuel.id}">
+            <button class="retirer" aria-label="Retirer ${e.nom} de ${actuel.nom}" data-confirmer="Retirer ${e.nom} de ${actuel.nom} ? L'élève garde son compte. Un lien d'inscription encore actif lui permet de revenir.">Retirer</button>
+          </form>`,
+      )
+    : tableEleves(
+        lignes.map((x) => x.eleve),
+        reinitialiser,
+        (e) =>
+          parEleve
+            .get(e.id)!
+            .cours.map(
+              (c, i) =>
+                html`${i ? ", " : ""}<a href="/prof/eleves?cours_id=${c.id}">${nomCours(cat, c)}</a>`,
+            ),
+      );
+  return html`
+    ${choix}
+    <h1>Élèves</h1>
+    ${
+      n
+        ? html`<p class="sous-titre">${compte} ${
+            actuel
+              ? `dans ${nomCours(cat, actuel)}`
+              : `dans ${o.groupes.filter((g) => g.eleves.length).length} ${l.cours_pluriel.toLowerCase()}`
+          }.</p>`
         : ""
     }
+    ${o.erreur ? html`<p role="alert">${o.erreur}</p>` : ""}
+    <div class="effectifs">
+      <div class="liste-eleves">
+        ${n ? liste : vide}
+        ${
+          !actuel && o.sansCours?.length
+            ? html`
+            <h2>Sans cours</h2>
+            <p class="aide">Ces élèves ne lisent que les ressources sans cours. Seuls les administrateurs les voient et les gèrent.</p>
+            ${tableEleves(o.sansCours, reinitialiser)}
+          `
+            : ""
+        }
+      </div>
+      ${ajoutEleves(cat, l, o.groupes, o.liens, o.adresse, actuel)}
+    </div>
   `;
+};
 
 export const feuilleIdentifiants = (
   liste: { identifiant: string; nom: string; motDePasse: string }[],
@@ -754,7 +869,7 @@ export const questionsProf = (messages: QuestionProf[]) => {
 /** Sélecteur de fichier au libellé français, quelle que soit la langue du navigateur. */
 const champFichier = (accept: string, plusieurs = false) =>
   html`
-    <span class="fichier">
+    <span class="fichier ${plusieurs ? "zone-depot" : ""}">
       <input
         type="file"
         id="fichier"
@@ -767,7 +882,9 @@ const champFichier = (accept: string, plusieurs = false) =>
       <label for="fichier" class="bouton">${icone("upload-simple")}Choisir ${
         plusieurs ? "des fichiers" : "un fichier"
       }</label>
-      <output for="fichier" class="discret">Aucun fichier choisi</output>
+      <output for="fichier" class="discret">${
+        plusieurs ? "ou glissez-les sur la page" : "Aucun fichier choisi"
+      }</output>
     </span>
   `;
 

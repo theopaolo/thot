@@ -747,6 +747,14 @@ export const aLegender = (db: Db, compte: Compte, imageId = "") => {
   return i && { ...i, restantes };
 };
 
+/** Le nombre de légendes que le compte a à relire, affiché dans le menu. */
+export const nombreLegendes = (db: Db, compte: Compte) =>
+  db
+    .prepare(
+      `SELECT count(*) AS n FROM images i JOIN sources s ON s.id = i.source_id WHERE ${FILE}`,
+    )
+    .get(parametresFile(db, compte))!.n as number;
+
 // Les douze prochaines images de la file, dans l'ordre où elles seront proposées.
 export const fileLegendes = (db: Db, compte: Compte) =>
   db

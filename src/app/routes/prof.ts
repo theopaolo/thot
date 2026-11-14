@@ -96,6 +96,92 @@ export function routesProf(app: Hono<Env>, w: Web) {
       cours: (noms.get(s.id) ?? []).map((l) => l.nom).join(", "),
     }));
   };
+  /**
+   * La vue « Dossiers » montre un niveau : à la racine, un dossier par cours et les ressources
+   * sans cours, dans un cours, un dossier par thème et les ressources sans thème. Une recherche,
+   * un lot ou un thème choisi montrent tous les fichiers trouvés, sans dossiers.
+   */
+  const ranger = (
+    c: Context<Env>,
+    f: ReturnType<typeof filtres>,
+    ressources: Prof.LigneSource[],
+    cat: Domaines.Catalogue,
+  ): { rangement: Prof.Rangement; fichiers: Prof.LigneSource[] } => {
+    const p = scope(c);
+    const racine = { nom: "Bibliothèque", portee: { matiere_id: "", cours_id: "", theme_id: "" } };
+    const cours = cat.cours.find((x) => x.id === p.cours_id);
+    const theme = cat.themes.find((x) => x.id === p.theme_id);
+    const fil = [
+      racine,
+      ...(cours ? [{ nom: cours.nom, portee: { cours_id: cours.id, theme_id: "" } }] : []),
+      ...(theme ? [{ nom: theme.nom, portee: { theme_id: theme.id } }] : []),
+    ];
+    if (f.q || f.lot || f.theme || p.theme_id) {
+      return { rangement: { fil, dossiers: [] }, fichiers: ressources };
+    }
+    const liens = db
+      .prepare(
+        `SELECT sc.source_id, sc.cours_id, sc.theme_id FROM source_cours sc
+         WHERE ${Domaines.MES_COURS}`,
+      )
+      .all(Domaines.mesCours(lu(c))) as {
+      source_id: string;
+      cours_id: string;
+      theme_id: string | null;
+    }[];
+    const parId = new Map(ressources.map((r) => [r.id, r]));
+    const contenu = (garde: (l: (typeof liens)[number]) => boolean) =>
+      [
+        ...new Set(liens.filter((l) => parId.has(l.source_id) && garde(l)).map((l) => l.source_id)),
+      ].map((id) => parId.get(id)!);
+    const aRelire = (liste: Prof.LigneSource[]) =>
+      liste.filter((s) => s.statut === "a_relire" || s.revision_en_attente).length;
+    const dossiers = (
+      groupes: { nom: string; portee: Partial<typeof f>; liste: Prof.LigneSource[] }[],
+    ) =>
+      groupes
+        .filter((g) => g.liste.length)
+        .map((g) => ({
+          nom: g.nom,
+          portee: g.portee,
+          n: g.liste.length,
+          aRelire: aRelire(g.liste),
+        }));
+    if (cours) {
+      return {
+        rangement: {
+          fil,
+          coursId: cours.id,
+          dossiers: dossiers(
+            cat.themes
+              .filter((t) => t.cours_id === cours.id)
+              .map((t) => ({
+                nom: t.nom,
+                portee: { theme_id: t.id },
+                liste: contenu((l) => l.cours_id === cours.id && l.theme_id === t.id),
+              })),
+          ),
+        },
+        fichiers: contenu((l) => l.cours_id === cours.id && !l.theme_id),
+      };
+    }
+    const ranges = new Set(liens.map((l) => l.source_id));
+    return {
+      rangement: {
+        fil,
+        dossiers: dossiers(
+          cat.cours
+            .filter((x) => !p.matiere_id || x.matiere_id === p.matiere_id)
+            .map((x) => ({
+              nom: x.nom,
+              portee: { cours_id: x.id, theme_id: "" },
+              liste: contenu((l) => l.cours_id === x.id),
+            })),
+        ),
+      },
+      fichiers: ressources.filter((r) => !ranges.has(r.id)),
+    };
+  };
   const filtres = (c: Context<Env>) => ({
     q: c.req.query("q") ?? "",
     statut: c.req.query("statut") ?? "",
@@ -121,6 +207,10 @@ export function routesProf(app: Hono<Env>, w: Web) {
       statut: statut(liste[0]),
       n: liste.length,
     }));
+    const montrees = ressources.filter(
+      (s) => (!f.statut || statut(s) === f.statut) && (!f.theme || s.theme === f.theme),
+    );
+    const bureau = f.vue === "grille" ? ranger(c, f, montrees, cat) : undefined;
     return c.html(
       rendre(
         c,
@@ -129,9 +219,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
           statut: f.statut,
           vue: f.vue,
         })}${Prof.sources(
-          ressources.filter(
-            (s) => (!f.statut || statut(s) === f.statut) && (!f.theme || s.theme === f.theme),
-          ),
+          bureau?.fichiers ?? montrees,
           f,
           repartition,
           libelles(db),
@@ -145,6 +233,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
             personnel,
             questions: personnel ? [] : questionsDesEleves(db, lu(c)),
           },
+          bureau?.rangement,
         )}`,
       ),
     );
@@ -154,11 +243,17 @@ export function routesProf(app: Hono<Env>, w: Web) {
   );
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
+    const liste = lignesVisibles(c, lignes(c, f.statut, f.theme));
+    const bureau =
+      f.vue === "grille"
+        ? ranger(c, f, liste, Domaines.catalogueDe(db, c.get("compte")))
+        : undefined;
     return c.html(
       Prof.lignesSources(
-        lignesVisibles(c, lignes(c, f.statut, f.theme)),
+        bureau?.fichiers ?? liste,
         new URLSearchParams(f).toString(),
         f.vue === "grille",
+        bureau?.rangement.coursId,
       ),
     );
   });

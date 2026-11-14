@@ -2177,13 +2177,15 @@ table.eleves .barre {
 table.eleves button {
   white-space: nowrap;
 }
-/* Sur téléphone, les boutons passent à la ligne plutôt que de sortir de l'écran. */
+/* Sur téléphone, les actions s'empilent, chacune sur une ligne. Le choix du cours remplace la
+   colonne des cours. */
 @media (max-width: 640px) {
   table.eleves .barre {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
   }
-  table.eleves button {
-    white-space: normal;
+  table.eleves .cours-eleve {
+    display: none;
   }
 }
 
@@ -2966,4 +2968,300 @@ form:not(.pas-a-pas) :is([data-suivant], [data-precedent]) {
 .activite-eleves ul {
   margin: 0;
   padding-left: 1.25rem;
+}
+
+/* Vue « Dossiers » : les cours et les thèmes en dossiers, les ressources en fichiers. */
+.fil ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s2);
+  margin: 0 0 var(--s4);
+  padding: 0;
+  list-style: none;
+}
+.fil li + li::before {
+  content: "/";
+  margin-right: var(--s2);
+  color: var(--ink-muted);
+}
+.fil [aria-current] {
+  font-weight: 700;
+}
+.bureau {
+  display: grid;
+  /* 8.5rem : « développeur·euses » tient sur une ligne en 14px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(8.5rem, 40vw), 1fr));
+  gap: var(--s3) var(--s2);
+  margin: 0 0 var(--s5);
+  padding: 0;
+  list-style: none;
+}
+.bureau > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s2) var(--s1);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.bureau a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  color: inherit;
+  text-decoration: none;
+}
+.bureau .pictogramme {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+}
+.bureau .pictogramme > * {
+  grid-area: 1 / 1;
+}
+.bureau .pictogramme .icone {
+  width: 100%;
+  height: 100%;
+}
+.bureau .dossier .icone {
+  color: var(--kraft);
+}
+.bureau .document .icone {
+  color: var(--ink-muted);
+}
+/* Le papier blanc sous le contour du document. */
+.bureau .document .icone:not(:last-of-type) {
+  color: var(--surface);
+}
+.bureau .activite .icone {
+  color: var(--ink);
+}
+.bureau .pictogramme img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.bureau .extension {
+  align-self: end;
+  justify-self: start;
+  margin: 0 0 0.6rem;
+  padding: 0 0.3rem;
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.bureau .extension[data-format="pdf"] {
+  background: var(--rose);
+}
+.bureau .extension:is([data-format="pptx"], [data-format="ppt"]) {
+  background: var(--pending);
+}
+.bureau .nom {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0 var(--s1);
+  border-radius: 2px;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+/* Un nom de cours ou de thème est la cible du clic : il s'affiche en entier. */
+.bureau .dossier .nom {
+  -webkit-line-clamp: unset;
+}
+.bureau a:hover .nom,
+.bureau a:focus-visible .nom {
+  text-decoration: underline;
+}
+.bureau .detail,
+.bureau .carte-etat {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+.bureau .carte-etat {
+  justify-content: center;
+}
+/* Comme dans un explorateur : la case cochée surligne le fichier et son nom. */
+.bureau > li:has(.carte-case:checked) {
+  background: var(--surface-tinted);
+}
+.bureau > li:has(.carte-case:checked) .nom {
+  background: var(--ink);
+  color: var(--surface);
+}
+.bureau .deposer .pictogramme {
+  place-items: center;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+}
+.bureau .deposer .icone {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--ink-muted);
+}
+/* Le champ du dépôt accueille les fichiers glissés sur la page. */
+.zone-depot {
+  display: flex;
+  padding: var(--s4);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+}
+form[data-survol] .zone-depot {
+  border-color: var(--ink);
+  background: var(--surface-tinted);
+}
+/* ------------------------------------------------------------ élèves */
+
+/* La liste mène. L'ajout se range à sa droite derrière un filet dès que la place le permet. */
+.effectifs {
+  display: grid;
+  gap: var(--s6);
+  align-items: start;
+}
+@media (min-width: 1180px) {
+  .effectifs {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+  .ajout {
+    padding-left: var(--s6);
+    border-left: 1px solid var(--line);
+  }
+}
+.liste-eleves h2 {
+  margin-top: var(--s7);
+}
+table.eleves .nom {
+  display: block;
+  font-weight: 700;
+}
+table.eleves .identifiant {
+  display: block;
+  color: var(--ink-muted);
+  font-family: var(--chiffres);
+  font-size: 0.875rem;
+}
+table.eleves td {
+  padding-block: var(--s3);
+}
+table.eleves td a {
+  white-space: nowrap;
+  text-decoration-color: var(--line);
+}
+table.eleves td a:hover {
+  text-decoration-color: currentColor;
+}
+/* Trente lignes de boutons cernés font une grille de cases : l'action se cerne au survol. */
+table.eleves button {
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border-color: transparent;
+  background: none;
+  font-weight: 400;
+}
+table.eleves button:hover {
+  border-color: var(--ink);
+}
+table.eleves button.retirer:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.liste-eleves .vide {
+  padding: var(--s6) var(--s5);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.liste-eleves .vide p:last-child {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.ajout h2 {
+  margin-bottom: var(--s1);
+}
+.ajout > .aide {
+  margin-bottom: var(--s4);
+}
+.ajout > details {
+  border-top: 1px solid var(--line);
+}
+.ajout > details:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+.ajout > details > summary {
+  justify-content: space-between;
+  min-height: 3rem;
+  color: var(--ink);
+  font-weight: 700;
+}
+.ajout > details > form {
+  padding: var(--s1) 0 var(--s5);
+}
+.ajout form > .aide {
+  margin-bottom: var(--s4);
+}
+.ajout .deux {
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--s4);
+}
+.cours-ajout {
+  margin: 0 0 var(--s4);
+}
+details.cours-ajout > summary {
+  min-height: 36px;
+  font-size: 0.9375rem;
+}
+.cours-ajout label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  margin: 0;
+  font-weight: 400;
+}
+.ajout h3 {
+  margin-top: var(--s6);
+}
+.cours-eleves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cours-eleves li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: var(--s2) 0;
+  border-top: 1px solid var(--line);
+}
+.cours-eleves a {
+  font-weight: 700;
+  text-decoration: none;
+}
+.cours-eleves a:hover {
+  text-decoration: underline;
+}
+.liens-actifs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.liens-actifs li {
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.liens-actifs p {
+  margin: 0;
+}
+.liens-actifs .barre {
+  margin: var(--s2) 0 0;
 }

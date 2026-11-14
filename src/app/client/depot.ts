@@ -278,6 +278,30 @@ export function installerDepot() {
     }
   });
 
+  // Des fichiers glissés n'importe où sur la page de dépôt remplissent le champ, comme un choix.
+  const glisse = (event: DragEvent) => {
+    const form = document.querySelector<HTMLFormElement>("form[data-depot]");
+    return form && event.dataTransfer?.types.includes("Files") ? form : undefined;
+  };
+  document.addEventListener("dragover", (event) => {
+    const form = glisse(event);
+    if (!form) return;
+    event.preventDefault();
+    form.toggleAttribute("data-survol", true);
+  });
+  document.addEventListener("dragleave", (event) => {
+    if (!event.relatedTarget) glisse(event)?.removeAttribute("data-survol");
+  });
+  document.addEventListener("drop", (event) => {
+    const form = glisse(event);
+    const champ = form?.querySelector<HTMLInputElement>("input[type=file]");
+    if (!form || !champ || !event.dataTransfer?.files.length) return;
+    event.preventDefault();
+    form.removeAttribute("data-survol");
+    champ.files = event.dataTransfer.files;
+    champ.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+
   document.addEventListener("submit", (event) => {
     if (!(event.target instanceof HTMLFormElement) || !event.target.matches("[data-depot]")) return;
     event.preventDefault();

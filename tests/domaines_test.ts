@@ -1475,7 +1475,8 @@ test("CSV élèves : les nouveaux comptes rejoignent les cours cochés, jamais c
     const eleves = () => db.prepare("SELECT count(*) n FROM comptes WHERE role = 'eleve'").get()!.n;
 
     const page = await (await prof.requete("/prof/eleves")).text();
-    assertStringIncludes(page, `name="cours" value="${optique}" checked`);
+    // Son seul cours est ouvert : les nouveaux comptes le rejoignent d'office.
+    assertStringIncludes(page, `type="hidden" name="cours" value="${optique}"`);
     assert(!page.includes(mecanique));
 
     const refus = await prof.requete("/prof/eleves/importer", {

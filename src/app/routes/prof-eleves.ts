@@ -1,4 +1,5 @@
 import { type Context, Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import {
   creerEleves,
   creerLien,
@@ -18,21 +19,44 @@ import type { Env, Web } from "./web.ts";
 
 export function routesProfEleves(app: Hono<Env>, w: Web) {
   const { db, rendre } = w;
-  // Les élèves de chaque cours de l'enseignant. Ceux sans cours ne se montrent qu'aux
-  // administrateurs, seuls à les gérer.
+  /**
+   * Les élèves d'un cours, ou de tous les cours de l'enseignant. Le cours vient de l'adresse, ou du
+   * périmètre retenu quand un formulaire refusé rend la page. Un enseignant d'un seul cours y est
+   * d'office. Ceux sans cours ne se montrent qu'aux administrateurs, seuls à les gérer.
+   */
   const pageEleves = (c: Context<Env>, erreur?: string) => {
-    const cat = Domaines.catalogueDe(db, c.get("compte"));
-    const groupes = cat.cours.map((cours) => ({
-      cours,
-      eleves: Domaines.membres(db, cours.id).filter((m) => m.role === "eleve"),
-    }));
-    const sansCours = elevesSansCours(db, c.get("compte"));
+    const compte = c.get("compte");
+    const cat = Domaines.catalogueDe(db, compte);
+    const url = new URL(c.req.url);
+    const p = new URLSearchParams(url.search || (getCookie(c, "perimetre") ?? ""));
+    const actuel =
+      cat.cours.find((x) => x.id === p.get("cours_id")) ??
+      (cat.cours.length === 1 ? cat.cours[0] : undefined);
+    const matiere = actuel ? "" : (p.get("matiere_id") ?? "");
+    const groupes = (actuel ? [actuel] : cat.cours)
+      .filter((x) => !matiere || x.matiere_id === matiere)
+      .map((cours) => ({
+        cours,
+        eleves: Domaines.membres(db, cours.id).filter((m) => m.role === "eleve"),
+      }));
     const liens =
-      lireInstance(db).mode === "personal" ? undefined : liensGeres(db, c.get("compte"));
+      lireInstance(db).mode === "personal"
+        ? undefined
+        : liensGeres(db, compte).filter((x) => !actuel || x.cours.includes(actuel.id));
     return rendre(
       c,
       "Élèves",
-      Prof.eleves(cat, groupes, sansCours, liens, new URL(c.req.url).origin, libelles(db), erreur),
+      Prof.eleves({
+        cat,
+        actuel,
+        groupes,
+        sansCours: actuel ? undefined : elevesSansCours(db, compte),
+        liens,
+        adresse: url.origin,
+        l: libelles(db),
+        matiere,
+        erreur,
+      }),
     );
   };
   /**
@@ -116,7 +140,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       return c.notFound();
     }
     Domaines.desinscrire(db, coursId, id);
-    return c.redirect(`/prof/eleves#cours-${coursId}`, 303);
+    return c.redirect(`/prof/eleves?cours_id=${coursId}`, 303);
   });
   app.post("/prof/eleves/:id/reinitialiser", async (c) => {
     const id = c.req.param("id");

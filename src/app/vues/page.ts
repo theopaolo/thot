@@ -20,6 +20,7 @@ export const page = (
   chemin = "",
   railReplie = false,
   instance: Pick<Instance, "nom" | "mode"> = { nom: "Thot", mode: "shared" },
+  legendes = 0,
 ) => {
   // L'administration garde le menu de l'enseignant : on y passe sans changer d'espace.
   const prof =
@@ -45,7 +46,7 @@ export const page = (
         <a class="evitement" href="#contenu">Aller au contenu</a>
         ${
           compte && prof
-            ? rail(compte, chemin, railReplie, instance)
+            ? rail(compte, chemin, railReplie, instance, legendes)
             : html`
           <header class="site">
             <a class="marque" href="/">${instance.nom}</a>
@@ -157,6 +158,7 @@ const rail = (
   chemin: string,
   replie: boolean,
   instance: Pick<Instance, "nom" | "mode">,
+  legendes: number,
 ) =>
   html`
     <header class="rail">
@@ -178,7 +180,15 @@ const rail = (
             chemin.startsWith("/prof/activites"),
         )}
         ${lienNav("/prof/depot", "Déposer", "upload-simple", chemin.startsWith("/prof/depot"))}
-        ${lienNav("/prof/legendes", "Légendes", "image", chemin.startsWith("/prof/legendes"))}
+        ${lienNav(
+          "/prof/legendes",
+          legendes
+            ? html`Légendes <span class="nombre"
+                >${legendes}<span class="visuellement-cache"> à relire</span></span>`
+            : "Légendes",
+          "image",
+          chemin.startsWith("/prof/legendes"),
+        )}
         ${
           instance.mode === "shared"
             ? html`

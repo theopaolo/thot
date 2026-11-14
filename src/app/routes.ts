@@ -42,7 +42,9 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
 
   const session = sessions(db);
   app.use("*", session.verifier);
-  for (const chemin of ["/prof", "/eleve", "/eleve/recherche"]) app.use(chemin, retenirPerimetre);
+  for (const chemin of ["/prof", "/prof/eleves", "/eleve", "/eleve/recherche"]) {
+    app.use(chemin, retenirPerimetre);
+  }
 
   const w = contexteWeb(db, modeles, reponses);
   routesComptes(app, w, session);

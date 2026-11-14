@@ -458,6 +458,7 @@ const TOUT = "Toutes les ressources";
 /**
  * Le choix du cours : un bouton ouvre la grille des cours, rangés par matière, chaque thème sous
  * son cours. Un lien applique le choix. `garder` : les paramètres de la page que le choix garde.
+ * `tout` nomme le choix sans cours, `themes: false` ne propose que les cours.
  */
 export const filtre = (
   cat: Catalogue,
@@ -465,6 +466,7 @@ export const filtre = (
   action: string,
   l: Libelles,
   garder: Record<string, string> = {},
+  { tout = TOUT, themes = true } = {},
 ) => {
   const lien = (champs: Record<string, string>) => {
     const q = new URLSearchParams(Object.entries(garder).filter(([, v]) => v));
@@ -482,14 +484,14 @@ export const filtre = (
       ? (c?.nom ?? `${l.cours} indisponible`)
       : p.matiere_id
         ? (cat.matieres.find((m) => m.id === p.matiere_id)?.nom ?? `${l.matiere} indisponible`)
-        : TOUT;
+        : tout;
   const plusieurs = cat.matieres.length > 1;
   const vue = garder.vue ?? "";
   const portee = Object.fromEntries(Object.entries(p).filter(([, v]) => v));
   return html`
     <div class="biblio-outils">
       ${
-        cat.cours.length || choisi !== TOUT
+        cat.cours.length || choisi !== tout
           ? html`
         <button type="button" class="choix-cours" popovertarget="grille-cours">
           <span class="discret">${l.cours}</span> ${choisi} ${icone("caret-down")}
@@ -497,7 +499,7 @@ export const filtre = (
         <nav id="grille-cours" popover aria-label="${l.cours_pluriel}">
           <a href="${lien({ cours_id: "" })}" ${actuel(
             !p.matiere_id && !p.cours_id && !p.theme_id && !p.matieres,
-          )}>${TOUT}</a>
+          )}>${tout}</a>
           ${cat.matieres.map((m) => {
             const cours = cat.cours.filter((x) => x.matiere_id === m.id);
             return cours.length
@@ -515,7 +517,7 @@ export const filtre = (
                   <a href="${lien({ cours_id: x.id })}" ${actuel(
                     p.cours_id === x.id && !p.theme_id,
                   )}>${x.nom}${x.public ? html`<small>${x.public}</small>` : ""}</a>
-                  ${cat.themes
+                  ${(themes ? cat.themes : [])
                     .filter((y) => y.cours_id === x.id)
                     .map(
                       (y) =>
@@ -538,7 +540,7 @@ export const filtre = (
           ? html`<nav class="segments" aria-label="Affichage">${(
               [
                 ["", "Liste", "list"],
-                ["grille", "Images", "squares-four"],
+                ["grille", "Dossiers", "squares-four"],
               ] as const
             ).map(
               ([v, nom, i]) =>

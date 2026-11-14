@@ -44,7 +44,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   app.get("/eleve", (c) => {
     const rangs = db
       .prepare(
-        `SELECT id, titre, profil, coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
+        `SELECT id, titre, profil, format, coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
@@ -144,7 +144,11 @@ export function routesEleve(app: Hono<Env>, w: Web) {
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
           </form>
-          ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille", activites)}
+          ${
+            c.req.query("vue") === "grille"
+              ? Eleve.bureauEleve(chapitres, activites, scope(c))
+              : Eleve.ressourcesParCours(chapitres, false, activites)
+          }
           ${
             visibles.length
               ? ""

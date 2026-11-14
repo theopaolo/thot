@@ -7,7 +7,7 @@ import { contexte } from "../../core/texte.ts";
 import { type Compte, lecteur } from "../comptes.ts";
 import { lireInstance } from "../instance.ts";
 import type { Db } from "../db.ts";
-import { lireDocument } from "../ingestion.ts";
+import { lireDocument, nombreLegendes } from "../ingestion.ts";
 import { boucleReponses } from "../reponses.ts";
 import { page } from "../vues/page.ts";
 import * as Eleve from "../vues/eleve.ts";
@@ -47,16 +47,19 @@ export type Reponses = ReturnType<typeof boucleReponses>;
 /** La base, les modèles, la boucle de réponses et les aides de page que partagent les routes. */
 export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
   const instance = lireInstance(db);
-  const rendre = (c: Context<Env>, titre: string, corps: unknown, classe = "") =>
-    page(
+  const rendre = (c: Context<Env>, titre: string, corps: unknown, classe = "") => {
+    const compte = c.get("compte");
+    return page(
       titre,
-      c.get("compte") ?? null,
+      compte ?? null,
       corps,
       classe,
       c.req.path,
       getCookie(c, "rail") === "replie",
       lireInstance(db),
+      compte?.role === "enseignant" ? nombreLegendes(db, compte) : 0,
     );
+  };
 
   const lu = (c: Context<Env>) => lecteur(c.get("compte"));
   // Qui lit les questions d'un élève : les enseignants de ses cours, ou tous s'il n'en a aucun.
