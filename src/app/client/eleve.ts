@@ -186,6 +186,19 @@ export function installerEleve() {
   document.addEventListener("htmx:load", (event) => {
     if (event.target instanceof Element) ouvrirConversation(event.target);
   });
+  // La fin du texte d'une ressource, une fois à l'écran, la marque lue. Un envoi perdu se refait
+  // à la prochaine ouverture.
+  document.addEventListener("htmx:load", (event) => {
+    if (!(event.target instanceof Element)) return;
+    for (const fin of event.target.querySelectorAll<HTMLElement>("[data-fin-lecture]")) {
+      const observateur = new IntersectionObserver((entrees) => {
+        if (!entrees.some((e) => e.isIntersecting)) return;
+        observateur.disconnect();
+        fetch(fin.dataset.finLecture!, { method: "POST" }).catch(() => {});
+      });
+      observateur.observe(fin);
+    }
+  });
 
   document.addEventListener("input", (event) => {
     const champ = event.target;

@@ -123,6 +123,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0024_explications.sql",
       "0025_termes.sql",
       "0026_series.sql",
+      "0027_lectures.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();

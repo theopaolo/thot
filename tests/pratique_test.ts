@@ -624,21 +624,22 @@ test("accueil de l'élève : l'activité suit les ressources de son cours, avec 
     const a = publie(db, prof.compte, id);
     regler(db, a, "Titre propre de la série", "2026-12-01");
 
+    // L'accueil liste les cours et compte les activités à faire. Le sommaire du cours les montre.
     const design = async () => {
       const accueil = await page(eleve, "/eleve");
       const [debut, fin] = [
-        accueil.indexOf("<h3>Design</h3>"),
-        accueil.indexOf("<h3>Histoire</h3>"),
+        accueil.indexOf(`<a href="/eleve?cours_id=${coursId}">Design</a>`),
+        accueil.indexOf(`<a href="/eleve?cours_id=${histoire}">Histoire</a>`),
       ];
       assert(debut >= 0 && fin > debut, "deux cours, Design d'abord");
-      const matiere = accueil.indexOf("<h2>Arts appliqués</h2>");
-      assert(matiere >= 0 && matiere < debut, "la matière titre ses cours");
-      assertEquals(accueil.split(`/eleve/activites/${id}`).length - 1, 1, "une seule fois");
-      return accueil.slice(debut, fin);
+      const sommaire = await page(eleve, `/eleve?cours_id=${coursId}`);
+      assertEquals(sommaire.split(`/eleve/activites/${id}`).length - 1, 1, "une seule fois");
+      return { ligne: accueil.slice(debut, fin), sommaire };
     };
-    let liste = await design();
-    assertStringIncludes(liste, "Exercices et explications");
+    const { ligne, sommaire: liste } = await design();
+    assertStringIncludes(ligne, '<span class="chiffres">1</span> à faire');
     assertStringIncludes(liste, `<a href="/eleve/activites/${id}">Titre propre de la série</a>`);
+    assertStringIncludes(liste, '<span class="chiffres">1</span> question');
     assert(!liste.includes("Lire la façade de la Casa Batlló"), "le titre remplace l'objectif");
     assertStringIncludes(liste, "À faire");
 
@@ -647,12 +648,14 @@ test("accueil de l'élève : l'activité suit les ressources de son cours, avec 
     assertStringIncludes(pratique, "<h1>Titre propre de la série</h1>");
     assertStringIncludes(pratique, "1 question. À rendre le 1 décembre 2026.");
     await envoyer(eleve, `${url}/reponses`, { q1: "Brouillon" });
-    assertStringIncludes(await design(), "En cours");
+    const enCours = await design();
+    assertStringIncludes(enCours.sommaire, "En cours");
+    assert(!enCours.ligne.includes("à faire"), "une activité commencée n'est plus à faire");
     await envoyer(eleve, `${url}/reponses`, { q1: "Ma réponse", remettre: "1" });
-    assertStringIncludes(await design(), "Remise");
+    assertStringIncludes((await design()).sommaire, "Remise");
     const t = tentative(db, eleve.compte, a)!;
     assert(noter(db, prof.compte, a, t.id, "q1", 1, "Bien vu."));
-    assertStringIncludes(await design(), "Retour reçu");
+    assertStringIncludes((await design()).sommaire, "Retour reçu");
     const corrige = await page(eleve, url);
     assertStringIncludes(corrige, "Note de ton enseignant : 1 point.");
     assertStringIncludes(corrige, "Bien vu.");

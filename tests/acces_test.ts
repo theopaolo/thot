@@ -488,6 +488,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0024_explications.sql",
       "0025_termes.sql",
       "0026_series.sql",
+      "0027_lectures.sql",
     ]);
     assertEquals(
       db
@@ -692,6 +693,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       "0024_explications.sql",
       "0025_termes.sql",
       "0026_series.sql",
+      "0027_lectures.sql",
     ]);
     assertEquals(
       db
@@ -951,14 +953,19 @@ test("cours : un élève ne voit ni ne choisit le nom d'un cours dont il n'est p
       },
     ]);
 
+    // L'accueil liste les cours, le sommaire d'un cours ses ressources et ses thèmes.
     const accueilA = await texteDe(eleveA, "/eleve");
-    assertStringIncludes(accueilA, "Cours du design");
+    const sommaireA = await texteDe(eleveA, `/eleve?cours_id=${c1}`);
+    assertStringIncludes(sommaireA, "Cours du design");
     assert(nomme(accueilA, "Design"));
-    assert(!nomme(accueilA, "Histoire de l'art"), "nom du cours c2 montré à un élève de c1");
-    assert(!nomme(accueilA, "Impressionnisme"), "nom du thème c2 montré à un élève de c1");
+    for (const page of [accueilA, sommaireA]) {
+      assert(!nomme(page, "Histoire de l'art"), "nom du cours c2 montré à un élève de c1");
+      assert(!nomme(page, "Impressionnisme"), "nom du thème c2 montré à un élève de c1");
+    }
     const accueilB = await texteDe(eleveB, "/eleve");
-    assert(nomme(accueilB, "Histoire de l'art") && nomme(accueilB, "Impressionnisme"));
-    assert(!nomme(accueilB, "Design"));
+    const sommaireB = await texteDe(eleveB, `/eleve?cours_id=${c2}`);
+    assert(nomme(accueilB, "Histoire de l'art") && nomme(sommaireB, "Impressionnisme"));
+    assert(!nomme(accueilB, "Design") && !nomme(sommaireB, "Design"));
 
     // eleveA lit la source rattachée à c2 par c1, mais ne pose pas de question dans c2.
     assertEquals(await statut(eleveA.requete(`/eleve/sources/${publie}`)), 200);

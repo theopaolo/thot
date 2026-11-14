@@ -7,7 +7,7 @@ import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
-import type { Avancement } from "../activites.ts";
+import { type Activite, type Avancement, couvre } from "../activites.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { sections, texteDocument } from "./document.ts";
 import { type Etape, dossier, fichier, fil } from "./bureau.ts";
@@ -32,6 +32,8 @@ export type SourceChapitre = {
   profil?: Profil;
   image_id: string | null;
   format?: string;
+  /** l'ordre de lecture que l'enseignant donne, `null` sans ordre */
+  ordre?: number | null;
 };
 
 export type FaitVue = {
@@ -183,51 +185,160 @@ export const accueilEleve = (
     </div>
   `;
 
+/** Le mot accordé au nombre, sans le nombre. */
+const accord = (n: number, mot: string) => `${mot}${n > 1 ? "s" : ""}`;
 const statutActivite = (a: ActiviteListee) =>
   a.avancement
     ? html`<span class="statut ${AVANCEMENTS[a.avancement][1]}">${AVANCEMENTS[a.avancement][0]}</span>`
     : "";
+const avancee = (lus: number, total: number) =>
+  html`<progress max="${total}" value="${lus}" aria-hidden="true"></progress>`;
 
 /**
- * La liste des ressources, rangée par matière, puis par cours, puis par thème. Les ressources d'un
- * cours sans thème viennent sous le nom du cours, celles sans cours sous « Autres documents ». Les
- * activités publiées suivent les ressources de leur cours.
+ * Les ressources de l'élève dans la vue liste. À la racine, ses cours, chacun avec sa progression,
+ * puis les ressources hors cours. Dans un cours ou un thème, son sommaire.
  */
-export const ressourcesParCours = (
+export const sommaireEleve = (
   chapitres: ChapitreVue[],
-  grille: boolean,
-  activites: ActiviteListee[] = [],
-) =>
-  [...Map.groupBy(chapitres, (ch) => ch.matiereId ?? "").values()].map(
-    (matiere) => html`
-      <h2>${matiere[0].matiere ?? "Autres documents"}</h2>
-      ${[...Map.groupBy(matiere, (ch) => ch.coursId ?? "").values()].map(
-        (groupe) => html`
-          ${groupe[0].cours ? html`<h3>${groupe[0].cours}</h3>` : ""}
-          ${groupe.map(
-            (ch) => html`
-              ${
-                // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, ne
-                // répète pas le titre.
-                ch.themeId && ch.nom !== ch.cours
-                  ? html`<h4><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h4>`
-                  : ""
-              }
-              <ul class="${grille ? "tuiles" : ""}">${ch.sources.map(
-                (r) =>
-                  html`<li><a class="${grille ? "tuile" : ""}" href="/eleve/sources/${r.id}">${
-                    grille && r.image_id
-                      ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
-                      : ""
-                  }${r.titre}</a></li>`,
-              )}</ul>
-            `,
-          )}
-          ${activitesDuCours(activites.filter((a) => a.cours_id === groupe[0].coursId))}
-        `,
-      )}
-    `,
-  );
+  activites: ActiviteCitante[],
+  p: Scope,
+  lues: Set<string>,
+) => {
+  if (p.cours_id || p.theme_id) {
+    const choisis = chapitres.filter((ch) =>
+      p.theme_id ? ch.themeId === p.theme_id : ch.coursId === p.cours_id,
+    );
+    return sommaireCours(
+      choisis,
+      activites.filter((a) => a.cours_id === choisis[0]?.coursId),
+      Boolean(p.theme_id),
+      lues,
+    );
+  }
+  const matieres = p.matieres ? idsMatieres(p.matieres) : p.matiere_id ? [p.matiere_id] : [];
+  const cours = [
+    ...Map.groupBy(
+      chapitres.filter(
+        (ch) => ch.coursId && (!matieres.length || matieres.includes(ch.matiereId ?? "")),
+      ),
+      (ch) => ch.coursId,
+    ).values(),
+  ];
+  const autres = chapitres.filter((ch) => !ch.coursId).flatMap((ch) => ch.sources);
+  return html`${
+    cours.length
+      ? html`<ul class="liste-cours">${cours.map((liste) => {
+          const ids = new Set(liste.flatMap((ch) => ch.sources.map((s) => s.id)));
+          const total = ids.size;
+          const lus = [...ids].filter((id) => lues.has(id)).length;
+          const aFaire = activites.filter(
+            (a) => a.cours_id === liste[0].coursId && a.avancement === "a_faire",
+          ).length;
+          return html`<li>
+            <a href="/eleve?cours_id=${liste[0].coursId}">${liste[0].cours}</a>
+            <span class="discret"><span class="chiffres">${total}</span> ${accord(
+              total,
+              "chapitre",
+            )}</span>
+            ${
+              lus
+                ? html`<span class="lus"><span class="chiffres">${lus} sur ${total}</span>${avancee(
+                    lus,
+                    total,
+                  )}</span>`
+                : ""
+            }
+            ${aFaire ? html`<span class="statut nouvelle"><span class="chiffres">${aFaire}</span> à faire</span>` : ""}
+          </li>`;
+        })}</ul>`
+      : ""
+  }${
+    autres.length
+      ? html`<h2>Autres documents</h2>
+        <ul>${autres.map((s) => html`<li><a href="/eleve/sources/${s.id}">${s.titre}</a></li>`)}</ul>`
+      : ""
+  }`;
+};
+
+/**
+ * Le sommaire d'un cours, ou d'un de ses thèmes : les ressources numérotées dans l'ordre de
+ * lecture, les ressources sans thème en tête, puis un groupe par thème. Chaque activité suit la
+ * dernière ressource qu'elle cite.
+ */
+const sommaireCours = (
+  chapitres: ChapitreVue[],
+  activites: ActiviteCitante[],
+  dansTheme: boolean,
+  lues: Set<string>,
+) => {
+  // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, reste à plat.
+  const enGroupe = (ch: ChapitreVue) => !dansTheme && ch.themeId && ch.nom !== ch.cours;
+  const groupes = [
+    ...Map.groupBy(
+      chapitres.toSorted((a, b) => Number(enGroupe(a)) - Number(enGroupe(b))),
+      (ch) => (enGroupe(ch) ? ch.themeId : ""),
+    ).values(),
+  ].map((liste) => ({
+    nom: enGroupe(liste[0]) ? liste[0].nom : "",
+    sources: liste.flatMap((ch) => ch.sources),
+  }));
+  const rangs = groupes.flatMap((g) => g.sources);
+  if (!rangs.length) return "";
+  const lu = (s: SourceChapitre) => lues.has(s.id);
+  // Le cours d'un carnet s'ouvre sur son introduction, d'ordre 0 : elle garde ce numéro.
+  const premier = rangs[0].ordre === 0 ? 0 : 1;
+  const premierLu = rangs.findIndex(lu);
+  const ici =
+    premierLu < 0
+      ? 0
+      : [rangs.findIndex((s, i) => i > premierLu && !lu(s)), rangs.findIndex((s) => !lu(s))].find(
+          (i) => i >= 0,
+        );
+  const places = Map.groupBy(activites, (a) => rangs.findLastIndex((s) => couvre(a, s.id)));
+  const activite = (a: ActiviteCitante) => {
+    const n =
+      a.type === "explication"
+        ? 0
+        : (JSON.parse(a.contenu) as { questions: unknown[] }).questions.length;
+    return html`<li class="activite"><span class="numero">${icone("exam")}</span><a href="/eleve/activites/${a.id}">${a.titre}</a><span class="discret">${
+      a.type === "explication"
+        ? "Explication"
+        : html`<span class="chiffres">${n}</span> ${accord(n, "question")}`
+    }</span>${statutActivite(a)}</li>`;
+  };
+  const ligne = (s: SourceChapitre) => {
+    const i = rangs.indexOf(s);
+    return html`<li class="${lu(s) ? "lu" : i === ici ? "ici" : ""}"><span class="numero chiffres">${
+      premier + i
+    }</span><a href="/eleve/sources/${s.id}">${s.titre}</a>${
+      lu(s) ? html`<span class="visuellement-cache">, lu</span>` : ""
+    }${
+      i === ici
+        ? html`<span class="repere">${premierLu < 0 ? "Commencer ici" : "Tu en es là"}</span>`
+        : ""
+    }</li>${(places.get(i) ?? []).map(activite)}`;
+  };
+  const total = rangs.length;
+  const lus = rangs.filter(lu).length;
+  const ch = chapitres[0];
+  return html`<section class="sommaire-cours" aria-labelledby="sommaire-cours">
+    <h2 id="sommaire-cours">${dansTheme ? ch.nom : ch.cours}</h2>
+    ${dansTheme ? html`<p class="discret"><a href="/eleve?cours_id=${ch.coursId}">${ch.cours}</a></p>` : ""}
+    <p class="discret"><span class="chiffres">${total}</span> ${accord(total, "chapitre")}</p>
+    ${
+      lus
+        ? html`<p class="lus"><span><span class="chiffres">${lus} sur ${total}</span> ${accord(
+            lus,
+            "lu",
+          )}</span>${avancee(lus, total)}</p>`
+        : ""
+    }
+    ${groupes.map(
+      (g) => html`${g.nom ? html`<h3>${g.nom}</h3>` : ""}<ol>${g.sources.map(ligne)}</ol>`,
+    )}
+    ${!dansTheme && places.has(-1) ? html`<ol>${places.get(-1)!.map(activite)}</ol>` : ""}
+  </section>`;
+};
 
 /**
  * La vue « Dossiers » de l'élève : à la racine, un dossier par cours, dans un cours, un dossier
@@ -332,11 +443,8 @@ export const ligneActivite = (a: ActiviteListee, cours = false) =>
       ? html` <span class="statut ${AVANCEMENTS[a.avancement][1]}">${AVANCEMENTS[a.avancement][0]}</span>`
       : ""
   }</li>`;
-const activitesDuCours = (liste: ActiviteListee[]) =>
-  liste.length
-    ? html`<h4>Exercices et explications</h4>
-      <ul>${liste.map((a) => ligneActivite(a))}</ul>`
-    : "";
+/** Une activité avec son contenu, pour savoir quelles ressources elle cite. */
+type ActiviteCitante = ActiviteListee & Pick<Activite, "contenu">;
 
 const formRecherche = (q: string, p?: Scope) =>
   html`
@@ -752,6 +860,7 @@ export const lectureSource = (
           }</figure>
         `,
       )} ${texteDocument(texte, marque, 2, s.titre)}
+      <div data-fin-lecture="/eleve/sources/${s.id}/lu"></div>
       ${
         activites.length
           ? html`<section aria-labelledby="s-entrainer">

@@ -180,8 +180,9 @@ Exercice ou explication préparé dans un cours, depuis un objectif et des sourc
 bibliothèque les range sous l'onglet « Activités ». « Préparer une activité », le choix du type,
 puis « Rédiger le brouillon ». « Importer un quiz » crée un exercice depuis un quiz de carnet-quiz.
 « Objectifs » renomme et fusionne les objectifs. Une activité a un titre et peut appartenir à
-plusieurs cours. L'élève trouve les activités publiées dans ses ressources, sous leur cours, après
-« Exercices et explications », et à la fin d'une ressource qu'elles couvrent, sous « S'entraîner ».
+plusieurs cours. L'élève trouve les activités publiées dans le sommaire de leur cours, après la
+dernière ressource qu'elles couvrent, et à la fin d'une ressource qu'elles couvrent, sous
+« S'entraîner ».
 
 **Exercice, question**
 Un exercice est une série de questions : « Choix unique », « Choix multiple », « Réponse à taper »
@@ -222,6 +223,13 @@ que sa réponse remplit puis « Enregistrer mon auto-évaluation ».
 les points de chaque question, puis « Réponses rédigées » et « Question par question ». Il note une
 réponse 0, 0,5 ou 1 et la commente. L'élève voit alors « Retour reçu ». « Faire reprendre » marque
 la tentative « À reprendre » et laisse l'élève « Recommencer ». Seuls les enseignants des cours de l'élève lisent ses réponses.
+
+**Sommaire d'un cours**
+Les ressources d'un cours numérotées dans l'ordre de lecture, puis ses thèmes. L'en-tête dit le
+nombre de chapitres et, dès la première lecture, la progression de l'élève : « 5 sur 16 lus ». Une ressource lue porte son numéro en noir. « Commencer ici »
+marque la première ressource tant que l'élève n'a rien lu, puis « Tu en es là » la première
+ressource non lue après une ressource lue. Une ressource est lue quand l'élève a vu la fin de son
+texte. Ses lectures ne se montrent qu'à lui.
 
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.

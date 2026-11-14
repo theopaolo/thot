@@ -18,6 +18,7 @@ import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import * as Activites from "../activites.ts";
 import * as PratiqueVue from "../vues/pratique.ts";
+import * as Lectures from "../lectures.ts";
 import type { Env, Web } from "./web.ts";
 
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
@@ -46,6 +47,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       .prepare(
         `SELECT id, titre, profil, format, coalesce(json_extract(metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(metadonnees, '$.date'), '') AS date,
+         json_extract(metadonnees, '$.ordre') AS ordre,
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE ${CITABLE}
@@ -147,7 +149,16 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           ${
             c.req.query("vue") === "grille"
               ? Eleve.bureauEleve(chapitres, activites, scope(c))
-              : Eleve.ressourcesParCours(chapitres, false, activites)
+              : Eleve.sommaireEleve(
+                  chapitres,
+                  activites,
+                  scope(c),
+                  Lectures.lues(
+                    db,
+                    c.get("compte").id,
+                    visibles.map((r) => r.id),
+                  ),
+                )
           }
           ${
             visibles.length
@@ -318,6 +329,14 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   app.get("/eleve/documents/:id/apercu", (c) => {
     const a = apercu(c.req.param("id"), lu(c));
     return a ? c.html(Eleve.lecteur(a, libelles(db))) : c.notFound();
+  });
+
+  // Le lecteur l'envoie quand la fin du texte paraît à l'écran.
+  app.post("/eleve/sources/:id/lu", (c) => {
+    const s = sourceCertifiee(c.req.param("id"), lu(c));
+    if (!s) return c.notFound();
+    Lectures.marquerLu(db, c.get("compte").id, s.id, s.revision);
+    return c.body(null, 204);
   });
 
   app.get("/eleve/sources/:id", (c) => {

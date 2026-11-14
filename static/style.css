@@ -3430,3 +3430,124 @@ details.cours-ajout > summary {
     max-height: calc(100dvh - 2 * var(--s4));
   }
 }
+
+/* Sommaire du cours et progression de lecture */
+.sommaire-cours,
+.liste-cours {
+  max-width: 44rem;
+}
+.sommaire-cours > h2 {
+  margin-bottom: var(--s1);
+}
+.sommaire-cours > p {
+  margin-bottom: var(--s1);
+}
+.sommaire-cours h3 {
+  margin: var(--s5) 0 0;
+  font-size: 1rem;
+}
+.sommaire-cours ol,
+.liste-cours {
+  margin: var(--s4) 0 var(--s5);
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+.sommaire-cours h3 + ol {
+  margin-top: var(--s2);
+}
+/* Numéro, titre et état sur la ligne. Le repère et le nombre de questions passent sous le titre. */
+.sommaire-cours li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  column-gap: var(--s3);
+  align-items: baseline;
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.sommaire-cours li > :is(.repere, .discret) {
+  grid-column: 2;
+}
+.sommaire-cours li > .statut {
+  grid-column: 3;
+  grid-row: 1;
+}
+:is(.sommaire-cours, .liste-cours) li > a {
+  color: var(--ink);
+  text-decoration: none;
+}
+:is(.sommaire-cours, .liste-cours) li > a:hover {
+  text-decoration: underline;
+}
+.sommaire-cours .numero {
+  justify-self: start;
+  min-width: 1.5rem;
+  padding: 0 var(--s1);
+  color: var(--ink-muted);
+  text-align: center;
+}
+.sommaire-cours li.lu .numero {
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--surface);
+}
+.sommaire-cours li.lu > a {
+  color: var(--ink-muted);
+}
+.sommaire-cours li.ici {
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+.sommaire-cours .repere {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.sommaire-cours li.activite .numero {
+  align-self: center;
+  color: var(--ink);
+}
+/* Le nom du cours et sa progression, puis son nombre de chapitres et ses activités à faire. */
+.liste-cours li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s1) var(--s4);
+  align-items: baseline;
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.liste-cours li > a {
+  font-weight: 700;
+}
+.liste-cours .lus {
+  grid-column: 2;
+  grid-row: 1;
+}
+.liste-cours .statut {
+  grid-column: 2;
+  justify-self: end;
+}
+.lus {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.lus progress {
+  flex: 1 1 auto;
+  width: 5rem;
+  max-width: 12rem;
+  height: 4px;
+  border: 0;
+  background: var(--surface-tinted);
+  appearance: none;
+}
+.sommaire-cours .lus progress {
+  width: auto;
+}
+.lus progress::-webkit-progress-bar {
+  background: var(--surface-tinted);
+}
+.lus progress::-webkit-progress-value {
+  background: var(--ink);
+}
+.lus progress::-moz-progress-bar {
+  background: var(--ink);
+}

@@ -877,7 +877,7 @@ test("exercice personnel : privé à son auteur, publié sans relecture indépen
     assertStringIncludes(pratique, "Exercice généré par Thot à partir de tes documents.");
     assertStringIncludes(pratique, "Personne d&#39;autre que toi ne l&#39;a relu.");
     assert(!pratique.includes("relu par"));
-    assertStringIncludes(await page(prof, "/eleve"), `/eleve/activites/${id}`);
+    assertStringIncludes(await page(prof, `/eleve?cours_id=${coursId}`), `/eleve/activites/${id}`);
 
     // Un autre compte, même membre du cours, ne le voit nulle part.
     const autre = await compte(db, "enseignant");
@@ -885,7 +885,9 @@ test("exercice personnel : privé à son auteur, publié sans relecture indépen
       assertEquals(await statut(autre.requete(url)), 404, url);
     }
     assert(!(await page(autre, "/prof/activites")).includes(id));
-    assert(!(await page(autre, "/eleve")).includes(id));
+    for (const url of ["/eleve", `/eleve?cours_id=${coursId}`]) {
+      assert(!(await page(autre, url)).includes(id), url);
+    }
   } finally {
     db.close();
     await rm(dir, { recursive: true });
