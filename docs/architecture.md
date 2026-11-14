@@ -175,8 +175,11 @@ leurs sources et leurs citations. Une matière absente reste non classée.
 
 Le thème est le seul regroupement des ressources. Le dépôt choisit un thème pour chaque cours
 coché. Les formulaires n'ont pas de champ libre « séquence ». La séquence reste lisible dans les
-métadonnées des anciennes sources, et l'import CLI la remplit avec le nom du dossier. Elle range
-la source dans le thème de même nom du cours, créé s'il manque. Le périmètre d'une question est
+métadonnées des anciennes sources, et l'import CLI la remplit avec le nom du dossier. Une
+séquence envoyée au dépôt range la source dans le thème de même nom du cours, créé s'il manque.
+L'import CLI range d'après le chemin importé, quelle que soit sa forme : son premier sous-dossier
+donne le thème, et un fichier posé à sa racine va directement dans le cours. Un cours importé
+d'un dossier à plat n'a donc aucun thème tant qu'on n'en crée pas. Le périmètre d'une question est
 un thème, pas une séquence. Une adresse ou une page d'avant les thèmes qui nomme une séquence
 mène au thème où sont rangées le plus de sources de cette séquence, dans un cours du compte
 d'abord. Une question posée dans une séquence qu'aucun thème ne remplace est refusée.

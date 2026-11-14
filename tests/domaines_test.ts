@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
-import { writeFile, rm, mkdtemp } from "node:fs/promises";
+import { mkdir, writeFile, rm, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { test } from "vite-plus/test";
 import {
@@ -10,7 +10,7 @@ import {
   assertStringIncludes,
   assertThrows,
 } from "@std/assert";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { connexion, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { deposer, valider } from "../src/app/depot.ts";
@@ -807,6 +807,59 @@ test("import CLI : un cours choisi sans thème range la source dans le thème du
     assertEquals(catalogue(db).themes.length, 1);
   } finally {
     db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("import CLI : un sous-dossier donne le thème, la racine du chemin va directement dans le cours", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "thot-"));
+  try {
+    const cli = (...args: string[]) => {
+      const r = spawnSync(process.execPath, ["src/cli.ts", ...args], {
+        cwd: RACINE,
+        encoding: "utf8",
+        env: { ...process.env, THOT_DATA_DIR: dir, THOT_ORIGIN: "", THOT_MISTRAL_ENABLED: "0" },
+      });
+      assert(r.status === 0, r.stderr);
+      return r.stdout.trim();
+    };
+    const racine = join(dir, "docker");
+    for (const [chemin, texte] of [
+      ["index.md", "Docker isole une application dans un conteneur."],
+      ["Réseau/ponts.md", "Un pont relie les conteneurs d'un même hôte."],
+      ["Réseau/annexes/ports.md", "Publier un port l'ouvre hors de l'hôte."],
+      ["Volumes/nommes.md", "Un volume nommé survit au conteneur."],
+    ]) {
+      await mkdir(dirname(join(racine, chemin)), { recursive: true });
+      await writeFile(join(racine, chemin), texte);
+    }
+    const m = cli("matiere", "Développement");
+    const c = cli("cours", m, "Docker");
+    cli("ingest", racine, `--matiere-id=${m}`, `--cours-id=${c}`);
+    const db = connexion(join(dir, "state.sqlite3"));
+    try {
+      const rangees = db
+        .prepare(
+          `SELECT s.fichier, json_extract(s.metadonnees, '$.sequence') AS sequence, t.nom AS theme
+           FROM sources s JOIN source_cours sc ON sc.source_id = s.id
+           LEFT JOIN themes t ON t.id = sc.theme_id ORDER BY s.fichier`,
+        )
+        .all();
+      assertEquals(
+        rangees.map((r) => [r.fichier, r.theme]),
+        [
+          ["index.md", null],
+          ["nommes.md", "Volumes"],
+          ["ponts.md", "Réseau"],
+          ["ports.md", "Réseau"],
+        ],
+      );
+      // L'évaluation retrouve encore un fichier par le nom de son dossier.
+      assertEquals(rangees[0].sequence, "docker");
+    } finally {
+      db.close();
+    }
+  } finally {
     await rm(dir, { recursive: true });
   }
 });

@@ -189,6 +189,8 @@ export async function deposer(
     audience: Audience;
     reponses: boolean;
     liens?: Affiliation[];
+    /** le thème, par son nom, d'un cours sans thème choisi. Vide : directement dans le cours. */
+    theme?: string;
     /** le lot du dépôt web et la clé qui rend un renvoi inoffensif */
     lotId?: string;
     cle?: string;
@@ -258,17 +260,18 @@ export async function deposer(
         d.cle ?? null,
         source_id,
       );
-      // Un cours sans thème choisi prend le thème du nom de la séquence, celle de l'import CLI.
+      // Sans `theme`, une ancienne séquence envoyée au dépôt donne encore son nom au thème.
+      const nomTheme = d.theme ?? d.meta.sequence;
       if (d.liens !== undefined) {
         affiliations(
           db,
           source_id,
           d.liens.map((l) => ({
             ...l,
-            theme_id: l.theme_id ?? themeNomme(db, l.cours_id, d.meta.sequence),
+            theme_id: l.theme_id ?? themeNomme(db, l.cours_id, nomTheme),
           })),
         );
-      } else rangerLegacy(db, source_id, domaine.matiere_id, d.meta.sequence, d.par);
+      } else rangerLegacy(db, source_id, domaine.matiere_id, nomTheme, d.par);
       db.prepare(
         "INSERT INTO ingestion_jobs (id, source_id, etat, cree_le, maj_le) VALUES (?, ?, 'received', ?, ?)",
       ).run(job_id, source_id, t, t);

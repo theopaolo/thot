@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { opendir, readFile, stat } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "../core/html.ts";
 import { lireFrontMatter } from "../core/markdown.ts";
 import { lireInstance } from "../app/instance.ts";
@@ -76,7 +76,11 @@ async function rubriquesDuDossier(dossier: string) {
   return rubriques;
 }
 
-/** Dépose chaque fichier du chemin. Le chapitre vient du dossier, la séance de son sommaire. */
+/**
+ * Dépose chaque fichier du chemin. Le premier sous-dossier du chemin donne le thème, et les
+ * fichiers posés à sa racine vont directement dans le cours. La séquence garde le nom du dossier,
+ * la séance vient de son sommaire.
+ */
 async function ingest(db: Db, argv: string[]) {
   const { values: args, positionals } = lire(argv, {
     matiere: texte,
@@ -161,6 +165,7 @@ async function ingest(db: Db, argv: string[]) {
       enseignant: args.enseignant ?? "import en ligne de commande",
       audience: lireInstance(db).lecteurs,
       reponses: true,
+      theme: relative(racine, dossier).split(sep)[0],
       liens: args["cours-id"]
         ? [{ cours_id: args["cours-id"], theme_id: args["theme-id"] ?? null }]
         : undefined,
