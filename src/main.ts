@@ -13,9 +13,9 @@ if (faites.length) console.log(`migrations appliquées: ${faites.join(", ")}`);
 
 const dev = process.argv.includes("--watch");
 // --watch relance le script dans un processus enfant, que --permission refuse sans ce droit.
-const surveiller = dev
-  ? ["--watch-path=src/", "--watch-path=static/", "--allow-child-process"]
-  : [];
+// static/ n'est pas surveillé : le serveur lit ses fichiers à chaque requête, et la page ouverte
+// les recharge seule (src/app/rechargement.ts).
+const surveiller = dev ? ["--watch-path=src/", "--allow-child-process"] : [];
 // Lecture du code et des données, écriture des données seules. Le worker lance pdftotext.
 const droits = [
   "--permission",

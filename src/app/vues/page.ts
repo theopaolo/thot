@@ -1,6 +1,7 @@
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
+import { SCRIPT_RECHARGEMENT } from "../rechargement.ts";
 import { AUDIENCES } from "../depot.ts";
 import {
   type Instance,
@@ -39,6 +40,7 @@ export const page = (
         <script src="/static/vendor/htmx.min.js" defer></script>
         <script src="/static/vendor/htmx-ext-sse.js" defer></script>
         <script type="module" src="/static/dist/app.js"></script>
+        ${config.dev ? html`<script>${raw(SCRIPT_RECHARGEMENT)}</script>` : ""}
       </head>
       <body
         class="${prof ? `prof${railReplie ? " rail-replie" : ""}` : "eleve"}"

@@ -23,6 +23,7 @@ import { routesDepot } from "./routes/prof-depot.ts";
 import { routesProfEleves } from "./routes/prof-eleves.ts";
 import { sessions } from "./routes/session.ts";
 import { contexteWeb, type Env, retenirPerimetre } from "./routes/web.ts";
+import { routesRechargement } from "./rechargement.ts";
 
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
@@ -34,11 +35,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     await next();
   });
 
-  app.use("/static/dist/*", async (c, next) => {
+  // Sous pnpm dev, une page rechargée relit aussi la feuille de style, pas sa copie en cache.
+  app.use(config.dev ? "/static/*" : "/static/dist/*", async (c, next) => {
     c.header("Cache-Control", "no-cache");
     await next();
   });
   app.use("/static/*", serveStatic({ root: "./" }));
+  if (config.dev) routesRechargement(app);
   app.use("*", csrf(config.origine ? { origin: config.origine } : undefined));
 
   const session = sessions(db);
