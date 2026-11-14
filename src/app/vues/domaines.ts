@@ -350,22 +350,31 @@ export const choixMatiere = (cat: Catalogue, l: Libelles, id = "") =>
         id,
       )}</select></label><button>Choisir les champs</button></form>
   `;
-export const liens = (cat: Catalogue, valeurs: Affiliation[] = [], regroupement: string) =>
-  html`<fieldset><legend>Cours de rattachement</legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${cat.cours.map(
-    (c) =>
-      html`
-        <div
-          class="champ"><label><input type="checkbox" name="cours" value="${
-            c.id
-          }" ${valeurs.some((v) => v.cours_id === c.id) ? "checked" : ""}> ${
-            cat.matieres.find((m) => m.id === c.matiere_id)?.nom
-          } / ${c.nom}</label><label>${regroupement} <select name="theme_${
-            c.id
-          }"><option value="">Directement dans le cours</option>${options(
-            cat.themes.filter((t) => t.cours_id === c.id),
-            valeurs.find((v) => v.cours_id === c.id)?.theme_id ?? "",
-          )}</select></label></div>
-      `,
+/** Les cours rangés par matière. Le thème d'un cours ne s'affiche qu'une fois le cours coché. */
+export const liens = (cat: Catalogue, l: Libelles, valeurs: Affiliation[] = []) =>
+  html`<fieldset class="rattachement"><legend><strong>${l.cours_pluriel} de rattachement</strong></legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${cat.matieres.map(
+    (m) => {
+      const cours = cat.cours.filter((c) => c.matiere_id === m.id);
+      return cours.length
+        ? html`<fieldset><legend>${m.nom}</legend>${cours.map((c) => {
+            const lien = valeurs.find((v) => v.cours_id === c.id);
+            const themes = cat.themes.filter((t) => t.cours_id === c.id);
+            return html`
+              <div class="lien-cours"><label><input type="checkbox" name="cours" value="${
+                c.id
+              }" ${lien ? "checked" : ""}> ${c.nom}</label>${
+                themes.length
+                  ? html`<label class="theme-cours">${l.regroupement} <select name="theme_${
+                      c.id
+                    }" aria-label="${l.regroupement} dans ${c.nom}"><option value="">Sans ${minuscule(
+                      l.regroupement,
+                    )}</option>${options(themes, lien?.theme_id ?? "")}</select></label>`
+                  : ""
+              }</div>
+            `;
+          })}</fieldset>`
+        : "";
+    },
   )}</fieldset>`;
 export const informations = (
   liste: Champ[],

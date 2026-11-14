@@ -622,12 +622,14 @@ label {
 .champ {
   margin-bottom: var(--s4);
 }
-.champ .aide,
-.reglages .aide {
-  margin: 0.15rem 0 0.35rem;
+.aide {
   color: var(--ink-muted);
   font-size: 0.875rem;
   font-weight: 400;
+}
+.champ .aide,
+.reglages .aide {
+  margin: 0.15rem 0 0.35rem;
 }
 .champ .erreur {
   margin: var(--s1) 0 0;
@@ -667,6 +669,9 @@ fieldset {
   margin: 0 0 var(--s4);
   padding: 0;
   border: 0;
+}
+legend {
+  padding: 0;
 }
 fieldset label {
   display: flex;
@@ -2022,6 +2027,49 @@ form.question-form textarea {
   margin-top: var(--s6);
   padding-top: var(--s3);
   border-top: 1px solid var(--line);
+}
+/* Sur grand écran, le texte à gauche, la fiche et la suppression dans la colonne de droite. */
+@media (min-width: 80rem) {
+  .fiche-source:has(> form) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-rows: auto 1fr;
+    gap: 0 var(--s6);
+    margin-top: var(--s5);
+  }
+  .fiche-source > .texte-source {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .fiche-source > .edition-source {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    border-bottom: 0;
+  }
+  .fiche-source > .suppression-source {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+  }
+}
+.rattachement fieldset {
+  margin-bottom: var(--s3);
+}
+.rattachement fieldset legend {
+  margin-top: var(--s2);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.lien-cours .theme-cours {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+  margin: 0 0 var(--s3) calc(20px + var(--s2));
+}
+.lien-cours:not(:has(input:checked)) .theme-cours {
+  display: none;
 }
 .questions-prof {
   margin: var(--s6) 0;

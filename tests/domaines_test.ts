@@ -1656,10 +1656,15 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     assertEquals(lireInstance(db).nom, "Thot");
 
     for (const [qui, chemin, attendu] of [
-      [admin, "/prof/depot", `<label>Module <select name="theme_${t.cours_id}">`],
+      [
+        admin,
+        "/prof/depot",
+        `<label class="theme-cours">Module <select name="theme_${t.cours_id}"`,
+      ],
       [admin, "/administration/domaines", "<h2>Modules</h2>"],
       [admin, "/administration/domaines", "<h2>Chapitres</h2>"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
+      [admin, "/prof/depot", "<strong>Chapitres de rattachement</strong>"],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
       [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],

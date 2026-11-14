@@ -846,7 +846,7 @@ export const depot = (s: {
           valeur: c.sous_matiere,
         })} ${champ({ nom: "seance", label: s.libelles.seance, valeur: c.seance })}
       </div>
-      ${s.catalogue ? Domaines.liens(s.catalogue, s.liens, s.libelles.regroupement) : ""}
+      ${s.catalogue ? Domaines.liens(s.catalogue, s.libelles, s.liens) : ""}
       ${Domaines.langue(c.langue)}
       <div class="deux">${Domaines.informations(s.informations, c)}</div>
       ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })} ${champ({
@@ -976,6 +976,7 @@ export const detailSource = (d: Detail) => {
       `
           : ""
     }
+    <div class="fiche-source">
     ${
       d.modifiable
         ? html`<form method="post" action="/prof/sources/${d.source.id}/modifier" class="etroit edition-source">
@@ -1011,13 +1012,14 @@ export const detailSource = (d: Detail) => {
           ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
           : ""
       }
-      ${d.catalogue ? Domaines.liens(d.catalogue, d.affiliations, d.libelles.regroupement) : ""}
+      ${d.catalogue ? Domaines.liens(d.catalogue, d.libelles, d.affiliations) : ""}
       ${Domaines.langue(d.source.langue)}
       ${lecteurs(d.source.audience, d.source.reponses === 1)}
       <button>Enregistrer</button>
     </form>`
         : ""
     }
+    <div class="texte-source">
     <div id="traitement-source" hx-disinherit="hx-select" ${
       d.job && JOBS_ACTIFS.includes(d.job.etat)
         ? html`hx-get="/prof/sources/${d.source.id}" hx-trigger="every 3s"
@@ -1105,6 +1107,7 @@ export const detailSource = (d: Detail) => {
     <div class="document">${texteDocument(d.blocs)}</div>
     </div>
     ${d.notes === undefined ? "" : notesOrateur(d.notes)}
+    </div>
     ${
       d.supprimable
         ? html`<form method="post" action="/prof/sources/${d.source.id}/supprimer"
@@ -1120,6 +1123,7 @@ export const detailSource = (d: Detail) => {
       </form>`
         : ""
     }
+    </div>
   `;
 };
 
