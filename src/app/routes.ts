@@ -1,12 +1,17 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Modeles } from "../core/modeles.ts";
+import { MAX_IMAGE } from "./activites.ts";
 import { config } from "./config.ts";
 import type { Db } from "./db.ts";
 import { boucleReponses } from "./reponses.ts";
 import { routesActivites } from "./routes/activites.ts";
+import { routesPratique } from "./routes/pratique.ts";
+import { routesPreparation } from "./routes/preparation.ts";
+import { routesReponses } from "./routes/reponses.ts";
 import { routesChat } from "./routes/chat.ts";
 import { routesComptes } from "./routes/comptes.ts";
 import { routesDomaines } from "./routes/domaines.ts";
@@ -46,7 +51,19 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   routesProf(app, w);
   routesProfEleves(app, w);
   routesDepot(app, w);
+  // Une question porte au plus une image déposée, le quiz importé pèse moins.
+  app.use(
+    "/prof/activites/*",
+    bodyLimit({
+      maxSize: MAX_IMAGE + 256 * 1024,
+      onError: (c) => c.text("Envoi trop volumineux : une image de 5 Mo au plus.", 413),
+    }),
+  );
+  // `/prof/activites/nouvelle` passe avant `/prof/activites/:id`.
+  routesPreparation(app, w);
+  routesReponses(app, w);
   routesActivites(app, w);
+  routesPratique(app, w);
   routesEleve(app, w);
   routesChat(app, w);
 

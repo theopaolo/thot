@@ -7,6 +7,7 @@ import { type Icone, icone } from "../icones.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
+import type { Avancement } from "../activites.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { sections, texteDocument } from "./document.ts";
 
@@ -214,16 +215,33 @@ export const ressourcesParCours = (
     `,
   );
 
-type ActiviteListee = { id: string; intitule: string; type: string; cours_id: string };
+export type ActiviteListee = {
+  id: string;
+  titre: string;
+  type: string;
+  cours_id: string;
+  cours: string;
+  avancement?: Avancement;
+};
+const AVANCEMENTS: Record<Avancement, [string, string]> = {
+  a_faire: ["À faire", "nouvelle"],
+  en_cours: ["En cours", "en-cours"],
+  remise: ["Remise", "certifiee"],
+  retour: ["Retour reçu", "certifiee"],
+};
+/** Une activité dans une liste de l'élève : son titre, son type, son cours et où il en est. */
+export const ligneActivite = (a: ActiviteListee, cours = false) =>
+  html`<li><a href="/eleve/activites/${a.id}">${a.titre}</a> <span class="discret">${
+    a.type === "explication" ? "Explication" : "Exercice"
+  }${cours ? `, ${a.cours}` : ""}</span>${
+    a.avancement
+      ? html` <span class="statut ${AVANCEMENTS[a.avancement][1]}">${AVANCEMENTS[a.avancement][0]}</span>`
+      : ""
+  }</li>`;
 const activitesDuCours = (liste: ActiviteListee[]) =>
   liste.length
     ? html`<h3>Exercices et explications</h3>
-      <ul>${liste.map(
-        (a) =>
-          html`<li><a href="/eleve/activites/${a.id}">${a.intitule}</a> <span class="discret">${
-            a.type === "explication" ? "Explication" : "Exercice"
-          }</span></li>`,
-      )}</ul>`
+      <ul>${liste.map((a) => ligneActivite(a))}</ul>`
     : "";
 
 const formRecherche = (q: string, p?: Scope) =>
@@ -553,6 +571,8 @@ export const lectureSource = (
   ancienne = false,
   /** les ressources du thème dans l'ordre de lecture, `s` comprise */
   voisins: { id: string; titre: string }[] = [],
+  /** les activités publiées qui citent la ressource ou y renvoient */
+  activites: ActiviteListee[] = [],
 ) => {
   const texte = blocs.filter((b, n) => !(n === 0 && b.texte === s.titre));
   const plan = sections(texte, s.titre);
@@ -634,6 +654,14 @@ export const lectureSource = (
           }</figure>
         `,
       )} ${texteDocument(texte, marque, 2, s.titre)}
+      ${
+        activites.length
+          ? html`<section aria-labelledby="s-entrainer">
+            <h2 id="s-entrainer">S'entraîner</h2>
+            <ul>${activites.map((a) => ligneActivite(a))}</ul>
+          </section>`
+          : ""
+      }
       ${
         precedente || suivante
           ? html`

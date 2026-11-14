@@ -333,22 +333,37 @@ les rapports d'évaluation de `data/evaluation/` ne sont pas touchés
 
 ## Activités sourcées
 
-Une activité est un exercice à réponse courte ou une explication d'étude. Un objectif
-d'apprentissage appartient à un cours. Sa référence (référentiel ou programme,
-compétence et version) reste un texte libre que Thot n'interprète pas : rien ne déduit qu'un
-document couvre un objectif.
+Une activité est un exercice ou une explication d'étude
+([ADR 0010](decisions/0010-series-de-questions.md)). Un objectif d'apprentissage appartient à un
+cours. Sa référence (référentiel ou programme, compétence et version) reste un texte libre que Thot
+n'interprète pas : rien ne déduit qu'un document couvre un objectif. La préparation reprend
+l'objectif du cours de même intitulé, sans compter la casse ni les accents, au lieu d'en créer un
+second.
 
-Un enseignant prépare un exercice à réponse courte depuis un objectif et une à quatre sources
-certifiées du cours, publiées à ses élèves et utilisées par Thot pour répondre. Un appel du
-générateur rédige la consigne, la réponse attendue, deux à cinq critères et le retour
-(`src/core/activite.ts`). Chaque champ cite des passages que `verifier()` retrouve mot pour mot
-dans l'extrait désigné, avec la révision et les offsets de leur source. Un champ dont une citation
-ne se retrouve pas, ou ne se retrouve que dans une légende d'image, est rejeté et compté, comme le
-prévoit l'ADR 0002. Sans consigne, réponse attendue, retour et deux critères ancrés, rien n'est
-enregistré, pas même un nouvel objectif.
+Un exercice est une série de questions de quatre types : choix unique, choix multiple, réponse à
+taper et réponse rédigée (`src/core/activite.ts`). Une réponse rédigée peut porter un langage :
+l'élève répond en code, que rien n'exécute. Toute question peut montrer une image et nommer une
+source du cours où chercher. Une version, une relecture et une publication valent pour toute la
+série.
+
+Thot rédige une série depuis un objectif et une à quatre sources certifiées du cours, publiées à ses
+élèves et utilisées par Thot pour répondre. Un appel du générateur rédige chaque question, et les
+appels partent ensemble. Chaque champ que Thot rédige cite des passages que `verifier()` retrouve
+mot pour mot dans l'extrait désigné, avec la révision et les offsets de leur source. Un champ dont
+une citation ne se retrouve pas, ou ne se retrouve que dans une légende d'image, est rejeté et
+compté, comme le prévoit l'ADR 0002. Une option fausse n'affirme rien et ne cite donc rien, mais une
+bonne option mal ancrée fait tomber sa question. La réponse acceptée d'une réponse à taper doit
+figurer dans un passage cité. Une question rejetée laisse les autres dans la série. Sans aucune
+question ancrée, rien n'est enregistré, pas même un nouvel objectif.
+
+L'enseignant écrit aussi ses propres champs, sans citation, et la page dit alors « Rédigé par
+l'enseignant ». Il ajoute, duplique, déplace et supprime des questions. Chaque passage qu'il colle
+est recherché mot pour mot dans la version servie de sa source, et le formulaire ne reprend rien
+d'autre d'une citation (`src/app/edition.ts`). Un quiz de carnet-quiz s'importe comme une série de
+champs rédigés par l'enseignant, sans ses pièges, son chrono ni ses images.
 
 Une citation retrouvée ne prouve que son passage : un premier essai réel gardait un retour qui en
-disait plus que ses citations. Le juge de soutien des réponses lit donc chaque champ gardé contre
+disait plus que ses citations. Le juge de soutien des réponses lit donc chaque champ cité contre
 ses passages mis bout à bout, un appel par champ, avec la consigne du profil général et
 `SEUIL_SOUTIEN`. Il ne rejette rien. Un champ qu'il ne soutient pas est « À vérifier » dans la page
 de l'enseignant, et un juge en panne ou trop lent laisse « Juge indisponible ». L'avis est enregistré
@@ -365,42 +380,68 @@ corrigé. Elle ne se modifie pas : l'enseignant en prépare une autre.
 
 Une activité est brouillon, relue, publiée ou à revoir. Une relecture vaut pour une version de
 l'activité. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut
-plus pour elle. Une relecture, une publication ou une modification partie d'une version périmée est
-refusée. Publier demande une version relue et des preuves qui tiennent encore. L'historique garde
-qui a relu, publié ou modifié chaque version, et quand.
+plus pour elle. Le titre et la date à rendre, qui ne bloque rien, ne créent pas de version. Une
+relecture, une publication ou une modification partie d'une version périmée est refusée. Publier
+demande une version relue et des preuves qui tiennent encore. L'historique garde qui a relu, publié
+ou modifié chaque version, et quand. Une activité archivée n'est plus servie, et ses tentatives
+restent lisibles. Seul un brouillon jamais publié et sans tentative se supprime.
 
-La liste des ressources de l'élève range les activités publiées sous le titre de leur cours. Un
-cours n'y figure que s'il a des ressources dans le périmètre choisi. L'accueil par chapitres, qui
-ne titre pas les cours, liste les activités après ses chapitres.
+Une activité appartient à un ou plusieurs cours. Le cours où elle est née porte son objectif et ne
+se retire pas. Un cours ne s'ajoute que si les sources que l'activité cite ou montre y sont
+rattachées. L'élève reçoit l'activité dans un de ses cours où ses preuves tiennent, et sa liste la
+range sous ce cours.
 
-Un élève pratique les exercices publiés des cours dont il est membre. Avant sa réponse, la page ne
-contient que l'objectif et la consigne. La réponse attendue, les critères, le retour et les passages
-cités ne sortent du serveur qu'avec une tentative de ce compte sur la version actuelle. L'élève
-coche ensuite les critères que sa réponse remplit. Thot ne note pas la réponse et ne la compare à
-aucun texte.
-
-Les enseignants membres du cours lisent les tentatives sur la page de l'exercice, toutes versions
-confondues : élève, date, version, réponse et critères cochés. L'auteur d'une activité privée lit
-les siennes. Être administrateur ne suffit pas. La liste des activités compte, par objectif des
-cours de l'enseignant, les activités publiées et les tentatives reçues. Ces nombres comptent ce qui
-a été pratiqué : ils ne mesurent pas un niveau.
+La liste des ressources de l'élève range les activités publiées sous le titre de leur cours, avec
+leur avancement : à faire, en cours, remise, retour reçu. Un cours n'y figure que s'il a des
+ressources dans le périmètre choisi. L'accueil par chapitres, qui ne titre pas les cours, liste les
+activités après ses chapitres. Le lecteur d'une ressource propose sous « S'entraîner » les
+activités publiées qui la citent, montrent une de ses images ou y renvoient.
 
 La bibliothèque, les ressources de l'élève et la recherche reprennent le dernier cours choisi dans
 le même navigateur. « Toutes les ressources » efface ce choix, la déconnexion aussi.
 
-Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
-publiée à ses élèves et utilisée par Thot. Chaque changement d'une source passe par
-`src/app/ingestion.ts`, par le web comme par la CLI : la même transaction écrit, réindexe et
-signale à revoir les activités dont une citation ne tient plus.
-La page de l'élève revérifie les citations à chaque affichage. Une activité à revoir n'est plus
-servie. L'enseignant enregistre de nouveau un exercice, ce qui recherche chaque passage dans la
-révision servie, puis le relit. Une tentative garde la version de l'exercice à laquelle elle
-répondait.
+Un élève pratique les exercices publiés des cours dont il est membre. L'enseignant règle quand le
+corrigé sort : après la remise de la série, ou après chaque question. Avant, la page ne contient
+que les consignes, les options et les images. La réponse attendue, les critères, le retour, les
+bonnes options, les réponses acceptées et les passages cités d'une question ne sortent du serveur
+qu'avec une tentative de ce compte sur la version actuelle, où cette question est finie. Les
+options se mélangent pour chaque élève, et le navigateur envoie la lettre affichée, pas
+l'identifiant de l'option : l'ordre des identifiants trahirait la bonne réponse. Quand le corrigé
+suit chaque question, une question fermée laisse deux essais, l'indice apparaît après une première
+erreur et le deuxième essai vaut 0,5 point. Quand il suit la série, l'élève enregistre ses
+réponses, revient, puis remet, avec un essai par question.
 
-Supprimer une source retire de chaque exercice ses passages et le texte des champs qui les citaient,
-rédigés d'après elle. Une explication perd les phrases qui la citaient, et ses blocs, dont les titres
-ont pu nommer la source. L'activité devient à revoir. Les réponses des élèves restent : elles viennent
-d'eux, et suivent la purge de `THOT_RETENTION_JOURS`.
+Thot corrige les questions fermées d'après les réponses de l'enseignant. Une réponse à taper se
+compare sans casse, sans accents ni mots de liaison, avec une faute de frappe tolérée dès 5 lettres
+et deux dès 10 (`src/core/questions.ts`). Une réponse rédigée n'a pas de note automatique : l'élève
+coche les critères qu'il pense remplir. Un modèle ne note rien.
+
+Un enseignant lit les tentatives des élèves de ses propres cours parmi ceux de l'activité, toutes
+versions confondues. L'auteur d'une activité privée lit les siennes. Être administrateur ne suffit
+pas. La page « Réponses » montre une ligne par élève suivi, sa dernière tentative et une case par
+question. L'enseignant note une réponse 0, 0,5 ou 1, ce qui remplace la note automatique, la
+commente, et peut marquer la tentative à reprendre : l'élève en commence alors une autre. Ces
+points comptent ce qui a été pratiqué : ils ne mesurent pas un niveau.
+
+Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
+publiée à ses élèves et utilisée par Thot. Une source qu'une question montre sans la citer, par son
+image ou comme source où chercher, doit rester citable de la même façon. Chaque changement d'une
+source passe par `src/app/ingestion.ts`, par le web comme par la CLI : la même transaction écrit,
+réindexe et signale à revoir les activités dont une preuve ne tient plus dans un de leurs cours.
+La page de l'élève revérifie les preuves à chaque affichage. Une activité à revoir n'est plus
+servie. L'enseignant fait rechercher ses passages dans la révision servie, ou retire le cours
+fautif, et l'activité redevient un brouillon à relire. Une tentative garde la version de l'exercice
+à laquelle elle répondait.
+
+Supprimer une source retire de chaque exercice ses passages, le texte des champs qui les citaient,
+rédigés d'après elle, l'image prise dans la source et le lien pour y chercher. Une explication perd
+les phrases qui la citaient, et ses blocs, dont les titres ont pu nommer la source. L'activité
+devient à revoir. Les réponses des élèves restent : elles viennent d'eux, et suivent la purge de
+`THOT_RETENTION_JOURS`, avec les notes et commentaires de l'enseignant.
+
+Une image déposée avec une activité est rangée dans `activites/` du dossier de données. Son format
+vient de ses octets : PNG, JPEG, WebP ou GIF, 5 Mo au plus. Elle n'est servie qu'à un enseignant
+d'un cours de l'activité, ou à un élève à qui la version publiée la montre.
 
 En mode personnel, une activité reste privée à son auteur, cours compris. Il la relit et la publie
 pour lui-même, et la page dit que personne d'autre ne l'a relue.
@@ -514,7 +555,7 @@ stateDiagram-v2
     brouillon --> a_revoir: citation retirée
     relue --> a_revoir: citation retirée
     publiee --> a_revoir: citation retirée
-    a_revoir --> brouillon: passages retrouvés
+    a_revoir --> brouillon: passages retrouvés ou cours retiré
   }
 ```
 

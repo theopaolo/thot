@@ -2,25 +2,30 @@ import { html } from "hono/html";
 import {
   type Champ,
   type Citation,
-  champs,
-  citationsDe,
+  champsQuestion,
   type Contenu,
+  CRITERES,
   type Explication,
+  MAX_TEXTE,
+  OPTIONS,
+  type Question,
+  TYPES_QUESTION,
+  type TypeQuestion,
 } from "../../core/activite.ts";
 import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
-import {
-  type Activite,
-  MAX_SOURCES,
-  nomChamp,
-  type Tentative,
-  type TentativeLue,
+import type {
+  Activite,
+  ActiviteListee,
+  FiltreActivites,
+  imagesCitables,
+  suiviObjectifs,
 } from "../activites.ts";
-import type { Catalogue } from "../domaines.ts";
-import { icone } from "../icones.ts";
-import { panneauSource, reponse } from "./eleve.ts";
+import { MAX_PASSAGES, type Saisie, un } from "../edition.ts";
+import { type Libelles, minuscule } from "../instance.ts";
 import { jour, ongletsBibliotheque } from "./prof.ts";
+import { enrichi, enrichiLigne, imageQuestion, LANGAGES, lettre, NOMS_TYPE } from "./questions.ts";
 
-const ETATS: Record<Activite["etat"], [string, string]> = {
+export const ETATS: Record<Activite["etat"], [string, string]> = {
   brouillon: ["Brouillon", "a_relire"],
   relue: ["Relu", "en-cours"],
   publiee: ["Publié", "certifiee"],
@@ -32,21 +37,23 @@ const ACTIONS: Record<string, string> = {
   modifiee: "Modifié",
   a_revoir: "Signalé à revoir",
 };
-const etat = (a: Activite) =>
-  html`<span class="statut ${ETATS[a.etat][1]}">${ETATS[a.etat][0]}</span>`;
+export const etat = (a: Activite) =>
+  html`<span class="statut ${ETATS[a.etat][1]}">${ETATS[a.etat][0]}</span>${
+    a.archivee_le ? html` <span class="statut">Archivée</span>` : ""
+  }`;
 
 /** Un passage cité. Sans offsets, il vient d'une légende d'image relue. */
-type Cite = Pick<Citation, "source_id" | "revision" | "titre" | "citation"> &
+export type Cite = Pick<Citation, "source_id" | "revision" | "titre" | "citation"> &
   Partial<Pick<Citation, "debut" | "fin">>;
 
 /** Le lecteur de source existant, ouvert sur le passage, dans la révision citée. */
-const lien = (c: Cite) =>
+export const lien = (c: Cite) =>
   c.debut === undefined
     ? `/eleve/sources/${c.source_id}`
     : `/eleve/sources/${c.source_id}?debut=${c.debut}&fin=${c.fin}&revision=${c.revision}#passage`;
 
 /** Les passages d'un champ. Avec `servies`, une citation qui ne tient plus le dit. */
-const passages = (ch: { citations: Cite[] }, servies?: Map<string, number | undefined>) =>
+export const passages = (ch: { citations: Cite[] }, servies?: Map<string, number | undefined>) =>
   ch.citations.length
     ? html`<ul class="discret">${ch.citations.map((c) => {
         const servie = servies?.get(c.source_id);
@@ -63,240 +70,457 @@ const passages = (ch: { citations: Cite[] }, servies?: Map<string, number | unde
     : "";
 
 /** L'avis du juge de soutien sur un champ. Il ne bloque rien : l'enseignant tranche. */
-const avis = (ch: Champ) =>
+export const avis = (ch: Champ) =>
   ch.soutien === null
     ? html`<p><span class="statut a_relire">Juge indisponible</span> <span class="discret">Les passages sont retrouvés mot pour mot, mais le juge n'a pas vérifié qu'ils établissent ce champ.</span></p>`
     : ch.soutien !== undefined && ch.soutien < SEUIL_SOUTIEN
       ? html`<p><span class="statut failed">À vérifier</span> <span class="discret">Selon le juge de soutien, les passages cités n'établissent pas tout ce que dit ce champ.</span></p>`
       : "";
 
-const TYPES: Record<Activite["type"], string> = {
+export const TYPES: Record<Activite["type"], string> = {
   exercice: "Exercice",
   explication: "Explication",
 };
 
-export type SuiviObjectif = {
-  intitule: string;
-  cours: string;
-  publiees: number;
-  tentatives: number;
+const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+
+/** « Exercice, 3 questions » ou « Explication ». */
+const typeDe = (type: Activite["type"], questions: number | null) =>
+  type === "exercice" && questions !== null
+    ? `Exercice, ${pluriel(questions, "question")}`
+    : TYPES[type];
+
+const option = (valeur: string, libelle: string, choisie: string) =>
+  html`<option value="${valeur}" ${valeur === choisie ? "selected" : ""}>${libelle}</option>`;
+
+// Bibliothèque
+
+const FILTRES_ETAT = [
+  ["", "Toutes, sauf archivées"],
+  ["brouillon", "Brouillons"],
+  ["relue", "Relues"],
+  ["publiee", "Publiées"],
+  ["a_revoir", "À revoir"],
+  ["archivee", "Archivées"],
+];
+export const ETATS_FILTRE = FILTRES_ETAT.map(([v]) => v).filter(Boolean);
+
+export type Liste = {
+  liste: ActiviteListee[];
+  cours: { id: string; nom: string }[];
+  filtre: FiltreActivites;
+  libelles: Libelles;
 };
 
-export const listeProf = (liste: Activite[], suivi: SuiviObjectif[]) => html`
+export const listeProf = ({ liste, cours, filtre, libelles: l }: Liste) => html`
   <h1>Bibliothèque</h1>
   ${ongletsBibliotheque("/prof/activites")}
-  <p><a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a></p>
+  <div class="barre">
+    <a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a>
+    <a class="bouton" href="/prof/activites/importer">Importer un quiz</a>
+    <a href="/prof/objectifs">Objectifs</a>
+  </div>
+  <form method="get" action="/prof/activites" class="barre reglage">
+    <label for="filtre-cours">${l.cours}</label>
+    <select id="filtre-cours" name="cours_id">${[
+      option("", "Tous", filtre.coursId ?? ""),
+      ...cours.map((c) => option(c.id, c.nom, filtre.coursId ?? "")),
+    ]}</select>
+    <label for="filtre-etat">État</label>
+    <select id="filtre-etat" name="etat">${FILTRES_ETAT.map(([v, t]) =>
+      option(v, t, filtre.etat ?? ""),
+    )}</select>
+    <button>Filtrer</button>
+  </form>
   ${
     liste.length
       ? html`<table>
-        <thead><tr><th>Objectif</th><th>Type</th><th>Cours</th><th>État</th><th>Version</th></tr></thead>
+        <thead><tr><th>Titre</th><th>Type</th><th>${l.cours_pluriel}</th><th>État</th><th>Remises</th><th>Modifiée le</th></tr></thead>
         <tbody>${liste.map(
           (a) => html`<tr>
-            <td><a href="/prof/activites/${a.id}">${a.intitule}</a></td>
-            <td>${TYPES[a.type]}</td><td>${a.cours}</td><td>${etat(a)}</td><td>${a.revision}</td>
+            <td><a href="/prof/activites/${a.id}">${a.titre}</a>${
+              a.titre === a.intitule ? "" : html`<br><span class="discret">${a.intitule}</span>`
+            }</td>
+            <td>${typeDe(a.type, a.questions)}</td><td>${a.les_cours}</td><td>${etat(a)}</td>
+            <td>${a.remises}</td><td>${jour(a.maj_le)}</td>
           </tr>`,
         )}</tbody>
       </table>`
-      : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
-  }
-  ${
-    suivi.length
-      ? html`<h2>Par objectif</h2>
-        <p class="discret">Dans vos cours. Une tentative est une réponse envoyée à un exercice, toutes versions confondues. Thot ne la note pas.</p>
-        <table>
-          <thead><tr><th>Objectif</th><th>Cours</th><th>Activités publiées</th><th>Tentatives</th></tr></thead>
-          <tbody>${suivi.map(
-            (o) =>
-              html`<tr><td>${o.intitule}</td><td>${o.cours}</td><td>${o.publiees}</td><td>${o.tentatives}</td></tr>`,
-          )}</tbody>
-        </table>`
-      : ""
+      : filtre.coursId || filtre.etat
+        ? html`<p>Aucune activité ne correspond à ce filtre.</p>`
+        : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
   }
 `;
 
-/** Les réponses des élèves, lues par les enseignants du cours. */
-const tentativesProf = (liste: TentativeLue[]) => html`
-  <h2>Tentatives</h2>
+// Objectifs
+
+export type LigneObjectif = ReturnType<typeof suiviObjectifs>[number];
+
+/** Les objectifs des cours du compte, avec leurs comptes, à renommer ou fusionner. */
+export const objectifs = (liste: LigneObjectif[], l: Libelles, erreur?: string) => html`
+  <p><a href="/prof/activites">Bibliothèque</a></p>
+  <h1>Objectifs</h1>
+  <p class="discret">Les objectifs de vos ${minuscule(l.cours_pluriel)}. Les tentatives remises sont celles des élèves que vous suivez, toutes versions confondues. Fusionner rattache les activités d'un objectif à un autre du même ${minuscule(l.cours)}, puis supprime le premier.</p>
+  ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
   ${
     liste.length
-      ? html`<p class="discret">Toutes versions confondues. Les critères cochés sont ceux que l'élève pense remplir, numérotés dans la version à laquelle il répondait.</p>
-        <table>
-          <thead><tr><th>Élève</th><th>Date</th><th>Version</th><th>Réponse</th><th>Critères cochés</th></tr></thead>
-          <tbody>${liste.map((t) => {
-            const coches = JSON.parse(t.criteres) as number[];
-            return html`<tr><td>${t.nom}</td><td>${jour(t.cree_le)}</td><td>${t.revision}</td><td>${
-              t.reponse
-            }</td><td>${coches.length ? coches.map((i) => i + 1).join(", ") : "aucun"}</td></tr>`;
-          })}</tbody>
-        </table>`
-      : html`<p class="discret">Aucune tentative.</p>`
+      ? html`<table>
+        <thead><tr><th>Objectif</th><th>${l.cours}</th><th>Activités</th><th>Publiées</th><th>Tentatives remises</th><th>Fusionner dans</th></tr></thead>
+        <tbody>${liste.map((o) => {
+          const autres = liste.filter((x) => x.cours_id === o.cours_id && x.id !== o.id);
+          return html`<tr>
+            <td><form method="post" action="/prof/objectifs/${o.id}/renommer" class="barre reglage">
+              <input type="text" name="intitule" value="${o.intitule}" maxlength="300" required aria-label="Intitulé de l'objectif">
+              <button>Renommer</button>
+            </form>${o.reference ? html`<span class="discret">${o.reference}</span>` : ""}</td>
+            <td>${o.cours}</td><td>${o.activites}</td><td>${o.publiees}</td><td>${o.tentatives}</td>
+            <td>${
+              autres.length
+                ? html`<form method="post" action="/prof/objectifs/${o.id}/fusionner" class="barre reglage">
+                  <select name="vers" aria-label="Objectif qui reprend les activités de « ${o.intitule} »">${autres.map(
+                    (x) => option(x.id, x.intitule, ""),
+                  )}</select>
+                  <button data-confirmer="Fusionner « ${o.intitule} » dans l'objectif choisi ? Ses activités passent à cet objectif, puis il disparaît.">Fusionner</button>
+                </form>`
+                : html`<span class="discret">Seul objectif de ce ${minuscule(l.cours)}</span>`
+            }</td>
+          </tr>`;
+        })}</tbody>
+      </table>`
+      : html`<p>Aucun objectif. Un objectif naît avec la première activité préparée pour lui.</p>`
   }
 `;
 
-export type Preparation = {
-  catalogue: Catalogue;
-  coursId: string;
-  objectifs: { id: string; intitule: string; reference: string }[];
-  sources: { id: string; titre: string }[];
-  personnel: boolean;
-  saisie: Record<string, unknown>;
-  erreur?: string;
-  rejets?: string[];
-};
+// Page d'une activité
 
-/** Choisir le type, le cours, l'objectif et les sources, puis faire rédiger le brouillon. */
-export const preparation = (p: Preparation) => {
-  const s = (nom: string) => String(p.saisie[nom] ?? "");
-  const choisies = new Set([p.saisie.sources ?? []].flat().map(String));
-  const explication = s("type") === "explication";
-  const nomCours = (c: Catalogue["cours"][number]) =>
-    `${p.catalogue.matieres.find((m) => m.id === c.matiere_id)?.nom ?? ""} / ${c.nom}`;
-  return html`
-    <p><a href="/prof/activites">Activités</a></p>
-    <h1>Préparer une activité</h1>
-    ${p.erreur ? html`<p role="alert">${p.erreur}</p>` : ""}
-    ${
-      p.rejets?.length
-        ? html`<div class="alerte"><strong>Champs rejetés : ${p.rejets.length}</strong><ul>${p.rejets.map(
-            (r) => html`<li>${r}</li>`,
-          )}</ul></div>`
-        : ""
-    }
-    ${
-      !p.catalogue.cours.length
-        ? html`<p>Aucun cours. Un objectif appartient à un cours : ${
-            p.personnel
-              ? html`créez-en un dans <a href="/administration/domaines">Matières et cours</a>.`
-              : "un administrateur vous inscrit à un cours."
-          }</p>`
-        : html`
-      <form method="get" action="/prof/activites/nouvelle" class="barre">
-        <label for="cours_id">Cours</label>
-        <select id="cours_id" name="cours_id">${p.catalogue.cours.map(
-          (c) =>
-            html`<option value="${c.id}" ${c.id === p.coursId ? "selected" : ""}>${nomCours(c)}</option>`,
-        )}</select>
-        <button>Changer de cours</button>
-      </form>
-      <form method="post" action="/prof/activites" class="etroit">
-        <input type="hidden" name="cours_id" value="${p.coursId}">
-        <fieldset>
-          <legend><strong>Activité</strong></legend>
-          <label><input type="radio" name="type" value="exercice" ${explication ? "" : "checked"}> Exercice à réponse courte</label>
-          <p class="aide">Thot rédige une consigne, une réponse attendue, 2 à 5 critères et un retour. Chaque champ cite des passages retrouvés mot pour mot. Un champ sans passage retrouvé est rejeté. Le juge de soutien signale ce que les passages d'un champ n'établissent pas.</p>
-          <label><input type="radio" name="type" value="explication" ${explication ? "checked" : ""}> Explication d'étude</label>
-          <p class="aide">Thot répond à l'objectif comme à une question, dans les sources choisies seulement. Chaque phrase cite son passage et passe le juge de soutien. L'élève la lit, sans réponse à envoyer.</p>
-        </fieldset>
-        <fieldset>
-          <legend><strong>Objectif</strong></legend>
-          ${
-            p.objectifs.length
-              ? html`<div class="champ">
-                <label for="objectif_id">Objectif du cours</label>
-                <select id="objectif_id" name="objectif_id">
-                  <option value="">Nouvel objectif</option>
-                  ${p.objectifs.map(
-                    (o) =>
-                      html`<option value="${o.id}" ${o.id === s("objectif_id") ? "selected" : ""}>${o.intitule}${
-                        o.reference ? ` (${o.reference})` : ""
-                      }</option>`,
-                  )}
-                </select>
-              </div>`
-              : ""
-          }
-          <div class="champ">
-            <label for="intitule">Nouvel objectif</label>
-            <p class="aide">Ce que la personne doit savoir ou savoir faire. Ignoré si un objectif du cours est choisi.</p>
-            <input type="text" id="intitule" name="intitule" maxlength="300" value="${s("intitule")}">
-          </div>
-          ${
-            p.personnel
-              ? ""
-              : html`<div class="champ">
-                <label for="reference">Référence (facultatif)</label>
-                <p class="aide">Référentiel ou programme, compétence et version, par exemple « BTS MCO, référentiel 2024, C2 ». Thot ne déduit pas qu'un document couvre l'objectif.</p>
-                <input type="text" id="reference" name="reference" maxlength="300" value="${s("reference")}">
-              </div>`
-          }
-        </fieldset>
-        <fieldset>
-          <legend><strong>Sources, de 1 à ${MAX_SOURCES}</strong></legend>
-          ${
-            p.sources.length
-              ? p.sources.map(
-                  (x) =>
-                    html`<label><input type="checkbox" name="sources" value="${x.id}" ${
-                      choisies.has(x.id) ? "checked" : ""
-                    }> ${x.titre}</label>`,
-                )
-              : html`<p class="discret">Aucune source certifiée de ce cours ne sert à Thot pour répondre${
-                  p.personnel ? "" : " et n'est publiée aux élèves"
-                }.</p>`
-          }
-        </fieldset>
-        <button class="principal" ${p.sources.length ? "" : "disabled"}>Rédiger le brouillon</button>
-      </form>
-    `
-    }
-  `;
-};
+/** La question ouverte en formulaire : `nouvelle` pour une question à ajouter. */
+export type Edition = { id: string; type: TypeQuestion; saisie: Saisie };
 
 export type DetailProf = {
   a: Activite;
   contenu: Contenu | Explication;
   relectures: { revision: number; action: string; le: string; nom: string | null }[];
   servies: Map<string, number | undefined>;
-  /** le titre de chaque source citée */
+  libelles: Libelles;
+  /** les cours de l'activité, chacun avec les titres des sources qui n'y tiennent pas */
+  cours: { id: string; nom: string; bloquantes: string[] }[];
+  /** les autres cours du compte, où l'ajouter */
+  autres: { id: string; nom: string }[];
+  objectifs: { id: string; intitule: string }[];
+  /** les sources que la série peut citer */
+  sources: { id: string; titre: string }[];
+  images: ReturnType<typeof imagesCitables>;
+  /** le titre de chaque source citée, montrée ou citable */
   titres: Map<string, string>;
-  /** absentes pour un compte qui ne les lit pas */
-  tentatives?: TentativeLue[];
+  /** absent pour un compte qui ne lit pas les réponses */
+  suivi?: { eleves: number; remis: number };
+  /** jamais publiée et sans tentative */
+  supprimable: boolean;
+  edition?: Edition;
   erreur?: string;
 };
 
 type Servies = DetailProf["servies"];
 
-/** Les champs d'un exercice, leurs preuves et l'avis du juge. */
-const champsExercice = (contenu: Contenu, servies: Servies) => {
-  const champ = (ch: Champ) =>
-    html`<p>${ch.texte || html`<span class="discret">Vide : sa source a été supprimée.</span>`}</p>${avis(ch)}${passages(ch, servies)}`;
-  return html`
-    <h2>Consigne</h2>
-    ${champ(contenu.consigne)}
-    <h2>Réponse attendue</h2>
-    ${champ(contenu.attendu)}
-    <h2>Critères</h2>
-    <ol>${contenu.criteres.map((ch) => html`<li>${champ(ch)}</li>`)}</ol>
-    <h2>Retour</h2>
-    ${champ(contenu.retour)}
-  `;
+const VIDE_SOURCE = "Vide : sa source a été supprimée.";
+
+/** Le texte d'un champ, puis ses preuves. Sans passage, il est rédigé par l'enseignant. */
+const champ = (ch: Champ, servies: Servies, vide: string, signer: boolean) =>
+  ch.texte
+    ? html`${enrichi(ch.texte)}${
+        ch.citations.length
+          ? html`${avis(ch)}${passages(ch, servies)}`
+          : signer
+            ? html`<p class="discret">Rédigé par l'enseignant</p>`
+            : ""
+      }`
+    : html`<p class="discret">${vide}</p>${passages(ch, servies)}`;
+
+/** Le contenu propre au type : réponse attendue et critères, options, ou réponses acceptées. */
+const corpsType = (q: Question, servies: Servies, signer: boolean) => {
+  if (q.type === "redigee") {
+    const code = q.langage && q.attendu.texte && !q.attendu.texte.includes("```");
+    return html`
+      <h4>Réponse attendue</h4>
+      ${
+        code
+          ? html`<pre data-langage="${q.langage}"><code>${q.attendu.texte}</code></pre>${
+              q.attendu.citations.length
+                ? html`${avis(q.attendu)}${passages(q.attendu, servies)}`
+                : signer
+                  ? html`<p class="discret">Rédigé par l'enseignant</p>`
+                  : ""
+            }`
+          : champ(q.attendu, servies, "Vide.", signer)
+      }
+      ${
+        q.criteres.length
+          ? html`<h4>Critères</h4><ol>${q.criteres.map(
+              (ch) => html`<li>${champ(ch, servies, VIDE_SOURCE, signer)}</li>`,
+            )}</ol>`
+          : ""
+      }`;
+  }
+  if (q.type === "terme") {
+    return html`<h4>Réponses acceptées</h4><ul>${q.accepte.map((x) => html`<li>${x}</li>`)}</ul>`;
+  }
+  // Une option fausse n'affirme rien : elle ne dit pas qui l'a rédigée.
+  return html`<ol type="A">${q.options.map(
+    (o) =>
+      html`<li>${o.texte.texte ? enrichiLigne(o.texte.texte) : html`<span class="discret">${VIDE_SOURCE}</span>`}${
+        o.juste ? html` <span class="statut certifiee">Bonne réponse</span>` : ""
+      }${o.texte.citations.length ? html`${avis(o.texte)}${passages(o.texte, servies)}` : ""}</li>`,
+  )}</ol>`;
 };
 
-const modification = (a: Activite, contenu: Contenu, erreur?: string) => {
-  const liste = champs(contenu);
+/** Une question en lecture, avec ses actions. */
+const lecture = (d: DetailProf, n: number, q: Question, i: number) => {
+  const { a, servies } = d;
+  const id = encodeURIComponent(q.id);
+  const base = `/prof/activites/${a.id}/questions/${id}`;
+  // Une question sans aucun passage le dit une fois, pas sous chaque champ.
+  // Une consigne vide vient d'une source supprimée, pas de l'enseignant.
+  const enseignant = !!q.consigne.texte && champsQuestion(q).every((ch) => !ch.citations.length);
+  return html`<section class="question-prof" id="q-${q.id}">
+    <h3>Question ${i + 1} <span class="discret">${NOMS_TYPE[q.type]}${
+      q.type === "redigee" && q.langage ? `, ${q.langage}` : ""
+    }${enseignant ? ", rédigée par l'enseignant" : ""}</span></h3>
+    ${imageQuestion(a.id, q.image)}
+    ${champ(q.consigne, servies, VIDE_SOURCE, !enseignant)}
+    ${corpsType(q, servies, !enseignant)}
+    ${q.indice ? html`<p><strong>Indice :</strong> ${enrichiLigne(q.indice)}</p>` : ""}
+    ${q.ou ? html`<p><strong>Où chercher :</strong> ${d.titres.get(q.ou) ?? "source supprimée"}</p>` : ""}
+    ${
+      q.retour.texte || q.retour.citations.length
+        ? html`<h4>Retour</h4>${champ(q.retour, servies, VIDE_SOURCE, !enseignant)}`
+        : html`<p class="discret">Pas de retour.</p>`
+    }
+    <form method="post" class="barre">
+      <input type="hidden" name="revision" value="${a.revision}">
+      <a class="bouton" href="/prof/activites/${a.id}?modifier=${id}#q-${id}">Modifier</a>
+      <button formaction="${base}/dupliquer">Dupliquer</button>
+      <button formaction="${base}/monter" ${i === 0 ? "disabled" : ""}>Monter</button>
+      <button formaction="${base}/descendre" ${i === n - 1 ? "disabled" : ""}>Descendre</button>
+      <button formaction="${base}/regenerer">Proposer une autre question</button>
+      <button formaction="${base}/supprimer" class="danger" ${n === 1 ? "disabled" : ""}
+        data-confirmer="Supprimer la question ${i + 1} ? La version suivante ne l'aura plus.">Supprimer</button>
+    </form>
+  </section>`;
+};
+
+/**
+ * Les passages d'un champ dans le formulaire : un par zone de texte, sa source en champ caché, puis
+ * une ligne pour en ajouter un. Une saisie refusée peut nommer une source inconnue : elle se
+ * choisit de nouveau.
+ */
+const passagesSaisis = (d: DetailProf, s: Saisie, cle: string) => {
+  const remplis = Array.from({ length: MAX_PASSAGES + 1 }, (_, j) => ({
+    source: un(s, `${cle}_s${j}`),
+    passage: un(s, `${cle}_p${j}`).trim(),
+  })).filter((p) => p.passage);
+  const choix = (j: number, choisie: string) =>
+    html`<select id="f-${cle}-s${j}" name="${cle}_s${j}">${d.sources.map((x) =>
+      option(x.id, x.titre, choisie),
+    )}</select>`;
+  const n = remplis.length;
+  return html`${remplis.map((p, j) =>
+    d.titres.has(p.source)
+      ? html`<input type="hidden" name="${cle}_s${j}" value="${p.source}">
+        <label for="f-${cle}-p${j}" class="aide">Passage de « ${d.titres.get(p.source)} »</label>
+        <textarea id="f-${cle}-p${j}" name="${cle}_p${j}" rows="2" maxlength="${MAX_TEXTE}">${p.passage}</textarea>`
+      : html`<label for="f-${cle}-s${j}" class="aide">Source du passage</label>${choix(j, p.source)}
+        <textarea id="f-${cle}-p${j}" name="${cle}_p${j}" rows="2" maxlength="${MAX_TEXTE}" aria-label="Passage">${p.passage}</textarea>`,
+  )}${
+    n < MAX_PASSAGES && d.sources.length
+      ? html`<details class="ajout-passage"><summary>Ajouter un passage</summary>
+        <label for="f-${cle}-s${n}">Source</label>${choix(n, "")}
+        <label for="f-${cle}-p${n}">Passage, copié mot pour mot de la source</label>
+        <textarea id="f-${cle}-p${n}" name="${cle}_p${n}" rows="2" maxlength="${MAX_TEXTE}"></textarea>
+      </details>`
+      : ""
+  }`;
+};
+
+/** Une zone de texte pour un champ, puis ses passages. */
+const zone = (
+  d: DetailProf,
+  s: Saisie,
+  cle: string,
+  libelle: string,
+  rows: number,
+  requis = false,
+) => html`<div class="champ">
+  <label for="f-${cle}">${libelle}</label>
+  <textarea id="f-${cle}" name="${cle}" rows="${rows}" maxlength="${MAX_TEXTE}" ${requis ? "required" : ""}>${un(s, cle)}</textarea>
+  ${passagesSaisis(d, s, cle)}
+</div>`;
+
+/** Les champs propres au type de la question. */
+const champsType = (d: DetailProf, s: Saisie, type: TypeQuestion, avant?: Question) => {
+  if (type === "redigee") {
+    const remplis = Array.from({ length: CRITERES.max }, (_, i) => un(s, `critere_${i}`).trim());
+    const n = Math.min(CRITERES.max, remplis.findLastIndex(Boolean) + 2);
+    const langages: string[] = [...LANGAGES];
+    const actuel = avant?.type === "redigee" ? avant.langage : undefined;
+    if (actuel && !langages.includes(actuel)) langages.push(actuel);
+    return html`
+      ${zone(d, s, "attendu", "Réponse attendue", 4)}
+      <fieldset>
+        <legend><strong>Critères</strong></legend>
+        <p class="aide">${CRITERES.max} au plus. L'élève coche ceux qu'il pense remplir. Un critère vidé disparaît.</p>
+        ${Array.from({ length: n }, (_, i) => zone(d, s, `critere_${i}`, `Critère ${i + 1}`, 2))}
+      </fieldset>
+      <div class="champ">
+        <label for="f-langage">Langage</label>
+        <p class="aide">Avec un langage, l'élève répond dans une zone à chasse fixe et le corrigé s'affiche coloré.</p>
+        <select id="f-langage" name="langage">${[
+          option("", "Texte", un(s, "langage")),
+          ...langages.map((x) => option(x, x, un(s, "langage"))),
+        ]}</select>
+      </div>`;
+  }
+  if (type === "terme") {
+    return html`<div class="champ">
+      <label for="f-accepte">Réponses acceptées</label>
+      <p class="aide">Une par ligne. Thot compare sans majuscules, sans accents ni mots de liaison, et tolère une faute de frappe dès 5 lettres, deux dès 10.</p>
+      <textarea id="f-accepte" name="accepte" rows="4" required>${un(s, "accepte")}</textarea>
+    </div>`;
+  }
+  const justes = new Set([s.juste ?? []].flat());
+  const multiple = type === "choix_multiple";
+  return html`<fieldset>
+    <legend><strong>Options</strong></legend>
+    <p class="aide">De ${OPTIONS.min} à ${OPTIONS.max} options. ${
+      multiple ? "Cochez les bonnes réponses." : "Cochez la bonne réponse."
+    } Une option vidée disparaît. L'élève les reçoit dans un ordre mélangé.</p>
+    ${Array.from(
+      { length: OPTIONS.max },
+      (_, i) => html`<div class="option-edition">
+        <input type="hidden" name="option_${i}_id" value="${un(s, `option_${i}_id`)}">
+        <label><input type="${multiple ? "checkbox" : "radio"}" name="juste" value="${i}" ${
+          justes.has(String(i)) ? "checked" : ""
+        }> Option ${lettre(i)} juste</label>
+        ${zone(d, s, `option_${i}`, `Option ${lettre(i)}`, 2)}
+      </div>`,
+    )}
+  </fieldset>`;
+};
+
+/** Le formulaire d'une question, à sa place dans la série. */
+const formulaire = (d: DetailProf, e: Edition, rang: number, avant?: Question) => {
+  const { a } = d;
+  const s = e.saisie;
+  const id = avant ? encodeURIComponent(avant.id) : "";
+  const image = avant?.image;
+  return html`<section class="question-prof" id="q-${avant?.id ?? "nouvelle"}">
+    <h3>${avant ? `Question ${rang + 1}` : "Nouvelle question"} <span class="discret">${NOMS_TYPE[e.type]}</span></h3>
+    ${d.erreur ? html`<p role="alert">${d.erreur}</p>` : ""}
+    <form method="post" enctype="multipart/form-data" class="etroit"
+      action="/prof/activites/${a.id}/questions${avant ? `/${id}/enregistrer` : ""}">
+      <input type="hidden" name="revision" value="${a.revision}">
+      ${avant ? "" : html`<input type="hidden" name="type" value="${e.type}">`}
+      <p class="aide">Enregistrer crée la version ${a.revision + 1}, à relire avant publication. Chaque passage est cherché mot pour mot dans la version actuelle de sa source. Videz un passage pour le retirer. Un champ sans passage s'affiche « Rédigé par l'enseignant ».</p>
+      ${zone(d, s, "consigne", "Consigne", 4, true)}
+      ${champsType(d, s, e.type, avant)}
+      ${zone(d, s, "retour", "Retour, lu après la correction", 3)}
+      <div class="champ">
+        <label for="f-indice">Indice</label>
+        <p class="aide">Montré après une première erreur, quand le corrigé suit chaque question.</p>
+        <input type="text" id="f-indice" name="indice" maxlength="500" value="${un(s, "indice")}">
+      </div>
+      <div class="champ">
+        <label for="f-ou">Où chercher</label>
+        <select id="f-ou" name="ou">${[
+          option("", "Aucune source", un(s, "ou")),
+          ...d.sources.map((x) => option(x.id, x.titre, un(s, "ou"))),
+        ]}</select>
+      </div>
+      <fieldset>
+        <legend><strong>Image</strong></legend>
+        ${
+          image
+            ? html`${imageQuestion(a.id, image)}<label><input type="checkbox" name="image_retirer" value="1"> Retirer l'image</label>`
+            : ""
+        }
+        <div class="champ">
+          <label for="f-image">Déposer une image</label>
+          <p class="aide">PNG, JPEG, WebP ou GIF, 5 Mo au plus.${image ? " Elle remplace l'image actuelle." : ""}</p>
+          <input type="file" id="f-image" name="image_fichier" accept="image/png,image/jpeg,image/webp,image/gif">
+        </div>
+        ${
+          d.images.length
+            ? html`<div class="champ">
+              <label for="f-media">Ou une image d'une source du cours</label>
+              <select id="f-media" name="image_media">${[
+                option(
+                  "",
+                  image?.fichier ? "Garder l'image déposée" : "Aucune",
+                  un(s, "image_media"),
+                ),
+                ...d.images.map((x) =>
+                  option(
+                    x.id,
+                    `${x.titre} : ${(x.legende ?? "sans légende").slice(0, 80)}`,
+                    un(s, "image_media"),
+                  ),
+                ),
+              ]}</select>
+            </div>`
+            : ""
+        }
+        <div class="champ">
+          <label for="f-alt">Texte alternatif</label>
+          <p class="aide">Obligatoire avec une image : ce qu'elle montre, pour qui ne la voit pas.</p>
+          <input type="text" id="f-alt" name="image_alt" maxlength="300" value="${un(s, "image_alt")}">
+        </div>
+      </fieldset>
+      <div class="barre">
+        <button class="principal">Enregistrer</button>
+        <a href="/prof/activites/${a.id}${avant ? `#q-${id}` : ""}">Annuler</a>
+      </div>
+    </form>
+  </section>`;
+};
+
+const choixType = (nom: string, id: string) =>
+  html`<select id="${id}" name="${nom}">${TYPES_QUESTION.map((t) => option(t, NOMS_TYPE[t], ""))}</select>`;
+
+/** Les questions dans l'ordre, l'une d'elles ouverte en formulaire, puis l'ajout d'une question. */
+const questions = (d: DetailProf, contenu: Contenu) => {
+  const { a, edition: e } = d;
+  const rejets = JSON.parse(a.rejets) as string[];
+  const n = contenu.questions.length;
+  const nouvelle = e && !contenu.questions.some((q) => q.id === e.id);
   return html`
-    <details ${erreur ? "open" : ""}>
-      <summary>Modifier</summary>
-      <form method="post" action="/prof/activites/${a.id}/modifier" class="etroit">
-        <input type="hidden" name="revision" value="${a.revision}">
-        <p class="aide">Enregistrer une modification crée la version ${a.revision + 1}, à relire avant publication. Chaque passage est recherché mot pour mot dans la version actuelle de sa source. Un critère ou un passage vidé disparaît.</p>
-        ${liste.map(
-          (ch, i) => html`
-            <div class="champ">
-              <label for="texte-${i}">${nomChamp(i, liste.length)}</label>
-              <textarea id="texte-${i}" name="texte_${i}" rows="3">${ch.texte}</textarea>
-            </div>
-            ${ch.citations.map(
-              (c, j) => html`<div class="champ">
-                <label for="citation-${i}-${j}">Passage cité de « ${c.titre} »</label>
-                <textarea id="citation-${i}-${j}" name="citation_${i}_${j}" rows="2">${c.citation}</textarea>
-              </div>`,
-            )}
-          `,
-        )}
-        <button class="principal">Enregistrer une nouvelle version</button>
-      </form>
-    </details>
+    <h2>Questions</h2>
+    ${
+      rejets.length
+        ? html`<p class="discret">${pluriel(rejets.length, "champ")} rejeté${
+            rejets.length > 1 ? "s" : ""
+          } à la génération : ${rejets.join(" ")}</p>`
+        : ""
+    }
+    ${contenu.questions.map((q, i) =>
+      e?.id === q.id ? formulaire(d, e, i, q) : lecture(d, n, q, i),
+    )}
+    ${
+      nouvelle
+        ? formulaire(d, e, n)
+        : html`<div class="ajout-question">
+          <form method="get" action="/prof/activites/${a.id}#q-nouvelle" class="barre reglage">
+            <input type="hidden" name="modifier" value="nouvelle">
+            <label for="ajout-type">Ajouter une question</label>
+            ${choixType("type", "ajout-type")}
+            <button>Ajouter</button>
+          </form>
+          <form method="post" action="/prof/activites/${a.id}/questions/proposer" class="barre reglage">
+            <input type="hidden" name="revision" value="${a.revision}">
+            <label for="proposer-type">Faire rédiger une question par Thot</label>
+            ${choixType("type", "proposer-type")}
+            <button>Faire rédiger</button>
+          </form>
+        </div>`
+    }
   `;
 };
 
@@ -324,27 +548,78 @@ const corpsExplication = (e: Explication, servies: Servies) => html`
   <p class="discret">L'aperçu élève montre les titres et le rangement en blocs, qui viennent du modèle sans preuve.</p>
 `;
 
-/** Inspecter les preuves, modifier, relire, publier, avec l'historique de relecture. */
-export const detailProf = ({
-  a,
-  contenu,
-  relectures,
-  servies,
-  titres,
-  tentatives,
-  erreur,
-}: DetailProf) => {
-  const rejets = JSON.parse(a.rejets) as string[];
-  const sources = [
-    ...new Map(citationsDe(contenu).map((c) => [`${c.source_id}/${c.revision}`, c])).values(),
-  ];
-  const personnel = a.audience === "prive";
-  const explication = a.type === "explication";
+/** Titre, date à rendre, objectif, cours et réglage du corrigé. */
+const reglages = (d: DetailProf) => {
+  const { a, contenu, libelles: l } = d;
   return html`
-    <p><a href="/prof/activites">Activités</a></p>
-    <h1>${a.intitule}</h1>
-    <p class="discret">${TYPES[a.type]} · ${a.cours}${a.reference ? ` · ${a.reference}` : ""} · version ${a.revision} · ${etat(a)}</p>
-    ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+    <form method="post" action="/prof/activites/${a.id}/reglages" class="barre reglage">
+      <label for="titre">Titre</label>
+      <input type="text" id="titre" name="titre" value="${a.titre}" maxlength="300" required>
+      <label for="a_rendre_le">À rendre le</label>
+      <input type="date" id="a_rendre_le" name="a_rendre_le" value="${a.a_rendre_le ?? ""}">
+      <button>Enregistrer</button>
+    </form>
+    <form method="post" action="/prof/activites/${a.id}/objectif" class="barre reglage">
+      <label for="objectif">Objectif</label>
+      <select id="objectif" name="objectif_id">${d.objectifs.map((o) =>
+        option(o.id, o.intitule, a.objectif_id),
+      )}</select>
+      <button>Changer d'objectif</button>
+      <a href="/prof/objectifs">Renommer ou fusionner</a>
+    </form>
+    ${a.reference ? html`<p class="discret">Référence : ${a.reference}</p>` : ""}
+    ${
+      a.audience === "prive"
+        ? ""
+        : html`<p class="cours-activite"><strong>${l.cours_pluriel} :</strong> ${d.cours.map(
+            (c, i) =>
+              html`${i ? ", " : ""}${c.nom}${
+                c.bloquantes.length
+                  ? html` <span class="statut failed">Ne tient plus : ${c.bloquantes.join(", ")}</span>`
+                  : ""
+              } ${
+                c.id === a.cours_id
+                  ? html`<span class="discret">(origine, porte l'objectif)</span>`
+                  : html`<form method="post" action="/prof/activites/${a.id}/cours/${c.id}/retirer"><button class="lien" aria-label="Retirer ${c.nom}">Retirer</button></form>`
+              }`,
+          )}</p>
+          ${
+            d.autres.length
+              ? html`<form method="post" action="/prof/activites/${a.id}/cours" class="barre reglage">
+                <label for="ajout-cours">Ajouter à un ${minuscule(l.cours)}</label>
+                <select id="ajout-cours" name="cours_id">${d.autres.map((c) => option(c.id, c.nom, ""))}</select>
+                <button>Ajouter</button>
+              </form>`
+              : ""
+          }`
+    }
+    ${
+      "questions" in contenu
+        ? html`<form method="post" action="/prof/activites/${a.id}/correction" class="barre reglage">
+          <input type="hidden" name="revision" value="${a.revision}">
+          <label for="correction">Corrigé</label>
+          <select id="correction" name="correction">${[
+            option("question", "Après chaque question", contenu.correction),
+            option("serie", "Après la remise de la série", contenu.correction),
+          ]}</select>
+          <button>Régler le corrigé</button>
+        </form>`
+        : ""
+    }
+  `;
+};
+
+/** La page d'une activité : ses réglages, ses questions à modifier, ses réponses, son historique. */
+export const detailProf = (d: DetailProf) => {
+  const { a, contenu } = d;
+  const personnel = a.audience === "prive";
+  const explication = "affirmations" in contenu;
+  const fautifs = d.cours.filter((c) => c.bloquantes.length);
+  return html`
+    <p><a href="/prof/activites">Bibliothèque</a></p>
+    <h1>${a.titre}</h1>
+    <p class="discret">${typeDe(a.type, explication ? null : contenu.questions.length)}, version ${a.revision} ${etat(a)}</p>
+    ${d.erreur && !d.edition ? html`<p role="alert">${d.erreur}</p>` : ""}
     ${
       personnel
         ? html`<p class="note">${
@@ -354,18 +629,22 @@ export const detailProf = ({
     }
     ${
       a.etat === "a_revoir"
-        ? html`<p role="alert">Une source citée a une nouvelle version, n'est plus citable dans ce cours ou a été supprimée. ${
+        ? html`<div role="alert"><p>Une source citée a une nouvelle version, n'est plus citable ou a été supprimée${
+            fautifs.length
+              ? `. Ne tiennent plus : ${fautifs.map((c) => `${c.bloquantes.join(", ")} dans ${c.nom}`).join(", ")}`
+              : ""
+          }. ${
             explication
               ? "Les élèves ne reçoivent plus cette explication. Préparez-en une autre."
-              : "Les élèves ne reçoivent plus cet exercice. Enregistrez-le de nouveau pour rechercher ses passages dans la version actuelle, ou préparez-en un autre."
-          }</p>`
-        : ""
-    }
-    ${
-      rejets.length
-        ? html`<p class="discret">${rejets.length} champ${rejets.length > 1 ? "s" : ""} rejeté${
-            rejets.length > 1 ? "s" : ""
-          } à la génération : ${rejets.join(" ")}</p>`
+              : "Les élèves ne reçoivent plus cet exercice. Cherchez ses passages dans la version actuelle des sources, modifiez les questions qui ne tiennent plus ou retirez le cours fautif."
+          }</p>${
+            explication
+              ? ""
+              : html`<form method="post" action="/prof/activites/${a.id}/reancrer">
+                <input type="hidden" name="revision" value="${a.revision}">
+                <button>Chercher les passages dans la version actuelle</button>
+              </form>`
+          }</div>`
         : ""
     }
     <div class="barre">
@@ -386,158 +665,48 @@ export const detailProf = ({
           : ""
       }
       <a class="bouton" href="/prof/activites/${a.id}/apercu">Aperçu élève</a>
+      ${explication ? "" : html`<a class="bouton" href="/prof/activites/${a.id}/reponses">Réponses</a>`}
+      <form method="post" action="/prof/activites/${a.id}/archiver">
+        <input type="hidden" name="oui" value="${a.archivee_le ? "0" : "1"}">
+        ${
+          a.archivee_le
+            ? html`<button>Désarchiver</button>`
+            : html`<button data-confirmer="Archiver cette activité ? Les élèves ne la reçoivent plus. Leurs tentatives restent lisibles.">Archiver</button>`
+        }
+      </form>
+      ${
+        d.supprimable
+          ? html`<form method="post" action="/prof/activites/${a.id}/supprimer">
+            <button class="danger" data-confirmer="Supprimer ce brouillon ? Il n'a jamais été publié. Rien ne le rétablit.">Supprimer le brouillon</button>
+          </form>`
+          : ""
+      }
     </div>
-    ${"affirmations" in contenu ? corpsExplication(contenu, servies) : champsExercice(contenu, servies)}
-    <h2>Sources citées</h2>
-    <ul>${sources.map(
-      (c) => html`<li>${titres.get(c.source_id) ?? c.titre}, version ${c.revision}</li>`,
-    )}</ul>
-    <h2>Relectures</h2>
+    ${reglages(d)}
+    ${explication ? corpsExplication(contenu, d.servies) : questions(d, contenu)}
     ${
-      relectures.length
-        ? html`<table>
-          <thead><tr><th>Action</th><th>Version</th><th>Par</th><th>Date</th></tr></thead>
-          <tbody>${relectures.map(
-            (r) =>
-              html`<tr><td>${ACTIONS[r.action] ?? r.action}</td><td>${r.revision}</td><td>${
-                r.nom ?? "Thot"
-              }</td><td>${jour(r.le)}</td></tr>`,
-          )}</tbody>
-        </table>`
-        : html`<p class="discret">Pas encore relu.</p>`
+      d.suivi && !explication
+        ? html`<h2>Réponses</h2>
+          <p>${pluriel(d.suivi.remis, "élève")} sur ${d.suivi.eleves} ${
+            d.suivi.remis > 1 ? "ont" : "a"
+          } remis une tentative, toutes versions confondues. <a href="/prof/activites/${a.id}/reponses">Lire les réponses</a></p>`
+        : ""
     }
-    ${tentatives && a.type === "exercice" ? tentativesProf(tentatives) : ""}
-    ${"affirmations" in contenu ? "" : modification(a, contenu, erreur)}
+    <details>
+      <summary>Historique des versions</summary>
+      ${
+        d.relectures.length
+          ? html`<table>
+            <thead><tr><th>Action</th><th>Version</th><th>Par</th><th>Date</th></tr></thead>
+            <tbody>${d.relectures.map(
+              (r) =>
+                html`<tr><td>${ACTIONS[r.action] ?? r.action}</td><td>${r.revision}</td><td>${
+                  r.nom ?? "Thot"
+                }</td><td>${jour(r.le)}</td></tr>`,
+            )}</tbody>
+          </table>`
+          : html`<p class="discret">Pas encore relu.</p>`
+      }
+    </details>
   `;
 };
-
-export type Pratique = {
-  a: Activite;
-  contenu: Contenu;
-  tentative?: Tentative;
-  relecteur?: string;
-  /** l'aperçu de l'enseignant : la page de l'élève avant sa réponse, formulaire inactif */
-  apercu?: boolean;
-};
-
-/** Le haut de la page élève : retour, objectif, cours, et qui a préparé et relu l'activité. */
-const entete = (a: Activite, relecteur?: string, apercu?: boolean) => {
-  const e = a.type === "explication" ? "e" : "";
-  return html`
-    ${
-      apercu
-        ? html`<p><a href="/prof/activites/${a.id}">Retour à l'activité</a></p>
-          <p class="note">Aperçu de la page élève.${
-            e
-              ? ""
-              : " La réponse attendue, les critères et le retour n'apparaissent qu'après la réponse de l'élève."
-          }</p>`
-        : html`<a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>`
-    }
-    <h1>${a.intitule}</h1>
-    <p class="discret"><a href="/eleve?cours_id=${a.cours_id}">${a.cours}</a>. ${
-      a.audience === "prive"
-        ? `${TYPES[a.type]} généré${e} par Thot à partir de tes documents. Personne d'autre que toi ne l'a relu${e}.`
-        : `${TYPES[a.type]} préparé${e} par ${a.auteur}${relecteur ? `, relu${e} par ${relecteur}` : ""}.`
-    }</p>
-  `;
-};
-
-/**
- * La page de l'élève. Avant une tentative sur la version actuelle, elle ne contient que l'objectif
- * et la consigne : ni réponse attendue, ni critère, ni retour, ni passage cité.
- */
-export const pratique = ({ a, contenu, tentative, relecteur, apercu }: Pratique) => {
-  const coches = tentative ? (JSON.parse(tentative.criteres) as number[]) : [];
-  return html`
-    ${entete(a, relecteur, apercu)}
-    <h2>Consigne</h2>
-    <p>${contenu.consigne.texte}</p>
-    ${
-      !tentative
-        ? html`<form method="post" action="/eleve/activites/${a.id}/tentatives" class="etroit">
-          <div class="champ">
-            <label for="reponse">Ta réponse</label>
-            <p class="aide">Après l'envoi, la réponse attendue et les critères s'affichent pour que tu te corriges.</p>
-            <textarea id="reponse" name="reponse" required maxlength="4000" rows="5" ${apercu ? "disabled" : ""}></textarea>
-          </div>
-          <button class="principal" ${apercu ? "disabled" : ""}>Envoyer ma réponse</button>
-        </form>`
-        : html`<section id="corrige" aria-labelledby="ta-reponse">
-          ${passages(contenu.consigne)}
-          <div class="deux">
-            <div>
-              <h2 id="ta-reponse">Ta réponse</h2>
-              <blockquote class="passage">${tentative.reponse}</blockquote>
-            </div>
-            <div>
-              <h2>Réponse attendue</h2>
-              <p>${contenu.attendu.texte}</p>
-              ${passages(contenu.attendu)}
-            </div>
-          </div>
-          <h2>Critères</h2>
-          <form method="post" action="/eleve/activites/${a.id}/tentatives/${tentative.id}/criteres">
-            <fieldset>
-              <legend>Coche les critères que ta réponse remplit.</legend>
-              ${contenu.criteres.map(
-                (ch, i) =>
-                  html`<label><input type="checkbox" name="criteres" value="${i}" ${
-                    coches.includes(i) ? "checked" : ""
-                  }> ${ch.texte}</label>${passages(ch)}`,
-              )}
-            </fieldset>
-            ${
-              coches.length
-                ? html`<p class="discret">Tu as coché ${coches.length} critère${
-                    coches.length > 1 ? "s" : ""
-                  } sur ${contenu.criteres.length}.</p>`
-                : ""
-            }
-            <button>Enregistrer mon auto-évaluation</button>
-          </form>
-          <h2>Retour</h2>
-          <p>${contenu.retour.texte}</p>
-          ${passages(contenu.retour)}
-        </section>`
-    }
-  `;
-};
-
-/**
- * Une explication se lit comme une réponse : ses blocs, ses numéros de citation, et la feuille du
- * passage cité. Ni tentative ni corrigé.
- */
-export const explication = ({
-  a,
-  contenu,
-  relecteur,
-  apercu,
-}: Omit<Pratique, "contenu" | "tentative"> & { contenu: Explication }) => html`
-  <div class="mur-lecteur" data-feuille>
-    <div>
-      ${entete(a, relecteur, apercu)}
-      ${reponse(
-        a.id,
-        { etat: "answered", affirmations: contenu.affirmations, blocs: contenu.blocs },
-        null,
-        [],
-        false,
-        `/${apercu ? "prof" : "eleve"}/activites/${a.id}/citations`,
-      )}
-    </div>
-    <div class="colonne-source">${panneauSource()}</div>
-  </div>
-`;
-
-/** Les activités publiées de l'élève, dans la page de ses ressources. */
-export const exercices = (liste: Activite[]) =>
-  liste.length
-    ? html`<section aria-labelledby="exercices">
-      <h2 id="exercices">Exercices et explications</h2>
-      <ul>${liste.map(
-        (a) =>
-          html`<li><a href="/eleve/activites/${a.id}">${a.intitule}</a> <span class="discret">${TYPES[a.type]}, ${a.cours}</span></li>`,
-      )}</ul>
-    </section>`
-    : "";

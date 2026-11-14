@@ -172,20 +172,24 @@ questions ». Chaque phrase de la réponse porte la matière de sa source à cô
 réponse nomme une matière sans passage assez proche : « Aucun passage trouvé en Philosophie. »
 
 **Objectif d'apprentissage**
-Ce qu'une personne doit savoir ou savoir faire, dans un cours. Sa « Référence » facultative nomme
-un référentiel ou un programme, une compétence et leur version. Thot ne déduit pas qu'un document
+Ce qu'une personne doit savoir ou savoir faire, dans un cours. Thot ne déduit pas qu'un document
 couvre un objectif.
 
 **Activité**
 Exercice ou explication préparé dans un cours, depuis un objectif et des sources certifiées. La
 bibliothèque les range sous l'onglet « Activités ». « Préparer une activité », le choix du type,
-puis « Rédiger le brouillon ». L'élève trouve les activités publiées dans ses ressources, sous leur
-cours, après « Exercices et explications ».
+puis « Rédiger le brouillon ». « Importer un quiz » crée un exercice depuis un quiz de carnet-quiz.
+« Objectifs » renomme et fusionne les objectifs. Une activité a un titre et peut appartenir à
+plusieurs cours. L'élève trouve les activités publiées dans ses ressources, sous leur cours, après
+« Exercices et explications », et à la fin d'une ressource qu'elles couvrent, sous « S'entraîner ».
 
-**Exercice**
-Exercice à réponse courte : consigne, réponse attendue, critères et retour, chacun avec les
-passages qu'il cite. Un champ dont un passage ne se retrouve pas mot pour mot est un « champ
-rejeté », et la page de l'exercice les compte.
+**Exercice, question**
+Un exercice est une série de questions : « Choix unique », « Choix multiple », « Réponse à taper »
+et « Réponse rédigée ». Une question a une consigne et un retour, parfois un indice, une image et
+« Où chercher ». Un champ que Thot rédige porte les passages qu'il cite. Celui dont un passage ne
+se retrouve pas mot pour mot est un « champ rejeté », et la page de l'exercice les compte. Un champ
+sans passage est « Rédigé par l'enseignant ». « Ajouter une question », « Faire rédiger une
+question par Thot » et « Proposer une autre question » complètent la série.
 
 **Explication d'étude**
 La réponse vérifiée de Thot à l'objectif, posé comme une question dans les sources choisies.
@@ -197,23 +201,27 @@ Avis du juge de soutien sur un champ d'exercice, dans la page de l'enseignant. �
 passages cités n'établissent pas tout ce que dit le champ. « Juge indisponible » : les passages
 sont retrouvés mot pour mot, mais le juge n'a pas répondu. Aucun des deux n'empêche de publier.
 
-**Brouillon, relu, publié, à revoir**
+**Brouillon, relu, publié, à revoir, archivé**
 États d'une activité. Thot rédige un « Brouillon ». « Marquer la version relue » le rend « Relu »,
-« Publier aux élèves du cours » le rend « Publié ». « Enregistrer une nouvelle version » remet un
-exercice en brouillon à relire. « À revoir » : une source citée a une nouvelle version, n'est plus
-citable dans le cours ou a été supprimée, et les élèves ne reçoivent plus l'activité. « Aperçu
-élève » montre la page de l'élève, avant sa réponse pour un exercice. En mode personnel, « Publier
-pour m'entraîner ».
+« Publier aux élèves du cours » le rend « Publié ». Enregistrer une question remet l'exercice en
+brouillon à relire. « À revoir » : une source citée a une nouvelle version, n'est plus citable dans
+un de ses cours ou a été supprimée, et les élèves ne reçoivent plus l'activité. « Chercher les
+passages dans la version actuelle » la remet en brouillon. « Archiver » la retire aux élèves.
+« Aperçu élève » montre la page de l'élève, avant sa réponse pour un exercice. En mode personnel,
+« Publier pour m'entraîner ».
 
-**Réponse attendue, critères, retour**
-Le corrigé d'un exercice. L'élève le lit après avoir envoyé sa réponse, qui s'affiche à côté. Il
-coche les critères que sa réponse remplit puis « Enregistrer mon auto-évaluation ». Thot ne note
-pas la réponse.
+**Corrigé**
+Le réglage « Corrigé » dit quand l'élève voit la correction : « Après chaque question » ou « Après
+la remise de la série ». Dans une série, l'élève clique « Enregistrer » pour garder ses réponses,
+puis « Remettre ». Question par question, une erreur affiche « Pas tout à fait. » et l'indice. Le
+corrigé montre la bonne réponse et le retour. Pour une réponse rédigée, l'élève coche les critères
+que sa réponse remplit puis « Enregistrer mon auto-évaluation ».
 
-**Tentatives, par objectif**
-« Tentatives » : sur la page d'un exercice, les réponses des élèves du cours, avec leur version et
-les « critères cochés ». « Par objectif » : sous la liste des activités, le nombre d'activités
-publiées et de tentatives de chaque objectif. Seuls les enseignants du cours les lisent.
+**Réponses, à reprendre**
+« Réponses » : la page d'un exercice où l'enseignant voit, élève par élève, la dernière tentative et
+les points de chaque question, puis « Réponses rédigées » et « Question par question ». Il note une
+réponse 0, 0,5 ou 1 et la commente. L'élève voit alors « Retour reçu ». « Faire reprendre » marque
+la tentative « À reprendre » et laisse l'élève « Recommencer ». Seuls les enseignants des cours de l'élève lisent ses réponses.
 
 **Ressource non classée**
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.

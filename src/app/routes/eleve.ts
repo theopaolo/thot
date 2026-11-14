@@ -15,7 +15,7 @@ import * as Eleve from "../vues/eleve.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import * as Activites from "../activites.ts";
-import * as ActiviteVue from "../vues/activites.ts";
+import * as PratiqueVue from "../vues/pratique.ts";
 import type { Env, Web } from "./web.ts";
 
 /** Réponses admises au quiz: artiste et mouvement enregistrés, séparés par `|`. */
@@ -101,11 +101,10 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     const generique =
       visibles.every((r) => r.profil === "general") || Object.values(scope(c)).some(Boolean);
     const mention = mentionLecteurs(c);
-    const activites = Activites.activitesEleve(
+    const activites = Activites.avecAvancement(
       db,
       c.get("compte"),
-      scope(c).cours_id,
-      scope(c).matiere_id,
+      Activites.activitesEleve(db, c.get("compte"), scope(c).cours_id, scope(c).matiere_id),
     );
     // La liste rangée par cours met les activités sous leur cours. L'accueil par chapitres, sans
     // titre de cours, les liste après ses chapitres.
@@ -150,7 +149,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           lireInstance(db).mode === "personal",
           mention,
           libelles(db),
-        )}${ActiviteVue.exercices(activites)}`,
+        )}${PratiqueVue.exercices(activites)}`,
         "accueil",
       ),
     );
@@ -279,6 +278,11 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           revision < s.revision,
           // Un cours général se lit de ressource en ressource, dans l'ordre de son thème.
           s.profil === "general" ? sourcesDuTheme(lu(c), s.theme_id) : [],
+          Activites.avecAvancement(
+            db,
+            c.get("compte"),
+            Activites.activitesEleve(db, c.get("compte")).filter((a) => Activites.couvre(a, s.id)),
+          ),
         ),
         "lecture",
       ),
