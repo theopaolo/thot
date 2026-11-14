@@ -389,6 +389,7 @@ export const sources = (
           `;
         })}
       </nav>
+      ${parStatut("a_relire") > 0 ? html`<a href="/prof/relecture">Relire une par une</a>` : ""}
       <nav class="segments" aria-label="Affichage">
         ${(
           [

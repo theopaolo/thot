@@ -177,6 +177,7 @@ const rail = (
           "file-text",
           chemin === "/prof" ||
             chemin.startsWith("/prof/sources") ||
+            chemin.startsWith("/prof/relecture") ||
             chemin.startsWith("/prof/activites"),
         )}
         ${lienNav("/prof/depot", "Déposer", "upload-simple", chemin.startsWith("/prof/depot"))}

@@ -12,6 +12,7 @@ import { routesActivites } from "./routes/activites.ts";
 import { routesPratique } from "./routes/pratique.ts";
 import { routesPreparation } from "./routes/preparation.ts";
 import { routesReponses } from "./routes/reponses.ts";
+import { routesRelecture } from "./routes/relecture.ts";
 import { routesChat } from "./routes/chat.ts";
 import { routesComptes } from "./routes/comptes.ts";
 import { routesDomaines } from "./routes/domaines.ts";
@@ -53,6 +54,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   routesProf(app, w);
   routesProfEleves(app, w);
   routesDepot(app, w);
+  routesRelecture(app, w);
   // Une question porte au plus une image déposée, le quiz importé pèse moins.
   app.use(
     "/prof/activites/*",
