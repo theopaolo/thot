@@ -131,6 +131,12 @@ après l'autre et liste le sort de chacun. Les champs communs (matière, cours, 
 pour tout le lot. Le titre vient du fichier (front matter pour le Markdown, sinon le nom sans
 extension), le nom saisi au formulaire ne vaut que pour un fichier seul.
 
+Le formulaire avance par étapes : fichiers, cours, lecteurs, puis informations facultatives. Il
+range le lot dans un seul cours, et la source prend la matière de ce cours. D'autres cours
+s'ajoutent sur la page de la ressource. Un administrateur crée le cours, et au besoin sa matière,
+depuis l'étape du cours. Chaque requête du lot porte les mêmes noms : la première crée la matière
+et le cours, les suivantes les retrouvent par leur nom.
+
 - Un lot (`sources.lot_id`) groupe les fichiers d'un même formulaire. La bibliothèque le filtre
   par `/prof?lot=`. Le serveur refuse le fichier qui ferait dépasser `MAX_LOT` sources au lot, et
   chaque fichier de plus de `MAX_OCTETS`.

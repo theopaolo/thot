@@ -137,6 +137,44 @@ export function cours(db: Db, matiereId: string, nom: string, publicCible = "", 
   );
   return id;
 }
+/**
+ * Le cours que le dépôt crée, dans une matière existante ou créée avec lui. Un dépôt web envoie
+ * une requête par fichier : la suivante retrouve la matière et le cours du même nom.
+ */
+export function coursDuDepot(
+  db: Db,
+  compte: { administrateur: number },
+  v: {
+    nouveau_matiere?: string;
+    nouvelle_matiere?: string;
+    nouveau_cours?: string;
+    profil?: string;
+  },
+) {
+  if (compte.administrateur !== 1) throw new Error("Seul un administrateur crée un cours.");
+  const nomCours = (v.nouveau_cours ?? "").trim();
+  if (!nomCours) throw new Error("Nommez le cours à créer.");
+  return transaction(db, () => {
+    let matiereId = v.nouveau_matiere ?? "";
+    if (matiereId === "nouvelle") {
+      const nom = (v.nouvelle_matiere ?? "").trim();
+      if (!nom) throw new Error("Nommez la matière à créer.");
+      matiereId =
+        (db.prepare("SELECT id FROM matieres WHERE nom = ?").get(nom)?.id as string) ??
+        matiere(db, nom, v.profil || undefined);
+    } else if (!db.prepare("SELECT 1 FROM matieres WHERE id = ?").get(matiereId)) {
+      throw new Error("Matière inconnue.");
+    }
+    return (
+      (db.prepare("SELECT id FROM cours WHERE matiere_id = ? AND nom = ?").get(matiereId, nomCours)
+        ?.id as string) ?? cours(db, matiereId, nomCours)
+    );
+  });
+}
+export const matiereDuCours = (db: Db, coursId: string) =>
+  db.prepare("SELECT matiere_id FROM cours WHERE id = ?").get(coursId)?.matiere_id as
+    | string
+    | undefined;
 export function theme(db: Db, coursId: string, nom: string) {
   const id = crypto.randomUUID();
   db.prepare("INSERT INTO themes VALUES (?, ?, ?)").run(id, coursId, texte(nom));

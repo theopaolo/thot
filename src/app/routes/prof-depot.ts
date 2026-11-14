@@ -19,11 +19,7 @@ import type { Env, Web } from "./web.ts";
 
 export function routesDepot(app: Hono<Env>, w: Web) {
   const { db, instance, rendre } = w;
-  const optionsDepot = (
-    c: Context<Env>,
-    champs: Record<string, string> = {},
-    b: Record<string, unknown> = {},
-  ) => {
+  const optionsDepot = (c: Context<Env>, champs: Record<string, string> = {}) => {
     const cat = Domaines.catalogueDe(db, c.get("compte"));
     // Une seule matière: le dépôt la prend d'office. « Non classée » reste un choix explicite.
     if (cat.matieres.length === 1 && champs.matiere_id === undefined && !champs.matiere) {
@@ -40,19 +36,20 @@ export function routesDepot(app: Hono<Env>, w: Web) {
     const instance = lireInstance(db);
     return {
       personnel: instance.mode === "personal",
+      administrateur: c.get("compte").administrateur === 1,
+      sansProfil: !Domaines.profilInstance(db),
       champs,
       catalogue: cat,
       profil,
       informations: Domaines.champsMatiere(db, m?.id ?? null, profil),
       libelles: libelles(db),
       lecteurs: instance.lecteurs,
-      liens: Domaines.liensFormulaire(b),
       lot: crypto.randomUUID(),
     };
   };
   // `?cours=` coche ce cours, comme le lien « Déposer dans ce cours » de l'administration.
   app.get("/prof/depot", (c) =>
-    c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query(), c.req.query())))),
+    c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query())))),
   );
   const parCle = (compte: Compte, cle: string) =>
     db
@@ -152,6 +149,27 @@ export function routesDepot(app: Hono<Env>, w: Web) {
         ),
       ) as Record<string, string>;
       const lot = jeton(b.lot) ?? crypto.randomUUID();
+      const json = c.req.header("accept")?.includes("application/json");
+      // Le cours créé à l'étape du cours, puis la matière de ce cours : la source la prend.
+      try {
+        if (b.cours === "nouveau") {
+          b.cours = Domaines.coursDuDepot(db, c.get("compte"), champs);
+          champs.cours = b.cours;
+        }
+        if (typeof b.cours === "string" && b.cours) {
+          const m = Domaines.matiereDuCours(db, b.cours);
+          if (m) champs.matiere_id = m;
+        }
+      } catch (e) {
+        const erreurs = { cours: (e as Error).message };
+        if (json) {
+          return c.json({ etat: "erreur", nom: fichiers[0]?.name ?? "", erreurs }, 400);
+        }
+        return c.html(
+          rendre(c, "Déposer", Prof.depot({ ...optionsDepot(c, champs), erreurs })),
+          400,
+        );
+      }
       const resultats: Prof.ResultatDepot[] = [];
       for (const [i, f] of (fichiers.length ? fichiers : [undefined]).entries()) {
         resultats.push(
@@ -166,7 +184,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
           ),
         );
       }
-      if (c.req.header("accept")?.includes("application/json")) {
+      if (json) {
         return c.json(resultats[0], resultats[0].etat === "erreur" ? 400 : 200);
       }
       if (fichiers.length <= 1 && resultats[0].etat === "erreur") {
@@ -174,7 +192,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
           rendre(
             c,
             "Déposer",
-            Prof.depot({ ...optionsDepot(c, champs, b), erreurs: resultats[0].erreurs }),
+            Prof.depot({ ...optionsDepot(c, champs), erreurs: resultats[0].erreurs }),
           ),
           400,
         );

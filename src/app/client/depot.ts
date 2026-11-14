@@ -179,7 +179,92 @@ async function envoyer(form: HTMLFormElement) {
   envoi.disabled = false;
 }
 
+/**
+ * Une étape du dépôt à la fois. « Continuer » vérifie d'abord les champs visibles de l'étape :
+ * un champ `data-requis` caché par CSS (le nouveau cours non choisi) ne bloque rien. Après un
+ * renvoi du serveur, l'étape qui porte une erreur s'ouvre la première.
+ */
+function pasAPas(form: HTMLFormElement) {
+  const etapes = [...form.querySelectorAll<HTMLElement>("[data-etape]")];
+  const indicateur = form.querySelectorAll<HTMLElement>("[data-indicateur] li");
+  if (!etapes.length || form.classList.contains("pas-a-pas")) return;
+  form.classList.add("pas-a-pas");
+  form.querySelector<HTMLElement>("[data-indicateur]")!.hidden = false;
+  const liste = form.querySelector<HTMLElement>("[data-lot-liste]")!;
+  // La liste des fichiers suit la première étape, qui les choisit, et ouvre la dernière, qui les
+  // dépose.
+  const montrer = (i: number, focus: boolean) => {
+    etapes.forEach((e, j) => (e.hidden = j !== i));
+    if (i === etapes.length - 1) etapes[i].querySelector("[data-recap]")?.after(liste);
+    else etapes[i].querySelector(".navigation-etape")?.before(liste);
+    liste.classList.toggle("ailleurs", i !== 0 && i !== etapes.length - 1);
+    if (i === etapes.length - 1) recapituler(form);
+    indicateur.forEach((li, j) => {
+      if (j === i) li.setAttribute("aria-current", "step");
+      else li.removeAttribute("aria-current");
+      li.classList.toggle("faite", j < i);
+    });
+    if (focus) etapes[i].querySelector<HTMLElement>("h2")?.focus();
+  };
+  const valide = (etape: HTMLElement) => {
+    for (const champ of etape.querySelectorAll<HTMLInputElement>("input, select, textarea")) {
+      if (champ.type === "hidden" || !champ.checkVisibility()) continue;
+      champ.setCustomValidity(
+        champ.hasAttribute("data-requis") && !champ.value.trim() ? "Champ obligatoire." : "",
+      );
+      if (!champ.reportValidity()) return false;
+    }
+    return true;
+  };
+  const erreur = etapes.findIndex((e) => e.querySelector(".erreur, [role=alert]"));
+  let actuelle = Math.max(0, erreur);
+  montrer(actuelle, false);
+  form.addEventListener("click", (event) => {
+    const cible = event.target instanceof Element && event.target.closest("button");
+    if (!cible) return;
+    if (cible.matches("[data-suivant]") && valide(etapes[actuelle])) {
+      montrer(++actuelle, true);
+    } else if (cible.matches("[data-precedent]")) montrer(--actuelle, true);
+  });
+  // Un champ invalide d'une étape cachée bloque l'envoi : son étape s'ouvre.
+  form.addEventListener(
+    "invalid",
+    (event) => {
+      const i = etapes.findIndex((e) => e.contains(event.target as Node));
+      if (i >= 0 && i !== actuelle) montrer((actuelle = i), false);
+    },
+    true,
+  );
+}
+
+/** La dernière étape rappelle le cours choisi, ou celui que le dépôt va créer. */
+function recapituler(form: HTMLFormElement) {
+  const recap = form.querySelector<HTMLElement>("[data-recap]");
+  const choix = form.querySelector<HTMLInputElement>("input[name=cours]:checked");
+  if (!recap || !choix) return;
+  const valeur = (nom: string) =>
+    form.querySelector<HTMLInputElement | HTMLSelectElement>(`[name=${nom}]`);
+  const matiere = valeur("nouveau_matiere");
+  const nomMatiere =
+    matiere?.value === "nouvelle"
+      ? valeur("nouvelle_matiere")?.value
+      : matiere instanceof HTMLSelectElement
+        ? matiere.selectedOptions[0]?.text
+        : "";
+  recap.textContent =
+    choix.value === "nouveau"
+      ? `Dans : ${nomMatiere} / ${valeur("nouveau_cours")?.value.trim()}, créé avec le dépôt.`
+      : `Dans : ${choix.dataset.chemin}.`;
+  recap.hidden = false;
+}
+
 export function installerDepot() {
+  document.addEventListener("htmx:load", (event) => {
+    if (event.target instanceof Element) {
+      event.target.querySelectorAll<HTMLFormElement>("form[data-depot]").forEach(pasAPas);
+    }
+  });
+
   document.addEventListener("change", (event) => {
     const champ = event.target;
     const form = champ instanceof HTMLInputElement && champ.form;

@@ -765,9 +765,13 @@ th {
   font-size: 0.875rem;
   font-weight: 700;
 }
-input[type="checkbox"] {
+/* Sans marge : la case s'aligne sur le texte au-dessus d'elle. */
+input[type="checkbox"],
+input[type="radio"] {
   width: 20px;
   height: 20px;
+  margin: 0;
+  flex: none;
   accent-color: var(--ink);
 }
 
@@ -2793,14 +2797,24 @@ details.cours > summary {
 details.cours > summary .discret {
   flex: 1;
 }
+details.ajout .reglages > fieldset > legend {
+  font-size: 0.9375rem;
+}
+section.matiere > details.cours:last-child {
+  border-bottom: 0;
+}
 details.cours[open] {
   padding-bottom: var(--s4);
 }
-.cours-corps {
-  padding-left: var(--s4);
-  border-left: 2px solid var(--surface-tinted);
+.matiere-tete .espace {
+  margin-left: auto;
 }
-.cours-corps h3 {
+.matiere-tete > button .icone {
+  width: 1em;
+  height: 1em;
+}
+.cours-corps h3,
+details.ajout h3 {
   margin-top: var(--s4);
   font-size: 1rem;
 }
@@ -2844,4 +2858,83 @@ h2.reglages-communs {
   margin-right: var(--s1);
   color: var(--certified);
   vertical-align: -0.2em;
+}
+
+/* ------------------------------------------------------------------- dépôt en étapes */
+.etapes-depot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  margin: 0 0 var(--s5);
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+  counter-reset: etape;
+}
+.etapes-depot li {
+  padding: var(--s2) 0 var(--s3);
+  color: var(--ink-muted);
+  font-weight: 700;
+  counter-increment: etape;
+}
+.etapes-depot li::before {
+  content: counter(etape) ". ";
+}
+.etapes-depot li[aria-current] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.etape-depot {
+  margin-bottom: var(--s6);
+}
+.etape-depot h2:focus {
+  outline: none;
+}
+.navigation-etape {
+  margin-top: var(--s5);
+}
+form:not(.pas-a-pas) :is([data-suivant], [data-precedent]) {
+  display: none;
+}
+/* Avec JavaScript, le tableau des fichiers porte le titre de chacun. */
+.pas-a-pas .champ:has(#titre) {
+  display: none;
+}
+.matiere-depot {
+  margin: var(--s4) 0 var(--s1);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.rangement {
+  margin: 0;
+}
+.nouveau-cours {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.nouveau-cours > label .icone {
+  width: 1em;
+  height: 1em;
+}
+.nouveau-cours-champs {
+  margin: var(--s2) 0 0 calc(20px + var(--s2));
+}
+.nouveau-cours-champs label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+  margin-bottom: var(--s3);
+  font-weight: 700;
+}
+.nouveau-cours:not(:has(> label input:checked)) .nouveau-cours-champs,
+.nouveau-cours:not(:has(option[value="nouvelle"]:checked)) .nouvelle-matiere.selon-choix {
+  display: none;
+}
+[data-lot-liste].ailleurs {
+  display: none;
+}
+[data-lot-liste] h2 {
+  font-size: 1.125rem;
 }

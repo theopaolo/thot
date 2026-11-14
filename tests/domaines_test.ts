@@ -397,6 +397,27 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     assertEquals(readdirSync(join(dir, "content"), { withFileTypes: true }).length, 1);
     assertEquals((await eleve.requete("/administration/domaines")).status, 403);
     assertEquals((await prof.requete("/administration/domaines")).status, 403);
+    // Le dépôt crée le cours et sa matière. Deux fichiers d'un lot rangent dans le même cours.
+    const deposerDansNouveau = (nom: string, texte: string) => {
+      const f = new FormData();
+      for (const [k, v] of Object.entries({
+        type_document: "cours",
+        cours: "nouveau",
+        nouveau_matiere: "nouvelle",
+        nouvelle_matiere: "Acoustique",
+        nouveau_cours: "Ondes",
+      }))
+        f.set(k, v);
+      f.set("fichier", new File([`<p>${texte}</p>`], nom));
+      return prof.requete("/prof/depot", {
+        method: "POST",
+        body: f,
+        headers: { accept: "application/json" },
+      });
+    };
+    const refuse = await deposerDansNouveau("onde.html", "Une onde transporte de l'énergie.");
+    assertEquals(refuse.status, 400);
+    assertStringIncludes(await refuse.text(), "Seul un administrateur crée un cours.");
     const compte = db.prepare("SELECT id FROM comptes WHERE role = 'enseignant'").get()!.id;
     db.prepare("UPDATE comptes SET administrateur = 1 WHERE id = ?").run(compte!);
     assertEquals((await prof.requete("/administration/domaines")).status, 200);
@@ -427,10 +448,27 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const etape3 = await (await prof.requete(nouveau.headers.get("location")!)).text();
     assertStringIncludes(etape3, `<details class="cours" id="cours-${mixage}" open>`);
     assertStringIncludes(etape3, "Étape 3 sur 3 : ajoutez ses membres");
+    for (const [nom, texte] of [
+      ["onde.html", "Une onde transporte de l'énergie."],
+      ["son.html", "Le son est une onde mécanique."],
+    ]) {
+      assertEquals((await deposerDansNouveau(nom, texte)).status, 200);
+    }
+    assertEquals(db.prepare("SELECT count(*) n FROM cours WHERE nom = 'Ondes'").get()!.n, 1);
+    assertEquals(
+      db
+        .prepare(
+          `SELECT count(*) n FROM sources s JOIN source_cours sc ON sc.source_id = s.id
+           JOIN cours c ON c.id = sc.cours_id JOIN matieres m ON m.id = s.matiere_id
+           WHERE c.nom = 'Ondes' AND m.nom = 'Acoustique' AND c.matiere_id = m.id`,
+        )
+        .get()!.n,
+      2,
+    );
     // Le lien « Déposer dans ce cours » coche ce cours au dépôt.
     assertStringIncludes(
       await (await prof.requete(`/prof/depot?matiere_id=${reaper}&cours=${mixage}`)).text(),
-      `value="${mixage}" checked`,
+      `value="${mixage}" required checked`,
     );
     assertEquals(
       (
@@ -1583,9 +1621,9 @@ test("champs du dépôt : « Norme » se coche par matière, se valide, se masqu
     const enregistre = await champs("1", "auteur", norme);
     assertEquals(enregistre.status, 303);
     const page = await (await admin.requete(enregistre.headers.get("location")!)).text();
-    assertStringIncludes(page, `<details id="champs-${elec}" open>`);
+    assertStringIncludes(page, `<details class="ajout" id="champs-${elec}" open>`);
     assertStringIncludes(page, "Réglages enregistrés.");
-    assertStringIncludes(page, "Champs du dépôt : 2");
+    assertStringIncludes(page, "Informations demandées au dépôt : 2");
     assertStringIncludes(page, "Texte, 1 matière, 0 ressource");
 
     // Une version périmée n'enregistre rien et rend la saisie avec la version actuelle.
@@ -1742,7 +1780,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
       [admin, "/administration/domaines", "<h3>Modules</h3>"],
       [admin, "/administration/domaines", "Chapitre à créer"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
-      [admin, "/prof/depot", "<strong>Chapitres de rattachement</strong>"],
+      [admin, "/prof/depot", "<li>Chapitre</li>"],
       [admin, "/prof", '<span class="discret">Chapitre</span>'],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
