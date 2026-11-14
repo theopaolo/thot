@@ -21,7 +21,10 @@ export const page = (
   railReplie = false,
   instance: Pick<Instance, "nom" | "mode"> = { nom: "Thot", mode: "shared" },
 ) => {
-  const prof = chemin.startsWith("/prof");
+  // L'administration garde le menu de l'enseignant : on y passe sans changer d'espace.
+  const prof =
+    chemin.startsWith("/prof") ||
+    (chemin.startsWith("/administration") && compte?.role === "enseignant");
   return html`
     <!DOCTYPE html>
     <html lang="fr">
@@ -191,7 +194,12 @@ const rail = (
         }
         ${
           c.administrateur
-            ? lienNav("/administration", "Administration", "sidebar-simple", false, false)
+            ? lienNav(
+                "/administration",
+                "Administration",
+                "sidebar-simple",
+                chemin.startsWith("/administration"),
+              )
             : ""
         }
       </nav>

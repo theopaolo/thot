@@ -57,8 +57,9 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     const chapitres: Eleve.ChapitreVue[] = [];
     const rattachements = db
       .prepare(
-        `SELECT sc.*, c.nom AS cours, t.nom AS theme FROM source_cours sc
-      JOIN cours c ON c.id = sc.cours_id LEFT JOIN themes t ON t.id = sc.theme_id
+        `SELECT sc.*, c.nom AS cours, t.nom AS theme, c.matiere_id, m.nom AS matiere
+      FROM source_cours sc JOIN cours c ON c.id = sc.cours_id
+      JOIN matieres m ON m.id = c.matiere_id LEFT JOIN themes t ON t.id = sc.theme_id
       WHERE ${Domaines.MES_COURS}`,
       )
       .all(Domaines.mesCours(lu(c)));
@@ -79,16 +80,21 @@ export function routesEleve(app: Hono<Env>, w: Web) {
             sources: [],
             questions: [],
             cours: lien?.cours as string | undefined,
+            matiereId: lien?.matiere_id as string | undefined,
+            matiere: lien?.matiere as string | undefined,
           };
           chapitres.push(ch);
         }
         ch.sources.push(r);
       }
     }
-    // Par cours, les sources hors cours en dernier. Dans un cours, celles sans thème d'abord.
+    // Par matière puis par cours, les sources hors cours en dernier. Dans un cours, celles sans
+    // thème d'abord.
     chapitres.sort(
       (a, b) =>
         Number(!a.cours) - Number(!b.cours) ||
+        (a.matiere ?? "").localeCompare(b.matiere ?? "", "fr") ||
+        (a.matiereId ?? "").localeCompare(b.matiereId ?? "") ||
         (a.cours ?? "").localeCompare(b.cours ?? "", "fr") ||
         (a.coursId ?? "").localeCompare(b.coursId ?? "") ||
         a.nom.localeCompare(b.nom, "fr", { numeric: true }),
@@ -113,7 +119,12 @@ export function routesEleve(app: Hono<Env>, w: Web) {
         rendre(
           c,
           "Ressources",
-          html`<h1>Ressources</h1>${filtresDomaines}
+          html`<h1>Ressources</h1>
+          <p class="sous-titre">${
+            lireInstance(db).mode === "personal"
+              ? "Tes ressources certifiées. Thot répond à tes questions en citant uniquement ces ressources."
+              : "Les ressources publiées par tes enseignants. Thot répond à tes questions en citant uniquement ces ressources."
+          }</p>${filtresDomaines}
           <form method="post" action="/eleve/questions" class="question-rapide">
             ${DomaineVue.champsScope(scope(c))}${Eleve.cleEnvoi()}
             <label for="texte">Une question dans ce périmètre ?</label>

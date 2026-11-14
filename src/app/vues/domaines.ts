@@ -21,17 +21,20 @@ export const selectionProfil = (valeur = "general") =>
     ([id, p]) => html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`,
   )}</select></label>`;
 const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème", champ: "champ" };
+/** `ouvert` : le cours que la page rouvre après l'envoi. */
 const ligne = (
   genre: keyof typeof LIBELLES,
   id: string,
   nom: string,
   contexte = "",
   terme = LIBELLES[genre],
+  ouvert = "",
 ) => {
   const libelle = `Nom (${terme})`;
   return html`
     <form method="post" action="/administration/domaines/renommer" class="barre">
       <input type="hidden" name="genre" value="${genre}"><input type="hidden" name="id" value="${id}">
+      ${ouvert ? html`<input type="hidden" name="ouvert" value="${ouvert}">` : ""}
       <input type="text" name="nom" value="${nom}" required maxlength="${
         genre === "champ" ? 60 : 200
       }" aria-label="${libelle}">
@@ -42,9 +45,20 @@ const ligne = (
   `;
 };
 export type Inscrit = { id: string; identifiant: string; nom: string; role: string };
-export type Inscriptions = { membres: Map<string, Inscrit[]>; comptes: Inscrit[]; ouvert: string };
+/**
+ * `ouvert` : le cours ou la matière que la page déplie. `etape` : l'étape suivante de la création
+ * guidée, après une matière (`cours`) ou après un cours (`membres`). `ressources` : le nombre de
+ * ressources rattachées à chaque cours.
+ */
+export type Inscriptions = {
+  membres: Map<string, Inscrit[]>;
+  comptes: Inscrit[];
+  ouvert: string;
+  etape?: "cours" | "membres";
+  ressources?: Map<string, number>;
+};
 const ROLES: Record<string, string> = { enseignant: "enseignant", eleve: "élève" };
-const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouvert: boolean) => {
+const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[]) => {
   const dehors = comptes.filter((a) => !inscrits.some((m) => m.id === a.id));
   const groupe = (role: string, libelle: string) => {
     const liste = dehors.filter((a) => a.role === role);
@@ -55,8 +69,7 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouver
       : "";
   };
   return html`
-    <details id="membres-${c.id}" ${ouvert ? "open" : ""}>
-      <summary>Membres : ${inscrits.length}</summary>
+      <h3>Membres : ${inscrits.length}</h3>
       ${
         inscrits.length
           ? html`
@@ -79,7 +92,8 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouver
             )}</tbody>
           </table>
         `
-          : html`<p class="discret">Aucun membre.</p>`
+          : html`<p class="discret">Aucun membre. Les élèves membres lisent les ressources
+            publiées du cours et y posent leurs questions.</p>`
       }
       ${
         dehors.length
@@ -97,7 +111,8 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[], ouver
         `
           : ""
       }
-    </details>
+      <p class="aide">Un enseignant du cours crée aussi ses élèves, ou partage un lien
+      d'inscription, depuis la page <a href="/prof/eleves">Élèves</a>.</p>
   `;
 };
 /**
@@ -159,6 +174,98 @@ const champsDuDepot = (m: Matiere, d: ChampsDepot, ouvert: boolean) => {
     </details>
   `;
 };
+/** Le formulaire d'un nouveau cours. Sans `matiereId`, il demande la matière. */
+const formCours = (cat: Catalogue, l: Libelles, matiereId = "", focus = false, fin: unknown = "") =>
+  html`
+    <form method="post" action="/administration/domaines/cours" class="etroit">
+      ${
+        matiereId
+          ? html`<input type="hidden" name="matiere_id" value="${matiereId}">`
+          : html`<label>${l.matiere} <select name="matiere_id" required>${options(
+              cat.matieres,
+            )}</select></label>`
+      }
+      <label>${l.cours} à créer <input type="text" name="nom" required maxlength="200" ${
+        focus ? "autofocus" : ""
+      } ${focus && matiereId ? html`aria-describedby="etape-${matiereId}"` : ""}></label>
+      <label>${l.niveau} (facultatif) <input type="text" name="public" maxlength="200"></label>
+      <label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label>
+      <div class="barre"><button class="principal">Créer et continuer</button>${fin}</div>
+    </form>
+  `;
+
+/**
+ * Une action rapide : un bouton ouvre son formulaire dans un panneau, sans script. `corps` reçoit
+ * le bouton qui referme le panneau.
+ */
+const actionRapide = (
+  id: string,
+  terme: string,
+  etape: string,
+  corps: (annuler: unknown) => unknown,
+) =>
+  html`
+    <button type="button" popovertarget="${id}">${icone("plus")}<span><span
+      class="visuellement-cache">Ajouter : </span>${terme}</span></button>
+    <div id="${id}" popover class="panneau" role="dialog" aria-label="Ajouter : ${terme}">
+      <p class="discret">${etape}</p>
+      ${corps(
+        html`<button type="button" popovertarget="${id}" popovertargetaction="hide">Annuler</button>`,
+      )}
+    </div>
+  `;
+
+/**
+ * Un cours déplié montre son nom, ses membres, ses thèmes et ses liens vers le dépôt et la
+ * bibliothèque. Le mode personnel n'a qu'un compte : il n'affiche pas les membres.
+ */
+const blocCours = (c: Cours, cat: Catalogue, i: Inscriptions, l: Libelles, personnel: boolean) => {
+  const inscrits = i.membres.get(c.id) ?? [];
+  const themes = cat.themes.filter((t) => t.cours_id === c.id);
+  const ouvert = i.ouvert === c.id;
+  const resume = [
+    c.public,
+    personnel ? "" : pluriel(inscrits.length, "membre"),
+    pluriel(i.ressources?.get(c.id) ?? 0, "ressource"),
+    themes.length ? nombre(themes.length, l.regroupement, l.regroupements) : "",
+  ].filter(Boolean);
+  return html`
+    <details class="cours" id="cours-${c.id}" ${ouvert ? "open" : ""}>
+      <summary><strong>${c.nom}</strong> <span class="discret">${resume.join(", ")}</span></summary>
+      <div class="cours-corps">
+        ${
+          ouvert && i.etape === "membres"
+            ? html`<p role="status" tabindex="-1" autofocus>Étape 3 sur 3 : ${
+                personnel ? "ajoutez ses ressources" : "ajoutez ses membres, puis ses ressources"
+              } avec « Déposer dans ce cours ».</p>`
+            : ""
+        }
+        ${c.objectif ? html`<p>${c.objectif}</p>` : ""}
+        ${ligne("cours", c.id, c.nom, "", l.cours, c.id)}
+        ${personnel ? "" : membresDuCours(c, inscrits, i.comptes)}
+        <h3>${l.regroupements}</h3>
+        ${
+          themes.length
+            ? themes.map((t) => ligne("theme", t.id, t.nom, "", l.regroupement, c.id))
+            : html`<p class="discret">Aucun. Les ressources se rangent directement dans le cours.</p>`
+        }
+        <form method="post" action="/administration/domaines/theme" class="barre">
+          <input type="hidden" name="cours_id" value="${c.id}"><input type="hidden" name="ouvert" value="${c.id}">
+          <input type="text" name="nom" required maxlength="200" aria-label="${l.regroupement} à créer dans ${c.nom}"
+            placeholder="${l.regroupement} à créer">
+          <button>Ajouter</button>
+        </form>
+        <div class="barre">
+          <a class="bouton" href="/prof/depot?matiere_id=${c.matiere_id}&cours=${c.id}">${icone(
+            "upload-simple",
+          )}Déposer dans ce cours</a>
+          <a href="/prof?cours_id=${c.id}">Voir ses ressources</a>
+        </div>
+      </div>
+    </details>
+  `;
+};
+
 export const gestion = (
   cat: Catalogue,
   erreur: string,
@@ -166,6 +273,7 @@ export const gestion = (
   inscriptions: Inscriptions,
   champs: ChampsDepot,
   l: Libelles,
+  personnel = false,
 ) => {
   const profil = cat.matieres[0]?.profil;
   const controleProfil = !profil
@@ -181,71 +289,90 @@ export const gestion = (
         )}<button data-confirmer="Changer le profil ? Les termes et les champs jamais modifiés prennent les valeurs du profil choisi.">Changer le profil de l'instance</button></form>
     `;
   const personnalises = champs.catalogue.filter((c) => !Object.hasOwn(CHAMPS, c.cle));
+  const { ouvert, etape } = inscriptions;
+  const nouvelle = etape === "cours" ? cat.matieres.find((m) => m.id === ouvert) : undefined;
+  const formMatiere = (annuler: unknown) => html`
+    <form method="post" action="/administration/domaines/matiere" class="etroit">
+      <label>${l.matiere} à créer <input type="text" name="nom" required maxlength="200" ${
+        etape ? "" : "autofocus"
+      }></label>
+      ${profil ? "" : selectionProfil()}
+      <div class="barre"><button class="principal">Créer et continuer</button>${annuler}</div>
+    </form>
+  `;
   return html`
     <h1>Administration</h1>
     ${ongletsAdministration("/administration/domaines", l)}
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+    <p class="sous-titre">Les ressources se rangent sur trois niveaux : ${l.matiere}, puis ${minuscule(
+      l.cours,
+    )}, puis ${minuscule(l.regroupement)}. ${
+      personnel
+        ? "Choisir un cours dans la vue élève limite vos questions à ses ressources."
+        : "Les élèves membres d'un cours lisent ses ressources publiées et y posent leurs questions."
+    }</p>
+    <div class="barre actions-rapides">
+      ${actionRapide(
+        "ajout-matiere",
+        l.matiere,
+        personnel
+          ? "Étape 1 sur 3. Les étapes suivantes créent son premier cours, puis y ajoutent des ressources."
+          : "Étape 1 sur 3. Les étapes suivantes créent son premier cours, puis y ajoutent membres et ressources.",
+        formMatiere,
+      )}
+      ${
+        cat.matieres.length
+          ? actionRapide(
+              "ajout-cours",
+              l.cours,
+              personnel
+                ? "L'étape suivante y ajoute des ressources."
+                : "Les étapes suivantes y ajoutent membres et ressources.",
+              (annuler) => formCours(cat, l, "", !etape, annuler),
+            )
+          : ""
+      }
+    </div>
+    ${
+      cat.matieres.length
+        ? ""
+        : html`<p>Aucune matière pour l'instant. Commencez par en créer une avec le bouton
+          ci-dessus : elle regroupera vos cours.</p>`
+    }
+    ${cat.matieres.map((m) => {
+      const cours = cat.cours.filter((c) => c.matiere_id === m.id);
+      return html`
+        <section class="matiere" id="matiere-${m.id}" aria-labelledby="titre-${m.id}">
+          <div class="matiere-tete">
+            <h2 id="titre-${m.id}">${m.nom}</h2>
+            <span class="discret">${nombre(cours.length, l.cours, l.cours_pluriel)}</span>
+          </div>
+          ${
+            nouvelle?.id === m.id
+              ? html`<p role="status" id="etape-${m.id}">Étape 2 sur 3 : créez le premier cours de
+                « ${m.nom} ».</p>`
+              : ""
+          }
+          ${cours.map((c) => blocCours(c, cat, inscriptions, l, personnel))}
+          <details class="ajout" id="ajout-cours-${m.id}" ${nouvelle?.id === m.id ? "open" : ""}>
+            <summary>${icone("plus")}${l.cours} dans ${m.nom}</summary>
+            ${formCours(cat, l, m.id, nouvelle?.id === m.id)}
+          </details>
+          <details class="ajout">
+            <summary>Renommer ou supprimer</summary>
+            ${ligne("matiere", m.id, m.nom, "", l.matiere)}
+            <p class="aide">Renommer garde les rattachements. Supprimer est refusé tant qu'une
+            ressource ou une question d'élève l'utilise.</p>
+          </details>
+          ${champsDuDepot(m, champs, ouvert === m.id && etape === undefined)}
+        </section>
+      `;
+    })}
+    <h2 class="reglages-communs">Réglages communs</h2>
     <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     ${controleProfil}
-    <p>Renommer garde les rattachements. Supprimer est refusé tant qu'une ressource ou une question
-    d'élève utilise l'entrée. Une matière ou un cours emporte tout ce qu'il contient.</p>
-    <h2>${l.matieres}</h2>
-    ${cat.matieres.map(
-      (m) =>
-        html`${ligne("matiere", m.id, m.nom, "", l.matiere)}${champsDuDepot(
-          m,
-          champs,
-          inscriptions.ouvert === m.id,
-        )}`,
-    )}
-    <form method="post" action="/administration/domaines/matiere"
-      class="etroit"><label>${l.matiere} à créer <input type="text" name="nom" required maxlength="200"></label>${
-        profil ? "" : selectionProfil()
-      }<button>Créer</button></form>
-    <h2>${l.cours_pluriel}</h2>
-    <p>Un nouveau cours démarre sans membre, et seuls ses membres, les administrateurs et les
-    propriétaires lisent les ressources qu'il partage.</p>${cat.cours.map(
-      (c) =>
-        html`${ligne(
-          "cours",
-          c.id,
-          c.nom,
-          `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${
-            c.public ? `, ${c.public}` : ""
-          }${c.objectif ? ` : ${c.objectif}` : ""}`,
-          l.cours,
-        )}${membresDuCours(
-          c,
-          inscriptions.membres.get(c.id) ?? [],
-          inscriptions.comptes,
-          inscriptions.ouvert === c.id,
-        )}`,
-    )}
-    <form method="post" action="/administration/domaines/cours"
-      class="etroit"><label>${l.matiere} <select name="matiere_id" required>${options(
-        cat.matieres,
-      )}</select></label><label>${l.cours} à créer <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer</button></form>
-    <h2>${l.regroupements}</h2>${cat.themes.map((t) =>
-      ligne(
-        "theme",
-        t.id,
-        t.nom,
-        `${
-          cat.matieres.find((m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id)
-            ?.nom
-        } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom}`,
-        l.regroupement,
-      ),
-    )}
-    <form method="post" action="/administration/domaines/theme"
-      class="etroit"><label>${l.cours} <select name="cours_id" required>${options(
-        cat.cours.map((c) => ({
-          id: c.id,
-          nom: `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`,
-        })),
-      )}</select></label><label>${l.regroupement} <input type="text" name="nom" required maxlength="200"></label><button>Créer</button></form>
-    <h2>Champs personnalisés</h2>
+    <h3>Champs personnalisés</h3>
     <p>Un champ se coche ensuite dans les champs du dépôt de chaque matière. Renommer garde ses
     valeurs. Son type ne change plus après sa création.</p>
     ${

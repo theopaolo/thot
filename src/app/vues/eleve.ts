@@ -16,6 +16,8 @@ export type ChapitreVue = {
   themeId?: string;
   coursId?: string;
   cours?: string;
+  matiereId?: string;
+  matiere?: string;
   sources: SourceChapitre[];
   questions: string[];
 };
@@ -180,38 +182,43 @@ export const accueilEleve = (
   `;
 
 /**
- * La liste des ressources, rangée par cours puis par thème. Les ressources d'un cours sans thème
- * viennent sous le nom du cours, celles sans cours sous « Autres documents ». Les activités
- * publiées suivent les ressources de leur cours.
+ * La liste des ressources, rangée par matière, puis par cours, puis par thème. Les ressources d'un
+ * cours sans thème viennent sous le nom du cours, celles sans cours sous « Autres documents ». Les
+ * activités publiées suivent les ressources de leur cours.
  */
 export const ressourcesParCours = (
   chapitres: ChapitreVue[],
   grille: boolean,
   activites: ActiviteListee[] = [],
 ) =>
-  [...Map.groupBy(chapitres, (ch) => ch.coursId ?? "").values()].map(
-    (groupe) => html`
-      <h2>${groupe[0].cours ?? "Autres documents"}</h2>
-      ${groupe.map(
-        (ch) => html`
-          ${
-            // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, ne
-            // répète pas le titre.
-            ch.themeId && ch.nom !== ch.cours
-              ? html`<h3><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h3>`
-              : ""
-          }
-          <ul class="${grille ? "tuiles" : ""}">${ch.sources.map(
-            (r) =>
-              html`<li><a class="${grille ? "tuile" : ""}" href="/eleve/sources/${r.id}">${
-                grille && r.image_id
-                  ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
+  [...Map.groupBy(chapitres, (ch) => ch.matiereId ?? "").values()].map(
+    (matiere) => html`
+      <h2>${matiere[0].matiere ?? "Autres documents"}</h2>
+      ${[...Map.groupBy(matiere, (ch) => ch.coursId ?? "").values()].map(
+        (groupe) => html`
+          ${groupe[0].cours ? html`<h3>${groupe[0].cours}</h3>` : ""}
+          ${groupe.map(
+            (ch) => html`
+              ${
+                // Un thème qui porte le nom de son cours, souvent celui d'un dossier importé, ne
+                // répète pas le titre.
+                ch.themeId && ch.nom !== ch.cours
+                  ? html`<h4><a href="/eleve/themes/${ch.themeId}">${ch.nom}</a></h4>`
                   : ""
-              }${r.titre}</a></li>`,
-          )}</ul>
+              }
+              <ul class="${grille ? "tuiles" : ""}">${ch.sources.map(
+                (r) =>
+                  html`<li><a class="${grille ? "tuile" : ""}" href="/eleve/sources/${r.id}">${
+                    grille && r.image_id
+                      ? html`<span class="passe-partout"><img src="/media/${r.image_id}" alt="" loading="lazy"></span>`
+                      : ""
+                  }${r.titre}</a></li>`,
+              )}</ul>
+            `,
+          )}
+          ${activitesDuCours(activites.filter((a) => a.cours_id === groupe[0].coursId))}
         `,
       )}
-      ${activitesDuCours(activites.filter((a) => a.cours_id === groupe[0].coursId))}
     `,
   );
 
@@ -240,7 +247,7 @@ export const ligneActivite = (a: ActiviteListee, cours = false) =>
   }</li>`;
 const activitesDuCours = (liste: ActiviteListee[]) =>
   liste.length
-    ? html`<h3>Exercices et explications</h3>
+    ? html`<h4>Exercices et explications</h4>
       <ul>${liste.map((a) => ligneActivite(a))}</ul>`
     : "";
 

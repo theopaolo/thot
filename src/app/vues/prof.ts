@@ -178,6 +178,58 @@ export const ongletsBibliotheque = (chemin: string) =>
       html`<a href="${href}" ${chemin === href ? html`aria-current="page"` : ""}>${libelle}</a>`,
   )}</nav>`;
 
+/** Où en est le compte dans la prise en main de Thot. */
+export type Debut = {
+  cours: boolean;
+  ressource: boolean;
+  certifiee: boolean;
+  administrateur: boolean;
+  personnel: boolean;
+};
+/**
+ * Les étapes qui mènent à une première réponse, tant qu'il manque un cours, une ressource ou une
+ * ressource certifiée. Une étape faite reste listée, cochée.
+ */
+const premiersPas = (d: Debut) => {
+  if (d.cours && d.ressource && d.certifiee) return "";
+  const etape = (fait: boolean, titre: unknown, aide: string) =>
+    html`<li class="${fait ? "fait" : ""}">${fait ? html`${icone("check")}<span class="visuellement-cache">Fait : </span>` : ""}<strong>${titre}</strong>
+      <span class="discret">${aide}</span></li>`;
+  return html`
+    <section class="premiers-pas" aria-labelledby="premiers-pas">
+      <h2 id="premiers-pas">Pour commencer</h2>
+      <ol>
+        ${etape(
+          d.cours,
+          d.administrateur
+            ? html`<a href="/administration/domaines">Créer une matière et un cours</a>`
+            : "Rejoindre un cours",
+          d.administrateur
+            ? "Ils rangent les ressources."
+            : "Un administrateur crée les cours et vous y inscrit.",
+        )}
+        ${etape(
+          d.ressource,
+          html`<a href="/prof/depot">Déposer des ressources</a>`,
+          "PDF, Word, PowerPoint, HTML, Markdown ou images. Thot en extrait le texte.",
+        )}
+        ${etape(
+          d.certifiee,
+          "Relire et certifier",
+          "Ouvrez chaque ressource, vérifiez son texte, puis certifiez-la. Seules les ressources certifiées servent aux réponses.",
+        )}
+        ${etape(
+          false,
+          html`<a href="/eleve">${d.personnel ? "Étudier" : "Ouvrir la vue élève"}</a>`,
+          d.personnel
+            ? "Posez vos questions. Chaque réponse cite les passages de vos ressources."
+            : "Les élèves membres du cours y posent leurs questions. Chaque réponse cite les passages des ressources certifiées.",
+        )}
+      </ol>
+    </section>
+  `;
+};
+
 export const sources = (
   lignes: LigneSource[],
   f: Filtres,
@@ -185,6 +237,7 @@ export const sources = (
   l: Libelles,
   general = false,
   supprimee = false,
+  debut?: Debut,
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
@@ -198,6 +251,16 @@ export const sources = (
   const grille = f.vue === "grille";
   return html`
     <h1>Bibliothèque</h1>
+    ${
+      debut
+        ? html`<p class="sous-titre">${
+            debut.personnel
+              ? "Thot répond à vos questions en citant uniquement les ressources certifiées ici."
+              : "Thot répond aux questions des élèves en citant uniquement les ressources certifiées ici."
+          }</p>`
+        : ""
+    }
+    ${debut ? premiersPas(debut) : ""}
     ${ongletsBibliotheque("/prof")}
     ${
       supprimee

@@ -611,10 +611,12 @@ test("accueil de l'élève : l'activité suit les ressources de son cours, avec 
     const design = async () => {
       const accueil = await page(eleve, "/eleve");
       const [debut, fin] = [
-        accueil.indexOf("<h2>Design</h2>"),
-        accueil.indexOf("<h2>Histoire</h2>"),
+        accueil.indexOf("<h3>Design</h3>"),
+        accueil.indexOf("<h3>Histoire</h3>"),
       ];
       assert(debut >= 0 && fin > debut, "deux cours, Design d'abord");
+      const matiere = accueil.indexOf("<h2>Arts appliqués</h2>");
+      assert(matiere >= 0 && matiere < debut, "la matière titre ses cours");
       assertEquals(accueil.split(`/eleve/activites/${id}`).length - 1, 1, "une seule fois");
       return accueil.slice(debut, fin);
     };

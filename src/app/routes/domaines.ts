@@ -1,5 +1,5 @@
 import { type Context, Hono } from "hono";
-import { libelles } from "../instance.ts";
+import { libelles, lireInstance } from "../instance.ts";
 import { domainesDe } from "../vues/page.ts";
 import { renommerEntree } from "../ingestion.ts";
 import * as Domaines from "../domaines.ts";
@@ -13,6 +13,7 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
     erreur = "",
     ouvert = "",
     saisie?: DomaineVue.ChampsDepot["saisie"],
+    etape?: DomaineVue.Inscriptions["etape"],
   ) => {
     const cat = Domaines.catalogue(db);
     return rendre(
@@ -28,6 +29,8 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
             .prepare("SELECT id, identifiant, nom, role FROM comptes ORDER BY nom")
             .all() as DomaineVue.Inscrit[],
           ouvert,
+          etape,
+          ressources: Domaines.nombreRessources(db),
         },
         {
           // Seul un champ personnalisé montre combien de ressources le remplissent.
@@ -45,20 +48,35 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
           enregistre: c.req.query("enregistre") !== undefined,
         },
         libelles(db),
+        lireInstance(db).mode === "personal",
       ),
     );
   };
-  app.get("/administration/domaines", (c) => c.html(pageDomaines(c, "", c.req.query("ouvert"))));
+  app.get("/administration/domaines", (c) => {
+    const etape = c.req.query("etape");
+    return c.html(
+      pageDomaines(
+        c,
+        "",
+        c.req.query("ouvert"),
+        undefined,
+        etape === "cours" || etape === "membres" ? etape : undefined,
+      ),
+    );
+  });
   app.post("/administration/domaines/:action", async (c) => {
     const b = await c.req.parseBody({ all: true });
     const action = c.req.param("action");
-    // Les membres d'un cours et les champs d'une matière restent affichés après un changement.
-    const ouvert =
+    // Le cours ou la matière modifié reste déplié après un changement. Une création mène à
+    // l'étape suivante : le premier cours d'une matière, puis les membres d'un cours. Son adresse
+    // n'a pas d'ancre : une ancre empêche le navigateur de placer le focus sur l'étape.
+    let ouvert =
       action === "inscrire" || action === "desinscrire"
         ? String(b.cours_id ?? "")
         : action === "champs"
           ? String(b.matiere_id ?? "")
-          : "";
+          : String(b.ouvert ?? "");
+    let etape = "";
     try {
       switch (action) {
         case "champs": {
@@ -72,10 +90,16 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
           Domaines.champPersonnalise(db, String(b.nom ?? ""), String(b.type ?? ""));
           break;
         case "matiere":
-          Domaines.matiere(db, String(b.nom ?? ""), b.profil ? String(b.profil) : undefined);
+          ouvert = Domaines.matiere(
+            db,
+            String(b.nom ?? ""),
+            b.profil ? String(b.profil) : undefined,
+          );
+          etape = "cours";
           break;
         case "cours":
-          Domaines.cours(
+          etape = "membres";
+          ouvert = Domaines.cours(
             db,
             String(b.matiere_id ?? ""),
             String(b.nom ?? ""),
@@ -111,9 +135,11 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
     return c.redirect(
       action === "champs"
         ? `/administration/domaines?ouvert=${id}&enregistre#champs-${id}`
-        : ouvert
-          ? `/administration/domaines?ouvert=${id}#membres-${id}`
-          : "/administration/domaines",
+        : etape
+          ? `/administration/domaines?ouvert=${id}&etape=${etape}`
+          : ouvert
+            ? `/administration/domaines?ouvert=${id}#cours-${id}`
+            : "/administration/domaines",
       303,
     );
   });

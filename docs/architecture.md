@@ -391,9 +391,9 @@ se retire pas. Un cours ne s'ajoute que si les sources que l'activité cite ou m
 rattachées. L'élève reçoit l'activité dans un de ses cours où ses preuves tiennent, et sa liste la
 range sous ce cours.
 
-La liste des ressources de l'élève range les activités publiées sous le titre de leur cours, avec
-leur avancement : à faire, en cours, remise, retour reçu. Un cours n'y figure que s'il a des
-ressources dans le périmètre choisi. L'accueil par chapitres, qui ne titre pas les cours, liste les
+La liste des ressources de l'élève les range par matière, puis par cours, puis par thème. Elle
+range les activités publiées sous le titre de leur cours, avec leur avancement : à faire, en
+cours, remise, retour reçu. Un cours n'y figure que s'il a des ressources dans le périmètre choisi. L'accueil par chapitres, qui ne titre pas les cours, liste les
 activités après ses chapitres. Le lecteur d'une ressource propose sous « S'entraîner » les
 activités publiées qui la citent, montrent une de ses images ou y renvoient.
 

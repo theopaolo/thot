@@ -295,6 +295,14 @@ export const coursDuCompte = (db: Db, compteId: string) =>
       .all(compteId)
       .map((l) => l.cours_id as string),
   );
+/** Le nombre de ressources rattachées à chaque cours, pour l'administration. */
+export const nombreRessources = (db: Db) =>
+  new Map(
+    db
+      .prepare("SELECT cours_id, count(*) n FROM source_cours GROUP BY cours_id")
+      .all()
+      .map((l) => [l.cours_id as string, l.n as number]),
+  );
 export const membres = (db: Db, coursId: string) =>
   db
     .prepare(

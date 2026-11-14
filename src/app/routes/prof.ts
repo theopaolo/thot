@@ -10,7 +10,7 @@ import {
   parametresModification,
   peutModifier,
 } from "../comptes.ts";
-import { libelles } from "../instance.ts";
+import { libelles, lireInstance } from "../instance.ts";
 import { contenu } from "../config.ts";
 import { audience } from "../depot.ts";
 import { questionsDesEleves } from "../conversations.ts";
@@ -78,7 +78,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
   app.get("/prof", (c) => {
     const f = filtres(c);
     const selection = idsScope(c);
-    const ressources = lignes(c, "", "").filter((s) => selection.has(s.id));
+    const toutes = lignes(c, "", "");
+    const ressources = toutes.filter((s) => selection.has(s.id));
+    const cat = Domaines.catalogueDe(db, c.get("compte"));
     // Une nouvelle version à relire compte avec les sources à relire.
     const statut = (s: Prof.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
     const repartition = [
@@ -92,13 +94,10 @@ export function routesProf(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Bibliothèque",
-        html`${DomaineVue.filtre(
-          Domaines.catalogueDe(db, c.get("compte")),
-          scope(c),
-          "/prof",
-          libelles(db),
-          { statut: f.statut, vue: f.vue },
-        )}${Prof.sources(
+        html`${DomaineVue.filtre(cat, scope(c), "/prof", libelles(db), {
+          statut: f.statut,
+          vue: f.vue,
+        })}${Prof.sources(
           ressources.filter(
             (s) => (!f.statut || statut(s) === f.statut) && (!f.theme || s.theme === f.theme),
           ),
@@ -107,6 +106,13 @@ export function routesProf(app: Hono<Env>, w: Web) {
           libelles(db),
           ressources.some((s) => s.profil === "general"),
           c.req.query("supprimee") !== undefined,
+          {
+            cours: cat.cours.length > 0,
+            ressource: toutes.length > 0,
+            certifiee: toutes.some((s) => s.statut === "certifiee"),
+            administrateur: c.get("compte").administrateur === 1,
+            personnel: lireInstance(db).mode === "personal",
+          },
         )}`,
       ),
     );

@@ -400,14 +400,37 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const compte = db.prepare("SELECT id FROM comptes WHERE role = 'enseignant'").get()!.id;
     db.prepare("UPDATE comptes SET administrateur = 1 WHERE id = ?").run(compte!);
     assertEquals((await prof.requete("/administration/domaines")).status, 200);
+    // Créer une matière mène à son premier cours, créer un cours à ses membres.
+    const creee = await prof.requete("/administration/domaines/matiere", {
+      method: "POST",
+      body: new URLSearchParams({ nom: "REAPER", profil: "general" }),
+    });
+    assertEquals(creee.status, 303);
+    const reaper = db.prepare("SELECT id FROM matieres WHERE nom = 'REAPER'").get()!.id;
     assertEquals(
-      (
-        await prof.requete("/administration/domaines/matiere", {
-          method: "POST",
-          body: new URLSearchParams({ nom: "REAPER", profil: "general" }),
-        })
-      ).status,
-      303,
+      creee.headers.get("location"),
+      `/administration/domaines?ouvert=${reaper}&etape=cours`,
+    );
+    assertStringIncludes(
+      await (await prof.requete(creee.headers.get("location")!)).text(),
+      "Étape 2 sur 3 : créez le premier cours de",
+    );
+    const nouveau = await prof.requete("/administration/domaines/cours", {
+      method: "POST",
+      body: new URLSearchParams({ matiere_id: String(reaper), nom: "Mixage" }),
+    });
+    const mixage = db.prepare("SELECT id FROM cours WHERE nom = 'Mixage'").get()!.id;
+    assertEquals(
+      nouveau.headers.get("location"),
+      `/administration/domaines?ouvert=${mixage}&etape=membres`,
+    );
+    const etape3 = await (await prof.requete(nouveau.headers.get("location")!)).text();
+    assertStringIncludes(etape3, `<details class="cours" id="cours-${mixage}" open>`);
+    assertStringIncludes(etape3, "Étape 3 sur 3 : ajoutez ses membres");
+    // Le lien « Déposer dans ce cours » coche ce cours au dépôt.
+    assertStringIncludes(
+      await (await prof.requete(`/prof/depot?matiere_id=${reaper}&cours=${mixage}`)).text(),
+      `value="${mixage}" checked`,
     );
     assertEquals(
       (
@@ -1371,7 +1394,7 @@ test("membres d'un cours : l'administrateur inscrit et retire, les autres compte
     assert(coursDuCompte(db, eleveId).has(c));
     page = await (await admin.requete(`/administration/domaines?ouvert=${c}`)).text();
     assertStringIncludes(page, "Membres : 1");
-    assertStringIncludes(page, `<details id="membres-${c}" open>`);
+    assertStringIncludes(page, `<details class="cours" id="cours-${c}" open>`);
     assertStringIncludes(page, "Compte eleve");
     assertStringIncludes(page, ", élève</span>");
     assert(!page.includes(`<option value="${eleveId}">`));
@@ -1716,8 +1739,8 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
         "/prof/depot",
         `<label class="theme-cours">Module <select name="theme_${t.cours_id}"`,
       ],
-      [admin, "/administration/domaines", "<h2>Modules</h2>"],
-      [admin, "/administration/domaines", "<h2>Chapitres</h2>"],
+      [admin, "/administration/domaines", "<h3>Modules</h3>"],
+      [admin, "/administration/domaines", "Chapitre à créer"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
       [admin, "/prof/depot", "<strong>Chapitres de rattachement</strong>"],
       [admin, "/prof", '<span class="discret">Chapitre</span>'],

@@ -50,8 +50,9 @@ export function routesDepot(app: Hono<Env>, w: Web) {
       lot: crypto.randomUUID(),
     };
   };
+  // `?cours=` coche ce cours, comme le lien « Déposer dans ce cours » de l'administration.
   app.get("/prof/depot", (c) =>
-    c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query())))),
+    c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query(), c.req.query())))),
   );
   const parCle = (compte: Compte, cle: string) =>
     db
