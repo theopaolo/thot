@@ -435,7 +435,7 @@ export const sources = (
             <output data-compte-selection aria-live="polite"></output>
             <button type="button" class="lien" data-selection="tout">Tout sélectionner</button>
             <button type="button" class="lien" data-selection="aucun">Annuler</button>
-            <button class="principal espace" name="statut" value="certifiee" formnovalidate
+            <button class="principal certifier espace" name="statut" value="certifiee" formnovalidate
               data-certifier-selection>
               ${icone("check")} Certifier
             </button>
@@ -1222,7 +1222,7 @@ export const statutSource = (s: Detail["source"], modifiable = true) =>
         modifiable && s.statut !== "certifiee"
           ? html`
           <button
-            class="principal"
+            class="principal certifier"
             hx-post="/prof/sources/${s.id}/certifiee"
             hx-target="#statut-source"
             hx-swap="outerHTML"
@@ -1360,7 +1360,7 @@ export const detailSource = (d: Detail) => {
             d.modifiable
               ? html`
               <form method="post" class="barre">
-                <button class="principal"
+                <button class="principal certifier"
                   formaction="/prof/sources/${d.source.id}/revisions/${d.attente.n}/certifiee">
                   Certifier cette version
                 </button>
