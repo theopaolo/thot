@@ -385,6 +385,9 @@ les siennes. Être administrateur ne suffit pas. La liste des activités compte,
 cours de l'enseignant, les activités publiées et les tentatives reçues. Ces nombres comptent ce qui
 a été pratiqué : ils ne mesurent pas un niveau.
 
+La bibliothèque, les ressources de l'élève et la recherche reprennent le dernier cours choisi dans
+le même navigateur. « Toutes les ressources » efface ce choix, la déconnexion aussi.
+
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
 publiée à ses élèves et utilisée par Thot. Chaque changement d'une source passe par
 `src/app/ingestion.ts`, par le web comme par la CLI : la même transaction écrit, réindexe et

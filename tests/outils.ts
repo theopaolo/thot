@@ -111,5 +111,5 @@ export async function session(db: Db, modeles: Modeles, role: Role, inscrit = tr
       ...init,
       headers: { cookie, origin: ORIGINE, ...(init.headers as Record<string, string> | undefined) },
     });
-  return { app, requete };
+  return { app, requete, cookie };
 }

@@ -16,7 +16,7 @@ import { routesProf } from "./routes/prof.ts";
 import { routesDepot } from "./routes/prof-depot.ts";
 import { routesProfEleves } from "./routes/prof-eleves.ts";
 import { sessions } from "./routes/session.ts";
-import { contexteWeb, type Env } from "./routes/web.ts";
+import { contexteWeb, type Env, retenirPerimetre } from "./routes/web.ts";
 
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
@@ -37,6 +37,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
 
   const session = sessions(db);
   app.use("*", session.verifier);
+  for (const chemin of ["/prof", "/eleve", "/eleve/recherche"]) app.use(chemin, retenirPerimetre);
 
   const w = contexteWeb(db, modeles, reponses);
   routesComptes(app, w, session);

@@ -68,8 +68,10 @@ export function sessions(db: Db) {
           c.req.header("x-forwarded-proto") === "https",
       },
     );
-  const fermer = (c: Context<Env>) =>
-    deleteCookie(c, SESSION, { path: "/", secure: config.origine.startsWith("https:") });
+  const fermer = (c: Context<Env>) => {
+    deleteCookie(c, "perimetre", { path: "/" });
+    return deleteCookie(c, SESSION, { path: "/", secure: config.origine.startsWith("https:") });
+  };
   return { verifier, ouvrir, fermer };
 }
 export type Session = ReturnType<typeof sessions>;

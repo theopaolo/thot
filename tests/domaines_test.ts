@@ -898,6 +898,27 @@ test("filtre : la grille des cours applique le choix par un lien qui garde les p
   assert(!grille.includes('class="matiere"') && !grille.includes('class="theme"'));
 });
 
+test("filtre : la page ouverte sans périmètre reprend le dernier cours choisi", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const c = cours(db, matiere(db, "Développement"), "Docker");
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const choix = await prof.requete(`/prof?cours_id=${c}`);
+    const retenu = choix.headers.get("set-cookie")!.split(";")[0];
+    assertEquals(retenu, `perimetre=${encodeURIComponent(`cours_id=${c}`)}`);
+    const avec = { headers: { cookie: `${prof.cookie}; ${retenu}` } };
+    const retour = await prof.requete("/prof?statut=a_relire", avec);
+    assertEquals(retour.status, 302);
+    assertEquals(retour.headers.get("location"), `/prof?statut=a_relire&cours_id=${c}`);
+    assertEquals((await prof.requete("/prof?lot=x", avec)).status, 200);
+    const tous = await prof.requete("/prof?cours_id=", avec);
+    assertStringIncludes(tous.headers.get("set-cookie")!, "perimetre=; Max-Age=0");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
   const { db, dir } = await environnement();
   try {

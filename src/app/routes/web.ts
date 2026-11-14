@@ -1,5 +1,5 @@
-import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
+import type { Context, Next } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import type { Modeles } from "../../core/modeles.ts";
 import type { Affirmation } from "../../core/reponse.ts";
 import { CITABLE, type Lecteur, parametresCitable } from "../../core/recherche.ts";
@@ -14,6 +14,34 @@ import * as Eleve from "../vues/eleve.ts";
 import * as Domaines from "../domaines.ts";
 
 export type Env = { Variables: { compte: Compte } };
+
+const CLES_PERIMETRE = ["matiere_id", "cours_id", "theme_id", "matieres", "chapitre"];
+/**
+ * Le cookie `perimetre` garde le dernier cours choisi : une page de ressources ouverte sans
+ * périmètre le reprend. « Tous les cours » envoie un périmètre vide, qui l'efface. Un lot déposé
+ * s'affiche en entier, hors du périmètre retenu.
+ */
+export async function retenirPerimetre(c: Context<Env>, next: Next) {
+  const url = new URL(c.req.url);
+  if (CLES_PERIMETRE.some((k) => url.searchParams.has(k))) {
+    const p = new URLSearchParams(
+      CLES_PERIMETRE.flatMap((k) => url.searchParams.getAll(k).map((v) => [k, v])).filter(
+        ([, v]) => v,
+      ),
+    );
+    setCookie(c, "perimetre", String(p), {
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      maxAge: p.size ? 31536000 : 0,
+    });
+    return next();
+  }
+  const retenu = getCookie(c, "perimetre");
+  if (!retenu || url.searchParams.has("lot")) return next();
+  for (const [k, v] of new URLSearchParams(retenu)) url.searchParams.append(k, v);
+  return c.redirect(url.pathname + url.search);
+}
 export type Reponses = ReturnType<typeof boucleReponses>;
 
 /** La base, les modèles, la boucle de réponses et les aides de page que partagent les routes. */
