@@ -13,6 +13,8 @@ type Ligne = {
   message: string;
   id?: string;
   format: string;
+  /** le fichier lui-même est refusé : le renvoyer tel quel ne changerait rien */
+  definitif?: boolean;
   tr: HTMLTableRowElement;
 };
 
@@ -86,7 +88,7 @@ function afficher(l: Ligne) {
   statut.textContent = l.etat === "erreur" ? `${texte} : ${l.message}` : texte;
   const actions: (Node | string)[] = [statut];
   if (l.etat === "attente") actions.push(" ", bouton("Retirer", "retirer", l));
-  if (l.etat === "erreur") actions.push(" ", bouton("Réessayer", "reessayer", l));
+  if (l.etat === "erreur" && !l.definitif) actions.push(" ", bouton("Réessayer", "reessayer", l));
   if (l.etat === "doublon" || l.etat === "recu") {
     const a = document.createElement("a");
     a.href = `/prof/sources/${l.id}`;
@@ -160,6 +162,7 @@ async function deposer(form: HTMLFormElement, l: Ligne) {
       l.format = d.format ?? l.format;
       // Un doublon garde le titre de la source existante pour le lien.
       l.message = d.etat === "doublon" ? d.titre : Object.values(d.erreurs ?? {}).join(" ");
+      l.definitif = Boolean(d.erreurs?.fichier);
     } else l.message = r.status === 413 ? "fichier trop lourd." : `réponse ${r.status}.`;
   } catch {
     l.message = "réseau indisponible.";
@@ -251,10 +254,12 @@ function recapituler(form: HTMLFormElement) {
       : matiere instanceof HTMLSelectElement
         ? matiere.selectedOptions[0]?.text
         : "";
-  recap.textContent =
+  const lecteurs = form.querySelector<HTMLInputElement>("input[name=audience]:checked");
+  recap.textContent = `${
     choix.value === "nouveau"
       ? `Dans : ${nomMatiere} / ${valeur("nouveau_cours")?.value.trim()}, créé avec le dépôt.`
-      : `Dans : ${choix.dataset.chemin}.`;
+      : `Dans : ${choix.dataset.chemin}.`
+  }${lecteurs ? ` Lecteurs : ${lecteurs.closest("label")?.textContent?.trim().toLowerCase()}.` : ""}`;
   recap.hidden = false;
 }
 

@@ -150,7 +150,7 @@ const sectionRedigees = (a: Activite, contenu: Contenu, liste: Ligne[]) => {
           return html`<li id="${ancre(l.t!, q)}" class="${c.points === null ? "a-noter" : ""}">
             <p><strong>${l.eleve.nom}</strong>${
               memeVersion ? "" : html` <span class="discret">version ${l.t!.revision}</span>`
-            }</p>
+            }${c.points === null ? html` <span class="statut a_relire">À noter</span>` : ""}</p>
             ${reponseRedigee(q, c.essais[0])}
             <p class="aide">${
               c.criteres.length

@@ -4,8 +4,10 @@ import {
   CITABLE,
   chercher,
   documentsProches,
+  LISIBLE,
   type Lecteur,
   parametresCitable,
+  parametresLisible,
 } from "../../core/recherche.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { config } from "../config.ts";
@@ -115,24 +117,45 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     // La liste rangée par cours met les activités sous leur cours. L'accueil par chapitres, sans
     // titre de cours, les liste après ses chapitres.
     if (generique) {
+      const personnel = lireInstance(db).mode === "personal";
+      // Un enseignant qui ne trouve rien à lire ici a souvent des ressources à relire avant.
+      const aRelire =
+        !visibles.length && c.get("compte").role === "enseignant"
+          ? (db
+              .prepare(
+                `SELECT count(*) n FROM sources s WHERE ${LISIBLE} AND s.statut = 'a_relire'`,
+              )
+              .get(parametresLisible(instance.school_id, lu(c)))!.n as number)
+          : 0;
+      const titre = personnel ? "Mes documents" : "Ressources";
       return c.html(
         rendre(
           c,
-          "Ressources",
-          html`<h1>Ressources</h1>
+          titre,
+          html`<h1>${titre}</h1>
           <p class="sous-titre">${
-            lireInstance(db).mode === "personal"
+            personnel
               ? "Tes ressources certifiées. Thot répond à tes questions en citant uniquement ces ressources."
               : "Les ressources publiées par tes enseignants. Thot répond à tes questions en citant uniquement ces ressources."
           }</p>${filtresDomaines}
           <form method="post" action="/eleve/questions" class="question-rapide">
             ${DomaineVue.champsScope(scope(c))}${Eleve.cleEnvoi()}
-            <label for="texte">Une question dans ce périmètre ?</label>
+            <label for="texte">Une question sur ces ressources ?</label>
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
           </form>
           ${Eleve.ressourcesParCours(chapitres, c.req.query("vue") === "grille", activites)}
-          ${!visibles.length ? html`<p>Aucune ressource dans ce périmètre.</p>` : ""}`,
+          ${
+            visibles.length
+              ? ""
+              : aRelire
+                ? html`<p>${aRelire} ressource${aRelire > 1 ? "s attendent leur" : " attend sa"} relecture.
+                  <a href="/prof?statut=a_relire">Relire et certifier</a> : Thot ne cite que les
+                  ressources certifiées.</p>`
+                : Object.values(scope(c)).some(Boolean)
+                  ? html`<p>Aucune ressource dans ce cours pour l'instant.</p>`
+                  : html`<p>Aucune ressource publiée pour l'instant.</p>`
+          }`,
         ),
       );
     }
@@ -198,6 +221,37 @@ export function routesEleve(app: Hono<Env>, w: Web) {
         }),
         ...Domaines.mesCours(l),
       }) as Eleve.SourceChapitre[];
+  /**
+   * Le cours où se lit une source sans thème : le premier des cours du lecteur qui la rattachent,
+   * et ses ressources rangées directement dans ce cours, dans l'ordre de lecture.
+   */
+  const coursDeLecture = (l: Lecteur, sourceId: string) =>
+    db
+      .prepare(
+        `SELECT c.id, c.nom FROM source_cours sc JOIN cours c ON c.id = sc.cours_id
+         WHERE sc.source_id = $source AND ${Domaines.MES_COURS} ORDER BY c.nom LIMIT 1`,
+      )
+      .get({ source: sourceId, ...Domaines.mesCours(l) }) as
+      | { id: string; nom: string }
+      | undefined;
+  const sourcesDuCours = (l: Lecteur, coursId: string) =>
+    db
+      .prepare(
+        `SELECT s.id, s.titre FROM sources s WHERE ${CITABLE}
+         AND EXISTS (SELECT 1 FROM source_cours sc
+           WHERE sc.source_id = s.id AND sc.cours_id = $cours AND sc.theme_id IS NULL)
+         ORDER BY coalesce(json_extract(s.metadonnees, '$.seance'), '') = '',
+           coalesce(json_extract(s.metadonnees, '$.seance'), ''), ${ORDRE_LECTURE}`,
+      )
+      // Le périmètre du cours restreint CITABLE à ce cours ; `$cours` y est son identifiant.
+      .all(
+        parametresCitable({
+          schoolId: instance.school_id,
+          lecteur: l,
+          bibliotheque: true,
+          coursId,
+        }),
+      ) as { id: string; titre: string }[];
   app.on("GET", ["/eleve/sans-sequence", "/eleve/themes/:theme"], (c) => {
     const themeId = c.req.param("theme") ?? "";
     const cat = Domaines.catalogueVisible(db, lu(c));
@@ -275,6 +329,16 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     // Une ancienne réponse ouvre la révision qu'elle cite. Une révision en attente ne se lit pas.
     const revision = Number(c.req.query("revision") ?? s.revision);
     if (!Number.isInteger(revision) || revision < 1 || revision > s.revision) return c.notFound();
+    // Un cours général se lit de ressource en ressource : dans son thème, sinon dans son cours.
+    const cours = s.profil === "general" && !s.theme_id ? coursDeLecture(lu(c), s.id) : undefined;
+    const voisins =
+      s.profil !== "general"
+        ? []
+        : s.theme_id
+          ? sourcesDuTheme(lu(c), s.theme_id)
+          : cours
+            ? sourcesDuCours(lu(c), cours.id)
+            : [];
     return c.html(
       rendre(
         c,
@@ -287,13 +351,13 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           libelles(db),
           marque,
           revision < s.revision,
-          // Un cours général se lit de ressource en ressource, dans l'ordre de son thème.
-          s.profil === "general" ? sourcesDuTheme(lu(c), s.theme_id) : [],
+          voisins,
           Activites.avecAvancement(
             db,
             c.get("compte"),
             Activites.activitesEleve(db, c.get("compte")).filter((a) => Activites.couvre(a, s.id)),
           ),
+          cours,
         ),
         "lecture",
       ),

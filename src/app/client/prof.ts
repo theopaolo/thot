@@ -47,6 +47,19 @@ export function installerProf() {
     }
     const confirmer = event.target.closest<HTMLElement>("[data-confirmer]");
     if (confirmer && !confirm(confirmer.dataset.confirmer ?? "")) event.preventDefault();
+    // Certifier plusieurs ressources d'un coup les ouvre aux élèves sans relecture une à une.
+    const certifier = event.target.closest<HTMLButtonElement>("[data-certifier-selection]");
+    if (certifier?.form) {
+      const n = certifier.form.querySelectorAll("[name=ids]:checked").length;
+      if (
+        n > 1 &&
+        !confirm(
+          `Certifier ${n} ressources ? Les membres de leurs cours pourront les lire et Thot les citera dans ses réponses. Relisez d'abord celles que personne n'a ouvertes.`,
+        )
+      ) {
+        event.preventDefault();
+      }
+    }
     const bouton = event.target.closest<HTMLButtonElement>("[data-rejeter-selection]");
     if (bouton?.form) {
       const n = bouton.form.querySelectorAll("[name=ids]:checked").length;

@@ -194,7 +194,8 @@ Dans un thème, les ressources se lisent par séance, puis par ordre de lecture,
 Une ressource sans ordre suit celles qui en ont. Le dépôt prend l'ordre d'un Markdown dans son
 front matter, et l'enseignant le change sur la fiche de la ressource. Le lecteur d'un cours
 général mène à la ressource précédente et à la suivante, et liste celles du thème à gauche du
-texte quand l'écran a la place de trois colonnes.
+texte quand l'écran a la place de trois colonnes. Une ressource sans thème se lit parmi celles
+rangées directement dans son cours, le premier des cours du lecteur qui la rattachent.
 
 L'en-tête de recherche de chaque passage (`rappel`) porte les noms des thèmes de la source, tous,
 par ordre alphabétique. Une source sans thème garde sa séquence. Renommer un thème réindexe ses

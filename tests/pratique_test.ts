@@ -585,6 +585,22 @@ test("plusieurs cours : l'élève d'un cours ajouté reçoit l'activité, celui 
   }
 });
 
+test("lecteur : Précédente et Suivante restent dans le cours de la ressource", async () => {
+  const { db, dir, coursId, eleve } = await cadre();
+  try {
+    const histoire = cours(db, matiere(db, "Histoire"), "Histoire");
+    db.prepare("INSERT INTO membres_cours VALUES (?, ?)").run(histoire, eleve.id);
+    const parc = await publierSource(db, "Parc Güell", coursId);
+    await publierSource(db, "Bauhaus", histoire);
+    const lecture = await page(eleve, `/eleve/sources/${parc}`);
+    assertStringIncludes(lecture, `<a href="/eleve?cours_id=${coursId}">Design</a>`);
+    assertStringIncludes(lecture, "<span>Précédente</span>Casa Batlló");
+    assert(!lecture.includes("Bauhaus"), "une ressource d'un autre cours n'est pas voisine");
+  } finally {
+    await fermer(db, dir);
+  }
+});
+
 test("accueil de l'élève : l'activité suit les ressources de son cours, avec son titre et où il en est", async () => {
   const { db, dir, coursId, prof, eleve } = await cadre();
   try {

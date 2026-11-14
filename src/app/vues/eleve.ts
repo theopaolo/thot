@@ -580,6 +580,8 @@ export const lectureSource = (
   voisins: { id: string; titre: string }[] = [],
   /** les activités publiées qui citent la ressource ou y renvoient */
   activites: ActiviteListee[] = [],
+  /** le cours d'une ressource sans thème : il titre la liste des voisines */
+  cours?: { id: string; nom: string },
 ) => {
   const texte = blocs.filter((b, n) => !(n === 0 && b.texte === s.titre));
   const plan = sections(texte, s.titre);
@@ -597,9 +599,11 @@ export const lectureSource = (
       voisins.length > 1
         ? html`
           <nav class="ressources-theme" aria-labelledby="ressources-theme-titre">
-            <h2 id="ressources-theme-titre"><a href="${lienTheme(s.theme_id)}">${
-              s.theme || "Ressources non classées"
-            }</a></h2>
+            <h2 id="ressources-theme-titre">${
+              cours
+                ? html`<a href="/eleve?cours_id=${cours.id}">${cours.nom}</a>`
+                : html`<a href="${lienTheme(s.theme_id)}">${s.theme || "Ressources non classées"}</a>`
+            }</h2>
             <ol>${voisins.map(
               (v) =>
                 html`<li><a href="/eleve/sources/${v.id}" aria-current="${

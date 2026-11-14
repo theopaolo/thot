@@ -84,7 +84,8 @@ const membresDuCours = (c: Cours, inscrits: Inscrit[], comptes: Inscrit[]) => {
                       <input type="hidden" name="cours_id" value="${
                         c.id
                       }"><input type="hidden" name="compte_id" value="${m.id}">
-                      <button aria-label="Retirer ${m.nom} de ${c.nom}">Retirer</button>
+                      <button aria-label="Retirer ${m.nom} de ${c.nom}"
+                        data-confirmer="Retirer ${m.nom} de ${c.nom} ? Le compte reste, il ne lit plus les ressources de ce cours.">Retirer</button>
                     </form>
                   </td>
                 </tr>

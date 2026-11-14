@@ -45,6 +45,8 @@ export type LigneSource = {
   audience?: Audience;
   /** 0 quand le compte lit la source sans pouvoir la modifier */
   modifiable?: number;
+  /** les cours du compte qui rattachent la source, quand aucun cours n'est choisi */
+  cours?: string;
 };
 
 export const JOBS_ACTIFS = ["received", "extracting", "enriching"];
@@ -142,7 +144,8 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
                 ${apercu(l)}
                 <div>
                   <a href="/prof/sources/${l.id}">${l.titre}</a>
-                  <small>${l.theme ?? ""} · ${l.format}</small>
+                  <small>${[l.cours, l.theme].filter(Boolean).join(" / ")}<span
+                    class="format">${l.format}</span></small>
                 </div>
               </div>
             </td>
@@ -156,6 +159,7 @@ export const lignesSources = (lignes: LigneSource[], requete: string, grille = f
 };
 
 type Filtres = {
+  q: string;
   statut: string;
   theme: string;
   lot: string;
@@ -185,6 +189,47 @@ export type Debut = {
   certifiee: boolean;
   administrateur: boolean;
   personnel: boolean;
+  /** les questions des élèves des cours du compte, vides en mode personnel */
+  questions?: QuestionProf[];
+};
+/**
+ * Ce que Thot fait des ressources, une fois l'une d'elles certifiée : les questions des élèves de
+ * la semaine, dont celles qu'aucun passage du cours n'a pu prouver, ou une invitation à essayer.
+ */
+const activiteEleves = (d: Debut) => {
+  const semaine = Date.now() - 7 * 24 * 3600 * 1000;
+  const recentes = (d.questions ?? []).filter((q) => Date.parse(q.cree_le) >= semaine);
+  const sansReponse = recentes.filter((q) => q.etat === "out_of_corpus").length;
+  const dernieres = [...(d.questions ?? [])]
+    .sort((a, b) => b.cree_le.localeCompare(a.cree_le))
+    .slice(0, 3);
+  const essayer = html`<a href="/eleve/chat">${
+    d.personnel ? "Poser une question" : "Essayer avec une question"
+  }</a>`;
+  return html`
+    <section class="activite-eleves" aria-labelledby="activite-eleves">
+      <h2 id="activite-eleves">${d.personnel ? "Vos questions" : "Questions des élèves"}</h2>
+      ${
+        dernieres.length
+          ? html`
+            <p>${recentes.length} cette semaine${
+              sansReponse
+                ? html`, dont ${sansReponse} sans passage dans le cours : un document manque peut-être`
+                : ""
+            }. <a href="/prof/questions">Voir les questions</a></p>
+            <ul>${dernieres.map(
+              (q) =>
+                html`<li>« ${q.question} » <span class="discret">${q.nom}${
+                  q.etat === "out_of_corpus" ? ", sans passage dans le cours" : ""
+                }</span></li>`,
+            )}</ul>
+          `
+          : html`<p>${
+              d.personnel ? "" : "Aucune question d'élève pour l'instant. "
+            }Chaque phrase d'une réponse cite un passage d'une ressource certifiée. ${essayer}</p>`
+      }
+    </section>
+  `;
 };
 /**
  * Les étapes qui mènent à une première réponse, tant qu'il manque un cours, une ressource ou une
@@ -215,7 +260,7 @@ const premiersPas = (d: Debut) => {
         )}
         ${etape(
           d.certifiee,
-          "Relire et certifier",
+          html`<a href="/prof?statut=a_relire">Relire et certifier</a>`,
           "Ouvrez chaque ressource, vérifiez son texte, puis certifiez-la. Seules les ressources certifiées servent aux réponses.",
         )}
         ${etape(
@@ -260,7 +305,13 @@ export const sources = (
           }</p>`
         : ""
     }
-    ${debut ? premiersPas(debut) : ""}
+    ${
+      !debut
+        ? ""
+        : debut.cours && debut.ressource && debut.certifiee
+          ? activiteEleves(debut)
+          : premiersPas(debut)
+    }
     ${ongletsBibliotheque("/prof")}
     ${
       supprimee
@@ -291,6 +342,14 @@ export const sources = (
     </nav>`
     }
     <div class="biblio-outils">
+      <form method="get" action="/prof" role="search" class="recherche-entete">
+        ${Object.entries(f)
+          .filter(([k, v]) => v && k !== "q")
+          .map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+        <input type="search" name="q" value="${f.q}" maxlength="200"
+          aria-label="Chercher une ressource par son titre" placeholder="Chercher par titre">
+        <button aria-label="Chercher">${icone("magnifying-glass")}</button>
+      </form>
       <nav class="segments" aria-label="Statut">
         ${[
           ["", "Toutes"],
@@ -349,13 +408,15 @@ export const sources = (
             <output data-compte-selection aria-live="polite"></output>
             <button type="button" class="lien" data-selection="tout">Tout sélectionner</button>
             <button type="button" class="lien" data-selection="aucun">Annuler</button>
-            <button class="principal espace" name="statut" value="certifiee">
+            <button class="principal espace" name="statut" value="certifiee" formnovalidate
+              data-certifier-selection>
               ${icone("check")} Certifier
             </button>
-            <button name="statut" value="rejetee" data-rejeter-selection>
+            <button name="statut" value="rejetee" formnovalidate data-rejeter-selection>
               ${icone("x")} Rejeter
             </button>
-            <select name="audience" aria-label="Lecteurs de la sélection">
+            <select name="audience" aria-label="Lecteurs de la sélection" required>
+              <option value="">Choisir les lecteurs</option>
               ${AUDIENCES.map(
                 (a) =>
                   html`

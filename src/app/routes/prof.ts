@@ -39,7 +39,7 @@ const MODIFICATION_REFUSEE =
 export function routesProf(app: Hono<Env>, w: Web) {
   const { db, instance, rendre, lu, scope, idsScope } = w;
 
-  const lignes = (c: Context<Env>, statut: string, theme: string) =>
+  const lignes = (c: Context<Env>, statut: string, theme: string, lot = c.req.query("lot") ?? "") =>
     db
       .prepare(
         `SELECT s.id, s.titre, s.profil, ${Domaines.nomTheme("s")} AS theme, s.format, s.statut,
@@ -64,10 +64,40 @@ export function routesProf(app: Hono<Env>, w: Web) {
         statut,
         theme,
         theme,
-        c.req.query("lot") ?? "",
-        c.req.query("lot") ?? "",
+        lot,
+        lot,
       ) as unknown as Prof.LigneSource[];
+  /** Sans accents ni casse : « algebre » trouve « Algèbre ». */
+  const plier = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLocaleLowerCase("fr");
+  /**
+   * Les ressources du périmètre qui contiennent la recherche dans leur titre. Sans cours choisi,
+   * chaque ligne nomme ses cours, parmi ceux du compte.
+   */
+  const lignesVisibles = (c: Context<Env>, liste: Prof.LigneSource[]) => {
+    const selection = idsScope(c);
+    const q = plier(c.req.query("q") ?? "");
+    const garde = liste.filter((s) => selection.has(s.id) && plier(s.titre).includes(q));
+    if (scope(c).cours_id) return garde;
+    const noms = Map.groupBy(
+      db
+        .prepare(
+          `SELECT sc.source_id, c.nom FROM source_cours sc JOIN cours c ON c.id = sc.cours_id
+           WHERE ${Domaines.MES_COURS} ORDER BY c.nom`,
+        )
+        .all(Domaines.mesCours(lu(c))) as { source_id: string; nom: string }[],
+      (l) => l.source_id,
+    );
+    return garde.map((s) => ({
+      ...s,
+      cours: (noms.get(s.id) ?? []).map((l) => l.nom).join(", "),
+    }));
+  };
   const filtres = (c: Context<Env>) => ({
+    q: c.req.query("q") ?? "",
     statut: c.req.query("statut") ?? "",
     theme: c.req.query("theme") ?? "",
     lot: c.req.query("lot") ?? "",
@@ -77,10 +107,11 @@ export function routesProf(app: Hono<Env>, w: Web) {
 
   app.get("/prof", (c) => {
     const f = filtres(c);
-    const selection = idsScope(c);
-    const toutes = lignes(c, "", "");
-    const ressources = toutes.filter((s) => selection.has(s.id));
+    // La prise en main compte toute la bibliothèque, pas seulement le lot affiché.
+    const toutes = lignes(c, "", "", "");
+    const ressources = lignesVisibles(c, f.lot ? lignes(c, "", "") : toutes);
     const cat = Domaines.catalogueDe(db, c.get("compte"));
+    const personnel = lireInstance(db).mode === "personal";
     // Une nouvelle version à relire compte avec les sources à relire.
     const statut = (s: Prof.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
     const repartition = [
@@ -111,7 +142,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
             ressource: toutes.length > 0,
             certifiee: toutes.some((s) => s.statut === "certifiee"),
             administrateur: c.get("compte").administrateur === 1,
-            personnel: lireInstance(db).mode === "personal",
+            personnel,
+            questions: personnel ? [] : questionsDesEleves(db, lu(c)),
           },
         )}`,
       ),
@@ -122,10 +154,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
   );
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
-    const selection = idsScope(c);
     return c.html(
       Prof.lignesSources(
-        lignes(c, f.statut, f.theme).filter((s) => selection.has(s.id)),
+        lignesVisibles(c, lignes(c, f.statut, f.theme)),
         new URLSearchParams(f).toString(),
         f.vue === "grille",
       ),

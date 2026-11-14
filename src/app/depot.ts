@@ -137,6 +137,18 @@ export async function sha256(octets: Uint8Array) {
   return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/** Ce que l'extension d'un nom promet, pour dire qu'un contenu ne le tient pas. */
+const PROMESSES: Record<string, string> = {
+  pdf: "un PDF",
+  docx: "un document Word",
+  pptx: "une présentation PowerPoint",
+  html: "une page HTML",
+  htm: "une page HTML",
+  png: "une image PNG",
+  jpg: "une image JPEG",
+  jpeg: "une image JPEG",
+};
+
 /** Contrôle un fichier reçu. Rend le format ou le message à afficher sous le champ. */
 export function controlerFichier(
   octets: Uint8Array,
@@ -150,8 +162,19 @@ export function controlerFichier(
   const office = detecterOffice(octets);
   if (office) return office;
   const format = detecterFormat(octets, nom);
-  if (!format) return { erreur: `Format non reconnu. Acceptés : ${FORMATS.join(", ")}.` };
-  return { format };
+  if (format) return { format };
+  const extension = nom.match(/\.([^.]+)$/)?.[1].toLowerCase() ?? "";
+  if (EST_MARKDOWN.test(nom)) {
+    return {
+      erreur:
+        "Format non reconnu : ce fichier Markdown n'est pas un texte UTF-8. Réenregistrez-le en UTF-8.",
+    };
+  }
+  return {
+    erreur: PROMESSES[extension]
+      ? `Format non reconnu : ce fichier porte l'extension .${extension} mais son contenu n'est pas ${PROMESSES[extension]}. Réenregistrez-le depuis son application, ou exportez-le en PDF.`
+      : "Format non reconnu. Déposez un PDF, un document Word (.docx), une présentation PowerPoint (.pptx), une page HTML, un fichier Markdown, ou une image PNG ou JPEG.",
+  };
 }
 
 /** Le titre du front matter pour un Markdown, sinon le nom du fichier sans son extension. */
