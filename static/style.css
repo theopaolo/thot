@@ -202,8 +202,13 @@ small,
   font-size: 0.875rem;
 }
 .sous-titre {
+  max-width: 75ch;
   color: var(--ink-muted);
   margin: calc(-1 * var(--s2)) 0 var(--s5);
+}
+.sous-titre a {
+  color: var(--ink);
+  white-space: nowrap;
 }
 .icone {
   width: 1.25em;

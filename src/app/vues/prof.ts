@@ -216,42 +216,42 @@ export type Debut = {
   /** les questions des élèves des cours du compte, vides en mode personnel */
   questions?: QuestionProf[];
 };
+/** Les étapes de prise en main sont faites : Thot peut répondre. */
+const pret = (d: Debut) => d.cours && d.ressource && d.certifiee;
+/**
+ * Sans question encore, le chapeau de la bibliothèque invite à en poser une, plutôt qu'une section
+ * vide qui répéterait que les réponses citent les ressources certifiées.
+ */
+const invitation = (d: Debut) =>
+  pret(d) && !d.questions?.length
+    ? html` ${d.personnel ? "" : "Aucune question d'élève pour l'instant. "}<a href="/eleve/chat">${
+        d.personnel ? "Poser une question" : "Essayer avec une question"
+      }</a>`
+    : "";
 /**
  * Ce que Thot fait des ressources, une fois l'une d'elles certifiée : les questions des élèves de
- * la semaine, dont celles qu'aucun passage du cours n'a pu prouver, ou une invitation à essayer.
+ * la semaine, dont celles qu'aucun passage du cours n'a pu prouver.
  */
 const activiteEleves = (d: Debut) => {
+  if (!d.questions?.length) return "";
   const semaine = Date.now() - 7 * 24 * 3600 * 1000;
-  const recentes = (d.questions ?? []).filter((q) => Date.parse(q.cree_le) >= semaine);
+  const recentes = d.questions.filter((q) => Date.parse(q.cree_le) >= semaine);
   const sansReponse = recentes.filter((q) => q.etat === "out_of_corpus").length;
-  const dernieres = [...(d.questions ?? [])]
-    .sort((a, b) => b.cree_le.localeCompare(a.cree_le))
-    .slice(0, 3);
-  const essayer = html`<a href="/eleve/chat">${
-    d.personnel ? "Poser une question" : "Essayer avec une question"
-  }</a>`;
+  const dernieres = [...d.questions].sort((a, b) => b.cree_le.localeCompare(a.cree_le)).slice(0, 3);
   return html`
     <section class="activite-eleves" aria-labelledby="activite-eleves">
       <h2 id="activite-eleves">${d.personnel ? "Vos questions" : "Questions des élèves"}</h2>
-      ${
-        dernieres.length
-          ? html`
-            <p>${recentes.length} cette semaine${
-              sansReponse
-                ? html`, dont ${sansReponse} sans passage dans le cours : un document manque peut-être`
-                : ""
-            }. <a href="/prof/questions">Voir les questions</a></p>
-            <ul>${dernieres.map(
-              (q) =>
-                html`<li>« ${q.question} » <span class="discret">${q.nom}${
-                  q.etat === "out_of_corpus" ? ", sans passage dans le cours" : ""
-                }</span></li>`,
-            )}</ul>
-          `
-          : html`<p>${
-              d.personnel ? "" : "Aucune question d'élève pour l'instant. "
-            }Chaque phrase d'une réponse cite un passage d'une ressource certifiée. ${essayer}</p>`
-      }
+      <p>${recentes.length} cette semaine${
+        sansReponse
+          ? html`, dont ${sansReponse} sans passage dans le cours : un document manque peut-être`
+          : ""
+      }. <a href="/prof/questions">Voir les questions</a></p>
+      <ul>${dernieres.map(
+        (q) =>
+          html`<li>« ${q.question} » <span class="discret">${q.nom}${
+            q.etat === "out_of_corpus" ? ", sans passage dans le cours" : ""
+          }</span></li>`,
+      )}</ul>
     </section>
   `;
 };
@@ -260,7 +260,7 @@ const activiteEleves = (d: Debut) => {
  * ressource certifiée. Une étape faite reste listée, cochée.
  */
 const premiersPas = (d: Debut) => {
-  if (d.cours && d.ressource && d.certifiee) return "";
+  if (pret(d)) return "";
   const etape = (fait: boolean, titre: unknown, aide: string) =>
     html`<li class="${fait ? "fait" : ""}">${fait ? html`${icone("check")}<span class="visuellement-cache">Fait : </span>` : ""}<strong>${titre}</strong>
       <span class="discret">${aide}</span></li>`;
@@ -327,16 +327,10 @@ export const sources = (
             debut.personnel
               ? "Thot répond à vos questions en citant uniquement les ressources certifiées ici."
               : "Thot répond aux questions des élèves en citant uniquement les ressources certifiées ici."
-          }</p>`
+          }${invitation(debut)}</p>`
         : ""
     }
-    ${
-      !debut
-        ? ""
-        : debut.cours && debut.ressource && debut.certifiee
-          ? activiteEleves(debut)
-          : premiersPas(debut)
-    }
+    ${!debut ? "" : pret(debut) ? activiteEleves(debut) : premiersPas(debut)}
     ${ongletsBibliotheque("/prof")}
     ${
       supprimee
