@@ -49,7 +49,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
          EXISTS (SELECT 1 FROM revisions r WHERE r.source_id = s.id AND r.n > s.revision) AS revision_en_attente,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id) AS images,
          (SELECT count(legende) FROM images i WHERE i.source_id = s.id) AS legendes,
-         (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
+         (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id,
+         json_extract(s.metadonnees, '$.ordre') AS ordre
        FROM sources s JOIN ingestion_jobs j ON j.source_id = s.id
        WHERE ${LISIBLE} AND (? = '' OR s.statut = ?)
          AND (? = '' OR theme = ?) AND (? = '' OR s.lot_id = ?)
@@ -85,15 +86,15 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const noms = Map.groupBy(
       db
         .prepare(
-          `SELECT sc.source_id, c.nom FROM source_cours sc JOIN cours c ON c.id = sc.cours_id
+          `SELECT sc.source_id, c.id, c.nom FROM source_cours sc JOIN cours c ON c.id = sc.cours_id
            WHERE ${Domaines.MES_COURS} ORDER BY c.nom`,
         )
-        .all(Domaines.mesCours(lu(c))) as { source_id: string; nom: string }[],
+        .all(Domaines.mesCours(lu(c))) as { source_id: string; id: string; nom: string }[],
       (l) => l.source_id,
     );
     return garde.map((s) => ({
       ...s,
-      cours: (noms.get(s.id) ?? []).map((l) => l.nom).join(", "),
+      cours: (noms.get(s.id) ?? []).map(({ id, nom }) => ({ id, nom })),
     }));
   };
   /**
@@ -254,6 +255,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
         new URLSearchParams(f).toString(),
         f.vue === "grille",
         bureau?.rangement.coursId,
+        libelles(db),
       ),
     );
   });

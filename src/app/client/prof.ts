@@ -18,8 +18,22 @@ function cocherTout(form: HTMLFormElement | null, coche: boolean) {
 }
 
 export function installerProf() {
+  // Le rafraîchissement des lignes pendant un traitement garde ouverts les plis ouverts.
+  let plisOuverts: string[] = [];
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    if (event.target instanceof Element && event.target.id === "lignes") {
+      plisOuverts = [...event.target.querySelectorAll<HTMLElement>("details[open][data-pli]")].map(
+        (d) => d.dataset.pli ?? "",
+      );
+    }
+  });
   document.addEventListener("htmx:afterSwap", (event) => {
     if (event.target instanceof Element && event.target.id === "lignes") {
+      for (const cle of plisOuverts) {
+        document
+          .querySelector(`#lignes details[data-pli="${CSS.escape(cle)}"]`)
+          ?.toggleAttribute("open", true);
+      }
       majSelection(event.target.closest("form"));
     }
   });

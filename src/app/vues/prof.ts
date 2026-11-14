@@ -47,7 +47,9 @@ export type LigneSource = {
   /** 0 quand le compte lit la source sans pouvoir la modifier */
   modifiable?: number;
   /** les cours du compte qui rattachent la source, quand aucun cours n'est choisi */
-  cours?: string;
+  cours?: { id: string; nom: string }[];
+  /** l'ordre de lecture que l'enseignant donne, `null` sans ordre */
+  ordre?: number | null;
 };
 
 export const JOBS_ACTIFS = ["received", "extracting", "enriching"];
@@ -77,16 +79,20 @@ const apercu = (l: LigneSource) =>
       : html`<span class="sans-image">${icone("file-text")}</span>`
   }</span>`;
 
-const caseSource = (l: LigneSource, classe = "") =>
+/** `suffixe` distingue la case d'une ressource qui revient dans un second cours. */
+const caseSource = (l: LigneSource, classe = "", suffixe = "") =>
   html`
-    <input id="selection-${l.id}" hx-preserve class="${classe}" type="checkbox" name="ids"
+    <input id="selection-${l.id}${suffixe}" hx-preserve class="${classe}" type="checkbox" name="ids"
       value="${l.id}" ${l.modifiable === 0 ? "disabled" : ""}
       aria-label="Sélectionner ${l.titre}">
   `;
 
-/** Une carte ne signale que l'écart: « certifiée » sur chaque œuvre ne dirait rien. */
+/** Une ressource ne signale que l'écart : « certifiée » sur chaque ressource ne dirait rien. */
+const enEcart = (l: LigneSource) =>
+  l.etat === "failed" || JOBS_ACTIFS.includes(l.etat) || l.statut !== "certifiee";
+
 const carte = (l: LigneSource) => {
-  const ecart = l.etat === "failed" || JOBS_ACTIFS.includes(l.etat) || l.statut !== "certifiee";
+  const ecart = enEcart(l);
   return fichier({
     href: `/prof/sources/${l.id}`,
     titre: l.titre,
@@ -107,12 +113,124 @@ const carte = (l: LigneSource) => {
   });
 };
 
+type Groupe = { cle: string; nom: string; coursId?: string; liste: LigneSource[] };
+
+/**
+ * Les ressources par cours, ou par thème quand un cours est choisi, chaque groupe dans l'ordre de
+ * lecture. Une ressource rattachée à deux cours revient dans les deux.
+ */
+const grouper = (lignes: LigneSource[], noms: Pick<Libelles, "cours" | "regroupement">) => {
+  const parCours = lignes.some((l) => l.cours);
+  const groupes = new Map<string, Groupe>();
+  for (const l of lignes) {
+    const cles = parCours
+      ? l.cours?.length
+        ? l.cours.map((c) => ({ cle: c.id, nom: c.nom, coursId: c.id }))
+        : [{ cle: "", nom: `Sans ${noms.cours.toLowerCase()}` }]
+      : [{ cle: l.theme ?? "", nom: l.theme ?? `Sans ${noms.regroupement.toLowerCase()}` }];
+    for (const { cle, ...g } of cles) {
+      if (!groupes.has(cle)) groupes.set(cle, { cle, ...g, liste: [] });
+      groupes.get(cle)!.liste.push(l);
+    }
+  }
+  const lecture = (a: LigneSource, b: LigneSource) =>
+    (a.ordre ?? Infinity) - (b.ordre ?? Infinity) || a.titre.localeCompare(b.titre, "fr");
+  return [...groupes.values()]
+    .map((g) => ({ ...g, liste: g.liste.toSorted(lecture) }))
+    .toSorted((a, b) => Number(!a.cle) - Number(!b.cle) || a.nom.localeCompare(b.nom, "fr"));
+};
+
+/** Ce qui reste à faire dans un groupe, en mots. Rien à faire : « toutes certifiées ». */
+const etatGroupe = (liste: LigneSource[]) => {
+  const n = (garde: (l: LigneSource) => boolean) => liste.filter(garde).length;
+  const traitee = (l: LigneSource) => !JOBS_ACTIFS.includes(l.etat) && l.etat !== "failed";
+  const legendes = liste.reduce((t, l) => t + l.images_a_relire, 0);
+  const ecarts = [
+    [n((l) => JOBS_ACTIFS.includes(l.etat)), "en-cours", "en cours", "en cours"],
+    [n((l) => l.etat === "failed"), "failed", "en échec", "en échec"],
+    [
+      n((l) => traitee(l) && (l.statut === "a_relire" || !!l.revision_en_attente)),
+      "a_relire",
+      "à relire",
+      "à relire",
+    ],
+    [n((l) => traitee(l) && l.statut === "rejetee"), "rejetee", "rejetée", "rejetées"],
+    [legendes, "unreviewed", "légende non relue", "légendes non relues"],
+  ] as const;
+  const faits = ecarts.filter(([k]) => k > 0);
+  return {
+    aFaire: faits.length > 0,
+    html: faits.length
+      ? faits.map(
+          ([k, classe, un, plusieurs]) =>
+            html`<span class="statut ${classe}">${k} ${k > 1 ? plusieurs : un}</span>`,
+        )
+      : html`<span class="statut certifiee">${
+          liste.length > 1 ? "toutes certifiées" : "certifiée"
+        }</span>`,
+  };
+};
+
+const ecartLigne = (l: LigneSource) =>
+  html`<span class="pli-etat">${enEcart(l) ? statutLigne(l) : ""}${versionLigne(l)}${lecteursLigne(l)}${
+    l.images_a_relire
+      ? html`<span class="statut unreviewed">${nonRelues(l.images_a_relire)}</span>`
+      : ""
+  }</span>`;
+
+/**
+ * La vue « Liste » : un pli par groupe, fermé tant qu'il n'a rien à relire, si bien que tous les
+ * cours tiennent sur un écran. Un filtre ouvre tous les plis. Un seul groupe sans nom s'affiche
+ * à plat.
+ */
+const plis = (
+  lignes: LigneSource[],
+  requete: string,
+  noms: Pick<Libelles, "cours" | "regroupement">,
+) => {
+  const groupes = grouper(lignes, noms);
+  const p = new URLSearchParams(requete);
+  const filtre = ["q", "statut", "theme", "lot"].some((k) => p.get(k));
+  const vues = new Set<string>();
+  const liste = (g: Groupe, i: number) => {
+    // Le cours d'un carnet s'ouvre sur son introduction, d'ordre 0 : elle garde ce numéro.
+    const premier = g.liste[0].ordre === 0 ? 0 : 1;
+    return html`<ol class="pli-liste">${g.liste.map((l, k) => {
+      const suffixe = vues.has(l.id) ? `-${i}` : "";
+      vues.add(l.id);
+      return html`<li>${caseSource(l, "", suffixe)}<span class="rang" aria-hidden="true">${
+        premier + k
+      }</span>${l.image_id ? apercu(l) : ""}<a href="/prof/sources/${l.id}">${l.titre}</a>${ecartLigne(l)}</li>`;
+    })}</ol>`;
+  };
+  if (groupes.length === 1 && !groupes[0].cle) {
+    return html`<div class="pli-seul">${liste(groupes[0], 0)}</div>`;
+  }
+  return groupes.map((g, i) => {
+    const etat = etatGroupe(g.liste);
+    const ouvert = filtre || groupes.length === 1 || etat.aFaire;
+    return html`<details class="pli" data-pli="${g.cle}" ${ouvert ? "open" : ""}>
+      <summary><span class="pli-nom">${g.nom}</span><span class="nombre">${nombre(
+        g.liste.length,
+        "ressource",
+      )}</span>${etat.html}</summary>
+      <div class="pli-corps">${liste(g, i)}${
+        g.coursId
+          ? html`<p class="pli-pied"><a href="/prof?cours_id=${g.coursId}">Ne montrer que ce cours</a><a
+              href="/prof/depot?cours=${g.coursId}">Déposer dans ce cours</a></p>`
+          : ""
+      }</div>
+    </details>`;
+  });
+};
+
 /** `coursId` ouvre la vue « Dossiers » sur ce cours : elle finit par « Déposer ici ». */
 export const lignesSources = (
   lignes: LigneSource[],
   requete: string,
   grille = false,
   coursId = "",
+  noms: Pick<Libelles, "cours" | "regroupement"> = { cours: "cours", regroupement: "thème" },
 ) => {
   const actifs = lignes.some((l) => JOBS_ACTIFS.includes(l.etat));
   const rafraichir = actifs
@@ -129,30 +247,7 @@ export const lignesSources = (
         : ""
     }</ul>`;
   }
-  return html`
-    <tbody id="lignes" ${rafraichir}>
-      ${lignes.map(
-        (l) =>
-          html`
-          <tr>
-            <td>${caseSource(l)}</td>
-            <td>
-              <div class="ligne-doc">
-                ${apercu(l)}
-                <div>
-                  <a href="/prof/sources/${l.id}">${l.titre}</a>
-                  <small>${[l.cours, l.theme].filter(Boolean).join(" / ")}<span
-                    class="format">${l.format}</span></small>
-                </div>
-              </div>
-            </td>
-            <td>${statutLigne(l)} ${versionLigne(l)} ${lecteursLigne(l)}</td>
-            <td class="statut unreviewed">${nonRelues(l.images_a_relire)}</td>
-          </tr>
-        `,
-      )}
-    </tbody>
-  `;
+  return html`<div id="lignes" class="plis" ${rafraichir}>${plis(lignes, requete, noms)}</div>`;
 };
 
 type Filtres = {
@@ -406,25 +501,7 @@ export const sources = (
       lignes.length || (grille && rangement?.coursId)
         ? html`
         <form method="post" action="/prof/sources/statut?${requete}">
-          ${
-            grille
-              ? lignesSources(lignes, requete, true, rangement?.coursId)
-              : html`
-            <table class="biblio">
-              <thead>
-                <tr>
-                  <th>
-                    <input type="checkbox" aria-label="Tout sélectionner" data-tout-selectionner>
-                  </th>
-                  <th>${general ? "Ressource" : "Document"}</th>
-                  <th>Statut</th>
-                  <th>Légendes</th>
-                </tr>
-              </thead>
-              ${lignesSources(lignes, requete)}
-            </table>
-          `
-          }
+          ${lignesSources(lignes, requete, grille, rangement?.coursId, l)}
           <div class="selection" role="region" aria-label="Sélection">
             <output data-compte-selection aria-live="polite"></output>
             <button type="button" class="lien" data-selection="tout">Tout sélectionner</button>

@@ -390,3 +390,51 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
     assertStringIncludes(lignes, 'hx-trigger="every 3s"');
   }
 });
+
+test("la liste de la bibliothèque range les ressources par cours, dans l'ordre de lecture", async () => {
+  const ligne = (
+    id: string,
+    titre: string,
+    ordre: number | null,
+    cours: string[],
+    statut = "certifiee",
+  ) => ({
+    id,
+    titre,
+    ordre,
+    statut,
+    cours: cours.map((c) => ({ id: c, nom: `Cours ${c}` })),
+    theme: null,
+    format: "md",
+    etat: "awaiting_review",
+    erreur: null,
+    images_a_relire: 0,
+    revision_en_attente: 0,
+    images: 0,
+    legendes: 0,
+    image_id: null,
+  });
+  const html = String(
+    await lignesSources(
+      [
+        ligne("b2", "Suite", 2, ["b"]),
+        ligne("b0", "Introduction", 0, ["b"]),
+        ligne("a1", "Sans ordre", null, ["a"], "a_relire"),
+        ligne("ab", "Commune", 1, ["a", "b"]),
+      ],
+      "",
+    ),
+  );
+  const plis = html.split('<details class="pli"').slice(1);
+  assertEquals(plis.length, 2);
+  // Le cours A a une ressource à relire : son pli s'ouvre. Le cours B, tout certifié, reste fermé.
+  assert(plis[0].startsWith(' data-pli="a" open') && plis[0].includes("1 à relire"));
+  assert(plis[1].startsWith(' data-pli="b" >') && !plis[1].includes("à relire"));
+  const titres = (pli: string) =>
+    [...pli.matchAll(/>([^<]+)<\/a><span class="pli-etat">/g)].map((m) => m[1]);
+  assertEquals(titres(plis[0]), ["Commune", "Sans ordre"]);
+  assertEquals(titres(plis[1]), ["Introduction", "Commune", "Suite"]);
+  // L'introduction d'ordre 0 garde ce numéro. La ressource commune a une seconde case, à son id.
+  assertStringIncludes(plis[1], 'aria-hidden="true">0</span>');
+  assertStringIncludes(plis[1], 'id="selection-ab-1"');
+});

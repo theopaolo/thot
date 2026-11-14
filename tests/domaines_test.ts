@@ -266,7 +266,7 @@ test("général : champs facultatifs, attribution, profil unique et rattachement
     ).run();
     const bibliotheque = await (await prof.requete(`/prof?cours_id=${c1}`)).text();
     assert(!bibliotheque.includes("Toutes les séquences"));
-    assertStringIncludes(bibliotheque, "Ressource</th>");
+    assertStringIncludes(bibliotheque, `href="/prof/sources/${id}"`);
     const detail = await (await prof.requete(`/prof/sources/${id}`)).text();
     assertStringIncludes(detail, "Isaac Newton");
     assertStringIncludes(

@@ -2471,28 +2471,83 @@ table.eleves button {
   color: var(--line);
 }
 
-.biblio td {
-  vertical-align: middle;
+/* Vue « Liste » : un pli par cours, ses ressources sur deux colonnes dans l'ordre de lecture. */
+.plis {
+  border-top: 1px solid var(--line);
 }
-.ligne-doc {
+.pli,
+.pli-seul {
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.pli > summary {
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  min-height: 52px;
+  padding: var(--s2) var(--s4);
+  color: var(--ink);
+}
+.pli > summary:hover {
+  background: var(--surface-tinted);
+}
+.pli-nom {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.pli > summary .nombre + .statut {
+  margin-left: auto;
+}
+.pli-corps,
+.pli-seul {
+  padding: var(--s1) var(--s4) var(--s4);
+}
+.pli-liste {
+  margin: 0;
+  padding: 0;
+  columns: 2;
+  column-gap: var(--s6);
+  list-style: none;
+}
+.pli-liste li {
   display: flex;
   align-items: center;
-  gap: var(--s3);
+  gap: var(--s2) var(--s3);
+  min-height: 36px;
+  padding: var(--s1) 0;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
 }
-.ligne-doc .passe-partout {
-  width: 3rem;
+.pli-liste .rang {
+  flex: none;
+  width: 1.5rem;
+  color: var(--ink-muted);
+  font-family: var(--chiffres);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pli-liste .passe-partout {
+  width: 2rem;
   flex: none;
   padding: 2px;
 }
-/* Les cours et le thème, puis le format : un écart les sépare, sans signe entre eux. */
-.ligne-doc small {
+.pli-etat {
   display: flex;
   flex-wrap: wrap;
   gap: 0 var(--s2);
+  margin-left: auto;
+}
+.pli-pied {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  margin: var(--s3) 0 0;
+  font-size: 0.875rem;
 }
 @media (max-width: 640px) {
-  table.biblio :is(th, td):nth-child(4) {
-    display: none;
+  .pli-liste {
+    columns: 1;
   }
 }
 
