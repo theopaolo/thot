@@ -167,7 +167,7 @@ la saisie : « Dans : Arts appliqués / STD2A / Bauhaus », ou « Dans : toutes 
 
 **Comparaison de matières**
 Périmètre qui couvre deux à quatre matières entières : « Dans : Histoire de l'art et Physique ».
-« Changer », les cases de « Comparer des matières », puis « Comparer dans les prochaines
+« Changer », les cases de « Matières à comparer », puis « Comparer dans les prochaines
 questions ». Chaque phrase de la réponse porte la matière de sa source à côté de son numéro. La
 réponse nomme une matière sans passage assez proche : « Aucun passage trouvé en Philosophie. »
 

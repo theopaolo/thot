@@ -989,11 +989,15 @@ const LISTE = new Intl.ListFormat("fr");
  * « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. Une
  * comparaison nomme ses matières : « Histoire de l'art et Physique ».
  */
-export const nomPerimetre = (cat: Catalogue, p: Scope, theme = "Thème") => {
+export const nomPerimetre = (
+  cat: Catalogue,
+  p: Scope,
+  l: Pick<Libelles, "matiere" | "cours" | "regroupement">,
+) => {
   if (p.matieres) {
     return LISTE.format(
       idsMatieres(p.matieres)
-        .map((id) => cat.matieres.find((m) => m.id === id)?.nom ?? "Matière indisponible")
+        .map((id) => cat.matieres.find((m) => m.id === id)?.nom ?? `${l.matiere} indisponible`)
         .sort((a, b) => a.localeCompare(b, "fr")),
     );
   }
@@ -1001,9 +1005,9 @@ export const nomPerimetre = (cat: Catalogue, p: Scope, theme = "Thème") => {
   const c = cat.cours.find((x) => x.id === (p.cours_id || t?.cours_id));
   const m = cat.matieres.find((x) => x.id === (p.matiere_id || c?.matiere_id));
   return [
-    m?.nom ?? (p.matiere_id ? "Matière indisponible" : ""),
-    c?.nom ?? (p.cours_id ? "Cours indisponible" : ""),
-    t?.nom ?? (p.theme_id ? `${theme} indisponible` : ""),
+    m?.nom ?? (p.matiere_id ? `${l.matiere} indisponible` : ""),
+    c?.nom ?? (p.cours_id ? `${l.cours} indisponible` : ""),
+    t?.nom ?? (p.theme_id ? `${l.regroupement} indisponible` : ""),
   ]
     .filter(Boolean)
     .join(" / ");
@@ -1156,7 +1160,7 @@ export type Fil = {
   suite: string;
   perimetre: Scope;
   catalogue: Catalogue;
-  theme: string;
+  libelles: Libelles;
   indisponible: boolean;
   statut?: string;
   personnel?: boolean;
@@ -1167,7 +1171,7 @@ export const chat = (f: Fil) => {
   const conv = f.conversation;
   const derniere = f.messages.findLastIndex((m) => m.etat === "answered");
   const enCours = f.messages.some((m) => !m.resultat);
-  const nom = nomPerimetre(f.catalogue, f.perimetre, f.theme) || "toutes tes ressources";
+  const nom = nomPerimetre(f.catalogue, f.perimetre, f.libelles) || "toutes tes ressources";
   const changer = conv
     ? html`method="post" action="/eleve/chat/${conv.id}/perimetre"`
     : html`method="get" action="/eleve/chat/nouvelle"`;
@@ -1293,7 +1297,7 @@ export const chat = (f: Fil) => {
                 <details ${f.indisponible ? "open" : ""}>
                   <summary>Changer</summary>
                   <form ${changer} data-focus=".perimetre summary">
-                    ${selectsPerimetre(f.catalogue, f.perimetre, f.theme)}
+                    ${selectsPerimetre(f.catalogue, f.perimetre, f.libelles)}
                     <button>Appliquer aux prochaines questions</button>
                   </form>
                   ${
@@ -1301,7 +1305,7 @@ export const chat = (f: Fil) => {
                       ? html`
                       <form ${changer} data-focus=".perimetre summary">
                         <fieldset>
-                          <legend>Comparer des matières</legend>
+                          <legend>${f.libelles.matieres} à comparer</legend>
                           ${f.catalogue.matieres.map(
                             (m) =>
                               html`<label><input type="checkbox" name="matieres" value="${m.id}" ${

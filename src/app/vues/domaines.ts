@@ -8,6 +8,7 @@ import {
   type Scope,
   TYPES_CHAMP,
 } from "../domaines.ts";
+import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
 import { ongletsAdministration } from "./page.ts";
 
@@ -272,75 +273,138 @@ export const gestion = (
   `;
 };
 
-/** Les trois listes du périmètre, communes au filtre de la bibliothèque et à celui du chat. */
-export const selectsPerimetre = (cat: Catalogue, p: Scope, theme = "Thème") =>
+/**
+ * Les listes du périmètre, communes au filtre de la bibliothèque et à celui du chat. Sans thème
+ * dans les cours du compte, la liste des thèmes disparaît.
+ */
+export const selectsPerimetre = (cat: Catalogue, p: Scope, l: Libelles) =>
   html`
-      <label>Matière <select name="matiere_id"><option value="">Toutes les matières</option>${options(
+      <label>${l.matiere} <select name="matiere_id"><option value="">Tout</option>${options(
         cat.matieres,
         p.matiere_id,
       )}</select></label>
-      <label>Cours <select name="cours_id"><option value="">Tous les cours</option>${options(
+      <label>${l.cours} <select name="cours_id"><option value="">Tout</option>${options(
         cat.cours.map((c) => ({
           id: c.id,
           nom: `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`,
         })),
         p.cours_id,
       )}</select></label>
-      <label>${theme} <select name="theme_id"><option value="">${
-        TOUS[theme] ?? "Tous"
-      }</option>${options(
-        cat.themes.map((t) => ({
-          id: t.id,
-          nom: `${
-            cat.matieres.find(
-              (m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id,
-            )?.nom
-          } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom} / ${t.nom}`,
-        })),
-        p.theme_id,
-      )}</select></label>
+      ${
+        cat.themes.length
+          ? html`<label>${l.regroupement} <select name="theme_id"><option value="">Tout</option>${options(
+              cat.themes.map((t) => ({
+                id: t.id,
+                nom: `${
+                  cat.matieres.find(
+                    (m) => m.id === cat.cours.find((c) => c.id === t.cours_id)?.matiere_id,
+                  )?.nom
+                } / ${cat.cours.find((c) => c.id === t.cours_id)?.nom} / ${t.nom}`,
+              })),
+              p.theme_id,
+            )}</select></label>`
+          : ""
+      }
   `;
-const TOUS: Record<string, string> = {
-  Thème: "Tous les thèmes",
-  Séquence: "Toutes les séquences",
-};
 
+/** Un terme réglé n'a pas de genre : « tous les cours » ne s'accorderait pas avec « matière ». */
+const TOUT = "Toutes les ressources";
+/**
+ * Le choix du cours : un bouton ouvre la grille des cours, rangés par matière, chaque thème sous
+ * son cours. Un lien applique le choix. `garder` : les paramètres de la page que le choix garde.
+ */
 export const filtre = (
   cat: Catalogue,
   p: Scope,
   action: string,
-  q = "",
-  vue = "",
-  theme = "Thème",
-) =>
-  html`
-    <form method="get" action="${action}" class="biblio-outils" aria-label="Périmètre des ressources">
-      ${selectsPerimetre(cat, p, theme)}
+  l: Libelles,
+  garder: Record<string, string> = {},
+) => {
+  const lien = (champs: Record<string, string>) => {
+    const q = new URLSearchParams(Object.entries(garder).filter(([, v]) => v));
+    for (const [k, v] of Object.entries(champs)) q.set(k, v);
+    return `${action}?${q}`;
+  };
+  const actuel = (vrai: boolean) => html`aria-current="${String(vrai)}"`;
+  const c = cat.cours.find((x) => x.id === p.cours_id);
+  const t = cat.themes.find((x) => x.id === p.theme_id);
+  const choisi = p.theme_id
+    ? t
+      ? `${cat.cours.find((x) => x.id === t.cours_id)?.nom}, ${t.nom}`
+      : `${l.regroupement} indisponible`
+    : p.cours_id
+      ? (c?.nom ?? `${l.cours} indisponible`)
+      : p.matiere_id
+        ? (cat.matieres.find((m) => m.id === p.matiere_id)?.nom ?? `${l.matiere} indisponible`)
+        : TOUT;
+  const plusieurs = cat.matieres.length > 1;
+  const vue = garder.vue ?? "";
+  const portee = Object.fromEntries(Object.entries(p).filter(([, v]) => v));
+  return html`
+    <div class="biblio-outils">
       ${
-        action === "/eleve/recherche"
-          ? html`<input type="text" name="q" value="${q}" aria-label="Recherche" maxlength="300">`
+        cat.cours.length || choisi !== TOUT
+          ? html`
+        <button type="button" class="choix-cours" popovertarget="grille-cours">
+          <span class="discret">${l.cours}</span> ${choisi} ${icone("caret-down")}
+        </button>
+        <nav id="grille-cours" popover aria-label="${l.cours_pluriel}">
+          <a href="${lien({ cours_id: "" })}" ${actuel(
+            !p.matiere_id && !p.cours_id && !p.theme_id && !p.matieres,
+          )}>${TOUT}</a>
+          ${cat.matieres.map((m) => {
+            const cours = cat.cours.filter((x) => x.matiere_id === m.id);
+            return cours.length
+              ? html`
+              ${
+                plusieurs
+                  ? html`<a class="matiere" href="${lien({ matiere_id: m.id })}" ${actuel(
+                      p.matiere_id === m.id && !p.cours_id && !p.theme_id,
+                    )}>${m.nom}</a>`
+                  : ""
+              }
+              <ul>${cours.map(
+                (x) => html`
+                <li>
+                  <a href="${lien({ cours_id: x.id })}" ${actuel(
+                    p.cours_id === x.id && !p.theme_id,
+                  )}>${x.nom}${x.public ? html`<small>${x.public}</small>` : ""}</a>
+                  ${cat.themes
+                    .filter((y) => y.cours_id === x.id)
+                    .map(
+                      (y) =>
+                        html`<a class="theme" href="${lien({ cours_id: x.id, theme_id: y.id })}" ${actuel(
+                          p.theme_id === y.id,
+                        )}>${y.nom}</a>`,
+                    )}
+                </li>
+              `,
+              )}</ul>
+            `
+              : "";
+          })}
+        </nav>
+      `
           : ""
       }
       ${
         action === "/eleve"
-          ? html`<label>Affichage <select name="vue"><option value="">Liste</option><option value="grille" ${
-              vue === "grille" ? "selected" : ""
-            }>Images</option></select></label>`
+          ? html`<nav class="segments" aria-label="Affichage">${(
+              [
+                ["", "Liste", "list"],
+                ["grille", "Images", "squares-four"],
+              ] as const
+            ).map(
+              ([v, nom, i]) =>
+                html`<a href="${lien({ ...portee, vue: v })}" title="${nom}" ${actuel(
+                  v === vue,
+                )}>${icone(i)}<span class="visuellement-cache">${nom}</span></a>`,
+            )}</nav>`
           : ""
       }
-      <button>Appliquer</button>
-    </form>
-    <p class="discret">Périmètre : ${
-      cat.matieres.find((m) => m.id === p.matiere_id)?.nom ??
-      (p.matiere_id ? "Matière indisponible" : "toutes les matières")
-    } / ${
-      cat.cours.find((c) => c.id === p.cours_id)?.nom ??
-      (p.cours_id ? "Cours indisponible" : "tous les cours")
-    } / ${
-      cat.themes.find((t) => t.id === p.theme_id)?.nom ??
-      (p.theme_id ? `${theme} indisponible` : (TOUS[theme] ?? "Tous").toLowerCase())
-    }.</p>
+    </div>
   `;
+};
 
 export const choixMatiere = (cat: Catalogue, l: Libelles, id = "") =>
   html`

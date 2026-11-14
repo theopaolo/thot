@@ -73,7 +73,7 @@ test("les vues partagent le bundle et gardent leurs contrats de fragments et d'√
     suite: "",
     perimetre: { matiere_id: "", cours_id: "", theme_id: "" },
     catalogue: { matieres: [], cours: [], themes: [] },
-    theme: "Th√®me",
+    libelles: LIBELLES,
     indisponible: false,
   });
   const panneau = await panneauSource(

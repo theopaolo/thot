@@ -95,14 +95,9 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     );
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db, lu(c));
-    const filtresDomaines = DomaineVue.filtre(
-      cat,
-      scope(c),
-      "/eleve",
-      "",
-      c.req.query("vue"),
-      libelles(db).regroupement,
-    );
+    const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", libelles(db), {
+      vue: c.req.query("vue") ?? "",
+    });
     const generique =
       visibles.every((r) => r.profil === "general") || Object.values(scope(c)).some(Boolean);
     const mention = mentionLecteurs(c);
@@ -303,9 +298,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
             Domaines.catalogueVisible(db, lu(c)),
             scope(c),
             "/eleve/recherche",
-            "",
-            "",
-            libelles(db).regroupement,
+            libelles(db),
           )}${Eleve.recherche("", [], scope(c))}`,
         ),
       );
@@ -364,9 +357,8 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           Domaines.catalogueVisible(db, lu(c)),
           scope(c),
           "/eleve/recherche",
-          q,
-          "",
-          libelles(db).regroupement,
+          libelles(db),
+          { q },
         )}${Eleve.recherche(q, trouves, scope(c))}`,
       ),
     );

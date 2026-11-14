@@ -171,7 +171,7 @@ test("comparaison dans le chat : choisie par cases, gardée sur chaque échange,
     const poster = (chemin: string, corps: URLSearchParams) =>
       eleve.requete(chemin, { method: "POST", body: corps });
 
-    assertStringIncludes(await texte("/eleve/chat/nouvelle"), "Comparer des matières");
+    assertStringIncludes(await texte("/eleve/chat/nouvelle"), "Matières à comparer");
     const nouvelle = await texte(
       `/eleve/chat/nouvelle?matieres=${m.physique}&matieres=${m.art}&matieres=${m.philo}`,
     );

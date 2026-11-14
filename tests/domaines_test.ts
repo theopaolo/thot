@@ -14,6 +14,7 @@ import { dirname, join } from "node:path";
 import { connexion, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { deposer, valider } from "../src/app/depot.ts";
+import { filtre } from "../src/app/vues/domaines.ts";
 import {
   affiliations,
   catalogue,
@@ -356,7 +357,7 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const eleve = await session(db, faux.modeles, "eleve");
     const page = await (await eleve.requete(`/eleve?cours_id=${c}&theme_id=${t}`)).text();
     assertStringIncludes(page, "Faits sociaux");
-    assertStringIncludes(page, "Théories / Auteurs");
+    assertStringIncludes(page, '<span class="discret">Cours</span> Théories, Auteurs');
     const recherche = await (
       await eleve.requete(`/eleve/recherche?q=faits&cours_id=${c}&theme_id=${t}`)
     ).text();
@@ -863,6 +864,38 @@ test("import CLI : un sous-dossier donne le thème, la racine du chemin va direc
   } finally {
     await rm(dir, { recursive: true });
   }
+});
+
+test("filtre : la grille des cours applique le choix par un lien qui garde les paramètres de la page", async () => {
+  const sans = String(
+    await filtre(
+      { matieres: [], cours: [], themes: [] },
+      { matiere_id: "", cours_id: "", theme_id: "" },
+      "/prof",
+      PROFILS.general,
+    ),
+  );
+  assert(!sans.includes("grille-cours"));
+  const matiere = { id: "m1", nom: "Développement", profil: "general" };
+  const grille = String(
+    await filtre(
+      {
+        matieres: [matiere],
+        cours: [{ id: "c1", nom: "Docker", matiere_id: "m1", public: "", objectif: "" }],
+        themes: [],
+      } as never,
+      { matiere_id: "", cours_id: "c1", theme_id: "" },
+      "/prof",
+      { ...PROFILS.general, cours: "Chapitre", cours_pluriel: "Chapitres" },
+      { statut: "a_relire", vue: "" },
+    ),
+  );
+  assertStringIncludes(grille, '<span class="discret">Chapitre</span> Docker');
+  assertStringIncludes(grille, 'aria-label="Chapitres"');
+  assertStringIncludes(grille, 'href="/prof?statut=a_relire&amp;cours_id=c1" aria-current="true"');
+  assertStringIncludes(grille, 'href="/prof?statut=a_relire&amp;cours_id="');
+  // Une seule matière : pas de lien de matière, ni de liste des thèmes sans thème.
+  assert(!grille.includes('class="matiere"') && !grille.includes('class="theme"'));
 });
 
 test("renommer : un nom pris est refusé en français, un import par nom cherche l’ancien nom", async () => {
@@ -1665,6 +1698,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
       [admin, "/administration/domaines", "<h2>Chapitres</h2>"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
       [admin, "/prof/depot", "<strong>Chapitres de rattachement</strong>"],
+      [admin, "/prof", '<span class="discret">Chapitre</span>'],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
       [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],

@@ -96,9 +96,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
           Domaines.catalogueDe(db, c.get("compte")),
           scope(c),
           "/prof",
-          "",
-          "",
-          libelles(db).regroupement,
+          libelles(db),
+          { statut: f.statut, vue: f.vue },
         )}${Prof.sources(
           ressources.filter(
             (s) => (!f.statut || statut(s) === f.statut) && (!f.theme || s.theme === f.theme),

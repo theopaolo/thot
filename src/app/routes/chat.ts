@@ -113,7 +113,6 @@ export function routesChat(app: Hono<Env>, w: Web) {
             : "Une réponse est déjà en cours dans cette conversation.",
           409,
         );
-  const libelleTheme = () => libelles(db).regroupement;
 
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
   const perimetreRefuse = (c: Context<Env>, perimetre: Perimetre) => {
@@ -151,10 +150,10 @@ export function routesChat(app: Hono<Env>, w: Web) {
 
   const conversations = (c: Context<Env>, archivees: boolean, toutes: boolean, q = "") => {
     const cat = Domaines.catalogueVisible(db, lu(c));
-    const theme = libelleTheme();
+    const termes = libelles(db);
     const { lignes, plus } = Conversations.lister(db, c.get("compte"), archivees, toutes, q);
     return {
-      liste: lignes.map((l) => ({ ...l, perimetre: Eleve.nomPerimetre(cat, l, theme) })),
+      liste: lignes.map((l) => ({ ...l, perimetre: Eleve.nomPerimetre(cat, l, termes) })),
       plus,
     };
   };
@@ -164,7 +163,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const compte = c.get("compte");
     if (conv) Conversations.conversationLue(db, compte, conv.id);
     const cat = Domaines.catalogueVisible(db, lu(c));
-    const theme = libelleTheme();
+    const termes = libelles(db);
     // Une nouvelle conversation part du périmètre choisi, sinon de celui de la dernière.
     const p: Perimetre = conv ??
       (Object.hasOwn(c.req.query(), "matiere_id") || Object.hasOwn(c.req.query(), "matieres")
@@ -175,7 +174,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
         theme_id: "",
       };
     const messages = conv
-      ? messagesDe(compte, conv.id, (m) => Eleve.nomPerimetre(cat, m, theme))
+      ? messagesDe(compte, conv.id, (m) => Eleve.nomPerimetre(cat, m, termes))
       : [];
     const dernier = messages.findLast((m) => m.resultat);
     const { liste, plus } = conversations(c, false, false);
@@ -206,7 +205,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
             matieres: p.matieres ?? "",
           },
           catalogue: cat,
-          theme,
+          libelles: termes,
           indisponible: !!perimetreRefuse(c, p),
           statut: c.req.query("archivee") ? "Conversation archivée." : undefined,
           personnel: lireInstance(db).mode === "personal",
