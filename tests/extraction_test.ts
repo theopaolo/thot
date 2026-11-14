@@ -218,6 +218,13 @@ test("Markdown: le front matter donne le titre et sort du texte", () => {
   assertEquals(lireFrontMatter("---\r\ntitle: 'Cours'\r\n---\r\ncorps").titre, "Cours");
 });
 
+test("Markdown: le front matter donne l'ordre de lecture s'il est un nombre", () => {
+  assertEquals(lireFrontMatter(COURS_MD).ordre, 2);
+  assertEquals(lireFrontMatter("---\norder: '11.5'\n---\n").ordre, 11.5);
+  assertEquals(lireFrontMatter("---\norder: premier\n---\n").ordre, undefined);
+  assertEquals(lireFrontMatter("---\ntitle: Sans ordre\n---\n").ordre, undefined);
+});
+
 test("Markdown: titres en sections, marques réduites, code gardé tel quel", () => {
   const ext = extraireMarkdown(COURS_MD, "repli");
   assertEquals(

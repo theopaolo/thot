@@ -253,12 +253,16 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const date = String(b.date ?? "").trim();
     const artiste = String(b.artiste ?? "").trim();
     const mouvement = String(b.mouvement ?? "").trim();
+    // Un ordre vidé retire la source de l'ordre de lecture : elle suit alors par titre.
+    const ordreSaisi = String(b.ordre ?? d.meta.ordre ?? "").trim();
+    const ordre = ordreSaisi ? Number(ordreSaisi) : undefined;
     if (
       !titre ||
       titre.length > 200 ||
       date.length > 40 ||
       artiste.length > 120 ||
-      mouvement.length > 120
+      mouvement.length > 120 ||
+      (ordre !== undefined && !Number.isFinite(ordre))
     ) {
       return c.text("Titre ou champ invalide.", 400);
     }
@@ -278,7 +282,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
       return c.text((e as Error).message, 400);
     }
     // Une ancienne séquence reste dans les métadonnées : le formulaire ne la montre plus.
-    const meta: Record<string, unknown> = { ...d.meta, ...informations, titre, langue };
+    const meta: Record<string, unknown> = { ...d.meta, ...informations, titre, langue, ordre };
     delete meta.propositions;
     delete meta.quiz_reponse;
     try {

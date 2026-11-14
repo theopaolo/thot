@@ -1634,3 +1634,68 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     await rm(dir, { recursive: true });
   }
 });
+
+test("ordre de lecture : le front matter range le thème, l'enseignant le change", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const m = matiere(db, "Développement", "general");
+    const c = cours(db, m, "Codebase");
+    const t = theme(db, c, "Codebase");
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const lecon = async (titre: string, order?: number) => {
+      const v = valider({ titre, type_document: "cours", matiere_id: m, langue: "fr" });
+      assert("meta" in v);
+      const { source_id } = await deposer(db, {
+        meta: v.meta,
+        liens: [{ cours_id: c, theme_id: t }],
+        nomFichier: `${titre}.md`,
+        format: "md",
+        schoolId: lireInstance(db).school_id,
+        enseignant: "Compte enseignant",
+        audience: "eleves",
+        reponses: true,
+        octets: new TextEncoder().encode(
+          `---\ntitle: ${titre}\n${order === undefined ? "" : `order: ${order}\n`}---\n\n` +
+            `La leçon ${titre} explique comment lire du code.\n`,
+        ),
+      });
+      await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+      statuer(db, source_id, "certifiee", "Test");
+      return source_id;
+    };
+    const alpha = await lecon("Alpha", 10);
+    const beta = await lecon("Bêta", 2);
+    const annexe = await lecon("Annexe");
+    const ordre = async () => [
+      ...new Set(
+        [
+          ...(await (await eleve.requete(`/eleve/themes/${t}`)).text()).matchAll(
+            /\/eleve\/sources\/([\w-]+)/g,
+          ),
+        ].map((x) => x[1]),
+      ),
+    ];
+    // Une leçon sans ordre suit celles qui en ont, même si son titre vient avant.
+    assertEquals(await ordre(), [beta, alpha, annexe]);
+
+    const lecture = await (await eleve.requete(`/eleve/sources/${beta}`)).text();
+    assertStringIncludes(lecture, `<a href="/eleve/sources/${beta}" aria-current="page">Bêta`);
+    assertStringIncludes(lecture, `<a href="/eleve/sources/${alpha}" rel="next">`);
+    assert(!lecture.includes('rel="prev"'));
+
+    const modifier = (ordre: string) =>
+      prof.requete(`/prof/sources/${annexe}/modifier`, {
+        method: "POST",
+        body: new URLSearchParams({ titre: "Annexe", ordre }),
+      });
+    assertEquals((await modifier("1")).status, 303);
+    assertEquals(await ordre(), [annexe, beta, alpha]);
+    assertEquals((await modifier("premier")).status, 400);
+    assertEquals((await modifier("")).status, 303);
+    assertEquals(await ordre(), [beta, alpha, annexe]);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});

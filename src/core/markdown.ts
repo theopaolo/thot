@@ -1,13 +1,21 @@
 import type { Extraction, Partie } from "./document.ts";
 import { decoder } from "./html.ts";
 
-/** Front matter YAML en tête de fichier. Seul `title` est lu, `corps` est le reste. */
-export function lireFrontMatter(md: string): { titre?: string; corps: string } {
+/** Front matter YAML en tête de fichier. Seuls `title` et `order` sont lus, `corps` est le reste. */
+export function lireFrontMatter(md: string): { titre?: string; ordre?: number; corps: string } {
   const texte = md.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
   const m = texte.match(/^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/);
   if (!m) return { corps: texte };
-  const titre = m[1]?.match(/^title:[ \t]*(.+?)[ \t]*$/m)?.[1].replace(/^(["'])(.*)\1$/, "$2");
-  return { titre: titre || undefined, corps: texte.slice(m[0].length) };
+  const cle = (nom: string) =>
+    m[1]
+      ?.match(new RegExp(`^${nom}:[ \\t]*(.+?)[ \\t]*$`, "m"))?.[1]
+      .replace(/^(["'])(.*)\1$/, "$2");
+  const ordre = Number(cle("order"));
+  return {
+    titre: cle("title") || undefined,
+    ordre: Number.isFinite(ordre) ? ordre : undefined,
+    corps: texte.slice(m[0].length),
+  };
 }
 
 const RE_IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)[^)]*\)/g;

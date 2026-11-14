@@ -981,6 +981,18 @@ export const detailSource = (d: Detail) => {
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
         ${Domaines.informations(d.informations, d.meta, propositions)}
       </div>
+      <div class="deux">
+        <div class="champ">
+          <label for="ordre">Ordre de lecture</label>
+          <p class="aide" id="ordre-aide">
+            Les élèves lisent les ressources rangées ensemble dans cet ordre, puis par titre. Un
+            Markdown le prend de la clé <code>order</code> de son front matter.
+          </p>
+          <input type="number" step="any" id="ordre" name="ordre" value="${String(
+            d.meta.ordre ?? "",
+          )}" aria-describedby="ordre-aide">
+        </div>
+      </div>
       ${
         d.source.profil !== "general"
           ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`

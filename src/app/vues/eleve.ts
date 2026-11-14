@@ -551,9 +551,14 @@ export const lectureSource = (
   marque?: [number, number],
   /** les blocs viennent d'une révision qui ne sert plus */
   ancienne = false,
+  /** les ressources du thème dans l'ordre de lecture, `s` comprise */
+  voisins: { id: string; titre: string }[] = [],
 ) => {
   const texte = blocs.filter((b, n) => !(n === 0 && b.texte === s.titre));
   const plan = sections(texte, s.titre);
+  const rang = voisins.findIndex((v) => v.id === s.id);
+  const precedente = rang > 0 ? voisins[rang - 1] : undefined;
+  const suivante = rang >= 0 ? voisins[rang + 1] : undefined;
   return html`
     <a class="bouton retour" href="${
       s.profil === "general" ? "/eleve" : lienTheme(s.theme_id, s.id)
@@ -561,6 +566,23 @@ export const lectureSource = (
       "arrow-left",
     )}${s.profil === "general" ? "Ressources" : nomChapitre(s.theme || "Autres documents")}</a>
     <div class="lecture-colonnes">
+    ${
+      voisins.length > 1
+        ? html`
+          <nav class="ressources-theme" aria-labelledby="ressources-theme-titre">
+            <h2 id="ressources-theme-titre"><a href="${lienTheme(s.theme_id)}">${
+              s.theme || "Ressources non classées"
+            }</a></h2>
+            <ol>${voisins.map(
+              (v) =>
+                html`<li><a href="/eleve/sources/${v.id}" aria-current="${
+                  v.id === s.id ? "page" : "false"
+                }">${v.titre}</a></li>`,
+            )}</ol>
+          </nav>
+        `
+        : ""
+    }
     <article class="document">
       <h1>${s.titre}</h1>
       ${
@@ -612,6 +634,24 @@ export const lectureSource = (
           }</figure>
         `,
       )} ${texteDocument(texte, marque, 2, s.titre)}
+      ${
+        precedente || suivante
+          ? html`
+            <nav class="suite-lecture" aria-label="Ressource précédente et suivante">
+              ${
+                precedente
+                  ? html`<a href="/eleve/sources/${precedente.id}" rel="prev"><span>Précédente</span>${precedente.titre}</a>`
+                  : ""
+              }
+              ${
+                suivante
+                  ? html`<a href="/eleve/sources/${suivante.id}" rel="next"><span>Suivante</span>${suivante.titre}</a>`
+                  : ""
+              }
+            </nav>
+          `
+          : ""
+      }
     </article>
     ${
       plan.length > 1

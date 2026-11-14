@@ -80,8 +80,8 @@ par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `
 figure, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Sa
 légende reprend l'`accTitle` et l'`accDescr` du code, et le code se replie sous la légende. Un
 dessin qui échoue laisse le code déplié. Le lecteur colore le code des autres langages que
-Shiki connaît, sans changer le texte du bloc. Le front matter fournit le titre, ses autres clés
-sont ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
+Shiki connaît, sans changer le texte du bloc. Le front matter fournit le titre et l'ordre de
+lecture (`order`), ses autres clés sont ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
 
 Le lecteur garde les lignes d'un bloc : une liste extraite garde une entrée par ligne. Un bloc
 dont toutes les lignes ont le même nombre de cellules séparées par « | » s'affiche en tableau,
@@ -180,6 +180,12 @@ la source dans le thème de même nom du cours, créé s'il manque. Le périmèt
 un thème, pas une séquence. Une adresse ou une page d'avant les thèmes qui nomme une séquence
 mène au thème où sont rangées le plus de sources de cette séquence, dans un cours du compte
 d'abord. Une question posée dans une séquence qu'aucun thème ne remplace est refusée.
+
+Dans un thème, les ressources se lisent par séance, puis par ordre de lecture, puis par titre.
+Une ressource sans ordre suit celles qui en ont. Le dépôt prend l'ordre d'un Markdown dans son
+front matter, et l'enseignant le change sur la fiche de la ressource. Le lecteur d'un cours
+général mène à la ressource précédente et à la suivante, et liste celles du thème à gauche du
+texte quand l'écran a la place de trois colonnes.
 
 L'en-tête de recherche de chaque passage (`rappel`) porte les noms des thèmes de la source, tous,
 par ordre alphabétique. Une source sans thème garde sa séquence. Renommer un thème réindexe ses

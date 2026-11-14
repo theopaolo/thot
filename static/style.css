@@ -971,8 +971,14 @@ kbd {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
 }
-.sommaire {
+.sommaire,
+.ressources-theme {
   display: none;
+  position: sticky;
+  top: var(--s5);
+  align-self: start;
+  max-height: calc(100dvh - 2 * var(--s5));
+  overflow-y: auto;
 }
 @media (min-width: 75rem) {
   .lecture-colonnes {
@@ -981,24 +987,39 @@ kbd {
   }
   .sommaire {
     display: block;
-    position: sticky;
-    top: var(--s5);
-    align-self: start;
-    max-height: calc(100dvh - 2 * var(--s5));
-    overflow-y: auto;
   }
 }
-.sommaire h2 {
+/* Les ressources du thème passent à gauche du texte quand trois colonnes tiennent. */
+@media (min-width: 85rem) {
+  main:has(.ressources-theme) {
+    max-width: 88rem;
+  }
+  .lecture-colonnes:has(> .ressources-theme) {
+    grid-template-columns: minmax(11rem, 14rem) minmax(0, 52rem) minmax(11rem, 14rem);
+    gap: var(--s6);
+  }
+  .ressources-theme {
+    display: block;
+  }
+}
+:is(.sommaire, .ressources-theme) h2 {
   margin-bottom: var(--s2);
   font-size: 1rem;
 }
-.sommaire ol {
+.ressources-theme h2 a {
+  color: inherit;
+  text-decoration: none;
+}
+.ressources-theme h2 a:hover {
+  text-decoration: underline;
+}
+:is(.sommaire, .ressources-theme) ol {
   margin: 0;
   padding: 0 0 0 var(--s3);
   border-left: 1px solid var(--line);
   list-style: none;
 }
-.sommaire a {
+:is(.sommaire, .ressources-theme) a {
   display: block;
   padding: var(--s1) 0;
   color: var(--ink-muted);
@@ -1006,9 +1027,41 @@ kbd {
   line-height: 1.4;
   text-decoration: none;
 }
-.sommaire a:hover {
+:is(.sommaire, .ressources-theme) a:hover {
   color: var(--ink);
   text-decoration: underline;
+}
+.ressources-theme a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.suite-lecture {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s4);
+  margin-top: var(--s7);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
+}
+.suite-lecture a {
+  max-width: 24rem;
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.suite-lecture a:hover {
+  text-decoration: underline;
+}
+.suite-lecture [rel="next"] {
+  margin-left: auto;
+  text-align: right;
+}
+.suite-lecture span {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
 }
 .fichier {
   display: inline-flex;

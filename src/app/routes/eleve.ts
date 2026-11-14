@@ -22,6 +22,10 @@ import type { Env, Web } from "./web.ts";
 const QUIZ = `CASE WHEN s.profil = 'arts-appliques' THEN trim(coalesce(json_extract(s.metadonnees, '$.artiste'), '') || '|' ||
   coalesce(json_extract(s.metadonnees, '$.mouvement'), ''), '|') ELSE '' END AS quiz_reponse`;
 
+/** Après la séance : l'ordre de lecture que l'enseignant donne, puis le titre. */
+const ORDRE_LECTURE = `json_extract(s.metadonnees, '$.ordre') IS NULL,
+  json_extract(s.metadonnees, '$.ordre'), s.titre`;
+
 export function routesEleve(app: Hono<Env>, w: Web) {
   const {
     db,
@@ -43,7 +47,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
          ${QUIZ},
          (SELECT id FROM images WHERE source_id = s.id ORDER BY position LIMIT 1) AS image_id
        FROM sources s WHERE ${CITABLE}
-       ORDER BY seance, titre`,
+       ORDER BY seance, ${ORDRE_LECTURE}`,
       )
       .all(
         parametresCitable({ schoolId: instance.school_id, lecteur: lu(c), bibliotheque: true }),
@@ -167,16 +171,9 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       }`,
     );
   });
-  // Sans thème : les sources qui n'ont de thème dans aucun cours du lecteur.
-  app.on("GET", ["/eleve/sans-sequence", "/eleve/themes/:theme"], (c) => {
-    const themeId = c.req.param("theme") ?? "";
-    const cat = Domaines.catalogueVisible(db, lu(c));
-    const theme = themeId ? cat.themes.find((t) => t.id === themeId) : undefined;
-    if (themeId && !theme) return c.notFound();
-    const nom = theme?.nom ?? "";
-    const cours = cat.cours.find((c) => c.id === theme?.cours_id);
-    const matiere = cat.matieres.find((m) => m.id === cours?.matiere_id);
-    const sources = db
+  /** Les sources d'un thème, ou sans `themeId` celles qui n'ont de thème dans aucun cours du lecteur. */
+  const sourcesDuTheme = (l: Lecteur, themeId: string) =>
+    db
       .prepare(
         `SELECT s.id, s.titre, s.profil, coalesce(json_extract(s.metadonnees, '$.seance'), '') AS seance,
          coalesce(json_extract(s.metadonnees, '$.date'), '') AS date,
@@ -185,17 +182,26 @@ export function routesEleve(app: Hono<Env>, w: Web) {
        FROM sources s WHERE ${CITABLE}
          AND ($theme != '' OR NOT EXISTS (SELECT 1 FROM source_cours sc
            WHERE sc.source_id = s.id AND sc.theme_id IS NOT NULL AND ${Domaines.MES_COURS}))
-       ORDER BY seance = '', seance, s.titre`,
+       ORDER BY seance = '', seance, ${ORDRE_LECTURE}`,
       )
       .all({
         ...parametresCitable({
           schoolId: instance.school_id,
-          lecteur: lu(c),
+          lecteur: l,
           bibliotheque: true,
           themeId,
         }),
-        ...Domaines.mesCours(lu(c)),
+        ...Domaines.mesCours(l),
       }) as Eleve.SourceChapitre[];
+  app.on("GET", ["/eleve/sans-sequence", "/eleve/themes/:theme"], (c) => {
+    const themeId = c.req.param("theme") ?? "";
+    const cat = Domaines.catalogueVisible(db, lu(c));
+    const theme = themeId ? cat.themes.find((t) => t.id === themeId) : undefined;
+    if (themeId && !theme) return c.notFound();
+    const nom = theme?.nom ?? "";
+    const cours = cat.cours.find((c) => c.id === theme?.cours_id);
+    const matiere = cat.matieres.find((m) => m.id === cours?.matiere_id);
+    const sources = sourcesDuTheme(lu(c), themeId);
     if (!sources.length) return c.notFound();
     // Le lecteur s'ouvre sur le document demandé, sinon sur la première œuvre du mur.
     const doc =
@@ -276,6 +282,8 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           libelles(db),
           marque,
           revision < s.revision,
+          // Un cours général se lit de ressource en ressource, dans l'ordre de son thème.
+          s.profil === "general" ? sourcesDuTheme(lu(c), s.theme_id) : [],
         ),
         "lecture",
       ),

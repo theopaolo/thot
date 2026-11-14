@@ -225,7 +225,15 @@ export async function deposer(
         source_id,
         d.schoolId,
         d.meta.titre,
-        JSON.stringify({ ...saisie, ...informations }),
+        // L'ordre de lecture d'un Markdown vient de son front matter. L'enseignant le change ensuite.
+        JSON.stringify({
+          ...saisie,
+          ...informations,
+          ordre:
+            d.format === "md"
+              ? lireFrontMatter(new TextDecoder().decode(d.octets)).ordre
+              : undefined,
+        }),
         nom,
         d.format,
         checksum,
