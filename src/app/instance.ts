@@ -10,6 +10,10 @@ export type Instance = {
   school_id: string;
   nom: string;
   mode: "shared" | "personal";
+  matiere: string;
+  matieres: string;
+  cours: string;
+  cours_pluriel: string;
   niveau: string;
   regroupement: string;
   regroupements: string;
@@ -41,12 +45,23 @@ export function initialiserInstance(db: Db) {
 export const lireInstance = (db: Db) =>
   db
     .prepare(
-      `SELECT id, school_id, nom, mode, niveau, regroupement, regroupements, lecteurs, version
-       FROM instance WHERE singleton = 1`,
+      `SELECT id, school_id, nom, mode, matiere, matieres, cours, cours_pluriel, niveau,
+       regroupement, regroupements, lecteurs, version FROM instance WHERE singleton = 1`,
     )
     .get() as Instance;
 
-export type Libelles = Pick<Instance, "niveau" | "regroupement" | "regroupements"> & {
+/** Un terme dans une phrase : « Matières et cours ». */
+export const minuscule = (terme: string) =>
+  terme.charAt(0).toLocaleLowerCase("fr") + terme.slice(1);
+/** Les termes que l'instance règle, chacun au singulier et au pluriel sauf le niveau. */
+export const TERMES = [
+  ["matiere", "matieres"],
+  ["cours", "cours_pluriel"],
+  ["niveau"],
+  ["regroupement", "regroupements"],
+] as const;
+type Terme = (typeof TERMES)[number][number];
+export type Libelles = Pick<Instance, Terme> & {
   sousRegroupement: string;
   seance: string;
 };
@@ -58,18 +73,13 @@ export function libelles(db: Db): Libelles {
   const i = lireInstance(db);
   const p = PROFILS[profilInstance(db) ?? "general"];
   return {
-    niveau: i.niveau || p.niveau,
-    regroupement: i.regroupement || p.regroupement,
-    regroupements: i.regroupements || p.regroupements,
+    ...(Object.fromEntries(TERMES.flat().map((t) => [t, i[t] || p[t]])) as Pick<Instance, Terme>),
     sousRegroupement: p.sousRegroupement,
     seance: p.seance,
   };
 }
 
-export type Reglages = Pick<
-  Instance,
-  "nom" | "niveau" | "regroupement" | "regroupements" | "lecteurs"
->;
+export type Reglages = Pick<Instance, "nom" | Terme | "lecteurs">;
 /**
  * Enregistre tous les réglages ou aucun. Rend les erreurs par champ, `false` si un autre
  * enregistrement a eu lieu depuis `version`, `true` une fois enregistré.
@@ -77,22 +87,25 @@ export type Reglages = Pick<
 export function enregistrerReglages(db: Db, r: Reglages, version: number) {
   const erreurs: Record<string, string> = {};
   if (!r.nom || r.nom.length > 100) erreurs.nom = "1 à 100 caractères.";
-  for (const n of ["niveau", "regroupement", "regroupements"] as const) {
-    if (r[n].length > 40) erreurs[n] = "1 à 40 caractères.";
-  }
-  // Un singulier sans son pluriel mêlerait le terme de l'instance et celui du profil.
-  if (!r.regroupement !== !r.regroupements) {
-    erreurs[r.regroupement ? "regroupements" : "regroupement"] = "1 à 40 caractères.";
+  for (const [singulier, pluriel] of TERMES) {
+    for (const n of [singulier, pluriel ?? singulier]) {
+      if (r[n].length > 40) erreurs[n] = "1 à 40 caractères.";
+    }
+    // Un singulier sans son pluriel mêlerait le terme de l'instance et celui du profil.
+    if (pluriel && !r[singulier] !== !r[pluriel]) {
+      erreurs[r[singulier] ? pluriel : singulier] = "1 à 40 caractères.";
+    }
   }
   if (!AUDIENCES.some((a) => a.value === r.lecteurs)) erreurs.lecteurs = "Lecteurs inconnus.";
   if (Object.keys(erreurs).length) return erreurs;
   return (
     db
       .prepare(
-        `UPDATE instance SET nom = ?, niveau = ?, regroupement = ?, regroupements = ?, lecteurs = ?,
-         version = version + 1 WHERE singleton = 1 AND version = ?`,
+        `UPDATE instance SET nom = ?, ${TERMES.flat()
+          .map((t) => `${t} = ?`)
+          .join(", ")}, lecteurs = ?, version = version + 1 WHERE singleton = 1 AND version = ?`,
       )
-      .run(r.nom, r.niveau, r.regroupement, r.regroupements, r.lecteurs, version).changes === 1
+      .run(r.nom, ...TERMES.flat().map((t) => r[t]), r.lecteurs, version).changes === 1
   );
 }
 

@@ -2,7 +2,13 @@ import { html } from "hono/html";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
 import { AUDIENCES } from "../depot.ts";
-import { type Instance, type Reglages, traitements } from "../instance.ts";
+import {
+  type Instance,
+  type Libelles,
+  minuscule,
+  type Reglages,
+  traitements,
+} from "../instance.ts";
 import { type Icone, icone } from "../icones.ts";
 import { type Profil, PROFILS } from "../../core/profils.ts";
 
@@ -315,10 +321,12 @@ export const motDePasse = (erreur?: string) =>
     </form>
   `;
 
-export const ongletsAdministration = (chemin: string) =>
+export const domainesDe = (l: Pick<Libelles, "matieres" | "cours_pluriel">) =>
+  `${l.matieres} et ${minuscule(l.cours_pluriel)}`;
+export const ongletsAdministration = (chemin: string, l: Libelles) =>
   html`<nav class="onglets" aria-label="Administration">${[
     ["/administration", "Instance"],
-    ["/administration/domaines", "Matières et cours"],
+    ["/administration/domaines", domainesDe(l)],
   ].map(
     ([href, libelle]) =>
       html`<a href="${href}" ${chemin === href ? html`aria-current="page"` : ""}>${libelle}</a>`,
@@ -332,6 +340,7 @@ export const administration = (
   instance: Instance,
   profil: Profil | undefined,
   fige: boolean,
+  l: Libelles,
   e: {
     saisie?: Reglages;
     erreurs?: Record<string, string>;
@@ -343,11 +352,7 @@ export const administration = (
   const erreurs = e.erreurs ?? {};
   const premiere = Object.keys(erreurs)[0];
   const preset = PROFILS[profil ?? "general"];
-  const texte = (
-    nom: "nom" | "niveau" | "regroupement" | "regroupements",
-    label: string,
-    max: number,
-  ) => {
+  const texte = (nom: Exclude<keyof Reglages, "lecteurs">, label: string, max: number) => {
     const aide = nom === "nom" ? "" : `Vide : ${preset[nom]}, le terme du profil ${preset.nom}.`;
     const decrit = [aide && `${nom}-aide`, erreurs[nom] && `${nom}-erreur`].filter(Boolean);
     return html`
@@ -365,7 +370,7 @@ export const administration = (
   };
   return html`
     <h1>Administration</h1>
-    ${ongletsAdministration("/administration")}
+    ${ongletsAdministration("/administration", l)}
     ${e.enregistre ? html`<p role="status" tabindex="-1" autofocus>Réglages enregistrés.</p>` : ""}
     ${
       e.conflit
@@ -385,6 +390,14 @@ export const administration = (
       </fieldset>
       <fieldset>
         <legend>Vocabulaire</legend>
+        <div class="deux">
+          ${texte("matiere", "Matière, au singulier", 40)}
+          ${texte("matieres", "Matière, au pluriel", 40)}
+        </div>
+        <div class="deux">
+          ${texte("cours", "Cours, au singulier", 40)}
+          ${texte("cours_pluriel", "Cours, au pluriel", 40)}
+        </div>
         ${texte("niveau", "Niveau", 40)}
         <div class="deux">
           ${texte("regroupement", "Regroupement, au singulier", 40)}
@@ -423,7 +436,7 @@ export const administration = (
           : fige
             ? "Des ressources sont déposées, il ne change plus."
             : "Il se change tant qu'aucune ressource n'est déposée."
-      } <a href="/administration/domaines">Matières et cours</a></p>
+      } <a href="/administration/domaines">${domainesDe(l)}</a></p>
       <h2>Traitement des documents et des questions</h2>
       <p>Services autorisés et localisations déclarés par l'opérateur. Les localisations ne sont pas vérifiées par l'application.</p>
       <dl>${traitements().map(

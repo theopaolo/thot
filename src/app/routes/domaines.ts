@@ -1,5 +1,6 @@
 import { type Context, Hono } from "hono";
 import { libelles } from "../instance.ts";
+import { domainesDe } from "../vues/page.ts";
 import { renommerEntree } from "../ingestion.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
@@ -16,7 +17,7 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
     const cat = Domaines.catalogue(db);
     return rendre(
       c,
-      "Matières et cours",
+      domainesDe(libelles(db)),
       DomaineVue.gestion(
         cat,
         erreur,

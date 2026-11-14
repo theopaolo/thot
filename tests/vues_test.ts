@@ -12,6 +12,10 @@ import {
 import type { BlocReponse } from "../src/core/reponse.ts";
 
 const LIBELLES = {
+  matiere: "Matière",
+  matieres: "Matières",
+  cours: "Cours",
+  cours_pluriel: "Cours",
   niveau: "Classe",
   regroupement: "Séquence",
   regroupements: "Séquences",

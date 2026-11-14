@@ -9,7 +9,7 @@ import {
   inscrireParLien,
   lireCompte,
 } from "../comptes.ts";
-import { enregistrerReglages, lireInstance, type Reglages } from "../instance.ts";
+import { enregistrerReglages, libelles, lireInstance, type Reglages, TERMES } from "../instance.ts";
 import {
   administration,
   connexion as formulaireConnexion,
@@ -79,7 +79,7 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
     session.fermer(c);
     return c.redirect("/connexion");
   });
-  const pageAdministration = (c: Context<Env>, etat: Parameters<typeof administration>[3] = {}) =>
+  const pageAdministration = (c: Context<Env>, etat: Parameters<typeof administration>[4] = {}) =>
     rendre(
       c,
       "Administration",
@@ -87,6 +87,7 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
         lireInstance(db),
         Domaines.profilInstance(db),
         !!db.prepare("SELECT 1 FROM sources").get(),
+        libelles(db),
         etat,
       ),
     );
@@ -99,9 +100,10 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
     const champ = (n: string) => String(b[n] ?? "").trim();
     const saisie: Reglages = {
       nom: champ("nom"),
-      niveau: champ("niveau"),
-      regroupement: champ("regroupement"),
-      regroupements: champ("regroupements"),
+      ...(Object.fromEntries(TERMES.flat().map((t) => [t, champ(t)])) as Omit<
+        Reglages,
+        "nom" | "lecteurs"
+      >),
       // Le mode personnel ne montre pas ce choix : un dépôt n'y a qu'un lecteur.
       lecteurs: String(b.lecteurs ?? lireInstance(db).lecteurs) as Reglages["lecteurs"],
     };

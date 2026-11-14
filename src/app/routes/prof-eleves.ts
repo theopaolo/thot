@@ -11,7 +11,7 @@ import {
   reinitialiserMotDePasse,
   revoquerLien,
 } from "../comptes.ts";
-import { lireInstance } from "../instance.ts";
+import { libelles, lireInstance } from "../instance.ts";
 import * as Prof from "../vues/prof.ts";
 import * as Domaines from "../domaines.ts";
 import type { Env, Web } from "./web.ts";
@@ -32,7 +32,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     return rendre(
       c,
       "Élèves",
-      Prof.eleves(cat, groupes, sansCours, liens, new URL(c.req.url).origin, erreur),
+      Prof.eleves(cat, groupes, sansCours, liens, new URL(c.req.url).origin, libelles(db), erreur),
     );
   };
   /**

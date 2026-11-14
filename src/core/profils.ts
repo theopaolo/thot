@@ -3,6 +3,10 @@ export type Profil = "general" | "arts-appliques";
 export const PROFILS = {
   general: {
     nom: "Général",
+    matiere: "Matière",
+    matieres: "Matières",
+    cours: "Cours",
+    cours_pluriel: "Cours",
     niveau: "Niveau",
     regroupement: "Thème",
     regroupements: "Thèmes",
@@ -22,6 +26,10 @@ export const PROFILS = {
   },
   "arts-appliques": {
     nom: "Arts appliqués",
+    matiere: "Matière",
+    matieres: "Matières",
+    cours: "Cours",
+    cours_pluriel: "Cours",
     niveau: "Classe",
     regroupement: "Séquence",
     regroupements: "Séquences",

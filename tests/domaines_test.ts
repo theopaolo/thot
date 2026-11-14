@@ -120,6 +120,7 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0020_credits.sql",
       "0021_images_section.sql",
       "0024_explications.sql",
+      "0025_termes.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -1619,6 +1620,10 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
         body: new URLSearchParams({
           nom: "Thot",
           niveau: "",
+          matiere: "Sujet",
+          matieres: "Sujets",
+          cours: "Chapitre",
+          cours_pluriel: "Chapitres",
           regroupement: "Module",
           regroupements: "Modules",
           lecteurs: "collegues",
@@ -1653,6 +1658,8 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     for (const [qui, chemin, attendu] of [
       [admin, "/prof/depot", `<label>Module <select name="theme_${t.cours_id}">`],
       [admin, "/administration/domaines", "<h2>Modules</h2>"],
+      [admin, "/administration/domaines", "<h2>Chapitres</h2>"],
+      [admin, "/administration", ">Sujets et chapitres</a>"],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
       [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],

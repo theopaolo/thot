@@ -8,7 +8,7 @@ import {
   type Scope,
   TYPES_CHAMP,
 } from "../domaines.ts";
-import type { Libelles } from "../instance.ts";
+import { type Libelles, minuscule } from "../instance.ts";
 import { ongletsAdministration } from "./page.ts";
 
 const options = (liste: { id: string; nom: string }[], valeur = "") =>
@@ -110,6 +110,8 @@ export type ChampsDepot = {
   enregistre: boolean;
 };
 const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
+const nombre = (n: number, singulier: string, pluriels: string) =>
+  `${n} ${minuscule(n > 1 ? pluriels : singulier)}`;
 /** Une case par champ du catalogue. Une matière arts garde cochés les champs que le quiz lit. */
 const champsDuDepot = (m: Matiere, d: ChampsDepot, ouvert: boolean) => {
   const conflit = d.saisie?.id === m.id;
@@ -180,23 +182,27 @@ export const gestion = (
   const personnalises = champs.catalogue.filter((c) => !Object.hasOwn(CHAMPS, c.cle));
   return html`
     <h1>Administration</h1>
-    ${ongletsAdministration("/administration/domaines")}
+    ${ongletsAdministration("/administration/domaines", l)}
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
     <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     ${controleProfil}
     <p>Renommer garde les rattachements. Supprimer est refusé tant qu'une ressource ou une question
     d'élève utilise l'entrée. Une matière ou un cours emporte tout ce qu'il contient.</p>
-    <h2>Matières</h2>
+    <h2>${l.matieres}</h2>
     ${cat.matieres.map(
       (m) =>
-        html`${ligne("matiere", m.id, m.nom)}${champsDuDepot(m, champs, inscriptions.ouvert === m.id)}`,
+        html`${ligne("matiere", m.id, m.nom, "", l.matiere)}${champsDuDepot(
+          m,
+          champs,
+          inscriptions.ouvert === m.id,
+        )}`,
     )}
     <form method="post" action="/administration/domaines/matiere"
-      class="etroit"><label>Nouvelle matière <input type="text" name="nom" required maxlength="200"></label>${
+      class="etroit"><label>${l.matiere} à créer <input type="text" name="nom" required maxlength="200"></label>${
         profil ? "" : selectionProfil()
-      }<button>Créer la matière</button></form>
-    <h2>Cours</h2>
+      }<button>Créer</button></form>
+    <h2>${l.cours_pluriel}</h2>
     <p>Un nouveau cours démarre sans membre, et seuls ses membres, les administrateurs et les
     propriétaires lisent les ressources qu'il partage.</p>${cat.cours.map(
       (c) =>
@@ -207,6 +213,7 @@ export const gestion = (
           `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom}${
             c.public ? `, ${c.public}` : ""
           }${c.objectif ? ` : ${c.objectif}` : ""}`,
+          l.cours,
         )}${membresDuCours(
           c,
           inscriptions.membres.get(c.id) ?? [],
@@ -215,9 +222,9 @@ export const gestion = (
         )}`,
     )}
     <form method="post" action="/administration/domaines/cours"
-      class="etroit"><label>Matière <select name="matiere_id" required>${options(
+      class="etroit"><label>${l.matiere} <select name="matiere_id" required>${options(
         cat.matieres,
-      )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>
+      )}</select></label><label>${l.cours} à créer <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer</button></form>
     <h2>${l.regroupements}</h2>${cat.themes.map((t) =>
       ligne(
         "theme",
@@ -231,7 +238,7 @@ export const gestion = (
       ),
     )}
     <form method="post" action="/administration/domaines/theme"
-      class="etroit"><label>Cours <select name="cours_id" required>${options(
+      class="etroit"><label>${l.cours} <select name="cours_id" required>${options(
         cat.cours.map((c) => ({
           id: c.id,
           nom: `${cat.matieres.find((m) => m.id === c.matiere_id)?.nom} / ${c.nom}`,
@@ -247,9 +254,10 @@ export const gestion = (
               "champ",
               c.cle,
               c.label,
-              `${TYPES_CHAMP[c.type]}, ${pluriel(
+              `${TYPES_CHAMP[c.type]}, ${nombre(
                 [...champs.listes.values()].filter((liste) => liste.includes(c.cle)).length,
-                "matière",
+                l.matiere,
+                l.matieres,
               )}, ${pluriel(c.ressources, "ressource")}`,
             ),
           )
@@ -334,10 +342,10 @@ export const filtre = (
     }.</p>
   `;
 
-export const choixMatiere = (cat: Catalogue, id = "") =>
+export const choixMatiere = (cat: Catalogue, l: Libelles, id = "") =>
   html`
     <form method="get" action="/prof/depot"
-      class="barre"><label>Matière <select name="matiere_id"><option value="">Non classée</option>${options(
+      class="barre"><label>${l.matiere} <select name="matiere_id"><option value="">Non classée</option>${options(
         cat.matieres,
         id,
       )}</select></label><button>Choisir les champs</button></form>

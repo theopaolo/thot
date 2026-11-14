@@ -317,7 +317,7 @@ export const sources = (
 
 export type Eleve = { id: string; identifiant: string; nom: string };
 
-const choixCours = (cat: Catalogue, aide: string, legende = "Cours des nouveaux comptes") =>
+const choixCours = (cat: Catalogue, aide: string, legende: string) =>
   cat.cours.length
     ? html`
       <fieldset>
@@ -362,14 +362,18 @@ export type Lien = {
 };
 
 /** Les liens d'inscription actifs. Un cours du lien ne se nomme qu'à ses enseignants. */
-const sectionLiens = (cat: Catalogue, liens: Lien[], adresse: string) =>
+const sectionLiens = (cat: Catalogue, liens: Lien[], adresse: string, termes: Libelles) =>
   html`
     <h2 id="liens">Lien d'inscription</h2>
     <p>L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint les cours du lien. Vérifiez ensuite la liste de chaque cours et retirez les comptes qui ne sont pas ceux de vos élèves.</p>
     <details>
       <summary>Créer un lien</summary>
       <form method="post" action="/prof/eleves/liens">
-        ${choixCours(cat, "Les élèves qui suivent le lien rejoignent ces cours.", "Cours du lien")}
+        ${choixCours(
+          cat,
+          "Les élèves qui suivent le lien rejoignent ces cours.",
+          `${termes.cours_pluriel} du lien`,
+        )}
         <div class="deux">
           <div class="champ">
             <label for="jours">Jours de validité</label>
@@ -389,7 +393,7 @@ const sectionLiens = (cat: Catalogue, liens: Lien[], adresse: string) =>
           <table class="eleves">
             <thead>
               <tr>
-                <th>Cours</th>
+                <th>${termes.cours_pluriel}</th>
                 <th><span class="visuellement-cache">Actions</span></th>
               </tr>
             </thead>
@@ -425,6 +429,7 @@ export const eleves = (
   sansCours: Eleve[] | undefined,
   liens: Lien[] | undefined,
   adresse: string,
+  l: Libelles,
   erreur?: string,
 ) =>
   html`
@@ -438,7 +443,11 @@ export const eleves = (
         : html`
     <h2>Ajouter un élève</h2>
     <form method="post" action="/prof/eleves/ajouter">
-      ${choixCours(cat, "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.")}
+      ${choixCours(
+        cat,
+        "Le nouvel élève rejoint ces cours et lit les ressources qu'ils partagent.",
+        `${l.cours_pluriel} des nouveaux comptes`,
+      )}
       <div class="champ">
         <label for="identifiant">Identifiant</label>
         <p id="format-identifiant" class="aide">Minuscules, chiffres, point, tiret ou tiret bas. Un élève qui a déjà un compte rejoint vos cours par un <a href="#liens">lien d'inscription</a>.</p>
@@ -454,7 +463,11 @@ export const eleves = (
       <summary>Importer une classe depuis un CSV</summary>
     <p>Un CSV UTF-8 avec les colonnes <code>identifiant,nom</code>. Les identifiants doivent être uniques.</p>
     <form method="post" action="/prof/eleves/importer" enctype="multipart/form-data">
-      ${choixCours(cat, "Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.")}
+      ${choixCours(
+        cat,
+        "Les élèves importés rejoignent ces cours et lisent les ressources qu'ils partagent.",
+        `${l.cours_pluriel} des nouveaux comptes`,
+      )}
       <div class="barre">
         <label for="fichier">Liste CSV</label>
         ${champFichier(".csv,text/csv")}
@@ -462,7 +475,7 @@ export const eleves = (
       </div>
     </form>
     </details>
-    ${liens && cat.cours.length ? sectionLiens(cat, liens, adresse) : ""}
+    ${liens && cat.cours.length ? sectionLiens(cat, liens, adresse, l) : ""}
     `
     }
     ${groupes.map(
@@ -769,7 +782,7 @@ export const depot = (s: {
   const arts = s.profil === "arts-appliques" || !s.catalogue;
   return html`
     <h1>Déposer une ressource</h1>
-    ${s.catalogue ? Domaines.choixMatiere(s.catalogue, c.matiere_id) : ""}
+    ${s.catalogue ? Domaines.choixMatiere(s.catalogue, s.libelles, c.matiere_id) : ""}
     ${s.depose ? bilanDepot(s.depose) : ""}
     <form method="post" action="/prof/depot" enctype="multipart/form-data" class="etroit" data-depot>
       ${s.lot ? html`<input type="hidden" name="lot" value="${s.lot}">` : ""}

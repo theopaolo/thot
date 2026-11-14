@@ -217,10 +217,12 @@ n'enregistrent que ce qui s'en écarte : un terme vide, ou une matière dont les
 par défaut sans réécrire les réglages enregistrés. Un autre traitement demande un nouveau profil
 en code, avec sa propre évaluation.
 
-Les termes de niveau et de regroupement appartiennent à l'instance, pas à la matière : l'accueil
-de l'élève et la bibliothèque montrent plusieurs matières sur une page. Un terme se règle au
-singulier et au pluriel, sans genre. L'interface ne l'accorde donc avec aucun article ni
-adjectif. Le terme de regroupement nomme les thèmes partout, administration comprise.
+Les termes de matière, de cours, de niveau et de regroupement appartiennent à l'instance, pas à
+la matière : l'accueil de l'élève et la bibliothèque montrent plusieurs matières sur une page. Un
+terme se règle au singulier et au pluriel, sans genre. L'interface ne l'accorde donc avec aucun
+article ni adjectif. Le terme de regroupement nomme les thèmes partout, administration comprise.
+Les termes de matière et de cours nomment les titres, les champs, les colonnes et le choix du
+cours. Les phrases de l'interface disent encore « matière » et « cours ».
 
 Les champs du dépôt appartiennent à chaque matière. Une matière coche des champs prédéfinis et
 des champs personnalisés de l'instance, de type texte, date ou mots-clés. La valeur d'un champ
