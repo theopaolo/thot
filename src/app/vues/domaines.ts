@@ -493,9 +493,12 @@ export const filtre = (
       ${
         cat.cours.length || choisi !== tout
           ? html`
-        <button type="button" class="choix-cours" popovertarget="grille-cours">
-          <span class="discret">${l.cours}</span> ${choisi} ${icone("caret-down")}
-        </button>
+        <div class="champ-cours">
+          <span class="etiquette" id="etiquette-cours">${l.cours}</span>
+          <button type="button" class="choix-cours" id="bouton-cours" popovertarget="grille-cours" aria-labelledby="etiquette-cours bouton-cours">
+            ${choisi} ${icone("caret-down")}
+          </button>
+        </div>
         <nav id="grille-cours" popover aria-label="${l.cours_pluriel}">
           <a href="${lien({ cours_id: "" })}" ${actuel(
             !p.matiere_id && !p.cours_id && !p.theme_id && !p.matieres,

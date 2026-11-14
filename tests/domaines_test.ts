@@ -358,7 +358,8 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
     const eleve = await session(db, faux.modeles, "eleve");
     const page = await (await eleve.requete(`/eleve?cours_id=${c}&theme_id=${t}`)).text();
     assertStringIncludes(page, "Faits sociaux");
-    assertStringIncludes(page, '<span class="discret">Cours</span> Théories, Auteurs');
+    assertStringIncludes(page, '<span class="etiquette" id="etiquette-cours">Cours</span>');
+    assert(/bouton-cours">\s*Théories, Auteurs/.test(page), "le choix ne montre pas le thème");
     const recherche = await (
       await eleve.requete(`/eleve/recherche?q=faits&cours_id=${c}&theme_id=${t}`)
     ).text();
@@ -952,7 +953,8 @@ test("filtre : la grille des cours applique le choix par un lien qui garde les p
       { statut: "a_relire", vue: "" },
     ),
   );
-  assertStringIncludes(grille, '<span class="discret">Chapitre</span> Docker');
+  assertStringIncludes(grille, '<span class="etiquette" id="etiquette-cours">Chapitre</span>');
+  assert(/bouton-cours">\s*Docker/.test(grille), "le choix ne montre pas le cours");
   assertStringIncludes(grille, 'aria-label="Chapitres"');
   assertStringIncludes(grille, 'href="/prof?statut=a_relire&amp;cours_id=c1" aria-current="true"');
   assertStringIncludes(grille, 'href="/prof?statut=a_relire&amp;cours_id="');
@@ -1782,7 +1784,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
       [admin, "/administration/domaines", "Chapitre à créer"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
       [admin, "/prof/depot", "<li>Chapitre</li>"],
-      [admin, "/prof", '<span class="discret">Chapitre</span>'],
+      [admin, "/prof", '<span class="etiquette" id="etiquette-cours">Chapitre</span>'],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
       [eleve, `/eleve/themes/${t.id}`, "<dt>Module</dt>"],

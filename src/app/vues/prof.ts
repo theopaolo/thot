@@ -375,7 +375,7 @@ export const sources = (
           aria-label="Chercher une ressource par son titre" placeholder="Chercher par titre">
         <button aria-label="Chercher">${icone("magnifying-glass")}</button>
       </form>
-      <nav class="segments" aria-label="Statut">
+      <nav class="segments statuts" aria-label="Statut">
         ${[
           ["", "Toutes"],
           ["a_relire", "À relire"],

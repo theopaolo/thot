@@ -2248,32 +2248,70 @@ table.eleves button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Les filtres se suivent à gauche, le choix de l'affichage part à droite. */
 .biblio-outils {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--s2) var(--s4);
   margin-bottom: var(--s4);
 }
+.biblio-outils > .segments:last-child {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .biblio-outils .recherche-entete {
+    order: 0;
+    flex: 1 1 12rem;
+    margin: 0;
+  }
+  /* Quatre statuts ne tiennent pas sur une ligne : deux par deux, sans défilement caché. */
+  .biblio-outils .statuts {
+    order: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex-basis: 100%;
+  }
+  .biblio-outils .statuts ~ a {
+    order: 1;
+  }
+}
 
-/* Le choix du cours : la grille s'ouvre sous son bouton, ou au centre sans ancrage CSS. */
+/* Le choix du cours : la grille s'ouvre sous son bouton, ou au centre sans ancrage CSS. Le
+   libellé reste hors du bouton, qui ne montre que la valeur, comme une liste déroulante. */
+.biblio-outils:has(> .champ-cours) {
+  align-items: end;
+}
+.champ-cours {
+  display: grid;
+  gap: var(--s1);
+  justify-items: start;
+}
+.champ-cours .etiquette {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
 .choix-cours {
   anchor-name: --choix-cours;
+  justify-content: space-between;
+  gap: var(--s4);
+  min-width: 18rem;
   max-width: 100%;
-}
-.choix-cours .discret {
+  font-size: 1rem;
   font-weight: 400;
+}
+.choix-cours .icone {
+  color: var(--ink-muted);
 }
 #grille-cours {
   width: min(60rem, 100vw - 2 * var(--gouttiere));
   max-height: min(36rem, 80dvh);
-  padding: var(--s3);
+  padding: var(--s2);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 8px 24px rgb(28 24 21 / 0.12);
   overflow: auto;
 }
 @supports (position-area: bottom) {
@@ -2287,9 +2325,8 @@ table.eleves button {
 }
 #grille-cours ul {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
-  gap: 2px;
-  margin: 0 0 var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -2297,7 +2334,6 @@ table.eleves button {
   display: block;
   padding: var(--s2) var(--s3);
   border-radius: 2px;
-  font-weight: 700;
   text-decoration: none;
 }
 #grille-cours a:hover {
@@ -2315,14 +2351,12 @@ table.eleves button {
   color: var(--line);
 }
 #grille-cours > a {
-  display: inline-block;
-  margin-bottom: var(--s2);
+  color: var(--ink-muted);
 }
 #grille-cours .matiere {
-  display: block;
-  width: fit-content;
-  margin: var(--s2) 0 0;
+  margin-top: var(--s2);
   color: var(--ink-muted);
+  font-weight: 700;
 }
 #grille-cours .theme {
   padding-block: var(--s1);
