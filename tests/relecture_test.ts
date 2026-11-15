@@ -65,7 +65,10 @@ test("relecture : certifier ouvre la suivante, la dernière mène à l'état vid
   assertEquals(r.status, 303);
   assertEquals(r.headers.get("location"), "/prof/relecture");
   assertEquals(statutDe(db, b), "rejetee");
-  assertStringIncludes(await (await prof.requete("/prof/relecture")).text(), "Rien à relire.");
+  assertStringIncludes(
+    await (await prof.requete("/prof/relecture")).text(),
+    "aucune n'attend votre relecture.",
+  );
   assert(!(await (await prof.requete("/prof")).text()).includes("Relire une par une"));
 });
 

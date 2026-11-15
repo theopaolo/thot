@@ -954,7 +954,11 @@ export const questionsProf = (messages: QuestionProf[]) => {
   );
   return html`
     <h1>Questions des élèves</h1>
-    ${messages.length ? "" : html`<p>Aucune question posée pour le moment.</p>`}
+    ${
+      messages.length
+        ? ""
+        : html`<p>Les questions que les élèves de vos cours posent à Thot s'affichent ici, et aucun n'en a encore posé.</p>`
+    }
     ${
       refus.length
         ? html`
@@ -1708,7 +1712,7 @@ export const legende = (i: ALegender | undefined, file: { id: string; titre: str
       </div>
     `
     : html`
-      <p id="legende">Toutes les légendes sont relues.</p>
+      <p id="legende">Les légendes que Thot propose pour les images de vos ressources s'affichent ici, et aucune n'attend votre relecture.</p>
     `;
 
 export const pageLegendes = (i: ALegender | undefined, file: { id: string; titre: string }[]) =>

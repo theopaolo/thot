@@ -15,7 +15,7 @@ export const pageRelecture = (liste: Attente[], choisie?: Attente, blocs: Bloc[]
   !choisie
     ? html`
         <h1>Relecture</h1>
-        <p>Rien à relire.</p>
+        <p>Les ressources déposées et les nouvelles versions à certifier s'affichent ici une par une, et aucune n'attend votre relecture.</p>
         <p><a href="/prof">Retour à la bibliothèque</a></p>
       `
     : html`
