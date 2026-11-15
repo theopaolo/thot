@@ -118,11 +118,14 @@ const carte = (l: LigneSource) => {
 type Groupe = { cle: string; nom: string; coursId?: string; liste: LigneSource[] };
 
 /**
- * Les ressources par cours, ou par thème quand un cours est choisi, chaque groupe dans l'ordre de
- * lecture. Une ressource rattachée à deux cours revient dans les deux.
+ * Les ressources par cours, ou par thème quand un cours est choisi ou qu'elles tiennent toutes dans
+ * un seul cours, chaque groupe dans l'ordre de lecture. Une ressource rattachée à deux cours
+ * revient dans les deux.
  */
 const grouper = (lignes: LigneSource[], noms: Pick<Libelles, "cours" | "regroupement">) => {
-  const parCours = lignes.some((l) => l.cours);
+  // Un seul pli de cours ne rangerait rien : ses thèmes prennent sa place.
+  const parCours =
+    new Set(lignes.flatMap((l) => (l.cours?.length ? l.cours.map((c) => c.id) : [""]))).size > 1;
   const groupes = new Map<string, Groupe>();
   for (const l of lignes) {
     const cles = parCours
@@ -142,7 +145,10 @@ const grouper = (lignes: LigneSource[], noms: Pick<Libelles, "cours" | "regroupe
     .toSorted((a, b) => Number(!a.cle) - Number(!b.cle) || a.nom.localeCompare(b.nom, "fr"));
 };
 
-/** Ce qui reste à faire dans un groupe, en mots. Rien à faire : « toutes certifiées ». */
+/**
+ * Ce qui reste à faire dans un groupe, en mots, et rien quand tout est certifié. Les légendes non
+ * relues se signalent sans ouvrir le pli : elles se relisent dans leur page.
+ */
 const etatGroupe = (liste: LigneSource[]) => {
   const n = (garde: (l: LigneSource) => boolean) => liste.filter(garde).length;
   const traitee = (l: LigneSource) => !JOBS_ACTIFS.includes(l.etat) && l.etat !== "failed";
@@ -161,15 +167,11 @@ const etatGroupe = (liste: LigneSource[]) => {
   ] as const;
   const faits = ecarts.filter(([k]) => k > 0);
   return {
-    aFaire: faits.length > 0,
-    html: faits.length
-      ? faits.map(
-          ([k, classe, un, plusieurs]) =>
-            html`<span class="statut ${classe}">${k} ${k > 1 ? plusieurs : un}</span>`,
-        )
-      : html`<span class="statut certifiee">${
-          liste.length > 1 ? "toutes certifiées" : "certifiée"
-        }</span>`,
+    aFaire: faits.some(([, classe]) => classe !== "unreviewed"),
+    html: faits.map(
+      ([k, classe, un, plusieurs]) =>
+        html`<span class="statut ${classe}">${k} ${k > 1 ? plusieurs : un}</span>`,
+    ),
   };
 };
 
@@ -183,7 +185,7 @@ const ecartLigne = (l: LigneSource) =>
 /**
  * La vue « Liste » : un pli par groupe, fermé tant qu'il n'a rien à relire, si bien que tous les
  * cours tiennent sur un écran. Un filtre ouvre tous les plis. Un seul groupe sans nom s'affiche
- * à plat.
+ * à plat. Le libellé autour de la case lui donne une cible de 36px sans grossir la ligne.
  */
 const plis = (
   lignes: LigneSource[],
@@ -200,7 +202,7 @@ const plis = (
     return html`<ol class="pli-liste">${g.liste.map((l, k) => {
       const suffixe = vues.has(l.id) ? `-${i}` : "";
       vues.add(l.id);
-      return html`<li>${caseSource(l, "", suffixe)}<span class="rang" aria-hidden="true">${
+      return html`<li><label class="pli-case">${caseSource(l, "", suffixe)}</label><span class="rang" aria-hidden="true">${
         premier + k
       }</span>${l.image_id ? apercu(l) : ""}<a href="/prof/sources/${l.id}">${l.titre}</a>${ecartLigne(l)}</li>`;
     })}</ol>`;

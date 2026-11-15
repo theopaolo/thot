@@ -2537,8 +2537,12 @@ table.eleves button {
   font-weight: 700;
   line-height: 1.3;
 }
+/* Les écarts et le chevron se rangent à droite, même quand le pli n'a rien à signaler. */
 .pli > summary .nombre + .statut {
   margin-left: auto;
+}
+.pli > summary .nombre:last-child {
+  margin-right: auto;
 }
 .pli-corps,
 .pli-seul {
@@ -2559,6 +2563,21 @@ table.eleves button {
   padding: var(--s1) 0;
   border-bottom: 1px solid var(--line);
   break-inside: avoid;
+}
+/* La case et le titre gardent leur taille à l'œil, leur zone de clic prend toute la ligne. */
+.pli-case {
+  display: flex;
+  flex: none;
+  margin: calc(-1 * var(--s2));
+  padding: var(--s2);
+  cursor: pointer;
+}
+.pli-liste li > a {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  margin-block: calc(-1 * var(--s1));
+  padding-block: var(--s1);
 }
 .pli-liste .rang {
   flex: none;

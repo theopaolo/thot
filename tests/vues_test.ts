@@ -449,24 +449,26 @@ test("le rafraîchissement enseignant exclut le formulaire et conserve les séle
   }
 });
 
-test("la liste de la bibliothèque range les ressources par cours, dans l'ordre de lecture", async () => {
+test("la liste de la bibliothèque range les ressources par cours, ou par thème dans un seul cours", async () => {
   const ligne = (
     id: string,
     titre: string,
     ordre: number | null,
     cours: string[],
     statut = "certifiee",
+    theme: string | null = null,
+    images_a_relire = 0,
   ) => ({
     id,
     titre,
     ordre,
     statut,
     cours: cours.map((c) => ({ id: c, nom: `Cours ${c}` })),
-    theme: null,
+    theme,
     format: "md",
     etat: "awaiting_review",
     erreur: null,
-    images_a_relire: 0,
+    images_a_relire,
     revision_en_attente: 0,
     images: 0,
     legendes: 0,
@@ -476,7 +478,7 @@ test("la liste de la bibliothèque range les ressources par cours, dans l'ordre 
     await lignesSources(
       [
         ligne("b2", "Suite", 2, ["b"]),
-        ligne("b0", "Introduction", 0, ["b"]),
+        ligne("b0", "Introduction", 0, ["b"], "certifiee", null, 1),
         ligne("a1", "Sans ordre", null, ["a"], "a_relire"),
         ligne("ab", "Commune", 1, ["a", "b"]),
       ],
@@ -485,9 +487,12 @@ test("la liste de la bibliothèque range les ressources par cours, dans l'ordre 
   );
   const plis = html.split('<details class="pli"').slice(1);
   assertEquals(plis.length, 2);
-  // Le cours A a une ressource à relire : son pli s'ouvre. Le cours B, tout certifié, reste fermé.
+  // Le cours A a une ressource à relire : son pli s'ouvre. Le cours B, tout certifié, reste fermé
+  // malgré sa légende non relue, qu'il signale sans dire « certifiée ».
   assert(plis[0].startsWith(' data-pli="a" open') && plis[0].includes("1 à relire"));
   assert(plis[1].startsWith(' data-pli="b" >') && !plis[1].includes("à relire"));
+  assertStringIncludes(plis[1], '<span class="statut unreviewed">1 légende non relue</span>');
+  assert(!html.includes("certifiée"));
   const titres = (pli: string) =>
     [...pli.matchAll(/>([^<]+)<\/a><span class="pli-etat">/g)].map((m) => m[1]);
   assertEquals(titres(plis[0]), ["Commune", "Sans ordre"]);
@@ -495,6 +500,25 @@ test("la liste de la bibliothèque range les ressources par cours, dans l'ordre 
   // L'introduction d'ordre 0 garde ce numéro. La ressource commune a une seconde case, à son id.
   assertStringIncludes(plis[1], 'aria-hidden="true">0</span>');
   assertStringIncludes(plis[1], 'id="selection-ab-1"');
+  // Toutes dans un seul cours : un pli par séquence, et « Sans séquence » à la fin.
+  const seul = String(
+    await lignesSources(
+      [
+        ligne("s1", "Affiche", null, ["a"], "certifiee", "Bauhaus"),
+        ligne("s2", "Chaise", null, ["a"], "certifiee", "Art nouveau"),
+        ligne("s3", "Note", null, ["a"]),
+      ],
+      "",
+      false,
+      "",
+      LIBELLES,
+    ),
+  );
+  assertEquals(
+    [...seul.matchAll(/data-pli="([^"]*)"/g)].map((m) => m[1]),
+    ["Art nouveau", "Bauhaus", ""],
+  );
+  assertStringIncludes(seul, "Sans séquence");
 });
 
 test("une recherche sans résultat le dit et s'efface sans perdre les autres filtres", async () => {
