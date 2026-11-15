@@ -475,8 +475,11 @@ Une conversation appartient au compte qui l'a ouverte. Pour tout autre compte, s
 actions et ses échanges répondent 404, comme un identifiant inconnu : afficher, renommer,
 archiver, désarchiver, changer de périmètre, envoyer, relancer, arrêter, donner un avis, suivre le
 flux et ouvrir une citation. Son titre reste privé : `/prof/questions` liste les échanges un par
-un, selon les cours de l'enseignant, sans passer par la conversation. Ces règles vivent dans
-`src/app/conversations.ts`, et les routes traduisent ses refus en 404 ou 409.
+un, selon les cours de l'enseignant, sans passer par la conversation. L'enseignant y ouvre un
+échange en lecture seule : la question, la réponse et ses passages, relus avec ses propres droits.
+Cette page ne nomme pas la conversation, ne montre pas ses autres échanges et n'y mène pas. Elle
+suit la règle d'accès de la liste, et un échange absent de la liste répond 404. Ces règles vivent
+dans `src/app/conversations.ts`, et les routes traduisent ses refus en 404 ou 409.
 
 La liste se filtre par le titre ou le texte d'une question (`?q=`, LIKE sans joker). Les
 conversations archivées ne sortent que de leur propre vue. Le navigateur garde, par compte et par

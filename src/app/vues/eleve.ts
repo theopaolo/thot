@@ -952,7 +952,10 @@ export const reponse = (
   choix: string | null = null,
   idees: string[] = [],
   auto = false,
-  /** hors d'une conversation, une explication publiée : l'adresse de ses passages, sans avis */
+  /**
+   * hors d'une conversation, une explication publiée ou l'échange relu par l'enseignant :
+   * l'adresse de ses passages, sans avis
+   */
   citations = "",
 ) => {
   if (r.etat === "answered") {
@@ -1135,12 +1138,14 @@ export const panneauSource = (
     enseignant?: string;
   },
   suite?: { id: string; n: number; total: number },
+  /** l'enseignant qui relit un échange est vouvoyé */
+  tete = "Dans ton cours",
 ) =>
   a
     ? html`
       <aside id="source" class="feuille" aria-labelledby="source-titre">
         <div class="feuille-tete">
-          <h2>Dans ton cours</h2>
+          <h2>${tete}</h2>
           ${fermer}
         </div>
         <div>
@@ -1202,7 +1207,7 @@ export const panneauSource = (
     `
     : html`
       <aside id="source" class="feuille" aria-labelledby="source-vide">
-        <h2 id="source-vide">Dans ton cours</h2>
+        <h2 id="source-vide">${tete}</h2>
         <p class="discret">
           Les numéros dans une réponse ouvrent ici le passage du cours sur lequel repose chaque phrase.
         </p>

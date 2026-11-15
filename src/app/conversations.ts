@@ -319,6 +319,21 @@ export type QuestionDesEleves = {
 
 // Un enseignant lit les questions posées dans ses cours. Sans cours choisi, celles des élèves
 // avec qui il partage un cours, ou de tout élève qui n'a aucun cours. Un administrateur lit tout.
+// La liste et la page d'un échange passent par cette condition sur l'échange `m` et son élève `c`.
+const QUESTION_LUE = `c.role = 'eleve' AND ($administrateur OR CASE
+         WHEN m.cours_id != '' THEN m.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = $lecteur)
+         WHEN m.theme_id != '' THEN EXISTS (SELECT 1 FROM themes t JOIN membres_cours mc
+           ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = $lecteur)
+         WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = $lecteur)
+         WHEN m.matieres != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
+           ON mc.cours_id = co.id WHERE instr(',' || m.matieres || ',', ',' || co.matiere_id || ',')
+           AND mc.compte_id = $lecteur)
+         ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
+           OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
+             ON lui.cours_id = moi.cours_id WHERE moi.compte_id = $lecteur AND lui.compte_id = m.compte_id)
+         END)`;
+
 export const questionsDesEleves = (db: Db, l: Lecteur) =>
   db
     .prepare(
@@ -331,19 +346,26 @@ export const questionsDesEleves = (db: Db, l: Lecteur) =>
          AND ${FILTRE_ACCES}
        LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
          AND ${filtreAcces("s2")}
-       WHERE c.role = 'eleve' AND ($administrateur OR CASE
-         WHEN m.cours_id != '' THEN m.cours_id IN (SELECT cours_id FROM membres_cours WHERE compte_id = $lecteur)
-         WHEN m.theme_id != '' THEN EXISTS (SELECT 1 FROM themes t JOIN membres_cours mc
-           ON mc.cours_id = t.cours_id WHERE t.id = m.theme_id AND mc.compte_id = $lecteur)
-         WHEN m.matiere_id != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
-           ON mc.cours_id = co.id WHERE co.matiere_id = m.matiere_id AND mc.compte_id = $lecteur)
-         WHEN m.matieres != '' THEN EXISTS (SELECT 1 FROM cours co JOIN membres_cours mc
-           ON mc.cours_id = co.id WHERE instr(',' || m.matieres || ',', ',' || co.matiere_id || ',')
-           AND mc.compte_id = $lecteur)
-         ELSE NOT EXISTS (SELECT 1 FROM membres_cours WHERE compte_id = m.compte_id)
-           OR EXISTS (SELECT 1 FROM membres_cours moi JOIN membres_cours lui
-             ON lui.cours_id = moi.cours_id WHERE moi.compte_id = $lecteur AND lui.compte_id = m.compte_id)
-         END)
+       WHERE ${QUESTION_LUE}
        ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
     )
     .all(parametresAcces(l)) as QuestionDesEleves[];
+
+/**
+ * Un échange de `questionsDesEleves`, sans sa conversation : ni son titre ni ses autres échanges.
+ * La réponse se relit avec les droits de l'enseignant, qui ne voit que les passages qu'il lit.
+ */
+export function questionDesEleves(db: Db, compte: Compte, id: string) {
+  const acces = parametresAcces(lecteur(compte));
+  const m = db
+    .prepare(
+      `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, m.resultat, c.nom,
+         m.matiere_id, m.cours_id, m.theme_id, m.matieres
+       FROM messages m JOIN comptes c ON c.id = m.compte_id
+       WHERE m.id = $id AND ${QUESTION_LUE}`,
+    )
+    .get({ administrateur: acces.administrateur, lecteur: acces.lecteur, id }) as
+    | (Omit<QuestionDesEleves, "code" | "chapitre"> & Scope & { resultat: string | null })
+    | undefined;
+  return m && { ...m, resultat: m.resultat ? relu(db, compte, m.resultat) : null };
+}

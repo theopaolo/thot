@@ -102,14 +102,19 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
         id,
       ) as Eleve.SourceLue | undefined;
   /** La feuille du passage `:n` d'une réponse ou d'une explication `id`, s'il est lisible. */
-  const feuilleCitation = (c: Context<Env>, affirmations: Affirmation[], id: string) => {
+  const feuilleCitation = (
+    c: Context<Env>,
+    affirmations: Affirmation[],
+    id: string,
+    tete?: string,
+  ) => {
     const n = Number(c.req.param("n"));
     const a = affirmations[n];
     const source = a && sourceCertifiee(a.source_id, lu(c));
-    if (!a || !source) return c.html(Eleve.panneauSource());
+    if (!a || !source) return c.html(Eleve.panneauSource(undefined, undefined, tete));
     const suite = { id, n, total: affirmations.length };
     if (a.debut === undefined || a.fin === undefined) {
-      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
+      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite, tete));
     }
     const revision = a.revision ?? 1;
     const { debut, fin } = a;
@@ -118,7 +123,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
       (b) => b.debut < fin && b.fin > debut,
     );
     return c.html(
-      Eleve.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite),
+      Eleve.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite, tete),
     );
   };
   return {

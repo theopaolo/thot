@@ -2218,6 +2218,10 @@ form.question-form textarea {
     width: 11rem;
   }
 }
+/* L'échange relu par l'enseignant espace la question et sa réponse comme le chat. */
+.echange-prof .question {
+  margin-bottom: var(--s5);
+}
 .feuilles {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));

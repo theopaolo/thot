@@ -13,7 +13,7 @@ import {
 import { libelles, lireInstance } from "../instance.ts";
 import { contenu } from "../config.ts";
 import { audience } from "../depot.ts";
-import { questionsDesEleves } from "../conversations.ts";
+import { questionDesEleves, questionsDesEleves } from "../conversations.ts";
 import {
   aLegender,
   changerLecteurs,
@@ -37,7 +37,7 @@ const MODIFICATION_REFUSEE =
   "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.";
 
 export function routesProf(app: Hono<Env>, w: Web) {
-  const { db, instance, rendre, lu, scope, idsScope } = w;
+  const { db, instance, rendre, lu, scope, idsScope, feuilleCitation } = w;
 
   const lignes = (c: Context<Env>, statut: string, theme: string, lot = c.req.query("lot") ?? "") =>
     db
@@ -242,6 +242,21 @@ export function routesProf(app: Hono<Env>, w: Web) {
   app.get("/prof/questions", (c) =>
     c.html(rendre(c, "Questions des élèves", Prof.questionsProf(questionsDesEleves(db, lu(c))))),
   );
+  // Un échange de la liste, sans sa conversation. Hors de la liste, il répond 404.
+  const echange = (c: Context<Env>) =>
+    questionDesEleves(db, c.get("compte"), c.req.param("echange")!);
+  app.get("/prof/questions/:echange", (c) => {
+    const e = echange(c);
+    if (!e) return c.notFound();
+    const cat = Domaines.catalogueDe(db, c.get("compte"));
+    return c.html(rendre(c, `Question de ${e.nom}`, Prof.echangeProf(e, cat, libelles(db))));
+  });
+  app.get("/prof/questions/:echange/citations/:n", (c) => {
+    const e = echange(c);
+    if (!e) return c.notFound();
+    const r = e.resultat;
+    return feuilleCitation(c, r?.etat === "answered" ? r.affirmations : [], e.id, "Dans le cours");
+  });
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);
     const liste = lignesVisibles(c, lignes(c, f.statut, f.theme));

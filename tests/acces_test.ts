@@ -659,6 +659,54 @@ test("questions des élèves : chaque enseignant lit celles de ses cours", async
   }
 });
 
+test("questions des élèves : un enseignant du cours relit un échange sans sa conversation", async () => {
+  const { db, dir, c1, profA, profB, eleveA } = await deuxCours(
+    fauxModeles({ sorties: [BONNE] }).modeles,
+  );
+  try {
+    const fragment = await (
+      await eleveA.requete("/eleve/questions", {
+        method: "POST",
+        headers: { "HX-Request": "true" },
+        body: new URLSearchParams({
+          texte: "Pourquoi la façade refuse la ligne droite ?",
+          cours_id: c1,
+        }),
+      })
+    ).text();
+    const id = fragment.match(/messages\/([\w-]+)\/flux/)![1];
+    await (await eleveA.requete(`/eleve/messages/${id}/flux`)).text();
+    const conversation = db.prepare("SELECT conversation_id FROM messages WHERE id = ?").get(id)!
+      .conversation_id as string;
+    db.prepare("UPDATE conversations SET titre = 'Titre privé' WHERE id = ?").run(conversation);
+
+    assertStringIncludes(await texteDe(profA, "/prof/questions"), `/prof/questions/${id}"`);
+    const page = await texteDe(profA, `/prof/questions/${id}`);
+    assertStringIncludes(page, "Pourquoi la façade refuse la ligne droite ?");
+    assertStringIncludes(page, "Gaudí refuse la ligne droite.");
+    assertStringIncludes(page, `/prof/questions/${id}/citations/0`);
+    assert(!page.includes("Titre privé") && !page.includes(conversation), "conversation montrée");
+    const passage = await texteDe(profA, `/prof/questions/${id}/citations/0`);
+    assertStringIncludes(passage, "Gaudí refuse la ligne droite dans toute la façade");
+    assertStringIncludes(passage, "Dans le cours");
+
+    // Hors de ses cours, l'échange n'existe pas. Le préfixe /prof refuse l'élève avant la route.
+    assertEquals(await statut(profB.requete(`/prof/questions/${id}`)), 404);
+    assertEquals(await statut(profB.requete(`/prof/questions/${id}/citations/0`)), 404);
+    assertEquals(await statut(eleveA.requete(`/prof/questions/${id}`)), 403);
+
+    // Sans passage dans le cours, la page mène au dépôt dans ce cours.
+    poserQuestion(db, "hors", eleveA.id, "Qui fait des tartes ?", { cours_id: c1 });
+    db.prepare("UPDATE messages SET etat = 'out_of_corpus' WHERE id = 'hors'").run();
+    const hors = await texteDe(profA, "/prof/questions/hors");
+    assertStringIncludes(hors, "Sans passage dans le cours");
+    assertStringIncludes(hors, `/prof/depot?cours=${c1}`);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("migration des membres : chaque compte rejoint chaque cours existant", async () => {
   const dir = await mkdtemp(join(tmpdir(), "thot-"));
   config.donnees = dir;
