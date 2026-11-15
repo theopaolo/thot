@@ -1,0 +1,530 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-14T14:02:11Z",
+  "title": "Design System: Thot",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "primary",
+        "displayName": "Encre",
+        "canonical": "oklch(21.3% 0.009 59.2)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#272423",
+          "#45413f",
+          "#65605d",
+          "#86817e",
+          "#a8a4a1",
+          "#ccc8c6",
+          "#f0eeec"
+        ]
+      },
+      "ink-hover": {
+        "role": "primary",
+        "displayName": "Encre levée",
+        "canonical": "oklch(26.8% 0.012 67.3)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#272422",
+          "#45413d",
+          "#65605b",
+          "#87817c",
+          "#a9a49f",
+          "#ccc8c5",
+          "#f0eeeb"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "oklch(50.8% 0.011 51.9)",
+        "tonalRamp": [
+          "#0d0b0a",
+          "#282422",
+          "#46413e",
+          "#66605c",
+          "#87817d",
+          "#a9a4a0",
+          "#ccc8c6",
+          "#f1eeec"
+        ]
+      },
+      "yellow": {
+        "role": "secondary",
+        "displayName": "Jaune surligneur",
+        "canonical": "oklch(84.4% 0.159 92.7)",
+        "tonalRamp": [
+          "#130900",
+          "#342200",
+          "#583e00",
+          "#7e5c00",
+          "#a17e00",
+          "#bfa344",
+          "#ddc886",
+          "#fbeec4"
+        ]
+      },
+      "yellow-surface": {
+        "role": "secondary",
+        "displayName": "Surlignage pâle",
+        "canonical": "oklch(95.1% 0.063 97.6)",
+        "tonalRamp": [
+          "#0e0b02",
+          "#2a2510",
+          "#494224",
+          "#6a623b",
+          "#8b835b",
+          "#ada685",
+          "#cfcab0",
+          "#f2efde"
+        ]
+      },
+      "rose": {
+        "role": "tertiary",
+        "displayName": "Rose correcteur",
+        "canonical": "oklch(55.3% 0.149 10.2)",
+        "tonalRamp": [
+          "#1c0106",
+          "#440e1b",
+          "#702234",
+          "#9f384f",
+          "#c55b6f",
+          "#e18795",
+          "#fab3bd",
+          "#ffe1e6"
+        ]
+      },
+      "rose-surface": {
+        "role": "tertiary",
+        "displayName": "Rose pâle",
+        "canonical": "oklch(94.6% 0.019 1.4)",
+        "tonalRamp": [
+          "#0e0a0b",
+          "#2a2325",
+          "#493f41",
+          "#6a5d60",
+          "#8c7e81",
+          "#ada1a4",
+          "#d0c6c8",
+          "#f3edee"
+        ]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Papier crème",
+        "canonical": "oklch(96.2% 0.009 84.6)",
+        "tonalRamp": [
+          "#0c0b0a",
+          "#262522",
+          "#43423e",
+          "#63615c",
+          "#84827d",
+          "#a7a5a1",
+          "#cac9c6",
+          "#efeeec"
+        ]
+      },
+      "bg-office": {
+        "role": "neutral",
+        "displayName": "Papier de bureau",
+        "canonical": "oklch(96.7% 0.001 106.4)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424241",
+          "#616160",
+          "#828281",
+          "#a5a5a4",
+          "#c9c9c8",
+          "#eeeeee"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Feuille",
+        "canonical": "oklch(99.1% 0.003 84.6)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252524",
+          "#424241",
+          "#62615f",
+          "#838280",
+          "#a5a5a3",
+          "#c9c9c8",
+          "#efeeee"
+        ]
+      },
+      "surface-tinted": {
+        "role": "neutral",
+        "displayName": "Passe-partout",
+        "canonical": "oklch(94.1% 0.010 81.8)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#262522",
+          "#44423d",
+          "#64615b",
+          "#85827c",
+          "#a7a5a0",
+          "#cbc9c5",
+          "#f0eeec"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Filet",
+        "canonical": "oklch(81.7% 0.016 77.1)",
+        "tonalRamp": [
+          "#0c0b09",
+          "#272520",
+          "#46413b",
+          "#666058",
+          "#878179",
+          "#a9a49d",
+          "#ccc8c3",
+          "#f1eeea"
+        ]
+      },
+      "kraft": {
+        "role": "neutral",
+        "displayName": "Kraft",
+        "canonical": "oklch(76.1% 0.069 79.8)",
+        "tonalRamp": [
+          "#110a02",
+          "#2f230e",
+          "#503f21",
+          "#745d36",
+          "#977e56",
+          "#b6a281",
+          "#d7c7ae",
+          "#f7eddd"
+        ]
+      },
+      "pending": {
+        "role": "status",
+        "displayName": "Ocre d'attente",
+        "canonical": "oklch(50.9% 0.117 54.0)",
+        "tonalRamp": [
+          "#180600",
+          "#3d1a01",
+          "#65330a",
+          "#8f4e1b",
+          "#b46f40",
+          "#d09670",
+          "#ecbea2",
+          "#ffe8d5"
+        ]
+      },
+      "certified": {
+        "role": "status",
+        "displayName": "Vert tampon",
+        "canonical": "oklch(51.9% 0.107 153.0)",
+        "tonalRamp": [
+          "#001004",
+          "#072d16",
+          "#194e2d",
+          "#2d7146",
+          "#509366",
+          "#7eb48e",
+          "#acd5b7",
+          "#dcf6e3"
+        ]
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Rouge",
+        "canonical": "oklch(53.7% 0.182 25.8)",
+        "tonalRamp": [
+          "#200000",
+          "#4b0407",
+          "#7a1517",
+          "#ac2a2a",
+          "#d4514b",
+          "#ee8178",
+          "#ffb0a7",
+          "#ffdfd8"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Titre de page, 2rem à partir de 900px."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Titres de section."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "Sous-sections, séances, premiers pas."
+      },
+      "reading": {
+        "displayName": "Reading",
+        "purpose": "Paragraphes d'un document, mesure de 32em."
+      },
+      "answer": {
+        "displayName": "Answer",
+        "purpose": "Texte d'une réponse de Thot avec ses citations."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texte courant de l'interface."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Boutons, liens de navigation, onglets."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Aide, métadonnées, statuts, en-têtes de tableau."
+      },
+      "figures": {
+        "displayName": "Figures",
+        "purpose": "Compteurs, formats, identifiants en Mono."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Blocs de code en chasse fixe du système."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu",
+        "value": "0 2px 8px rgb(28 24 21 / 0.08)",
+        "purpose": "Menu du compte."
+      },
+      {
+        "name": "feuille-basse",
+        "value": "0 -2px 8px rgb(28 24 21 / 0.08)",
+        "purpose": "Feuille basse qui montre une source sous 1180px."
+      },
+      {
+        "name": "panneau",
+        "value": "0 8px 24px rgb(28 24 21 / 0.12)",
+        "purpose": "Dialogues et grille de choix du cours."
+      },
+      {
+        "name": "fond-dialogue",
+        "value": "rgb(28 24 21 / 0.2)",
+        "purpose": "Fond derrière un dialogue ouvert."
+      },
+      {
+        "name": "cadre-choisi",
+        "value": "inset 0 0 0 3px var(--ink)",
+        "purpose": "Tuile ou carte choisie, une marque et pas une élévation."
+      },
+      {
+        "name": "onglet-courant",
+        "value": "inset 0 -3px 0 var(--ink)",
+        "purpose": "Soulignement de l'onglet courant."
+      },
+      {
+        "name": "chapitre-ouvert",
+        "value": "inset 3px 0 0 var(--ink)",
+        "purpose": "Liseré du chapitre ouvert dans le sommaire d'un cours."
+      },
+      {
+        "name": "surlignage",
+        "value": "inset 0 -2px 0 var(--yellow)",
+        "purpose": "Trait sous un passage surligné."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-page",
+        "value": "@view-transition { navigation: auto; }",
+        "purpose": "Fondu natif entre deux pages, coupé sous prefers-reduced-motion."
+      },
+      {
+        "name": "pulse",
+        "value": "opacity 0.3 → 1, 1s, infinite alternate",
+        "purpose": "Carré jaune de la ligne d'étape pendant que Thot travaille."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "etroit",
+        "value": "480px"
+      },
+      {
+        "name": "telephone",
+        "value": "640px"
+      },
+      {
+        "name": "tablette",
+        "value": "900px"
+      },
+      {
+        "name": "relecture",
+        "value": "1000px"
+      },
+      {
+        "name": "deux-colonnes",
+        "value": "1180px"
+      },
+      {
+        "name": "trois-colonnes-chat",
+        "value": "1400px"
+      },
+      {
+        "name": "lecture-sommaire",
+        "value": "75rem"
+      },
+      {
+        "name": "fiche-source",
+        "value": "80rem"
+      },
+      {
+        "name": "lecture-trois-colonnes",
+        "value": "85rem"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Bouton",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Contrôle cerné par défaut, avec une icône Phosphor et un verbe.",
+      "html": "<button class=\"ds-btn\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0ZM93.66,77.66,120,51.31V144a8,8,0,0,0,16,0V51.31l26.34,26.35a8,8,0,0,0,11.32-11.32l-40-40a8,8,0,0,0-11.32,0l-40,40A8,8,0,0,0,93.66,77.66Z\"/></svg>Déposer des ressources</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: var(--s2, 0.5rem); min-height: 44px; padding: 0.5rem 1rem; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); color: var(--ink, #1c1815); font: 700 0.9375rem/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; } .ds-btn:hover { border-color: var(--ink, #1c1815); } .ds-btn:active { background: var(--surface-tinted, #efebe4); } .ds-btn:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-icone { width: 1.25em; height: 1.25em; flex: none; }"
+    },
+    {
+      "name": "Bouton principal",
+      "kind": "button",
+      "refersTo": "button-principal",
+      "description": "L'unique action remplie d'encre d'une zone.",
+      "html": "<button class=\"ds-btn ds-btn-principal\">Envoyer</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: var(--s2, 0.5rem); min-height: 44px; padding: 0.5rem 1rem; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); color: var(--ink, #1c1815); font: 700 0.9375rem/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; } .ds-btn:hover { border-color: var(--ink, #1c1815); } .ds-btn:active { background: var(--surface-tinted, #efebe4); } .ds-btn:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-icone { width: 1.25em; height: 1.25em; flex: none; } .ds-btn-principal { border-color: var(--ink, #1c1815); background: var(--ink, #1c1815); color: var(--surface, #fdfcfa); } .ds-btn-principal:hover { background: var(--ink-hover, #2a2520); }"
+    },
+    {
+      "name": "Certifier",
+      "kind": "button",
+      "refersTo": "button-certifier",
+      "description": "Le tampon de l'enseignant, le seul bouton rempli de vert.",
+      "html": "<button class=\"ds-btn ds-btn-certifier\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z\"/></svg>Certifier</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: var(--s2, 0.5rem); min-height: 44px; padding: 0.5rem 1rem; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); color: var(--ink, #1c1815); font: 700 0.9375rem/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; cursor: pointer; } .ds-btn:hover { border-color: var(--ink, #1c1815); } .ds-btn:active { background: var(--surface-tinted, #efebe4); } .ds-btn:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-icone { width: 1.25em; height: 1.25em; flex: none; } .ds-btn-certifier { border-color: var(--certified, #2d7a4a); background: var(--certified, #2d7a4a); color: var(--surface, #fdfcfa); } .ds-btn-certifier:hover { background: color-mix(in srgb, var(--certified, #2d7a4a) 85%, var(--ink, #1c1815)); }"
+    },
+    {
+      "name": "Champ",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Libellé en gras au-dessus, aide en graphite dessous.",
+      "html": "<div class=\"ds-champ\"><label for=\"ds-q\">Ta question</label><input id=\"ds-q\" type=\"text\" placeholder=\"Pose ta question avec tes mots\"><p class=\"ds-aide\">Thot répond avec les ressources certifiées du cours.</p></div>",
+      "css": ".ds-champ { font: 400 1rem/1.5 'Atkinson Hyperlegible', system-ui, sans-serif; color: var(--ink, #1c1815); } .ds-champ label { display: block; margin-bottom: 0.25rem; font-weight: 700; } .ds-champ input { width: 100%; min-height: 44px; padding: 0.5rem 0.75rem; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); color: inherit; font: inherit; } .ds-champ input::placeholder { color: var(--ink-muted, #6b6460); } .ds-champ input:focus-visible { border-color: var(--ink, #1c1815); outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-aide { margin: 0.15rem 0 0; color: var(--ink-muted, #6b6460); font-size: 0.875rem; }"
+    },
+    {
+      "name": "Rail enseignant",
+      "kind": "nav",
+      "refersTo": "rail-lien",
+      "description": "Liens de 44px avec icône, page courante sur surlignage pâle.",
+      "html": "<nav class=\"ds-rail\"><a href=\"#\" aria-current=\"page\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M219.31,108.68l-80-80a16,16,0,0,0-22.62,0l-80,80A15.87,15.87,0,0,0,32,120v96a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V160h32v56a8,8,0,0,0,8,8h64a8,8,0,0,0,8-8V120A15.87,15.87,0,0,0,219.31,108.68ZM208,208H160V152a8,8,0,0,0-8-8H104a8,8,0,0,0-8,8v56H48V120l80-80,80,80Z\"/></svg><span>Bibliothèque</span></a><a href=\"#\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M117.25,157.92a60,60,0,1,0-66.5,0A95.83,95.83,0,0,0,3.53,195.63a8,8,0,1,0,13.4,8.74,80,80,0,0,1,134.14,0,8,8,0,0,0,13.4-8.74A95.83,95.83,0,0,0,117.25,157.92ZM40,108a44,44,0,1,1,44,44A44.05,44.05,0,0,1,40,108Zm210.14,98.7a8,8,0,0,1-11.07-2.33A79.83,79.83,0,0,0,172,168a8,8,0,0,1,0-16,44,44,0,1,0-16.34-84.87,8,8,0,1,1-5.940-14.85,60,60,0,0,1,55.53,105.64,95.83,95.83,0,0,1,47.22,37.71A8,8,0,0,1,250.14,206.7Z\"/></svg><span>Élèves</span></a></nav>",
+      "css": ".ds-rail { display: flex; flex-direction: column; gap: 0.25rem; width: 15rem; padding: 1rem; background: var(--bg-office, #f4f4f3); } .ds-rail a { display: flex; align-items: center; gap: 0.75rem; min-height: 44px; padding: 0 0.75rem; border-radius: var(--radius, 4px); color: var(--ink, #1c1815); font: 700 0.9375rem/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; text-decoration: none; } .ds-rail a:hover { background: var(--surface, #fdfcfa); } .ds-rail a[aria-current='page'] { background: var(--yellow-surface, #faf0c0); } .ds-rail a:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-icone { width: 1.25em; height: 1.25em; flex: none; }"
+    },
+    {
+      "name": "Segments",
+      "kind": "chip",
+      "refersTo": "segment",
+      "description": "Filtre ou affichage : le segment courant est rempli d'encre.",
+      "html": "<div class=\"ds-segments\"><a href=\"#\" aria-current=\"true\">Toutes <span class=\"ds-nombre\">108</span></a><a href=\"#\">À relire <span class=\"ds-nombre\">12</span></a><a href=\"#\" class=\"ds-vide\">Rejetées <span class=\"ds-nombre\">0</span></a></div>",
+      "css": ".ds-segments { display: inline-flex; padding: 2px; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); } .ds-segments a { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 36px; padding: 0 0.75rem; border-radius: 2px; color: var(--ink, #1c1815); font: 700 0.9375rem/1.2 'Atkinson Hyperlegible', system-ui, sans-serif; text-decoration: none; white-space: nowrap; } .ds-segments a:hover { background: var(--surface-tinted, #efebe4); } .ds-segments a.ds-vide { color: var(--ink-muted, #6b6460); } .ds-segments a[aria-current='true'] { background: var(--ink, #1c1815); color: var(--surface, #fdfcfa); } .ds-segments a:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-nombre { color: var(--ink-muted, #6b6460); font: 400 0.8125rem 'Atkinson Hyperlegible Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; } .ds-segments a[aria-current='true'] .ds-nombre { color: var(--line, #c9c2b8); }"
+    },
+    {
+      "name": "Statut",
+      "kind": "chip",
+      "refersTo": "statut",
+      "description": "Le mot porte l'état, la couleur le répète.",
+      "html": "<p class=\"ds-statuts\"><span class=\"ds-statut ds-a-relire\">À relire</span><span class=\"ds-statut ds-certifiee\">Certifiée</span><span class=\"ds-statut ds-rejetee\">Rejetée</span></p>",
+      "css": ".ds-statuts { display: flex; gap: 1rem; margin: 0; } .ds-statut { font: 700 0.875rem/1.5 'Atkinson Hyperlegible', system-ui, sans-serif; white-space: nowrap; } .ds-a-relire { color: var(--pending, #985015); } .ds-certifiee { color: var(--certified, #2d7a4a); } .ds-rejetee { color: var(--danger, #c13030); }"
+    },
+    {
+      "name": "Citation",
+      "kind": "custom",
+      "refersTo": "citation",
+      "description": "Relie une phrase de Thot à son passage, zone de clic de 44px.",
+      "html": "<p class=\"ds-reponse\">Une balise sémantique décrit le rôle de son contenu.<span>&nbsp;<button class=\"ds-citation\" aria-pressed=\"true\" aria-label=\"1, voir le passage\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M100,56H40A16,16,0,0,0,24,72v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,100,56Zm0,80H40V72h60ZM216,56H156a16,16,0,0,0-16,16v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,216,56Zm0,80H156V72h60Z\"/></svg>1</button></span> Le navigateur en tire la structure du document.<span>&nbsp;<button class=\"ds-citation\" aria-pressed=\"false\" aria-label=\"2, voir le passage\"><svg class=\"ds-icone\" viewBox=\"0 0 256 256\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M100,56H40A16,16,0,0,0,24,72v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,100,56Zm0,80H40V72h60ZM216,56H156a16,16,0,0,0-16,16v64a16,16,0,0,0,16,16h60v8a32,32,0,0,1-32,32,8,8,0,0,0,0,16,48.05,48.05,0,0,0,48-48V72A16,16,0,0,0,216,56Zm0,80H156V72h60Z\"/></svg>2</button></span></p>",
+      "css": ".ds-reponse { max-width: 32em; margin: 0; color: var(--ink, #1c1815); font: 400 1.125rem/1.75 'Atkinson Hyperlegible', system-ui, sans-serif; } .ds-citation { position: relative; display: inline-flex; align-items: center; gap: 0.2em; padding: 0.05em 0.4em; border: 1px solid var(--line, #c9c2b8); border-radius: var(--radius, 4px); background: var(--surface, #fdfcfa); color: var(--ink, #1c1815); font: 700 0.875rem/1.4 'Atkinson Hyperlegible', system-ui, sans-serif; font-variant-numeric: tabular-nums; vertical-align: 0.1em; cursor: pointer; } .ds-citation::after { content: ''; position: absolute; inset: -11px -4px; } .ds-citation:hover { border-color: var(--ink, #1c1815); } .ds-citation[aria-pressed='true'] { border-color: var(--yellow, #f0c835); background: var(--yellow-surface, #faf0c0); } .ds-citation:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; } .ds-citation svg { width: 1em; height: 1em; }"
+    },
+    {
+      "name": "Passe-partout",
+      "kind": "card",
+      "refersTo": "passe-partout",
+      "description": "L'image entière sur un carré teinté, cadre d'encre une fois choisie.",
+      "html": "<a href=\"#\" class=\"ds-tuile\" aria-current=\"true\"><span class=\"ds-passe-partout\"><span class=\"ds-image\"></span></span><span class=\"ds-tuile-titre\">Schéma du modèle de boîte</span></a>",
+      "css": ".ds-tuile { display: flex; flex-direction: column; gap: 0.25rem; width: 9rem; color: var(--ink, #1c1815); font: 400 0.9375rem/1.3 'Atkinson Hyperlegible', system-ui, sans-serif; text-decoration: none; } .ds-passe-partout { display: block; aspect-ratio: 1; padding: 0.5rem; background: var(--surface-tinted, #efebe4); } .ds-image { display: block; width: 100%; height: 70%; margin-top: 15%; background: var(--surface, #fdfcfa); border: 1px solid var(--line, #c9c2b8); } .ds-tuile:hover .ds-passe-partout { background: var(--line, #c9c2b8); } .ds-tuile:hover .ds-tuile-titre { text-decoration: underline; } .ds-tuile[aria-current='true'] .ds-passe-partout { box-shadow: inset 0 0 0 3px var(--ink, #1c1815); } .ds-tuile[aria-current='true'] .ds-tuile-titre { font-weight: 700; } .ds-tuile:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ligne d'étape",
+      "kind": "custom",
+      "refersTo": "etape",
+      "description": "Thot au travail : un carré jaune pulse à côté de l'étape.",
+      "html": "<div class=\"ds-etape-ligne\"><p class=\"ds-etape\">Thot cherche dans le cours…</p><button class=\"ds-lien\">Arrêter</button></div>",
+      "css": ".ds-etape-ligne { display: flex; flex-wrap: wrap; align-items: center; column-gap: 1rem; font: 400 1rem/1.5 'Atkinson Hyperlegible', system-ui, sans-serif; } .ds-etape { margin: 0; color: var(--ink-muted, #6b6460); } .ds-etape::before { content: ''; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.5rem; background: var(--yellow, #f0c835); animation: ds-pulse 1s infinite alternate; } @keyframes ds-pulse { from { opacity: 0.3; } to { opacity: 1; } } @media (prefers-reduced-motion: reduce) { .ds-etape::before { animation: none; } } .ds-lien { min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink, #1c1815); font: inherit; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-lien:focus-visible { outline: 3px solid var(--rose, #b8455e); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "L'atelier d'étude",
+    "overview": "Thot est un atelier où l'on apprend. Sur l'établi se trouve la matière : les sources qu'un enseignant ou un apprenant seul a déposées et certifiées, lues comme les pages d'un wiki. Les outils restent à portée de main autour de l'établi. Certains reposent sur l'IA, comme la réponse citée ou la légende d'image proposée. D'autres servent à s'exercer, comme les séries de questions ou le sommaire qui suit la lecture. Tous travaillent sur la même matière, et chacun montre ce qu'il a produit et d'où il le tient.\n\nL'ambiance est studieuse et calme : papier crème, encre presque noire, une seule famille de caractères et des filets de 1px. Les surfaces restent à plat. La matière occupe la plus grande place à l'écran, tandis que les outils forment une couche plus discrète qui parle partout la même langue : une icône Phosphor, un verbe, un contrôle cerné, un état écrit en toutes lettres. Un outil de plus entre dans cette grammaire sans en inventer une autre, si bien que l'atelier peut s'équiper sans devenir bruyant.\n\nDeux surfaces partagent ce système : l'élève lit, interroge et s'exerce sur le papier crème, tandis que l'enseignant dépose, certifie et relit sur un fond gris clair, avec un rail de navigation à gauche. Le mouvement se limite aux transitions entre pages et au carré qui pulse pendant que Thot travaille, et les deux s'arrêtent sous `prefers-reduced-motion`.",
+    "keyCharacteristics": [
+      "La matière d'abord : le passage, l'image ou la page de cours est plus grand que les contrôles qui travaillent dessus.",
+      "Une seule grammaire d'outil : icône Phosphor regular, libellé verbal, contrôle cerné de 1px, cible de 44px.",
+      "Le mot avant la couleur : un état se lit dans son libellé, son chiffre ou sa forme.",
+      "À plat : la profondeur vient du ton des papiers et des filets, l'ombre est réservée à ce qui flotte.",
+      "Une seule famille : Atkinson Hyperlegible en 400 et 700, sa version Mono pour les codes courts.",
+      "La trace visible : chaque production d'un outil montre sa source et son état."
+    ],
+    "rules": [
+      {
+        "name": "La règle du mot d'abord",
+        "body": "Un état se lit dans son libellé, son chiffre ou sa forme, et la couleur le répète. La grille des réponses écrit 1, 0,5, 0 ou ? dans chaque case, et chaque statut porte son mot. Test : en niveaux de gris, chaque état reste distinct.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle de l'acteur",
+        "body": "Chaque teinte appartient à quelqu'un qui agit : le jaune à Thot qui cite, le rose à l'enseignant qui annote, le vert à l'enseignant qui certifie, le kraft au rangement. Un outil nouveau reprend la teinte de son acteur au lieu d'en recevoir une. Les étiquettes de format de la vue Dossiers font exception : elles empruntent le rose pour un PDF et l'ocre pour un PowerPoint, et leur texte porte l'extension.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle du contraste sur crème",
+        "body": "Un texte atteint 4,5:1 sur le papier crème et sur la feuille. Sur le papier crème, le graphite atteint 5,2:1, l'ocre 5,4:1, le rouge 5,0:1, le vert 4,7:1 et le rose 4,6:1. Sur le passe-partout, le vert et le rose tombent à 4,4:1, donc un texte de statut ne se pose pas sur le passe-partout.",
+        "section": "colors"
+      },
+      {
+        "name": "La règle des deux graisses",
+        "body": "400 sert à lire, 700 à titrer et à agir. Les titres gardent leur casse et leur approche normales.",
+        "section": "typography"
+      },
+      {
+        "name": "La règle de la chasse fixe",
+        "body": "La Mono sert aux codes courts que l'œil compare d'une ligne à l'autre : un format, un compteur, un identifiant. Une durée ou une date reste en Atkinson, avec des chiffres tabulaires quand elle s'aligne en colonne.",
+        "section": "typography"
+      },
+      {
+        "name": "La règle du flottant",
+        "body": "Une ombre signale qu'une couche passe au-dessus de la page. Un élément qui reste dans le flux n'en porte pas, même au survol.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do donner la plus grande place à la matière : le passage, l'image ou la page de cours dépasse en taille les contrôles qui travaillent dessus.",
+      "Do construire un outil nouveau avec les composants existants : bouton cerné avec icône et verbe, segments, statut, feuille basse, panneau. Un composant nouveau vient seulement quand aucun ne convient.",
+      "Do montrer la provenance de ce qu'un outil produit : la citation vers son passage, la ligne de provenance, le statut « à relire » tant que l'enseignant n'a pas certifié.",
+      "Do écrire chaque état en mot ou en chiffre, puis le doubler de couleur.",
+      "Do marquer l'élément courant à l'encre et par une forme : fond plein, soulignement ou liseré de 3px, cadre intérieur.",
+      "Do garder une seule action remplie d'encre par zone.",
+      "Do séparer les lignes et les sections par un filet de 1px.",
+      "Do mesurer le contraste sur le papier crème et sur la feuille : 4,5:1 pour un texte, 3:1 pour le bord d'un champ.",
+      "Do couper le mouvement sous `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "Don't porter un état par la seule teinte.",
+      "Don't donner à un outil sa propre couleur, sa propre police ou un autre jeu d'icônes.",
+      "Don't poser d'ombre sur un élément du flux, arrondir au-delà de 4px ou encadrer une ligne de liste dans une carte.",
+      "Don't recadrer une image de contenu : elle tient entière sur son passe-partout.",
+      "Don't ajouter d'interlettrage, de titre en capitales, de police à empattements ou de seconde famille.",
+      "Don't reprendre l'allure du chatbot généraliste, avec ses bulles de part et d'autre et son avertissement « l'IA peut se tromper ». Une réponse est un texte à la mesure de lecture, et chaque phrase porte sa citation.",
+      "Don't reprendre l'allure de l'ENT gris et institutionnel (Moodle), contre-modèle de `PRODUCT.md`.",
+      "Don't colorer un hors-cours ou une panne côté élève : le texte en dit la cause."
+    ]
+  }
+}

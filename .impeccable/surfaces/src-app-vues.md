@@ -1,13 +1,13 @@
 ---
 version: 1
-slug: "src-app-vues-ts"
-primary_target: "src/app/vues.ts"
-related_targets: ["static/style.css","src/app/routes.ts"]
+slug: "src-app-vues"
+primary_target: "src/app/vues"
+related_targets: ["static/style.css","src/app/routes.ts","src/app/routes"]
 ---
 
 # Surface brief: Thoth student and teacher views
 
-Scope: `src/app/vues.ts` and `static/style.css`. Student surfaces are Read mode, teacher surfaces are Operate mode. Visual authority is the 12/09/2026 handoff in `design/mvp-2026-09-12/`.
+Scope: `src/app/vues/` and `static/style.css`. Student surfaces are Read mode, teacher surfaces are Operate mode. Visual authority is the 12/09/2026 handoff in `design/mvp-2026-09-12/`.
 
 Audience: STD2A students revising on a phone, and one teacher certifying sources at a desk. Constraints: Hono, hono/html and HTMX, no build step. Tu for students, vous for teachers. Features without data stay unbuilt: notes, cards, profile, Fiche and Repères tabs.
 
