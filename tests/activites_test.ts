@@ -1,7 +1,7 @@
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertMatch, assertStringIncludes, assertThrows } from "@std/assert";
-import { activitesEleve, lireImage } from "../src/app/activites.ts";
+import { activitesEleve, lireImage, ordreLecture } from "../src/app/activites.ts";
 import { lireCompte } from "../src/app/comptes.ts";
 import { contenu as chemin } from "../src/app/config.ts";
 import type { Db } from "../src/app/db.ts";
@@ -432,6 +432,27 @@ test("exercice : un juge en panne laisse le brouillon et le dit", async () => {
     db.close();
     await rm(dir, { recursive: true });
   }
+});
+
+test("sources citables : sans thème d'abord, puis l'ordre de lecture, puis le titre en français", () => {
+  const s = (titre: string, ordre: number | null, theme: string | null = null) => ({
+    id: titre,
+    titre,
+    ordre,
+    theme,
+  });
+  const sources = [
+    s("Vers l'AI engineering", null),
+    s("Écrire un AGENTS.md", null),
+    s("Annexe", 1, "Pour aller plus loin"),
+    s("Quiz", 13),
+    s("MCP", 9),
+    s("Agentic coding", 0),
+  ];
+  assertEquals(
+    sources.toSorted(ordreLecture).map((x) => x.titre),
+    ["Agentic coding", "MCP", "Quiz", "Écrire un AGENTS.md", "Vers l'AI engineering", "Annexe"],
+  );
 });
 
 test("titre et date à rendre : réglés sans nouvelle version", async () => {

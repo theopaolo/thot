@@ -1,8 +1,8 @@
 import { html } from "hono/html";
 import { TYPES_QUESTION } from "../../core/activite.ts";
-import { MAX_SERIE, MAX_SOURCES } from "../activites.ts";
+import { MAX_SERIE, MAX_SOURCES, type SourceCitable } from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
-import type { Libelles } from "../instance.ts";
+import { type Libelles, minuscule } from "../instance.ts";
 import { NOMS_TYPE } from "./questions.ts";
 
 export type Preparation = {
@@ -10,7 +10,8 @@ export type Preparation = {
   libelles: Libelles;
   coursId: string;
   objectifs: { id: string; intitule: string; reference: string }[];
-  sources: { id: string; titre: string }[];
+  /** dans l'ordre du sommaire élève */
+  sources: SourceCitable[];
   personnel: boolean;
   saisie: Record<string, unknown>;
   erreur?: string;
@@ -27,10 +28,19 @@ export const preparation = (p: Preparation) => {
   );
   const nomCours = (c: Catalogue["cours"][number]) =>
     `${p.catalogue.matieres.find((m) => m.id === c.matiere_id)?.nom ?? ""} / ${c.nom}`;
+  // Un groupe par thème, seulement quand le cours en a plusieurs.
+  const groupes = Map.groupBy(p.sources, (x) => x.theme ?? "");
+  const cases = (liste: SourceCitable[]) =>
+    html`<div class="sources-preparation">${liste.map(
+      (x) =>
+        html`<label><input type="checkbox" name="sources" value="${x.id}" ${
+          choisies.has(x.id) ? "checked" : ""
+        }> ${x.titre}</label>`,
+    )}</div>`;
   return html`
     <p><a href="/prof/activites">Activités</a></p>
     <h1>Préparer une activité</h1>
-    <p class="discret">Un quiz de carnet-quiz s'importe depuis <a href="/prof/activites/importer">cette page</a>.</p>
+    <p class="discret">Pour reprendre un quiz déjà écrit, <a href="/prof/activites/importer">importez-le</a>.</p>
     ${p.erreur ? html`<p role="alert">${p.erreur}</p>` : ""}
     ${
       p.rejets?.length
@@ -55,35 +65,40 @@ export const preparation = (p: Preparation) => {
         )}</select>
         <button>Changer</button>
       </form>
-      <form method="post" action="/prof/activites" class="etroit">
+      <form method="post" action="/prof/activites" class="etroit preparation">
         <input type="hidden" name="cours_id" value="${p.coursId}">
         <fieldset>
           <legend><strong>Activité</strong></legend>
           <label><input type="radio" name="type" value="exercice" ${explication ? "" : "checked"}> Exercice, une série de questions</label>
-          <p class="aide">Chaque champ que Thot rédige cite des passages retrouvés mot pour mot. Un champ sans passage retrouvé est rejeté. Une réponse rédigée a une consigne, une réponse attendue, 2 à 5 critères et un retour. Un choix a une consigne, des options et un retour : la bonne option et le retour citent leurs passages, les options fausses non. Le juge de soutien signale ce que les passages d'un champ n'établissent pas.</p>
+          <p class="aide">Thot rédige les questions, leurs réponses et leurs retours en citant les sources choisies mot pour mot. Il écarte ce qu'il ne peut pas citer et signale ce que les passages cités ne prouvent pas entièrement. Vous relisez la série avant de la publier.</p>
           <label><input type="radio" name="type" value="explication" ${explication ? "checked" : ""}> Explication d'étude</label>
-          <p class="aide">Thot répond à l'objectif comme à une question, dans les sources choisies seulement. Chaque phrase cite son passage et passe le juge de soutien. L'élève la lit, sans réponse à envoyer.</p>
+          <p class="aide">Thot répond à l'objectif comme à une question, dans les sources choisies seulement. Chaque phrase cite son passage. L'élève la lit, sans réponse à envoyer.</p>
         </fieldset>
-        <fieldset>
+        <fieldset class="pour-serie">
           <legend><strong>Série de questions</strong></legend>
-          <p class="aide">Pour un exercice. Thot rédige une question par appel, chacune citée mot pour mot. Une question mal ancrée est rejetée et comptée, les autres restent.</p>
           <div class="champ">
             <label for="nombre">Nombre de questions, de 1 à ${MAX_SERIE}</label>
+            <p class="aide">Thot rédige chaque question à part. Une question qu'il ne peut pas citer est écartée, les autres restent.</p>
             <input type="number" id="nombre" name="nombre" min="1" max="${MAX_SERIE}" value="${s("nombre") || "1"}">
           </div>
-          <p class="aide">Types, tirés dans l'ordre et en boucle.</p>
-          ${TYPES_QUESTION.map(
-            (t) =>
-              html`<label><input type="checkbox" name="types" value="${t}" ${
-                types.has(t) ? "checked" : ""
-              }> ${NOMS_TYPE[t]}</label>`,
-          )}
-          <p class="aide">Corrigé de l'élève.</p>
-          <label><input type="radio" name="correction" value="serie" ${s("correction") === "question" ? "" : "checked"}> Après la remise de la série</label>
-          <label><input type="radio" name="correction" value="question" ${s("correction") === "question" ? "checked" : ""}> Après chaque question</label>
+          <fieldset>
+            <legend>Types de questions, alternés dans cet ordre</legend>
+            ${TYPES_QUESTION.map(
+              (t) =>
+                html`<label><input type="checkbox" name="types" value="${t}" ${
+                  types.has(t) ? "checked" : ""
+                }> ${NOMS_TYPE[t]}</label>`,
+            )}
+          </fieldset>
+          <fieldset>
+            <legend>L'élève voit le corrigé</legend>
+            <label><input type="radio" name="correction" value="serie" ${s("correction") === "question" ? "" : "checked"}> Après la remise de la série</label>
+            <label><input type="radio" name="correction" value="question" ${s("correction") === "question" ? "checked" : ""}> Après chaque question</label>
+          </fieldset>
         </fieldset>
         <fieldset>
           <legend><strong>Objectif</strong></legend>
+          <p class="aide">Ce que l'élève doit savoir ou savoir faire. Thot s'en sert pour chercher les passages.</p>
           ${
             p.objectifs.length
               ? html`<div class="champ">
@@ -100,7 +115,7 @@ export const preparation = (p: Preparation) => {
               </div>`
               : ""
           }
-          <div class="champ">
+          <div class="champ nouvel-objectif">
             <label for="intitule">Nouvel objectif</label>
             <input type="text" id="intitule" name="intitule" maxlength="300" value="${s("intitule")}">
           </div>
@@ -108,16 +123,18 @@ export const preparation = (p: Preparation) => {
         <fieldset>
           <legend><strong>Sources, de 1 à ${MAX_SOURCES}</strong></legend>
           ${
-            p.sources.length
-              ? p.sources.map(
-                  (x) =>
-                    html`<label><input type="checkbox" name="sources" value="${x.id}" ${
-                      choisies.has(x.id) ? "checked" : ""
-                    }> ${x.titre}</label>`,
-                )
-              : html`<p class="discret">Aucune source certifiée de ce cours ne sert à Thot pour répondre${
+            !p.sources.length
+              ? html`<p class="discret">Aucune source certifiée de ce cours ne sert à Thot pour répondre${
                   p.personnel ? "" : " et n'est publiée aux élèves"
                 }.</p>`
+              : groupes.size > 1
+                ? [...groupes].map(
+                    ([theme, liste]) => html`<fieldset>
+                      <legend>${theme || `Directement dans le ${minuscule(p.libelles.cours)}`}</legend>
+                      ${cases(liste)}
+                    </fieldset>`,
+                  )
+                : cases(p.sources)
           }
         </fieldset>
         <button class="principal" ${p.sources.length ? "" : "disabled"}>Rédiger le brouillon</button>

@@ -2995,6 +2995,40 @@ details.reglages-activite {
 .option-edition textarea {
   field-sizing: content;
 }
+/*
+ * Préparer une activité : un groupe titré par fieldset. Une explication masque les réglages de la
+ * série, un objectif enregistré masque le champ du nouvel objectif, sans script.
+ */
+.preparation > fieldset {
+  margin-bottom: var(--s5);
+}
+.preparation > fieldset > legend {
+  margin-bottom: var(--s2);
+  font-size: 1.125rem;
+}
+.preparation fieldset fieldset {
+  margin: var(--s3) 0 0;
+}
+.preparation fieldset fieldset > legend,
+.preparation .champ > label {
+  display: block;
+  min-height: 0;
+  font-weight: 700;
+}
+.preparation input[type="number"] {
+  width: 6rem;
+}
+.preparation:has(input[name="type"][value="explication"]:checked) .pour-serie,
+.preparation:has(#objectif_id option:checked:not([value=""])) .nouvel-objectif {
+  display: none;
+}
+.sources-preparation {
+  columns: 2 14rem;
+  column-gap: var(--s5);
+}
+.sources-preparation label {
+  break-inside: avoid;
+}
 /* L'index de la série reprend le sommaire du lecteur : collé à droite quand il tient, absent sinon. */
 @media (min-width: 75rem) {
   .questions-colonnes {

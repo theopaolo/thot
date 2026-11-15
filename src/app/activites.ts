@@ -278,17 +278,40 @@ const cle = (s: string) => sansAccents(s.toLowerCase()).replace(/\s+/g, " ").tri
 export const objectifNomme = (db: Db, coursId: string, intitule: string) =>
   objectifs(db, coursId).find((o) => cle(o.intitule) === cle(intitule));
 
-/** Les sources du cours qu'un exercice peut citer. */
+export type SourceCitable = {
+  id: string;
+  titre: string;
+  /** le thème de la source dans le cours, `null` directement dans le cours */
+  theme: string | null;
+  /** l'ordre de lecture que l'enseignant donne, `null` sans ordre */
+  ordre: number | null;
+};
+
+/**
+ * L'ordre du sommaire élève : les sources sans thème en tête, puis par thème, chacune dans l'ordre
+ * de lecture puis par titre. La collation française range « Écrire » avec les E.
+ */
+export const ordreLecture = (a: SourceCitable, b: SourceCitable) =>
+  Number(a.theme !== null) - Number(b.theme !== null) ||
+  (a.theme ?? "").localeCompare(b.theme ?? "", "fr") ||
+  (a.ordre ?? Infinity) - (b.ordre ?? Infinity) ||
+  a.titre.localeCompare(b.titre, "fr");
+
+/** Les sources du cours qu'un exercice peut citer, dans l'ordre de lecture. */
 export const sourcesCitables = (db: Db, a: Cible) => {
   const p = perimetre(db, a);
   return (
     db
       .prepare(
-        `SELECT s.id, s.titre FROM sources s JOIN source_cours sc ON sc.source_id = s.id
-         WHERE sc.cours_id = ? AND s.statut = 'certifiee' ORDER BY s.titre`,
+        `SELECT s.id, s.titre, t.nom AS theme, json_extract(s.metadonnees, '$.ordre') AS ordre
+         FROM sources s JOIN source_cours sc ON sc.source_id = s.id
+         LEFT JOIN themes t ON t.id = sc.theme_id
+         WHERE sc.cours_id = ? AND s.statut = 'certifiee'`,
       )
-      .all(a.cours_id) as { id: string; titre: string }[]
-  ).filter((s) => revisionCitable(db, s.id, p) !== undefined);
+      .all(a.cours_id) as SourceCitable[]
+  )
+    .filter((s) => revisionCitable(db, s.id, p) !== undefined)
+    .toSorted(ordreLecture);
 };
 
 /** Les images des sources citables du cours, qu'une question peut montrer. */
