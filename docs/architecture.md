@@ -92,6 +92,17 @@ sa première ligne en en-tête. Le texte du bloc et ses offsets ne changent pas.
 passage cité rend les blocs qui le portent comme le lecteur, si bien qu'une ligne de tableau citée
 reste dans son tableau.
 
+Une page HTML se lit comme le navigateur l'affiche, et seul son `<main>` compte quand elle en a
+un. Scripts, styles, menus `<nav>`, boutons, listes de choix, zones de saisie et figures SVG
+n'entrent pas dans le texte, et un avertissement compte les figures. Le premier `<h1>` donne le
+titre, sinon le titre de l'onglet. Les titres ouvrent les sections. Une liste garde une ligne par
+entrée, un tableau une ligne par rangée avec ses cellules séparées par « | ». Un `<pre>` reste mot
+pour mot, avec le langage de sa classe `language-…`, et un `<code>` en ligne garde sa plage comme
+en Markdown. Une image intégrée en `data:` entre dans sa section si elle est en PNG, JPEG ou GIF,
+sous la borne de pixels des documents Word. Une image liée n'est pas jointe, et un avertissement
+nomme celles d'un chemin relatif. Le profil arts appliqués lit toute page HTML comme un export
+Pearltrees : un titre, des paragraphes, des intertitres en gras et la première image seule.
+
 Un zip est un document Word quand `[Content_Types].xml` déclare `word/document.xml` comme document
 principal, une présentation quand il déclare ainsi `ppt/presentation.xml`. Le dépôt refuse avec
 sa raison un conteneur OLE (document chiffré, ancien `.doc` ou `.ppt`), un paquet à macros
@@ -215,12 +226,13 @@ rattachée : sans cours, toute l'instance la lirait. Un dépôt sans cours coch�
 premier cours de sa matière dont le déposant est membre. Sans un tel cours, il reste non classé.
 
 Les profils fixes se lisent dans `src/core/profils.ts`. Le profil général garde un vocabulaire
-neutre. Le profil arts conserve les rubriques ATC, les propositions de métadonnées artistiques
-et le quiz d'identification. Il garde aussi les consignes de réponse, de juge, de suggestion et
-de légende mesurées sur le pilote. La première matière fixe le profil de l'instance. Une seule
-action le change pour toutes les matières, tant qu'aucune ressource n'a un autre profil. Ensuite,
-l'administration et la CLI refusent une matière d'un autre profil. La source capture le profil au
-dépôt, y compris sans matière. Une réextraction conserve ce profil.
+neutre. Le profil arts conserve les rubriques ATC, la lecture des exports Pearltrees, les
+propositions de métadonnées artistiques et le quiz d'identification. Il garde aussi les consignes
+de réponse, de juge, de suggestion et de légende mesurées sur le pilote. La première matière fixe
+le profil de l'instance. Une seule action le change pour toutes les matières, tant qu'aucune
+ressource n'a un autre profil. Ensuite, l'administration et la CLI refusent une matière d'un
+autre profil. La source capture le profil au dépôt, y compris sans matière. Une réextraction
+conserve ce profil.
 
 Un profil est un préréglage de code. Il fixe les traitements construits ou mesurés pour lui et
 fournit les termes et les champs du dépôt par défaut. Les réglages de l'administration

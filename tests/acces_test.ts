@@ -31,6 +31,9 @@ const TEXTE =
   "La façade de la Casa Batlló est couverte de céramique irisée. " +
   "Gaudí refuse la ligne droite dans toute la façade.";
 const BAUHAUS = "L'école du Bauhaus réunit les arts et l'artisanat à Weimar.";
+/** Une image PNG de 1 × 1 pixel : la lecture HTML écarte une image dont l'en-tête est faux. */
+const PNG =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const BONNE = JSON.stringify({
   affirmations: [
     {
@@ -62,7 +65,7 @@ async function source(
     reponses: true,
     liens: coursId ? [{ cours_id: coursId, theme_id: null }] : undefined,
     octets: new TextEncoder().encode(
-      `<html><h1>${titre}</h1><img src="data:image/jpeg;base64,/9j/4AAQ"><p>${texte}</p></html>`,
+      `<html><h1>${titre}</h1><img src="data:image/png;base64,${PNG}"><p>${texte}</p></html>`,
     ),
   });
   await traiter(db, revendiquer(db)!, fauxModeles().modeles);

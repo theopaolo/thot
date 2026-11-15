@@ -3,7 +3,7 @@ import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
 import { fileURLToPath } from "node:url";
 import { assembler, coherent } from "../src/core/document.ts";
-import { extraireHtml, pageVide, rubriquesSommaire } from "../src/core/html.ts";
+import { extraireHtml, extrairePearltrees, pageVide, rubriquesSommaire } from "../src/core/html.ts";
 import { extraireMarkdown, lireFrontMatter } from "../src/core/markdown.ts";
 import { decouperPdf, extrairePdf } from "../src/core/pdf.ts";
 import { tranche } from "../src/core/texte.ts";
@@ -116,7 +116,7 @@ const PAGE = `<html><head><title>Titre de repli</title><style>p{}</style></head>
 <img src="data:image/png;base64,iVBORw0KGgo=" /></div></div></body></html>`;
 
 test("HTML Pearltrees: titre, texte décodé, intertitre, première image seule", () => {
-  const ext = extraireHtml(PAGE, "repli");
+  const ext = extrairePearltrees(PAGE, "repli");
   assertEquals(ext.parties[0].texte, "Antoni Gaudi, Casa Batlló (1906)");
   assertEquals(ext.parties.map((p) => p.texte).slice(1), [
     "Le patio est revêtu de céramique bleue.",
@@ -150,7 +150,7 @@ test("sommaire Pearltrees: chaque fichier reçoit la rubrique qui le précède",
 });
 
 test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une étiquette non", () => {
-  const ext = extraireHtml(
+  const ext = extrairePearltrees(
     `<h1>Synthèse séance 1</h1>
      <p><b>Fauvisme · Expressionnisme · Cubisme</b></p>
      <p>Trois mouvements rompent le contrat.</p>
@@ -174,6 +174,73 @@ test("HTML Pearltrees: un gras en tête de paragraphe devient intertitre, une é
       "Les Fauves",
     ],
   );
+});
+
+test("HTML: le <main> sans scripts ni commandes, titres, listes, tableaux et code", () => {
+  const ext = extraireHtml(
+    `<!doctype html><html><head><meta charset=utf-8><title>Onglet</title>
+<script>if (a < b) {}</script></head><body><header><nav><a href="/">Accueil</a></nav></header>
+<main><h1>Accords de septième</h1>
+<p>Une triade empile deux tierces&nbsp;: C, E, G. Écrire <code>chord("C^7")</code>
+dans Strudel.</p>
+<div class="widget"><button type="button">Start</button><select><option>C</option></select>
+<svg viewBox="0 0 1 1"><text>Do</text></svg></div>
+<h2 id="a">Étape 1 &rarr; quatre notes</h2>
+<ul><li>Cmaj7<li>C7<ul><li>dominante</li></ul></li></ul>
+<table><thead><tr><th>Accord<th>Notes</tr></thead>
+<tbody><tr><td>Cmaj7</td><td>C E G B</td></tr><tr><td></td><td></td></tr></tbody></table>
+<pre><code class="language-js">chord("&lt;C^7 C7&gt;")
+  .voicing()</code></pre>
+<img src="portee.png" alt=""><img src="https://exemple.org/a.png">
+</main><footer>Pied</footer></body></html>`,
+    "repli",
+  );
+  const etape = "Étape 1 → quatre notes";
+  assertEquals(
+    ext.parties.map((p) => [p.section, p.texte]),
+    [
+      ["Accords de septième", "Accords de septième"],
+      [
+        "Accords de septième",
+        'Une triade empile deux tierces : C, E, G. Écrire chord("C^7") dans Strudel.',
+      ],
+      [etape, etape],
+      [etape, "Cmaj7\nC7\ndominante"],
+      [etape, "Accord | Notes\nCmaj7 | C E G B"],
+      [etape, 'chord("<C^7 C7>")\n  .voicing()'],
+    ],
+  );
+  const p = ext.parties[1];
+  assertEquals(p.codes, [[p.texte.indexOf("chord"), p.texte.indexOf(" dans")]]);
+  assertEquals([ext.parties[5].code, ext.parties[5].langage], [true, "js"]);
+  assertEquals(ext.avertissements, [
+    "Images liées, non jointes à la source : portee.png.",
+    "Figures SVG non extraites : 1.",
+  ]);
+});
+
+test("HTML: sans <main>, toute la page, titre de l'onglet, image intégrée dans sa section", () => {
+  const png =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const ext = extraireHtml(
+    `<html><head><title>Fiche &amp; repères</title></head><body>
+<h2>Couleur</h2><p>Bleu<br>outremer &#99999999;</p><img src="data:image/png;base64,${png}">
+</body></html>`,
+    "repli",
+  );
+  assertEquals(
+    ext.parties.map((p) => [p.section, p.texte]),
+    [
+      ["Fiche & repères", "Fiche & repères"],
+      ["Couleur", "Couleur"],
+      ["Couleur", "Bleu\noutremer &#99999999;"],
+    ],
+  );
+  assertEquals(
+    ext.images.map((i) => [i.mime, i.section]),
+    [["image/png", "Couleur"]],
+  );
+  assertEquals(ext.avertissements, []);
 });
 
 const COURS_MD = `---

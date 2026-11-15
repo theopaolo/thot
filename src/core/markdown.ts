@@ -1,5 +1,5 @@
 import type { Extraction, Partie } from "./document.ts";
-import { decoder } from "./html.ts";
+import { decoder, RELATIF } from "./html.ts";
 import { longueur } from "./texte.ts";
 
 /** Front matter YAML en tête de fichier. Seuls `title` et `order` sont lus, `corps` est le reste. */
@@ -20,7 +20,6 @@ export function lireFrontMatter(md: string): { titre?: string; ordre?: number; c
 }
 
 const RE_IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)[^)]*\)/g;
-const RELATIF = /^(?![a-z][a-z\d+.-]*:|\/\/)/i;
 
 type Lisible = { texte: string; codes: [number, number][] };
 

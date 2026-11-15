@@ -9,7 +9,7 @@ import {
   type Extraction,
 } from "../core/document.ts";
 import { extraireDocx } from "../core/docx.ts";
-import { extraireHtml } from "../core/html.ts";
+import { extraireHtml, extrairePearltrees } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
 import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
@@ -89,7 +89,12 @@ const lireSource = (db: Db, id: string) =>
 async function extraire(s: Source): Promise<Extraction> {
   const chemin = contenu(s.id, "original", s.fichier);
   if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
-  if (s.format === "html") return extraireHtml(await readFile(chemin, "utf8"), s.titre);
+  if (s.format === "html") {
+    // Le pilote arts appliqués dépose des exports Pearltrees. Une autre lecture changerait le
+    // texte de ses sources à la réextraction.
+    const lire = s.profil === "arts-appliques" ? extrairePearltrees : extraireHtml;
+    return lire(await readFile(chemin, "utf8"), s.titre);
+  }
   if (s.format === "md") return extraireMarkdown(await readFile(chemin, "utf8"), s.titre);
   if (s.format === "docx") return await extraireDocx(await readFile(chemin), s.titre);
   if (s.format === "pptx") {
