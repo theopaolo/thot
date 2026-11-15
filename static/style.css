@@ -788,6 +788,20 @@ form.etroit {
   min-height: 0;
   font-weight: 700;
 }
+/* Les services, en lecture seule, se lisent comme un groupe des réglages. */
+.traitements {
+  margin: 0 0 var(--s5);
+}
+.traitements h2 {
+  margin: 0 0 var(--s1);
+  font-size: 1.125rem;
+}
+.pied-reglages {
+  max-width: 44rem;
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
 .saisie {
   display: flex;
   align-items: stretch;

@@ -407,8 +407,27 @@ export const administration = (
         ${texte("nom", "Nom de l'instance", 100)}
         <p>Mode d'usage : ${instance.mode === "personal" ? "personnel" : "partagé"}<br><span
             class="aide">Choisi par l'opérateur avant la création des comptes.</span></p>
-        <p>Identité de l'instance : <code>${instance.id}</code></p>
+        <p>Profil d'import : ${profil ? PROFILS[profil].nom : "aucun"}<br><span class="aide">${
+          !profil
+            ? "La première matière le choisit."
+            : fige
+              ? "Des ressources sont déposées, il ne change plus."
+              : "Il se change tant qu'aucune ressource n'est déposée."
+        } <a href="/administration/domaines">${domainesDe(l)}</a></span></p>
       </fieldset>
+      <section class="traitements" aria-labelledby="titre-traitements">
+        <h2 id="titre-traitements">Traitement des documents et des questions</h2>
+        <p class="aide">Services autorisés et localisations déclarés par l'opérateur. Les localisations ne sont pas vérifiées par l'application. Aucun traitement par un modèle local n'est proposé.</p>
+        <table>
+          <thead><tr><th>Service</th><th>État</th><th>Localisation</th></tr></thead>
+          <tbody>${traitements().map(
+            (f) =>
+              html`<tr><td>${f.nom}</td><td>${
+                !f.autorise ? "Désactivé" : f.disponible ? "Configuré" : "Clé absente"
+              }</td><td>${f.localisation}</td></tr>`,
+          )}</tbody>
+        </table>
+      </section>
       <fieldset>
         <legend>Vocabulaire</legend>
         <div class="deux">
@@ -449,28 +468,9 @@ export const administration = (
         <button type="reset">Annuler les modifications</button>
       </div>
     </form>
-    <section class="etroit">
-      <h2>Profil d'import</h2>
-      <p>${profil ? PROFILS[profil].nom : "Aucun"}. ${
-        !profil
-          ? "La première matière le choisit."
-          : fige
-            ? "Des ressources sont déposées, il ne change plus."
-            : "Il se change tant qu'aucune ressource n'est déposée."
-      } <a href="/administration/domaines">${domainesDe(l)}</a></p>
-      <h2>Traitement des documents et des questions</h2>
-      <p>Services autorisés et localisations déclarés par l'opérateur. Les localisations ne sont pas vérifiées par l'application.</p>
-      <dl>${traitements().map(
-        (f) =>
-          html`
-          <dt>${f.nom}</dt>
-          <dd>${
-            !f.autorise ? "Désactivé" : f.disponible ? "Configuré" : "Clé absente"
-          }. Localisation : ${f.localisation}.</dd>
-        `,
-      )}</dl>
-      <p>Aucun traitement par un modèle local n'est proposé.</p>
-      <a class="bouton" href="/prof">Gérer les documents</a>
-    </section>
+    <div class="pied-reglages">
+      <p><a class="bouton" href="/prof">Gérer les documents</a></p>
+      <p class="discret">Identité de l'instance : <code>${instance.id}</code></p>
+    </div>
   `;
 };
