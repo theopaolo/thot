@@ -149,6 +149,22 @@ test("grille : l'enseignant du cours lit les élèves qui ont remis et ceux qui 
   assertStringIncludes(page, '<li class="juste">');
   assertStringIncludes(page, '<span style="width: 100%"></span>');
   assertStringIncludes(page, "100 % de réussite");
+  assertStringIncludes(page, "Les barres comptent le premier choix");
+  assertStringIncludes(page, `href="/prof/activites/${a.id}/reponses.csv"`);
+  db.close();
+});
+
+test("sans réponse, l'export attend, et une série sans choix n'a pas de légende des barres", async () => {
+  const { db, c1, prof, e1 } = await cadre();
+  const a = serie(db, prof, c1, [redigee]);
+  const s = await connecter(db, prof);
+  const vide = await (await s.lire(`/prof/activites/${a.id}/reponses`)).text();
+  assertStringIncludes(vide, "Aucun élève n'a encore répondu.");
+  assert(!vide.includes("reponses.csv"), "rien à exporter");
+  enregistrerReponses(db, e1, a, { q3: "Une céramique bleue" }, true);
+  const page = await (await s.lire(`/prof/activites/${a.id}/reponses`)).text();
+  assertStringIncludes(page, `href="/prof/activites/${a.id}/reponses.csv"`);
+  assert(!page.includes("Les barres comptent"), "aucune barre à légender");
   db.close();
 });
 

@@ -207,10 +207,16 @@ const sectionFermees = (a: Activite, contenu: Contenu, liste: Ligne[]) => {
     : "";
 };
 
+/** Le premier choix de chaque élève qui a fini une question à choix, vide pour un autre type. */
+const premiersChoix = (q: Question, liste: Ligne[], i: number) =>
+  q.type === "choix" || q.type === "choix_multiple"
+    ? liste.flatMap((l) => l.cases[i]?.essais[0] ?? [])
+    : [];
+
 const sectionQuestions = (contenu: Contenu, liste: Ligne[]) => html`
   <h2>Question par question</h2>
   <ol class="reponses-questions">${contenu.questions.map((q, i) => {
-    const premiers = liste.flatMap((l) => l.cases[i]?.essais[0] ?? []);
+    const premiers = premiersChoix(q, liste, i);
     const t = taux(liste, i);
     const compter = (id: string) => premiers.filter((v) => v.split(",").includes(id)).length;
     return html`<li id="q-${i + 1}">
@@ -233,7 +239,12 @@ const sectionQuestions = (contenu: Contenu, liste: Ligne[]) => html`
       }
     </li>`;
   })}</ol>
-  <p class="aide">Les barres comptent le premier choix de chaque élève. La bonne réponse est en vert.</p>`;
+  ${
+    // La légende suit les barres : sans question à choix déjà répondue, il n'y en a pas.
+    contenu.questions.some((q, i) => premiersChoix(q, liste, i).length)
+      ? html`<p class="aide">Les barres comptent le premier choix de chaque élève. La bonne réponse est en vert.</p>`
+      : ""
+  }`;
 
 export function pageReponses(a: Activite, contenu: Contenu, liste: Ligne[]) {
   const remises = liste.filter((l) => l.t?.rendue_le).length;
@@ -248,9 +259,12 @@ export function pageReponses(a: Activite, contenu: Contenu, liste: Ligne[]) {
           : "Aucune réponse rédigée à noter."
       }</p>
       <p class="discret">Les points mesurent ce qui a été pratiqué, pas un niveau.</p>
-      <div class="barre">
-        <a class="bouton" href="/prof/activites/${a.id}/reponses.csv">Exporter en CSV</a>
-      </div>
+      <div class="barre">${
+        liste.some((l) => l.t)
+          ? html`<a class="bouton" href="/prof/activites/${a.id}/reponses.csv">Exporter en CSV</a>`
+          : html`<button type="button" disabled aria-describedby="sans-export">Exporter en CSV</button>
+            <span class="aide" id="sans-export">Aucun élève n'a encore répondu.</span>`
+      }</div>
       ${
         liste.length
           ? html`<div class="defilable"><table class="grille">
