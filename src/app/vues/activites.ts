@@ -136,14 +136,18 @@ export const listeProf = ({ liste, cours, filtre, libelles: l }: Liste) => html`
   ${
     liste.length
       ? html`<table>
-        <thead><tr><th>Titre</th><th>Type</th><th>${l.cours_pluriel}</th><th>État</th><th>Remises</th><th>Modifiée le</th></tr></thead>
+        <thead><tr><th>Activité</th><th>État</th><th>Remises</th><th>Modifiée le</th></tr></thead>
         <tbody>${liste.map(
+          // Deux activités au même titre se distinguent par la ligne qui le suit : type, nombre de
+          // questions, cours, puis l'objectif quand le titre ne le reprend pas.
           (a) => html`<tr>
-            <td><a href="/prof/activites/${a.id}">${a.titre}</a>${
-              a.titre === a.intitule ? "" : html`<br><span class="discret">${a.intitule}</span>`
-            }</td>
-            <td>${typeDe(a.type, a.questions)}</td><td>${a.les_cours}</td><td>${etat(a)}</td>
-            <td>${a.remises}</td><td>${jour(a.maj_le)}</td>
+            <td><a href="/prof/activites/${a.id}">${a.titre}</a><br><span class="discret">${[
+              typeDe(a.type, a.questions) + (a.les_cours ? `, dans ${a.les_cours}` : ""),
+              a.titre === a.intitule ? "" : `Objectif : ${a.intitule}`,
+            ]
+              .filter(Boolean)
+              .join(". ")}</span></td>
+            <td>${etat(a)}</td><td>${a.remises}</td><td>${jour(a.maj_le)}</td>
           </tr>`,
         )}</tbody>
       </table>`
