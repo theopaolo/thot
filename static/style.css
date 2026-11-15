@@ -3625,7 +3625,7 @@ details.cours-ajout > summary {
 }
 
 /* Relecture en colonnes */
-.relecture {
+.relecture-sources {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--s4) var(--s5);
@@ -3679,7 +3679,7 @@ details.cours-ajout > summary {
   margin-top: 0;
 }
 @media (min-width: 900px) {
-  .relecture {
+  .relecture-sources {
     grid-template-columns: 19rem minmax(0, 1fr);
   }
   .relecture-liste {

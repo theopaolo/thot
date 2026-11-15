@@ -20,7 +20,7 @@ export const pageRelecture = (liste: Attente[], choisie?: Attente, blocs: Bloc[]
       `
     : html`
         <h1 class="visuellement-cache">Relecture</h1>
-        <div class="relecture">
+        <div class="relecture-sources">
           <nav class="relecture-liste" aria-label="Ressources à relire">
             <p class="discret"><a href="/prof">Bibliothèque</a>, ${liste.length} à relire</p>
             ${groupes(liste).map(
