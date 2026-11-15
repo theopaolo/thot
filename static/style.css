@@ -2995,21 +2995,62 @@ details.reglages-activite {
 .option-edition textarea {
   field-sizing: content;
 }
-/* Sous une question, seul « Modifier » garde son cadre : les autres actions restent discrètes. */
-.question-prof > form.barre {
-  gap: var(--s2) var(--s4);
+/* Le texte d'une question se lit à la mesure, comme un document. */
+.question-prof > :is(p, ol, ul) {
+  max-width: var(--measure);
 }
-.question-prof > form.barre button {
-  min-height: 24px;
-  padding: 0;
-  border: 0;
+/* Sous une question : « Modifier », puis un menu pour les autres actions. */
+.menu-question {
+  min-width: 18rem;
+  padding: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgb(28 24 21 / 0.08);
+}
+.menu-question:popover-open {
+  display: grid;
+}
+@supports (position-area: bottom) {
+  .menu-question {
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block;
+    inset: auto;
+    margin: var(--s1) 0;
+  }
+}
+.menu-question button {
+  justify-content: flex-start;
+  border-color: transparent;
   background: none;
-  font-weight: 400;
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
 }
-.question-prof > form.barre button:disabled {
-  text-decoration: none;
+.menu-question button:hover {
+  border-color: transparent;
+  background: var(--surface-tinted);
+}
+.menu-question button.danger:hover {
+  background: var(--rose-surface);
+}
+.menu-question .filet,
+.menu-question .filet:hover {
+  margin-top: var(--s1);
+  border-top-color: var(--line);
+  border-radius: 0;
+}
+.deplacer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s2);
+  padding-left: var(--s4);
+}
+.deplacer label {
+  margin: 0;
+  font-weight: 400;
+}
+.deplacer select {
+  width: auto;
 }
 
 /* ------------------------------------------------- matières et cours (administration) */

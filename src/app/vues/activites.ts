@@ -21,6 +21,7 @@ import type {
   suiviObjectifs,
 } from "../activites.ts";
 import { MAX_PASSAGES, type Saisie, un } from "../edition.ts";
+import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
 import { jour, ongletsBibliotheque } from "./prof.ts";
 import { enrichi, enrichiLigne, imageQuestion, LANGAGES, lettre, NOMS_TYPE } from "./questions.ts";
@@ -276,8 +277,6 @@ const corpsType = (q: Question, servies: Servies, signer: boolean) => {
 /** Une question en lecture, avec ses actions. */
 const lecture = (d: DetailProf, n: number, q: Question, i: number) => {
   const { a, servies } = d;
-  const id = encodeURIComponent(q.id);
-  const base = `/prof/activites/${a.id}/questions/${id}`;
   // Une question sans aucun passage le dit une fois, pas sous chaque champ.
   // Une consigne vide vient d'une source supprimée, pas de l'enseignant.
   const enseignant = !!q.consigne.texte && champsQuestion(q).every((ch) => !ch.citations.length);
@@ -295,17 +294,44 @@ const lecture = (d: DetailProf, n: number, q: Question, i: number) => {
         ? html`<h4>Retour</h4>${champ(q.retour, servies, VIDE_SOURCE, !enseignant)}`
         : html`<p class="discret">Pas de retour.</p>`
     }
-    <form method="post" class="barre">
-      <input type="hidden" name="revision" value="${a.revision}">
-      <a class="bouton" href="/prof/activites/${a.id}?modifier=${id}#q-${id}">Modifier</a>
-      <button formaction="${base}/dupliquer">Dupliquer</button>
-      <button formaction="${base}/monter" ${i === 0 ? "disabled" : ""}>Monter</button>
-      <button formaction="${base}/descendre" ${i === n - 1 ? "disabled" : ""}>Descendre</button>
-      <button formaction="${base}/regenerer">Proposer une autre question</button>
-      <button formaction="${base}/supprimer" class="danger" ${n === 1 ? "disabled" : ""}
-        data-confirmer="Supprimer la question ${i + 1} ? La version suivante ne l'aura plus.">Supprimer</button>
-    </form>
+    ${actions(d, n, q, i)}
   </section>`;
+};
+
+/**
+ * Modifier, puis les autres actions dans un menu ancré sous son bouton. Le menu reste dans le
+ * formulaire : ses boutons envoient la version lue. Sans ancrage CSS, il s'ouvre au centre.
+ */
+const actions = (d: DetailProf, n: number, q: Question, i: number) => {
+  const { a } = d;
+  const id = encodeURIComponent(q.id);
+  const base = `/prof/activites/${a.id}/questions/${id}`;
+  return html`<form method="post" class="barre actions-question">
+    <input type="hidden" name="revision" value="${a.revision}">
+    <a class="bouton" href="/prof/activites/${a.id}?modifier=${id}#q-${id}">${icone("pencil-simple")}Modifier</a>
+    <button type="button" popovertarget="menu-${q.id}" style="anchor-name: --menu-${i}">${icone("dots-three")}Autres actions</button>
+    <div id="menu-${q.id}" popover class="menu-question" style="position-anchor: --menu-${i}">
+      <button formaction="${base}/dupliquer">${icone("copy")}Dupliquer</button>
+      <button formaction="${base}/regenerer">${icone("arrows-clockwise")}Proposer une autre question</button>
+      <button formaction="${base}/monter" class="filet" ${i === 0 ? "disabled" : ""}>${icone("arrow-up")}Monter</button>
+      <button formaction="${base}/descendre" ${i === n - 1 ? "disabled" : ""}>${icone("arrow-down")}Descendre</button>
+      ${
+        n > 2
+          ? html`<div class="deplacer">
+            <label for="rang-${q.id}">Déplacer en position</label>
+            <select id="rang-${q.id}" name="rang">${Array.from(
+              { length: n },
+              (_, k) =>
+                html`<option value="${k + 1}" ${k === i ? "selected" : ""}>${k + 1}${k === i ? ", actuelle" : ""}</option>`,
+            )}</select>
+            <button formaction="${base}/deplacer">${icone("arrows-down-up")}Déplacer</button>
+          </div>`
+          : ""
+      }
+      <button formaction="${base}/supprimer" class="danger filet" ${n === 1 ? "disabled" : ""}
+        data-confirmer="Supprimer la question ${i + 1} ? La version suivante ne l'aura plus.">${icone("trash")}Supprimer</button>
+    </div>
+  </form>`;
 };
 
 /**

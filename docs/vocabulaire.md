@@ -191,7 +191,9 @@ et « Réponse rédigée ». Une question a une consigne et un retour, parfois u
 « Où chercher ». Un champ que Thot rédige porte les passages qu'il cite. Celui dont un passage ne
 se retrouve pas mot pour mot est un « champ rejeté », et la page de l'exercice les compte. Un champ
 sans passage est « Rédigé par l'enseignant ». « Ajouter une question », « Faire rédiger une
-question par Thot » et « Proposer une autre question » complètent la série.
+question par Thot » et « Proposer une autre question » complètent la série. Sous chaque question,
+« Modifier » ouvre son formulaire et « Autres actions » ouvre un menu : « Dupliquer », « Proposer
+une autre question », « Monter », « Descendre », « Déplacer en position » et « Supprimer ».
 
 **Explication d'étude**
 La réponse vérifiée de Thot à l'objectif, posé comme une question dans les sources choisies.

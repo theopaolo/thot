@@ -597,7 +597,7 @@ test("champ rédigé par l'enseignant : sans passage il s'enregistre, un passage
   }
 });
 
-test("série : ajouter, dupliquer, monter et supprimer une question créent chacun une version", async () => {
+test("série : ajouter, dupliquer, monter, déplacer et supprimer une question créent chacun une version", async () => {
   const { db, dir, coursId, source, prof } = await cadre();
   try {
     const id = await preparer(prof, coursId, source);
@@ -639,6 +639,19 @@ test("série : ajouter, dupliquer, monter et supprimer une question créent chac
       serie(db, id).questions.map((q) => q.id),
       [terme.id, q1, apres[1].id],
     );
+    // Déplacer en position : la question saute d'un coup, les autres glissent d'un rang.
+    const deplacer = (qid: string, rang: string) =>
+      envoyer(prof, `/prof/activites/${id}/questions/${qid}/deplacer`, {
+        revision: String(ligne(db, id).revision),
+        rang,
+      });
+    assertEquals(await statut(deplacer(apres[1].id, "1")), 303);
+    assertEquals(
+      serie(db, id).questions.map((q) => q.id),
+      [apres[1].id, terme.id, q1],
+    );
+    assertEquals(await statut(deplacer(q1, "9")), 303, "hors de la série, rien ne bouge");
+    assertEquals(ligne(db, id).revision, 6);
     assertEquals(await statut(op(apres[1].id, "supprimer")), 303);
     assertEquals(await statut(op(terme.id, "supprimer")), 303);
     assertEquals(
@@ -647,12 +660,12 @@ test("série : ajouter, dupliquer, monter et supprimer une question créent chac
     );
     assertEquals(
       actions(db, id),
-      [2, 3, 4, 5, 6, 7].map((n) => `modifiee ${n}`),
+      [2, 3, 4, 5, 6, 7, 8].map((n) => `modifiee ${n}`),
     );
     assertEquals(await statut(op(q1, "supprimer")), 400, "une série garde une question");
     assertEquals(await statut(op(q1, "dupliquer", 1)), 409, "une page d'une version précédente");
     assertEquals(await statut(op("inconnue", "dupliquer")), 404);
-    assertEquals(ligne(db, id).revision, 7);
+    assertEquals(ligne(db, id).revision, 8);
 
     // Le corrigé se règle sur toute la série, comme une nouvelle version.
     const corrige = (correction: string) =>
@@ -661,7 +674,7 @@ test("série : ajouter, dupliquer, monter et supprimer une question créent chac
         correction,
       });
     assertEquals(await statut(corrige("question")), 303);
-    assertEquals([serie(db, id).correction, ligne(db, id).revision], ["question", 8]);
+    assertEquals([serie(db, id).correction, ligne(db, id).revision], ["question", 9]);
     assertEquals(await statut(corrige("jamais")), 400);
   } finally {
     db.close();

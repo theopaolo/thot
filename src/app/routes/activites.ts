@@ -208,7 +208,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
   };
   app.post("/prof/activites/:id/questions", (c) => enregistrerQuestion(c));
   app.post(
-    "/prof/activites/:id/questions/:q/:op{(?:enregistrer|dupliquer|monter|descendre|supprimer)}",
+    "/prof/activites/:id/questions/:q/:op{(?:enregistrer|dupliquer|monter|descendre|deplacer|supprimer)}",
     async (c) => {
       const op = c.req.param("op");
       const qid = c.req.param("q");
@@ -231,9 +231,16 @@ export function routesActivites(app: Hono<Env>, w: Web) {
         liste.splice(rang, 1);
         ancre = liste[Math.max(0, rang - 1)].id;
       } else {
-        const autre = op === "monter" ? rang - 1 : rang + 1;
-        if (autre >= 0 && autre < liste.length) {
-          [liste[rang], liste[autre]] = [liste[autre], liste[rang]];
+        // Monter, descendre ou déplacer en position `rang`, comptée depuis 1. Hors de la série,
+        // rien ne bouge.
+        const vers =
+          op === "monter"
+            ? rang - 1
+            : op === "descendre"
+              ? rang + 1
+              : Number(valeur(b, "rang")) - 1;
+        if (Number.isInteger(vers) && vers >= 0 && vers < liste.length) {
+          liste.splice(vers, 0, ...liste.splice(rang, 1));
         }
       }
       return nouvelleVersion(
