@@ -40,9 +40,10 @@ modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
    Les offsets comptent des points de code, les chaînes JavaScript des unités UTF-16. Tout
    découpage passe par `src/core/texte.ts`.
 7. Le choix d'un modèle est un réglage d'environnement. Il ne traverse pas le domaine.
-8. Le corpus est théorique. Une source porte des notions, des exemples, des procédures ou un quiz
-   corrigé. Un énoncé d'exercice reste hors du corpus, sinon Thot cite sa consigne comme un fait
-   ([ADR 0009](decisions/0009-enonces-hors-du-corpus.md)). L'enseignant le retire avant le dépôt.
+8. Le corpus est théorique. Une source porte des notions, des exemples commentés et des procédures
+   générales. Un exercice reste hors du corpus, quiz corrigés et étapes guidées compris, sinon Thot
+   cite sa consigne comme un fait ([ADR 0009](decisions/0009-enonces-hors-du-corpus.md)).
+   L'enseignant le retire avant le dépôt.
 
 ## Forme du système
 
