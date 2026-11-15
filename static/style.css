@@ -932,6 +932,11 @@ table.lot .statut {
 .barre .espace {
   margin-left: auto;
 }
+/* Une aide en paragraphe passe sous les boutons de la barre. */
+.barre > p.aide {
+  flex-basis: 100%;
+  margin: 0;
+}
 .barre input[type="text"],
 .barre > select {
   flex: 1 1 18rem;

@@ -130,17 +130,16 @@ export const listeProf = ({ liste, cat, filtre, libelles: l }: Liste) => html`
   <div class="barre">
     <a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a>
     <a class="bouton" href="/prof/activites/importer">Importer un quiz</a>
-    <a href="/prof/objectifs">Objectifs</a>
+    <p class="aide">Chaque activité part d'un objectif de cours. <a href="/prof/objectifs">Renommer ou fusionner les objectifs</a></p>
   </div>
-  <form method="get" action="/prof/activites" class="barre reglage">
-    ${filtre.coursId ? html`<input type="hidden" name="cours_id" value="${filtre.coursId}">` : ""}
-    ${filtre.matiereId ? html`<input type="hidden" name="matiere_id" value="${filtre.matiereId}">` : ""}
-    <label for="filtre-etat">État</label>
-    <select id="filtre-etat" name="etat">${FILTRES_ETAT.map(([v, t]) =>
-      option(v, t, filtre.etat ?? ""),
-    )}</select>
-    <button>Filtrer</button>
-  </form>
+  <div class="barre">
+    <nav class="segments" aria-label="État">${FILTRES_ETAT.map(([v, t]) => {
+      const p = { cours_id: filtre.coursId, matiere_id: filtre.matiereId, etat: v };
+      const q = new URLSearchParams(Object.entries(p).filter(([, x]) => x) as [string, string][]);
+      return html`<a href="/prof/activites${q.size ? `?${q}` : ""}"
+        aria-current="${String(v === (filtre.etat ?? ""))}">${t}</a>`;
+    })}</nav>
+  </div>
   ${
     liste.length
       ? html`<table>

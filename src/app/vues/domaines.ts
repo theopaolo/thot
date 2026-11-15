@@ -157,7 +157,7 @@ const reglagesMatiere = (m: Matiere, d: ChampsDepot, ouvert: boolean, l: Libelle
       cette matière.</p>
       ${
         conflit
-          ? html`<p role="alert" tabindex="-1" autofocus>Ces réglages ont changé pendant votre saisie. Vos valeurs sont conservées.</p>`
+          ? html`<p role="alert" tabindex="-1" autofocus>Quelqu'un a modifié ces réglages pendant votre saisie. Vos valeurs sont conservées : enregistrez pour remplacer les siennes.</p>`
           : ouvert && d.enregistre
             ? html`<p role="status" tabindex="-1" autofocus>Réglages enregistrés.</p>`
             : ""

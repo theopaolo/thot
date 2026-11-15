@@ -1634,7 +1634,7 @@ test("champs du dépôt : « Norme » se coche par matière, se valide, se masqu
     const conflit = await champs("1", norme);
     assertEquals(conflit.status, 409);
     const saisie = await conflit.text();
-    assertStringIncludes(saisie, "Ces réglages ont changé pendant votre saisie.");
+    assertStringIncludes(saisie, "Quelqu'un a modifié ces réglages pendant votre saisie.");
     assertStringIncludes(saisie, `name="version" value="2"`);
     assertStringIncludes(saisie, `value="${norme}" checked`);
     assert(!saisie.includes(`value="auteur" checked`));
@@ -1770,7 +1770,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     const conflit = await reglages({ nom: "Autre nom" });
     assertEquals(conflit.status, 409);
     const saisie = await conflit.text();
-    assertStringIncludes(saisie, "Ces réglages ont changé pendant votre saisie.");
+    assertStringIncludes(saisie, "Quelqu'un a modifié ces réglages pendant votre saisie.");
     assertStringIncludes(saisie, 'value="Autre nom"');
     assertStringIncludes(saisie, 'name="version" value="1"');
     assertEquals(lireInstance(db).nom, "Thot");
