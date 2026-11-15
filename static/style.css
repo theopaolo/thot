@@ -1291,7 +1291,7 @@ figcaption .credit {
 }
 .chapitre-tete h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
 }
 .chapitre-tete a {
   text-decoration: none;
@@ -1464,11 +1464,11 @@ button.idee .icone {
 }
 .feuille h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
 }
 #source > .feuille-tete h2,
 #source > h2 {
-  font-size: 1.5rem;
+  font-size: 1.375rem;
 }
 .feuille h3 {
   margin: 0 0 var(--s1);
@@ -1496,7 +1496,7 @@ button.idee .icone {
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 1.0625rem;
+  font-size: 1.125rem;
   line-height: 1.55;
 }
 .oeuvre-grande {
