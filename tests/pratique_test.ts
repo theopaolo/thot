@@ -275,13 +275,18 @@ test("question par question : l'indice après un essai faux, le corrigé quand l
     const essai = (q: string, v: string | string[]) =>
       envoyer(eleve, `${url}/questions/${q}`, { [q]: v });
 
-    // Un essai faux : l'indice, rien du corrigé.
+    // La position de chaque question, et l'avancement en haut de la série.
+    assertStringIncludes(texte(avant), "Question 2 sur 4");
+    assertStringIncludes(texte(avant), "0 faite sur 4");
+
+    // Un essai faux : l'indice, rien du corrigé. La question n'est pas encore faite.
     assertEquals(await statut(essai("qc", lettres(qc, eleve.id, "opt-b-qc"))), 303);
     let html = await page(eleve, url);
     assertStringIncludes(
       section(html, "qc"),
       "Pas tout à fait. Indice : INDICE-qc Il te reste 1 essai.",
     );
+    assertStringIncludes(texte(html), "0 faite sur 4");
     sansCorrige(html, "qc");
     for (const q of ["qm", "qt", "qr"]) sansCorrige(html, q, true);
 
@@ -293,6 +298,7 @@ test("question par question : l'indice après un essai faux, le corrigé quand l
       assertStringIncludes(corrigeQc, s);
     }
     assertStringIncludes(texte(corrigeQc), "Juste au deuxième essai, 0,5 point.");
+    assertStringIncludes(texte(html), "1 faite sur 4 Aller à la question 2");
     for (const q of ["qm", "qt", "qr"]) sansCorrige(html, q, true);
     assertEquals(await statut(essai("qc", lettres(qc, eleve.id, "opt-juste-qc"))), 409);
 
@@ -340,6 +346,8 @@ test("série : enregistrer garde le brouillon, remettre avec un trou demande con
     assertStringIncludes(html, `value="${brouillon.qc[0]}" checked`);
     for (const l of brouillon.qm) assertStringIncludes(html, `value="${l}" checked`);
     assertStringIncludes(html, 'value="céramique"');
+    // Dans une série, une réponse enregistrée compte comme faite.
+    assertStringIncludes(texte(html), "3 faites sur 4 Aller à la question 4");
     assert(!(await page(eleve, url)).includes("Tes réponses sont enregistrées."));
 
     // Remettre avec la réponse rédigée vide : le brouillon reste, la page demande confirmation.

@@ -311,9 +311,15 @@ export const pratique = (p: Pratique) => {
   const parQuestion = contenu.correction === "question";
   const enSaisie = !parQuestion && !t?.rendue_le;
   const sansReponse = contenu.questions.filter((q) => !t?.reponses[q.id]?.essais.length).length;
+  const n = contenu.questions.length;
+  // Faite : finie quand le corrigé suit chaque question, enregistrée quand il suit la série.
+  const faite = (q: Question) =>
+    parQuestion ? !!t?.reponses[q.id]?.finie : !!t?.reponses[q.id]?.essais.length;
+  const faites = contenu.questions.filter(faite).length;
+  const suivante = contenu.questions.find((q) => !faite(q));
   const questions = contenu.questions.map(
     (q, i) => html`<section class="question-serie" id="q-${q.id}" aria-labelledby="t-${q.id}">
-      <h2 id="t-${q.id}">Question ${i + 1}</h2>
+      <h2 id="t-${q.id}">Question ${i + 1}${n > 1 ? html` <span class="discret">sur ${n}</span>` : ""}</h2>
       ${imageQuestion(a.id, q.image)}
       ${enrichi(q.consigne.texte)}
       ${
@@ -334,6 +340,16 @@ export const pratique = (p: Pratique) => {
   );
   return html`
     ${entete(a, p.relecteur, p.apercu, contenu)}
+    ${
+      // Collée en haut de l'écran : une série de 23 questions dépasse 10 000px sur téléphone.
+      t?.rendue_le || n < 2
+        ? ""
+        : html`<p class="avancement"><strong>${faites} ${faites > 1 ? "faites" : "faite"} sur ${n}</strong>${
+            faites && suivante
+              ? html` <a href="#q-${suivante.id}">Aller à la question ${contenu.questions.indexOf(suivante) + 1}</a>`
+              : ""
+          }</p>`
+    }
     ${t?.rendue_le ? bilan(a, contenu, { ...t, rendue_le: t.rendue_le }) : ""}
     ${
       enSaisie

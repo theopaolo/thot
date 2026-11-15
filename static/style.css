@@ -2857,6 +2857,32 @@ form:has([name="ids"]:checked) .selection {
 .question-serie h2 {
   margin-top: 0;
 }
+.question-serie h2 .discret {
+  font-weight: 400;
+}
+/* L'avancement reste en haut de l'écran : une série de 23 questions dépasse 10 000px sur téléphone. */
+.avancement {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  max-width: 48rem;
+  margin: 0 0 var(--s4);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 0.9375rem;
+}
+.avancement a {
+  margin-left: var(--s3);
+}
+/* L'aperçu de l'enseignant garde le papier de bureau sous la ligne collée. */
+body.prof .avancement {
+  background: var(--bg-office);
+}
+/* Une question visée par son ancre ne passe pas sous l'avancement. */
+.question-serie {
+  scroll-margin-top: 3rem;
+}
 .image-question {
   margin: 0 0 var(--s3);
 }

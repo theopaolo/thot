@@ -219,7 +219,10 @@ Le réglage « Corrigé » dit quand l'élève voit la correction : « Après ch
 la remise de la série ». Dans une série, l'élève clique « Enregistrer » pour garder ses réponses,
 puis « Remettre ». Question par question, une erreur affiche « Pas tout à fait. » et l'indice. Le
 corrigé montre la bonne réponse et le retour. Pour une réponse rédigée, l'élève coche les critères
-que sa réponse remplit puis « Enregistrer mon auto-évaluation ».
+que sa réponse remplit puis « Enregistrer mon auto-évaluation ». Chaque question dit sa place,
+« Question 6 sur 23 ». En haut de la série, l'avancement compte les questions faites, « 4 faites
+sur 23 », avec « Aller à la question 5 ». Une question est faite quand elle est finie, question
+par question, ou quand sa réponse est enregistrée, dans une série.
 
 **Réponses, à reprendre**
 « Réponses » : la page d'un exercice où l'enseignant voit, élève par élève, la dernière tentative et
