@@ -224,7 +224,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
           f,
           repartition,
           libelles(db),
-          ressources.some((s) => s.profil === "general"),
+          // Le profil vient de toute la bibliothèque : une recherche vide ne le change pas.
+          toutes.some((s) => s.profil === "general"),
           c.req.query("supprimee") !== undefined,
           {
             cours: cat.cours.length > 0,

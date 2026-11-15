@@ -1,7 +1,7 @@
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
-import { depot, detailSource, lignesSources, pageLegendes } from "../src/app/vues/prof.ts";
+import { depot, detailSource, lignesSources, pageLegendes, sources } from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource, reponse } from "../src/app/vues/eleve.ts";
 import {
   legendeSchema,
@@ -495,4 +495,15 @@ test("la liste de la bibliothèque range les ressources par cours, dans l'ordre 
   // L'introduction d'ordre 0 garde ce numéro. La ressource commune a une seconde case, à son id.
   assertStringIncludes(plis[1], 'aria-hidden="true">0</span>');
   assertStringIncludes(plis[1], 'id="selection-ab-1"');
+});
+
+test("une recherche sans résultat le dit et s'efface sans perdre les autres filtres", async () => {
+  const f = { q: "zzz", statut: "a_relire", theme: "", lot: "", vue: "" };
+  const vide = String(await sources([], f, [], LIBELLES, true));
+  assertStringIncludes(vide, "Aucun titre de ressource ne contient « zzz ».");
+  assertStringIncludes(vide, 'href="/prof?q=&amp;statut=a_relire&amp;');
+  assert(!vide.includes("Déposer le premier"));
+  // Sans recherche, une bibliothèque vide invite au premier dépôt.
+  const neuve = String(await sources([], { ...f, q: "", statut: "" }, [], LIBELLES, true));
+  assertStringIncludes(neuve, "Déposer le premier");
 });

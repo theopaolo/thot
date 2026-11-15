@@ -530,11 +530,17 @@ export const sources = (
       `
         : grille && rangement?.dossiers.length
           ? ""
-          : repartition.length
+          : // Les comptes suivent la recherche : à zéro, c'est la recherche qui ne trouve rien.
+            f.q
             ? html`
+        <p>Aucun titre de ressource ne contient « ${f.q} »${repartition.length ? " pour ce filtre" : ""}.
+          <a href="${lienFiltres(f, { q: "" })}">Effacer la recherche</a></p>
+      `
+            : repartition.length
+              ? html`
         <p>Aucun document pour ce filtre.</p>
       `
-            : html`
+              : html`
         <p>Aucun document. <a href="/prof/depot">Déposer le premier</a>.</p>
       `
     }
