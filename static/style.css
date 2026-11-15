@@ -2904,8 +2904,55 @@ textarea.code {
 td .reglage {
   margin: 0;
 }
-.cours-activite form {
-  display: inline;
+/* Les réglages d'une activité se replient sous leur résumé : les questions viennent d'abord. */
+details.reglages-activite {
+  margin: 0 0 var(--s5);
+  border-block: 1px solid var(--line);
+}
+.reglages-activite > summary {
+  color: var(--ink);
+  font-weight: 700;
+}
+.reglages-activite > summary .discret {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.reglages-activite > form {
+  display: grid;
+  column-gap: var(--s5);
+  max-width: 56rem;
+  padding-top: var(--s2);
+}
+@media (min-width: 48rem) {
+  .reglages-activite > form {
+    grid-template-columns: 2fr 1fr;
+  }
+  .reglages-activite > form > :is(fieldset, .barre) {
+    grid-column: 1 / -1;
+  }
+}
+.cours-activite ul {
+  margin: 0 0 var(--s3);
+  padding: 0;
+  list-style: none;
+}
+.cours-activite li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s3);
+  min-height: 36px;
+}
+.cours-activite > label {
+  display: block;
+  min-height: 0;
+  font-weight: 700;
+}
+.cours-activite > select {
+  max-width: 24rem;
+}
+.reglages-activite button.lien {
+  min-height: 36px;
 }
 .question-prof {
   padding-top: var(--s4);

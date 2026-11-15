@@ -180,7 +180,8 @@ Exercice ou explication préparé dans un cours, depuis un objectif et des sourc
 bibliothèque les range sous l'onglet « Activités ». « Préparer une activité », le choix du type,
 puis « Rédiger le brouillon ». « Importer un quiz » crée un exercice depuis un quiz de carnet-quiz.
 « Objectifs » renomme et fusionne les objectifs. Une activité a un titre et peut appartenir à
-plusieurs cours. L'élève trouve les activités publiées dans le sommaire de leur cours, après la
+plusieurs cours. Ses « Réglages » rangent le titre, la date à rendre, l'objectif, les cours et le
+corrigé dans un formulaire, avec un seul « Enregistrer ». L'élève trouve les activités publiées dans le sommaire de leur cours, après la
 dernière ressource qu'elles couvrent, et à la fin d'une ressource qu'elles couvrent, sous
 « S'entraîner ».
 

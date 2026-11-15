@@ -7,6 +7,7 @@ import {
   sourcesMontrees,
   TYPES_QUESTION,
 } from "../../core/activite.ts";
+import { transaction } from "../../core/recherche.ts";
 import * as Activites from "../activites.ts";
 import { catalogueDe } from "../domaines.ts";
 import { lireQuestion, nouvelId, reancrer, saisie, saisieDe } from "../edition.ts";
@@ -245,17 +246,62 @@ export function routesActivites(app: Hono<Env>, w: Web) {
     },
   );
 
-  app.post("/prof/activites/:id/:action{(?:correction|reancrer)}", async (c) => {
+  app.post("/prof/activites/:id/reancrer", async (c) => {
     const x = exercice(c);
     if (!x) return c.notFound();
-    const { a, contenu } = x;
     const b = await c.req.parseBody();
-    const correction = valeur(b, "correction");
-    return nouvelleVersion(c, a, Number(valeur(b, "revision")), () => {
-      if (c.req.param("action") === "reancrer") return reancrer(db, a, contenu);
-      if (correction !== "question" && correction !== "serie") throw new Error("Corrigé inconnu.");
-      return { ...contenu, correction };
-    });
+    return nouvelleVersion(c, x.a, Number(valeur(b, "revision")), () =>
+      reancrer(db, x.a, x.contenu),
+    );
+  });
+
+  /**
+   * Les réglages d'une activité, enregistrés ensemble. Un champ absent ne change rien. Le titre, la
+   * date, l'objectif et les cours ne créent pas de version : un refus n'en enregistre aucun. Le
+   * corrigé crée une version, après les autres.
+   */
+  app.post("/prof/activites/:id/reglages", async (c) => {
+    const a = activiteProf(c);
+    if (!a) return c.notFound();
+    const b = await c.req.parseBody();
+    const v = (k: string) => valeur(b, k);
+    const compte = c.get("compte");
+    const contenu = JSON.parse(a.contenu) as Contenu | Explication;
+    const correction =
+      "questions" in contenu && v("correction") && v("correction") !== contenu.correction
+        ? v("correction")
+        : "";
+    const revision = Number(v("revision"));
+    if (correction && revision !== a.revision) {
+      return c.html(detail(c, a, { erreur: CONFLIT }), 409);
+    }
+    try {
+      if (correction && correction !== "question" && correction !== "serie") {
+        throw new Error("Corrigé inconnu.");
+      }
+      transaction(db, () => {
+        if ("titre" in b) Activites.regler(db, a, v("titre"), v("a_rendre_le"));
+        if (v("objectif_id") && v("objectif_id") !== a.objectif_id) {
+          Activites.changerObjectif(db, a, v("objectif_id"));
+        }
+        if (!v("cours_id")) return;
+        const manque = Activites.ajouterCours(db, compte, a, v("cours_id"));
+        if (manque.length) {
+          const nom = catalogueDe(db, compte).cours.find((x) => x.id === v("cours_id"))?.nom;
+          throw new Error(
+            `Rattachez d'abord à ${nom} ${manque.length > 1 ? "les sources citées" : "la source citée"} : ${manque.join(", ")}.`,
+          );
+        }
+      });
+    } catch (e) {
+      return c.html(detail(c, a, { erreur: message(e) }), 400);
+    }
+    if (!correction) return c.redirect(`/prof/activites/${a.id}`, 303);
+    const serie = contenu as Contenu;
+    return nouvelleVersion(c, activiteProf(c)!, revision, () => ({
+      ...serie,
+      correction: correction as Contenu["correction"],
+    }));
   });
 
   app.post("/prof/activites/:id/cours/:cours/retirer", (c) => {
@@ -269,58 +315,38 @@ export function routesActivites(app: Hono<Env>, w: Web) {
     return c.redirect(`/prof/activites/${a.id}`, 303);
   });
 
-  app.post(
-    "/prof/activites/:id/:action{(?:reglages|objectif|cours|archiver|supprimer|relire|publier)}",
-    async (c) => {
-      const a = activiteProf(c);
-      if (!a) return c.notFound();
-      const b = await c.req.parseBody();
-      const v = (k: string) => valeur(b, k);
-      const compte = c.get("compte");
-      let refus = "";
-      try {
-        switch (c.req.param("action")) {
-          case "reglages":
-            Activites.regler(db, a, v("titre"), v("a_rendre_le"));
-            break;
-          case "objectif":
-            Activites.changerObjectif(db, a, v("objectif_id"));
-            break;
-          case "cours": {
-            const manque = Activites.ajouterCours(db, compte, a, v("cours_id"));
-            if (manque.length) {
-              const nom = catalogueDe(db, compte).cours.find((x) => x.id === v("cours_id"))?.nom;
-              throw new Error(
-                `Rattachez d'abord à ${nom} ${manque.length > 1 ? "les sources citées" : "la source citée"} : ${manque.join(", ")}.`,
-              );
-            }
-            break;
+  app.post("/prof/activites/:id/:action{(?:archiver|supprimer|relire|publier)}", async (c) => {
+    const a = activiteProf(c);
+    if (!a) return c.notFound();
+    const b = await c.req.parseBody();
+    const v = (k: string) => valeur(b, k);
+    const compte = c.get("compte");
+    let refus = "";
+    try {
+      switch (c.req.param("action")) {
+        case "archiver":
+          Activites.archiver(db, a, v("oui") === "1");
+          break;
+        case "supprimer":
+          if (await Activites.supprimerBrouillon(db, a)) {
+            return c.redirect("/prof/activites", 303);
           }
-          case "archiver":
-            Activites.archiver(db, a, v("oui") === "1");
-            break;
-          case "supprimer":
-            if (await Activites.supprimerBrouillon(db, a)) {
-              return c.redirect("/prof/activites", 303);
-            }
-            refus =
-              "Une activité déjà publiée ou qui a des tentatives ne se supprime pas. Archivez-la.";
-            break;
-          case "relire":
-            if (!Activites.relire(db, compte, a, Number(v("revision")))) refus = CONFLIT;
-            break;
-          default: {
-            const r = Activites.publier(db, compte, a.id, Number(v("revision")));
-            if (r === "refus") refus = "Seule la version relue d'une activité se publie.";
-            if (r === "preuves")
-              refus = "Une source citée ne tient plus : l'activité est à revoir.";
-          }
+          refus =
+            "Une activité déjà publiée ou qui a des tentatives ne se supprime pas. Archivez-la.";
+          break;
+        case "relire":
+          if (!Activites.relire(db, compte, a, Number(v("revision")))) refus = CONFLIT;
+          break;
+        default: {
+          const r = Activites.publier(db, compte, a.id, Number(v("revision")));
+          if (r === "refus") refus = "Seule la version relue d'une activité se publie.";
+          if (r === "preuves") refus = "Une source citée ne tient plus : l'activité est à revoir.";
         }
-      } catch (e) {
-        return c.html(detail(c, a, { erreur: message(e) }), 400);
       }
-      if (refus) return c.html(detail(c, activiteProf(c)!, { erreur: refus }), 409);
-      return c.redirect(`/prof/activites/${a.id}`, 303);
-    },
-  );
+    } catch (e) {
+      return c.html(detail(c, a, { erreur: message(e) }), 400);
+    }
+    if (refus) return c.html(detail(c, activiteProf(c)!, { erreur: refus }), 409);
+    return c.redirect(`/prof/activites/${a.id}`, 303);
+  });
 }

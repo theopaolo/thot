@@ -548,65 +548,96 @@ const corpsExplication = (e: Explication, servies: Servies) => html`
   <p class="discret">L'aperçu élève montre les titres et le rangement en blocs, qui viennent du modèle sans preuve.</p>
 `;
 
-/** Titre, date à rendre, objectif, cours et réglage du corrigé. */
+/**
+ * Titre, date à rendre, objectif, cours et corrigé, dans un seul formulaire replié. Son résumé dit
+ * les cours, le corrigé et la date. Retirer un cours passe par un formulaire à part, hors de celui-ci :
+ * un bouton imbriqué deviendrait le bouton par défaut de la touche Entrée.
+ */
 const reglages = (d: DetailProf) => {
   const { a, contenu, libelles: l } = d;
-  return html`
-    <form method="post" action="/prof/activites/${a.id}/reglages" class="barre reglage">
-      <label for="titre">Titre</label>
-      <input type="text" id="titre" name="titre" value="${a.titre}" maxlength="300" required>
-      <label for="a_rendre_le">À rendre le</label>
-      <input type="date" id="a_rendre_le" name="a_rendre_le" value="${a.a_rendre_le ?? ""}">
-      <button>Enregistrer</button>
+  const serie = "questions" in contenu;
+  const prive = a.audience === "prive";
+  const resume = [
+    prive ? "" : d.cours.map((c) => c.nom).join(", "),
+    serie
+      ? contenu.correction === "question"
+        ? "corrigé après chaque question"
+        : "corrigé après la remise"
+      : "",
+    a.a_rendre_le ? `à rendre le ${jour(a.a_rendre_le)}` : "",
+  ].filter(Boolean);
+  return html`<details class="reglages-activite" ${d.cours.some((c) => c.bloquantes.length) ? "open" : ""}>
+    <summary>Réglages <span class="discret">${resume.join(", ")}</span></summary>
+    <form method="post" action="/prof/activites/${a.id}/reglages">
+      <input type="hidden" name="revision" value="${a.revision}">
+      <div class="champ">
+        <label for="titre">Titre</label>
+        <input type="text" id="titre" name="titre" value="${a.titre}" maxlength="300" required>
+      </div>
+      <div class="champ">
+        <label for="a_rendre_le">À rendre le</label>
+        <input type="date" id="a_rendre_le" name="a_rendre_le" value="${a.a_rendre_le ?? ""}">
+      </div>
+      <div class="champ">
+        <label for="objectif">Objectif</label>
+        <select id="objectif" name="objectif_id">${d.objectifs.map((o) =>
+          option(o.id, o.intitule, a.objectif_id),
+        )}</select>
+        <p class="aide">${a.reference ? `Référence : ${a.reference}. ` : ""}<a href="/prof/objectifs">Renommer ou fusionner les objectifs</a></p>
+      </div>
+      ${
+        serie
+          ? html`<div class="champ">
+            <label for="correction">Corrigé</label>
+            <select id="correction" name="correction">${[
+              option("question", "Après chaque question", contenu.correction),
+              option("serie", "Après la remise de la série", contenu.correction),
+            ]}</select>
+            <p class="aide">Le changer crée la version ${a.revision + 1}, à relire.</p>
+          </div>`
+          : ""
+      }
+      ${
+        prive
+          ? ""
+          : html`<fieldset class="cours-activite">
+            <legend><strong>${l.cours_pluriel}</strong></legend>
+            <ul>${d.cours.map(
+              (c) =>
+                html`<li>${c.nom}${
+                  c.bloquantes.length
+                    ? html` <span class="statut failed">Ne tient plus : ${c.bloquantes.join(", ")}</span>`
+                    : ""
+                } ${
+                  c.id === a.cours_id
+                    ? html`<span class="discret">origine, porte l'objectif</span>`
+                    : html`<button class="lien" form="retirer-${c.id}" aria-label="Retirer ${c.nom}">Retirer</button>`
+                }</li>`,
+            )}</ul>
+            ${
+              d.autres.length
+                ? html`<label for="ajout-cours">Ajouter à un ${minuscule(l.cours)}</label>
+                  <select id="ajout-cours" name="cours_id">${[
+                    option("", "Aucun", ""),
+                    ...d.autres.map((c) => option(c.id, c.nom, "")),
+                  ]}</select>`
+                : ""
+            }
+          </fieldset>`
+      }
+      <div class="barre"><button>Enregistrer</button></div>
     </form>
-    <form method="post" action="/prof/activites/${a.id}/objectif" class="barre reglage">
-      <label for="objectif">Objectif</label>
-      <select id="objectif" name="objectif_id">${d.objectifs.map((o) =>
-        option(o.id, o.intitule, a.objectif_id),
-      )}</select>
-      <button>Changer d'objectif</button>
-      <a href="/prof/objectifs">Renommer ou fusionner</a>
-    </form>
-    ${a.reference ? html`<p class="discret">Référence : ${a.reference}</p>` : ""}
     ${
-      a.audience === "prive"
+      prive
         ? ""
-        : html`<p class="cours-activite"><strong>${l.cours_pluriel} :</strong> ${d.cours.map(
-            (c, i) =>
-              html`${i ? ", " : ""}${c.nom}${
-                c.bloquantes.length
-                  ? html` <span class="statut failed">Ne tient plus : ${c.bloquantes.join(", ")}</span>`
-                  : ""
-              } ${
-                c.id === a.cours_id
-                  ? html`<span class="discret">(origine, porte l'objectif)</span>`
-                  : html`<form method="post" action="/prof/activites/${a.id}/cours/${c.id}/retirer"><button class="lien" aria-label="Retirer ${c.nom}">Retirer</button></form>`
-              }`,
-          )}</p>
-          ${
-            d.autres.length
-              ? html`<form method="post" action="/prof/activites/${a.id}/cours" class="barre reglage">
-                <label for="ajout-cours">Ajouter à un ${minuscule(l.cours)}</label>
-                <select id="ajout-cours" name="cours_id">${d.autres.map((c) => option(c.id, c.nom, ""))}</select>
-                <button>Ajouter</button>
-              </form>`
-              : ""
-          }`
+        : d.cours
+            .filter((c) => c.id !== a.cours_id)
+            .map(
+              (c) =>
+                html`<form id="retirer-${c.id}" method="post" action="/prof/activites/${a.id}/cours/${c.id}/retirer"></form>`,
+            )
     }
-    ${
-      "questions" in contenu
-        ? html`<form method="post" action="/prof/activites/${a.id}/correction" class="barre reglage">
-          <input type="hidden" name="revision" value="${a.revision}">
-          <label for="correction">Corrigé</label>
-          <select id="correction" name="correction">${[
-            option("question", "Après chaque question", contenu.correction),
-            option("serie", "Après la remise de la série", contenu.correction),
-          ]}</select>
-          <button>Régler le corrigé</button>
-        </form>`
-        : ""
-    }
-  `;
+  </details>`;
 };
 
 /** La page d'une activité : ses réglages, ses questions à modifier, ses réponses, son historique. */

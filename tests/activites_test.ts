@@ -489,7 +489,7 @@ test("objectifs : un même intitulé est repris, un objectif se renomme, se chan
 
     // Changer l'objectif d'une activité, dans son cours seulement.
     const changer = (objectif_id: string) =>
-      statut(envoyer(prof, `/prof/activites/${b}/objectif`, { objectif_id }));
+      statut(envoyer(prof, `/prof/activites/${b}/reglages`, { objectif_id }));
     assertEquals(await changer(second), 303);
     assertEquals(ligne(db, b).objectif_id, second);
     assertEquals(await changer("inconnu"), 400);
@@ -518,7 +518,7 @@ test("cours : une activité rejoint un autre cours une fois ses sources citées 
     const id = await preparer(prof, coursId, source);
     const histoire = cours(db, matiere(db, "Histoire"), "Histoire");
     db.prepare("INSERT INTO membres_cours VALUES (?, ?)").run(histoire, prof.id);
-    const ajouter = () => envoyer(prof, `/prof/activites/${id}/cours`, { cours_id: histoire });
+    const ajouter = () => envoyer(prof, `/prof/activites/${id}/reglages`, { cours_id: histoire });
     const refus = await ajouter();
     assertEquals(refus.status, 400);
     assertStringIncludes(
@@ -531,6 +531,14 @@ test("cours : une activité rejoint un autre cours une fois ses sources citées 
         .all()
         .map((l) => l.cours_id);
     assertEquals(liens(), [coursId]);
+    // Les réglages s'enregistrent ensemble : un cours refusé n'enregistre pas le titre.
+    const ensemble = envoyer(prof, `/prof/activites/${id}/reglages`, {
+      titre: "Autre titre",
+      a_rendre_le: "",
+      cours_id: histoire,
+    });
+    assertEquals(await statut(ensemble), 400);
+    assert(db.prepare("SELECT titre FROM activites").get()!.titre !== "Autre titre");
 
     rattacher(db, source, [
       { cours_id: coursId, theme_id: null },
@@ -648,7 +656,7 @@ test("série : ajouter, dupliquer, monter et supprimer une question créent chac
 
     // Le corrigé se règle sur toute la série, comme une nouvelle version.
     const corrige = (correction: string) =>
-      envoyer(prof, `/prof/activites/${id}/correction`, {
+      envoyer(prof, `/prof/activites/${id}/reglages`, {
         revision: String(ligne(db, id).revision),
         correction,
       });
@@ -871,7 +879,7 @@ test("exercice personnel : privé à son auteur, publié sans relecture indépen
     );
     const detail = await page(prof, `/prof/activites/${id}`);
     assertStringIncludes(detail, "Votre relecture ne vaut pas relecture indépendante.");
-    assert(!detail.includes('/cours"'), "une activité privée ne rejoint pas d'autre cours");
+    assert(!detail.includes('name="cours_id"'), "une activité privée ne rejoint pas d'autre cours");
     await relirePublier(prof, db, id);
     const pratique = await page(prof, `/eleve/activites/${id}`);
     assertStringIncludes(pratique, "Exercice généré par Thot à partir de tes documents.");
