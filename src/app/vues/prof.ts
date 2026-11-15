@@ -1260,7 +1260,10 @@ export const depot = (s: {
     ${s.depose ? bilanDepot(s.depose) : ""}
     <form method="post" action="/prof/depot" enctype="multipart/form-data" class="etroit" data-depot>
       ${s.lot ? html`<input type="hidden" name="lot" value="${s.lot}">` : ""}
-      <ol class="etapes-depot" data-indicateur hidden>${etapes.map((x) => html`<li>${x}</li>`)}</ol>
+      <ol class="etapes-depot" data-indicateur hidden>${etapes.map(
+        (x) =>
+          html`<li><span class="fait">${icone("check")}<span class="visuellement-cache">Fait : </span></span>${x}</li>`,
+      )}</ol>
       ${etape(
         ++n,
         "Quels fichiers déposer ?",

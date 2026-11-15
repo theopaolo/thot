@@ -3275,8 +3275,18 @@ h2.reglages-communs {
 .etapes-depot li::before {
   content: counter(etape) ". ";
 }
+/* Une étape faite troque son numéro contre la coche, comme dans « Pour commencer ». */
 .etapes-depot li.faite {
   color: var(--ink);
+}
+.etapes-depot li.faite::before,
+.etapes-depot li:not(.faite) .fait {
+  display: none;
+}
+.etapes-depot .fait .icone {
+  margin-right: var(--s1);
+  color: var(--certified);
+  vertical-align: -0.2em;
 }
 .etapes-depot li[aria-current] {
   color: var(--ink);

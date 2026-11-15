@@ -1784,7 +1784,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
       [admin, "/administration/domaines", "<h3>Modules</h3>"],
       [admin, "/administration/domaines", "Chapitre à créer"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
-      [admin, "/prof/depot", "<li>Chapitre</li>"],
+      [admin, "/prof/depot", "</span></span>Chapitre</li>"],
       [admin, "/prof", '<span class="etiquette" id="etiquette-cours">Chapitre</span>'],
       [admin, "/prof", 'aria-label="Modules"'],
       [eleve, "/eleve", '<h2 id="tes-chapitres">Modules</h2>'],
