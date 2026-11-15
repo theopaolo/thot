@@ -397,8 +397,11 @@ body.prof {
   padding: var(--s5) var(--s4);
   border-right: 1px solid var(--line);
 }
+/* La marque de citation partage la classe et ne passe pas à la ligne : un long nom d'instance
+   repousserait le bouton du rail hors de sa colonne. */
 .rail .marque {
   margin: 0;
+  white-space: normal;
 }
 .rail-tete {
   display: flex;
@@ -407,6 +410,7 @@ body.prof {
   gap: var(--s2);
 }
 button.rail-bascule {
+  flex: none;
   min-width: 36px;
   min-height: 36px;
   padding: 0;
