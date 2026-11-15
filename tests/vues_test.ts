@@ -1,7 +1,14 @@
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
-import { depot, detailSource, lignesSources, pageLegendes, sources } from "../src/app/vues/prof.ts";
+import {
+  depot,
+  detailSource,
+  eleves,
+  lignesSources,
+  pageLegendes,
+  sources,
+} from "../src/app/vues/prof.ts";
 import { chat, pageChapitre, panneauSource, reponse } from "../src/app/vues/eleve.ts";
 import {
   legendeSchema,
@@ -519,6 +526,38 @@ test("la liste de la bibliothèque range les ressources par cours, ou par thème
     ["Art nouveau", "Bauhaus", ""],
   );
   assertStringIncludes(seul, "Sans séquence");
+});
+
+test("hors d'un cours, la page Élèves liste d'abord les cours qui ont des élèves", async () => {
+  const cours = (id: string) => ({
+    id,
+    matiere_id: "m",
+    nom: `Cours ${id}`,
+    public: "",
+    objectif: "",
+  });
+  const cat = {
+    matieres: [{ id: "m", nom: "Web", profil: "general" }],
+    cours: ["a", "b", "c"].map(cours),
+    themes: [],
+  } as unknown as Parameters<typeof eleves>[0]["cat"];
+  const eleve = { id: "e", identifiant: "ada", nom: "Ada" };
+  const page = String(
+    await eleves({
+      cat,
+      groupes: [
+        { cours: cours("a"), eleves: [] },
+        { cours: cours("b"), eleves: [eleve] },
+        { cours: cours("c"), eleves: [] },
+      ],
+      adresse: "",
+      l: { ...LIBELLES, cours: "Cours", cours_pluriel: "Cours" },
+    }),
+  );
+  const ajout = page.slice(page.indexOf('class="ajout"'));
+  assert(ajout.indexOf("Cours b") < ajout.indexOf("<details>"));
+  assertStringIncludes(ajout, "<summary>2 cours sans élève</summary>");
+  assert(ajout.indexOf("<details>") < ajout.indexOf("Cours a"));
 });
 
 test("une recherche sans résultat le dit et s'efface sans perdre les autres filtres", async () => {

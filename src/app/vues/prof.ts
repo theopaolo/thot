@@ -640,7 +640,8 @@ const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Co
 
 /**
  * Les trois façons d'ajouter des élèves, une seule ouverte à la fois. Hors d'un cours, on ouvre
- * d'abord celui qui les accueille. Un administrateur sans cours crée des élèves sans cours. Une
+ * d'abord celui qui les accueille : les cours qui ont des élèves d'abord, les autres repliés
+ * derrière une ligne s'il y en a. Un administrateur sans cours crée des élèves sans cours. Une
  * instance personnelle n'a pas de lien d'inscription, et un lien demande un cours.
  */
 const ajoutEleves = (
@@ -650,19 +651,36 @@ const ajoutEleves = (
   liens: Lien[] | undefined,
   adresse: string,
   actuel?: Cours,
-) =>
-  !actuel && cat.cours.length
-    ? html`
+) => {
+  if (!actuel && cat.cours.length) {
+    const ligne = (g: (typeof groupes)[number]) =>
+      html`<li><a href="/prof/eleves?cours_id=${g.cours.id}">${nomCours(cat, g.cours)}</a>${
+        g.eleves.length
+          ? html` <span class="nombre">${nombre(g.eleves.length, "élève")}</span>`
+          : ""
+      }</li>`;
+    const pleins = groupes.filter((g) => g.eleves.length);
+    const vides = groupes.filter((g) => !g.eleves.length);
+    const listeVides = html`<ul class="cours-eleves">${vides.map(ligne)}</ul>`;
+    return html`
     <section class="ajout" aria-labelledby="titre-ajout">
       <h2 id="titre-ajout">Ajouter des élèves</h2>
-      <ul class="cours-eleves">${groupes.map(
-        (g) =>
-          html`<li><a href="/prof/eleves?cours_id=${g.cours.id}">${nomCours(cat, g.cours)}</a> <span class="nombre">${g.eleves.length}</span></li>`,
-      )}</ul>
+      <p class="aide">Choisissez le cours qui accueille les élèves.</p>
+      ${pleins.length ? html`<ul class="cours-eleves">${pleins.map(ligne)}</ul>` : ""}
+      ${
+        !vides.length
+          ? ""
+          : pleins.length
+            ? html`<details><summary>${vides.length} ${
+                vides.length > 1 ? l.cours_pluriel.toLowerCase() : l.cours.toLowerCase()
+              } sans élève</summary>${listeVides}</details>`
+            : listeVides
+      }
       ${liens ? liensActifs(cat, liens, adresse) : ""}
     </section>
-  `
-    : html`
+  `;
+  }
+  return html`
     <section class="ajout" aria-labelledby="titre-ajout">
       <h2 id="titre-ajout">Ajouter des élèves</h2>
       <details name="ajout" open>
@@ -719,6 +737,7 @@ const ajoutEleves = (
       }
     </section>
   `;
+};
 
 /**
  * La page d'un cours liste ses élèves, qu'on retire du cours sans supprimer leur compte. Sans cours
@@ -773,7 +792,12 @@ export const eleves = (o: {
   const vide = html`
     <div class="vide">
       <p><strong>${actuel ? `Aucun élève dans ${nomCours(cat, actuel)}.` : "Aucun élève dans vos cours."}</strong></p>
-      <p>Créez les comptes un par un, importez la classe depuis un CSV${o.liens && actuel ? " ou partagez un lien d'inscription" : ""}.</p>
+      <p>${
+        // Hors d'un cours, les formulaires attendent qu'on en choisisse un.
+        !actuel && cat.cours.length
+          ? "Choisissez un cours sous « Ajouter des élèves », puis créez"
+          : "Créez"
+      } les comptes un par un, importez la classe depuis un CSV${o.liens && (actuel || cat.cours.length) ? " ou partagez un lien d'inscription" : ""}.</p>
     </div>
   `;
   const liste = actuel

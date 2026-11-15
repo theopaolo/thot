@@ -3612,20 +3612,17 @@ details.cours-ajout > summary {
   padding: 0;
   list-style: none;
 }
+/* Un cours est un lien qui ouvre ses formulaires : souligné, et cliquable sur toute la ligne. */
 .cours-eleves li {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: var(--s3);
-  padding: var(--s2) 0;
   border-top: 1px solid var(--line);
 }
 .cours-eleves a {
-  font-weight: 700;
-  text-decoration: none;
-}
-.cours-eleves a:hover {
-  text-decoration: underline;
+  flex: 1;
+  padding: var(--s2) 0;
 }
 .liens-actifs {
   margin: 0;
