@@ -59,7 +59,8 @@ export const pageRelecture = (liste: Attente[], choisie?: Attente, blocs: Bloc[]
                     <form method="post" class="barre">
                       <button class="principal certifier"
                         formaction="/prof/relecture/${choisie.id}/certifiee">Certifier</button>
-                      <button formaction="/prof/relecture/${choisie.id}/rejetee">Rejeter</button>
+                      <button formaction="/prof/relecture/${choisie.id}/rejetee"
+                        data-confirmer="Rejeter cette source ? Les élèves ne la verront plus.">Rejeter</button>
                       <a href="/prof/sources/${choisie.id}">Ouvrir la fiche</a>
                     </form>
                   `
