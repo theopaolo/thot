@@ -492,11 +492,13 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
             <a class="tuile" href="${
               s.profil === "general" ? `/eleve/sources/${s.id}` : lienTheme(s.theme_id, s.id)
             }">
-              <span class="passe-partout">${
+              ${
+                // Une ressource sans image n'a rien à montrer dans un passe-partout.
                 s.image_id
-                  ? html`<img src="/media/${s.image_id}" alt="" loading="lazy">`
-                  : html`<span class="sans-image">${icone("file-text")}</span>`
-              }</span>
+                  ? html`<span class="passe-partout"><img src="/media/${s.image_id}" alt=""
+                      loading="lazy"></span>`
+                  : ""
+              }
               <span class="tuile-titre">${s.titre}</span>
               <span class="discret">${[
                 s.profil === "general" ? s.theme : nomChapitre(s.theme),
@@ -1404,6 +1406,10 @@ export type Fil = {
 
 export const chat = (f: Fil) => {
   const conv = f.conversation;
+  // Le titre donné d'office reprend la première question, affichée juste dessous : il reste
+  // pour les lecteurs d'écran, et reparaît une fois la conversation renommée.
+  const titreRepete =
+    !!conv && !!f.messages[0]?.question.replace(/\s+/g, " ").startsWith(conv.titre);
   const derniere = f.messages.findLastIndex((m) => m.etat === "answered");
   const enCours = f.messages.some((m) => !m.resultat);
   const nom = nomPerimetre(f.catalogue, f.perimetre, f.libelles) || "toutes tes ressources";
@@ -1462,7 +1468,9 @@ export const chat = (f: Fil) => {
             <a href="/eleve/chat/nouvelle">Nouvelle</a>
           </p>
           ${f.statut ? html`<p role="status">${f.statut}</p>` : ""}
-          <h1 id="titre-chat" tabindex="-1">${conv?.titre ?? "Nouvelle conversation"}</h1>
+          <h1 id="titre-chat" tabindex="-1" ${
+            titreRepete ? html`class="visuellement-cache"` : ""
+          }>${conv?.titre ?? "Nouvelle conversation"}</h1>
           ${
             conv && !conv.archivee
               ? html`
@@ -1527,36 +1535,36 @@ export const chat = (f: Fil) => {
               </form>
             `
               : html`
-              <div class="perimetre">
-                <p id="perimetre" aria-live="polite">Dans : ${nom}</p>
-                <details ${f.indisponible ? "open" : ""}>
-                  <summary>Changer</summary>
-                  <form ${changer} data-focus=".perimetre summary">
-                    ${selectsPerimetre(f.catalogue, f.perimetre, f.libelles)}
-                    <button>Appliquer aux prochaines questions</button>
-                  </form>
-                  ${
-                    f.catalogue.matieres.length > 1
-                      ? html`
-                      <form ${changer} data-focus=".perimetre summary">
-                        <fieldset>
-                          <legend>${f.libelles.matieres} à comparer</legend>
-                          ${f.catalogue.matieres.map(
-                            (m) =>
-                              html`<label><input type="checkbox" name="matieres" value="${m.id}" ${
-                                comparees.includes(m.id) ? "checked" : ""
-                              }> ${m.nom}</label>`,
-                          )}
-                        </fieldset>
-                        <button>Comparer dans les prochaines questions</button>
-                      </form>
-                    `
-                      : ""
-                  }
-                </details>
-              </div>
               <div class="composeur">
                 <button type="button" class="lien" data-aller-reponse hidden>Aller à la nouvelle réponse</button>
+                <div class="perimetre">
+                  <p id="perimetre" aria-live="polite">Dans : ${nom}</p>
+                  <details ${f.indisponible ? "open" : ""}>
+                    <summary>Changer</summary>
+                    <form ${changer} data-focus=".perimetre summary">
+                      ${selectsPerimetre(f.catalogue, f.perimetre, f.libelles)}
+                      <button>Appliquer aux prochaines questions</button>
+                    </form>
+                    ${
+                      f.catalogue.matieres.length > 1
+                        ? html`
+                        <form ${changer} data-focus=".perimetre summary">
+                          <fieldset>
+                            <legend>${f.libelles.matieres} à comparer</legend>
+                            ${f.catalogue.matieres.map(
+                              (m) =>
+                                html`<label><input type="checkbox" name="matieres" value="${m.id}" ${
+                                  comparees.includes(m.id) ? "checked" : ""
+                                }> ${m.nom}</label>`,
+                            )}
+                          </fieldset>
+                          <button>Comparer dans les prochaines questions</button>
+                        </form>
+                      `
+                        : ""
+                    }
+                  </details>
+                </div>
                 ${f.indisponible ? "" : composer}
               </div>
               ${

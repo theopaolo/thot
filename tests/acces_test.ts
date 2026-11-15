@@ -1530,3 +1530,25 @@ test("supprimer : le propriétaire efface la source, ses fichiers et ses citatio
     await rm(dir, { recursive: true });
   }
 });
+
+test("une adresse inconnue rend une page dans la mise en page, une requête htmx un texte court", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const eleve = await compte(db, "eleve");
+    const prof = await compte(db, "enseignant");
+    const page = await eleve.requete("/eleve/sources/inconnue");
+    assertEquals(page.status, 404);
+    const texte = await page.text();
+    assertStringIncludes(texte, "<h1>Page introuvable</h1>");
+    assertStringIncludes(texte, "que ton compte peut ouvrir");
+    assertStringIncludes(texte, 'href="/"');
+    assertStringIncludes(await (await prof.requete("/nulle-part")).text(), "que votre compte");
+    const fragment = await eleve.requete("/eleve/sources/inconnue", {
+      headers: { "HX-Request": "true" },
+    });
+    assertEquals([fragment.status, await fragment.text()], [404, "Introuvable."]);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});

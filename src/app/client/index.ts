@@ -28,7 +28,7 @@ function boutonsCopier(racine: Element) {
       setTimeout(() => (bouton.textContent = "Copier"), 2000);
     });
     pre.before(cadre);
-    cadre.append(pre, bouton);
+    cadre.append(bouton, pre);
   }
 }
 

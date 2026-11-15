@@ -1,4 +1,5 @@
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
+import { html } from "hono/html";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
@@ -24,6 +25,7 @@ import { routesProfEleves } from "./routes/prof-eleves.ts";
 import { sessions } from "./routes/session.ts";
 import { contexteWeb, type Env, retenirPerimetre } from "./routes/web.ts";
 import { routesRechargement } from "./rechargement.ts";
+import { icone } from "./icones.ts";
 
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
@@ -74,10 +76,46 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   routesEleve(app, w);
   routesChat(app, w);
 
+  // Une page d'erreur garde la mise en page et dit où aller. Une requête htmx garde un texte court :
+  // le client affiche son propre message sans remplacer la page.
+  const erreur = (c: Context<Env>, statut: 404 | 500) => {
+    if (c.req.header("HX-Request") && !c.req.header("HX-Boosted")) {
+      return c.text(statut === 404 ? "Introuvable." : "Erreur interne.", statut);
+    }
+    const tu = c.get("compte")?.role === "eleve";
+    // Une base en panne ferait échouer la page elle-même : le texte court reste.
+    try {
+      return c.html(
+        w.rendre(
+          c,
+          statut === 404 ? "Page introuvable" : "Erreur du serveur",
+          statut === 404
+            ? html`<h1>Page introuvable</h1>
+              <p>${
+                tu
+                  ? "Cette adresse ne mène à aucune page que ton compte peut ouvrir."
+                  : "Cette adresse ne mène à aucune page que votre compte peut ouvrir."
+              }</p>
+              <p><a class="bouton" href="/">${icone("arrow-left")}Retour à l'accueil</a></p>`
+            : html`<h1>Erreur du serveur</h1>
+              <p>${
+                tu
+                  ? "Une erreur de Thot a interrompu la page. Ce n'est pas une limite du cours. Réessaie dans un instant."
+                  : "Une erreur du serveur a interrompu la page. Réessayez dans un instant. Si elle revient, le journal du serveur en donne la cause."
+              }</p>
+              <p><a class="bouton" href="/">${icone("arrow-left")}Retour à l'accueil</a></p>`,
+        ),
+        statut,
+      );
+    } catch {
+      return c.text(statut === 404 ? "Page introuvable." : "Erreur du serveur.", statut);
+    }
+  };
+  app.notFound((c) => erreur(c, 404));
   app.onError((e, c) => {
     if (e instanceof HTTPException) return e.getResponse();
     console.error(e);
-    return c.text("Erreur interne.", 500);
+    return erreur(c, 500);
   });
 
   return app;

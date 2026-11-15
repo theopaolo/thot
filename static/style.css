@@ -968,20 +968,23 @@ kbd {
 .document pre code {
   font: inherit;
 }
-/* Le bouton « Copier » reste en haut à droite pendant que le code défile en largeur. */
+/* « Copier » se pose au-dessus du bloc, à droite : il ne cache aucune ligne du code. */
 .bloc-code {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   margin: var(--s4) 0;
 }
 .bloc-code pre {
   margin: 0;
+  border-top-right-radius: 0;
 }
 .bloc-code .copier {
-  position: absolute;
-  top: var(--s2);
-  right: var(--s2);
+  align-self: flex-end;
   min-height: 28px;
+  margin-bottom: -1px;
   padding: 0 var(--s2);
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
   font-size: 0.8125rem;
   font-weight: 400;
 }
@@ -1336,9 +1339,11 @@ figcaption .credit {
 .idee-form {
   margin: 0;
 }
+/* Une question longue passe sur deux lignes : l'interligne garde les lignes séparées. */
 button.idee {
   font-size: 0.9375rem;
   font-weight: 400;
+  line-height: 1.35;
 }
 button.idee .icone {
   color: var(--ink-muted);
@@ -1397,6 +1402,20 @@ button.idee .icone {
 }
 .resultats {
   grid-template-columns: repeat(auto-fill, minmax(min(11rem, 40vw), 1fr));
+}
+/* Une ressource sans image se lit en ligne pleine largeur, comme une entrée de liste. */
+.resultats .tuile:not(:has(.passe-partout)) {
+  grid-column: 1 / -1;
+  max-width: 48rem;
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+  font-size: 1rem;
+}
+.resultats .tuile:not(:has(.passe-partout)) .tuile-titre {
+  font-weight: 700;
+}
+.resultats .tuile:not(:has(.passe-partout)) .tuile-extrait {
+  -webkit-line-clamp: 2;
 }
 .tuile-extrait {
   display: -webkit-box;
@@ -1916,11 +1935,11 @@ form.question-form textarea {
   margin-bottom: var(--s5);
 }
 /* Le titre reprend souvent la première question : il reste court pour laisser voir la réponse. */
-#titre-chat {
+#titre-chat:not(.visuellement-cache) {
   display: -webkit-box;
   overflow: hidden;
   overflow-wrap: anywhere;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
