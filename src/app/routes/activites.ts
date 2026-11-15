@@ -31,11 +31,13 @@ export function routesActivites(app: Hono<Env>, w: Web) {
 
   app.get("/prof/activites", (c) => {
     const compte = c.get("compte");
-    const cours = catalogueDe(db, compte).cours;
+    const cat = catalogueDe(db, compte);
     const coursId = c.req.query("cours_id") ?? "";
+    const matiereId = c.req.query("matiere_id") ?? "";
     const etat = c.req.query("etat") ?? "";
     const filtre = {
-      coursId: cours.some((x) => x.id === coursId) ? coursId : "",
+      coursId: cat.cours.some((x) => x.id === coursId) ? coursId : "",
+      matiereId: cat.matieres.some((m) => m.id === matiereId) ? matiereId : "",
       etat: Vue.ETATS_FILTRE.includes(etat) ? etat : "",
     };
     return c.html(
@@ -44,7 +46,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
         "Activités",
         Vue.listeProf({
           liste: Activites.activitesProf(db, compte, filtre),
-          cours,
+          cat,
           filtre,
           libelles: libelles(db),
         }),

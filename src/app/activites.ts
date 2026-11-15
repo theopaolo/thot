@@ -192,6 +192,8 @@ export type ActiviteListee = Activite & {
 
 export type FiltreActivites = {
   coursId?: string;
+  /** les activités d'un cours de cette matière */
+  matiereId?: string;
   /** vide : les activités non archivées. `archivee`, ou un état. */
   etat?: string;
 };
@@ -207,6 +209,8 @@ export const activitesProf = (db: Db, c: Compte, f: FiltreActivites = {}) =>
         WHERE t.activite_id = x.id AND t.rendue_le IS NOT NULL AND ${LUE}) AS remises
        FROM (${SELECT} WHERE ${ACCES}
          AND (? = '' OR EXISTS (SELECT 1 FROM activite_cours w WHERE w.activite_id = a.id AND w.cours_id = ?))
+         AND (? = '' OR EXISTS (SELECT 1 FROM activite_cours w JOIN cours co ON co.id = w.cours_id
+           WHERE w.activite_id = a.id AND co.matiere_id = ?))
          AND CASE ? WHEN '' THEN a.archivee_le IS NULL WHEN 'archivee' THEN a.archivee_le IS NOT NULL
            ELSE a.archivee_le IS NULL AND a.etat = ? END) x
        ORDER BY x.maj_le DESC`,
@@ -217,6 +221,8 @@ export const activitesProf = (db: Db, c: Compte, f: FiltreActivites = {}) =>
       ...acces(c),
       f.coursId ?? "",
       f.coursId ?? "",
+      f.matiereId ?? "",
+      f.matiereId ?? "",
       f.etat ?? "",
       f.etat ?? "",
     ) as ActiviteListee[];

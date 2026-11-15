@@ -546,7 +546,8 @@ test("cours : une activité rejoint un autre cours une fois ses sources citées 
   const { db, dir, coursId, source, prof } = await cadre();
   try {
     const id = await preparer(prof, coursId, source);
-    const histoire = cours(db, matiere(db, "Histoire"), "Histoire");
+    const matiereHistoire = matiere(db, "Histoire");
+    const histoire = cours(db, matiereHistoire, "Histoire");
     db.prepare("INSERT INTO membres_cours VALUES (?, ?)").run(histoire, prof.id);
     const ajouter = () => envoyer(prof, `/prof/activites/${id}/reglages`, { cours_id: histoire });
     const refus = await ajouter();
@@ -579,6 +580,8 @@ test("cours : une activité rejoint un autre cours une fois ses sources citées 
     const liste = await page(prof, "/prof/activites");
     assertMatch(liste, /Design, Histoire|Histoire, Design/);
     assertStringIncludes(await page(prof, `/prof/activites?cours_id=${histoire}`), id);
+    // La grille du choix du cours propose aussi la matière.
+    assertStringIncludes(await page(prof, `/prof/activites?matiere_id=${matiereHistoire}`), id);
 
     const retirer = (c: string) =>
       statut(envoyer(prof, `/prof/activites/${id}/cours/${c}/retirer`));
@@ -586,6 +589,7 @@ test("cours : une activité rejoint un autre cours une fois ses sources citées 
     assertEquals(await retirer(histoire), 303);
     assertEquals(liens(), [coursId]);
     assert(!(await page(prof, `/prof/activites?cours_id=${histoire}`)).includes(id));
+    assert(!(await page(prof, `/prof/activites?matiere_id=${matiereHistoire}`)).includes(id));
   } finally {
     db.close();
     await rm(dir, { recursive: true });

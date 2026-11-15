@@ -21,8 +21,10 @@ import type {
   suiviObjectifs,
 } from "../activites.ts";
 import { MAX_PASSAGES, type Saisie, un } from "../edition.ts";
+import type { Catalogue } from "../domaines.ts";
 import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
+import { filtre as filtreCours } from "./domaines.ts";
 import { jour, ongletsBibliotheque } from "./prof.ts";
 import { enrichi, enrichiLigne, imageQuestion, LANGAGES, lettre, NOMS_TYPE } from "./questions.ts";
 
@@ -108,12 +110,21 @@ export const ETATS_FILTRE = FILTRES_ETAT.map(([v]) => v).filter(Boolean);
 
 export type Liste = {
   liste: ActiviteListee[];
-  cours: { id: string; nom: string }[];
+  cat: Catalogue;
   filtre: FiltreActivites;
   libelles: Libelles;
 };
 
-export const listeProf = ({ liste, cours, filtre, libelles: l }: Liste) => html`
+/** Le cours se choisit dans la même grille que pour les ressources, l'état dans le formulaire. */
+export const listeProf = ({ liste, cat, filtre, libelles: l }: Liste) => html`
+  ${filtreCours(
+    cat,
+    { matiere_id: filtre.matiereId ?? "", cours_id: filtre.coursId ?? "", theme_id: "" },
+    "/prof/activites",
+    l,
+    { etat: filtre.etat ?? "" },
+    { tout: "Toutes les activités", themes: false },
+  )}
   <h1>Bibliothèque</h1>
   ${ongletsBibliotheque("/prof/activites")}
   <div class="barre">
@@ -122,11 +133,8 @@ export const listeProf = ({ liste, cours, filtre, libelles: l }: Liste) => html`
     <a href="/prof/objectifs">Objectifs</a>
   </div>
   <form method="get" action="/prof/activites" class="barre reglage">
-    <label for="filtre-cours">${l.cours}</label>
-    <select id="filtre-cours" name="cours_id">${[
-      option("", "Tous", filtre.coursId ?? ""),
-      ...cours.map((c) => option(c.id, c.nom, filtre.coursId ?? "")),
-    ]}</select>
+    ${filtre.coursId ? html`<input type="hidden" name="cours_id" value="${filtre.coursId}">` : ""}
+    ${filtre.matiereId ? html`<input type="hidden" name="matiere_id" value="${filtre.matiereId}">` : ""}
     <label for="filtre-etat">État</label>
     <select id="filtre-etat" name="etat">${FILTRES_ETAT.map(([v, t]) =>
       option(v, t, filtre.etat ?? ""),
@@ -151,7 +159,7 @@ export const listeProf = ({ liste, cours, filtre, libelles: l }: Liste) => html`
           </tr>`,
         )}</tbody>
       </table>`
-      : filtre.coursId || filtre.etat
+      : filtre.coursId || filtre.matiereId || filtre.etat
         ? html`<p>Aucune activité ne correspond à ce filtre.</p>`
         : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
   }
