@@ -508,6 +508,35 @@ const formulaire = (d: DetailProf, e: Edition, rang: number, avant?: Question) =
   </section>`;
 };
 
+/**
+ * Ce qu'une question demande à l'enseignant : « À revoir » quand une citation ne vise plus la
+ * version servie ou que sa consigne est vide, « À vérifier » quand le juge ne soutient pas un champ.
+ */
+const aFaire = (q: Question, servies: Servies) =>
+  !q.consigne.texte ||
+  champsQuestion(q).some((ch) => ch.citations.some((c) => servies.get(c.source_id) !== c.revision))
+    ? "À revoir"
+    : champsQuestion(q).some(
+          (ch) =>
+            ch.citations.length && typeof ch.soutien === "number" && ch.soutien < SEUIL_SOUTIEN,
+        )
+      ? "À vérifier"
+      : "";
+
+/** L'index de la série, collé à droite des questions sur un écran large, comme le sommaire du lecteur. */
+const indexQuestions = (
+  d: DetailProf,
+  contenu: Contenu,
+) => html`<nav class="sommaire" aria-labelledby="index-questions">
+  <h2 id="index-questions">${pluriel(contenu.questions.length, "question")}</h2>
+  <ol>${contenu.questions.map((q, i) => {
+    const etat = aFaire(q, d.servies);
+    return html`<li><a href="#q-${q.id}"><span class="chiffres">${i + 1}.</span> ${NOMS_TYPE[q.type]}${
+      etat ? html` <span class="statut failed">${etat}</span>` : ""
+    }</a></li>`;
+  })}</ol>
+</nav>`;
+
 const choixType = (nom: string, id: string) =>
   html`<select id="${id}" name="${nom}">${TYPES_QUESTION.map((t) => option(t, NOMS_TYPE[t], ""))}</select>`;
 
@@ -526,6 +555,7 @@ const questions = (d: DetailProf, contenu: Contenu) => {
           } à la génération : ${rejets.join(" ")}</p>`
         : ""
     }
+    <div class="questions-colonnes"><div>
     ${contenu.questions.map((q, i) =>
       e?.id === q.id ? formulaire(d, e, i, q) : lecture(d, n, q, i),
     )}
@@ -547,6 +577,7 @@ const questions = (d: DetailProf, contenu: Contenu) => {
           </form>
         </div>`
     }
+    </div>${indexQuestions(d, contenu)}</div>
   `;
 };
 

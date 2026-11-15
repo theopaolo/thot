@@ -2995,6 +2995,14 @@ details.reglages-activite {
 .option-edition textarea {
   field-sizing: content;
 }
+/* L'index de la série reprend le sommaire du lecteur : collé à droite quand il tient, absent sinon. */
+@media (min-width: 75rem) {
+  .questions-colonnes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    gap: var(--s6);
+  }
+}
 /* Le texte d'une question se lit à la mesure, comme un document. */
 .question-prof > :is(p, ol, ul) {
   max-width: var(--measure);

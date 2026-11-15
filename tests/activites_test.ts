@@ -312,6 +312,10 @@ test("exercice : nouvelle version, lecteurs retirés, rejet et suppression de la
     const revoir = await page(prof, `/prof/activites/${id}`);
     assertStringIncludes(revoir, "version 1 citée, la source sert la version 2");
     assertStringIncludes(revoir, "Ne tiennent plus : Casa Batlló dans Design");
+    assertMatch(
+      revoir,
+      /<li><a href="#q-[^"]+">.*<span class="statut failed">À revoir<\/span><\/a><\/li>/,
+    );
 
     // Chercher les passages de toute la série dans la révision servie.
     const r = envoyer(prof, `/prof/activites/${id}/reancrer`, { revision: "1" });
@@ -386,7 +390,12 @@ test("exercice : le juge marque un champ à vérifier sans le rejeter, une modif
       [1, 1, 1, 1, 0.1],
     );
     const detail = await page(prof, `/prof/activites/${id}`);
-    assertEquals(detail.split("À vérifier").length - 1, 1);
+    // L'avis sous le champ, puis la question dans l'index de la série.
+    assertEquals(detail.split("À vérifier").length - 1, 2);
+    assertMatch(
+      detail,
+      /<li><a href="#q-[^"]+">[^<]*<span class="chiffres">1\.<\/span> Réponse rédigée <span class="statut failed">À vérifier<\/span><\/a><\/li>/,
+    );
     assertStringIncludes(detail, "les passages cités n'établissent pas tout");
     // Afficher la page ne rappelle pas le juge.
     assertEquals(juges.length, 5);
