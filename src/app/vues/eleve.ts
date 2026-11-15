@@ -978,7 +978,7 @@ export const reponse = (
         typeof m === "string"
           ? m
           : html`<span class="${m.bloc ? "formule formule-bloc" : "formule"}" data-tex="${m.tex}">${m.source}</span>`,
-      )}</span><span class="marque">&nbsp;<button
+      )}</span><span class="lien-citation">&nbsp;<button
         class="citation"
         aria-pressed="${String(auto && n === 0)}"
         aria-label="${n + 1}, voir le passage : ${r.affirmations[n].titre}"

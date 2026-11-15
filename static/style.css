@@ -397,11 +397,8 @@ body.prof {
   padding: var(--s5) var(--s4);
   border-right: 1px solid var(--line);
 }
-/* La marque de citation partage la classe et ne passe pas à la ligne : un long nom d'instance
-   repousserait le bouton du rail hors de sa colonne. */
 .rail .marque {
   margin: 0;
-  white-space: normal;
 }
 .rail-tete {
   display: flex;
@@ -1725,8 +1722,8 @@ main.page-chat #erreur-reseau {
   overflow-x: auto;
   overflow-y: hidden;
 }
-/* L'espace et la marque ne se séparent pas : le dernier mot de la phrase les suit à la ligne. */
-.marque {
+/* L'espace et la citation ne se séparent pas : le dernier mot de la phrase les suit à la ligne. */
+.lien-citation {
   white-space: nowrap;
 }
 /* Marque de citation dans la phrase: petite à l'œil, 44 px au toucher. */
