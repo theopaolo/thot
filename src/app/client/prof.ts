@@ -106,48 +106,87 @@ export function installerProf() {
     if (event.key === "Escape" && coche) cocherTout(coche.form, false);
   });
 
-  document.addEventListener("keydown", (event) => {
-    const revue = document.querySelector("#legende.relecture");
-    if (
-      !revue ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey ||
-      event.repeat ||
-      event.isComposing ||
-      (event.target instanceof Element &&
-        event.target.closest("input,textarea,select,[contenteditable]"))
-    )
+  installerRaccourcisLegendes();
+}
+
+const CLE_RACCOURCIS = "thot-raccourcis-legendes";
+
+/**
+ * Les raccourcis de la relecture des légendes. Les touches V, R et E n'agissent que depuis la page
+ * ou la zone de relecture, jamais depuis un champ, un lien ou un bouton, et une case les coupe
+ * (WCAG 2.1.4). Les flèches changent d'image depuis la zone ou ses vignettes et font défiler la
+ * page ailleurs.
+ */
+function installerRaccourcisLegendes() {
+  let actifs = true;
+  try {
+    actifs = localStorage.getItem(CLE_RACCOURCIS) !== "non";
+  } catch {
+    /* stockage bloqué : les raccourcis restent actifs */
+  }
+  // Le serveur rend la case cochée et la zone se remplace à chaque légende relue.
+  const synchroniser = () => {
+    document.body.classList.toggle("sans-raccourcis", !actifs);
+    const coche = document.querySelector<HTMLInputElement>("#raccourcis-actifs");
+    if (coche) coche.checked = actifs;
+    for (const b of document.querySelectorAll<HTMLElement>("#legende [data-raccourci]")) {
+      if (actifs) b.setAttribute("aria-keyshortcuts", b.dataset.raccourci ?? "");
+      else b.removeAttribute("aria-keyshortcuts");
+    }
+  };
+  synchroniser();
+  document.addEventListener("htmx:afterSwap", synchroniser);
+  // Une flèche recharge la page sur l'image voisine : le focus revient à sa vignette.
+  if (location.hash === "#vignettes") {
+    document.querySelector<HTMLElement>('#legende .file a[aria-current="true"]')?.focus();
+  }
+  document.addEventListener("change", (event) => {
+    if (!(event.target instanceof HTMLInputElement) || event.target.id !== "raccourcis-actifs")
       return;
+    actifs = event.target.checked;
+    try {
+      localStorage.setItem(CLE_RACCOURCIS, actifs ? "oui" : "non");
+    } catch {
+      /* le choix vaut pour cette page seulement */
+    }
+    synchroniser();
+  });
+
+  /** La zone de relecture, si la touche peut y agir. `simple` : une touche-caractère. */
+  const zone = (event: KeyboardEvent, simple: boolean) => {
+    const revue = document.querySelector<HTMLElement>("#legende.relecture");
+    if (!revue || event.metaKey || event.ctrlKey || event.altKey || event.isComposing) return;
+    const cible = event.target instanceof Element ? event.target : document.body;
+    if (cible.closest("input,textarea,select,[contenteditable]")) return;
+    const dedans = revue.contains(cible);
+    if (!simple) return dedans ? revue : undefined;
+    const page = cible === document.body || cible.id === "contenu";
+    return actifs && (page || (dedans && !cible.closest("a,button"))) ? revue : undefined;
+  };
+
+  document.addEventListener("keydown", (event) => {
+    if (event.repeat) return;
     if (event.key === "e") {
+      const revue = zone(event, true);
+      if (!revue) return;
       event.preventDefault();
       revue.querySelector<HTMLTextAreaElement>("#texte")?.focus();
     } else if (["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+      const revue = zone(event, false);
+      if (!revue) return;
       const liens = [...revue.querySelectorAll<HTMLAnchorElement>(".file a")];
       const i = liens.findIndex((a) => a.getAttribute("aria-current") === "true");
       const suivant = event.key === "ArrowDown" || event.key === "ArrowRight";
       const cible = liens[suivant ? i + 1 : i - 1];
       if (cible) {
         event.preventDefault();
-        cible.click();
+        location.assign(`${cible.href}#vignettes`);
       }
     }
   });
 
   document.addEventListener("keyup", (event) => {
-    if (
-      event.metaKey ||
-      event.ctrlKey ||
-      event.altKey ||
-      event.isComposing ||
-      (event.target instanceof Element &&
-        event.target.closest("input,textarea,select,[contenteditable]"))
-    )
-      return;
-    if (event.key === "v" || event.key === "r") {
-      document
-        .querySelector<HTMLButtonElement>(`#legende [data-raccourci="${event.key}"]`)
-        ?.click();
-    }
+    if (event.key !== "v" && event.key !== "r") return;
+    zone(event, true)?.querySelector<HTMLButtonElement>(`[data-raccourci="${event.key}"]`)?.click();
   });
 }

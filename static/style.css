@@ -2091,6 +2091,10 @@ form.question-form textarea {
 .file a[aria-current="true"] img {
   opacity: 1;
 }
+/* La bande défile : un anneau à l'extérieur de la vignette serait rogné. */
+.file a:focus-visible {
+  outline-offset: -3px;
+}
 
 .relecture-plan {
   display: grid;
@@ -2155,10 +2159,27 @@ form.question-form textarea {
 .raccourcis {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--s1) var(--s4);
 }
 .raccourcis kbd {
   font-size: 0.8125rem;
+}
+.raccourcis label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  margin: 0;
+  font-weight: 400;
+}
+/* La zone prend le focus pour que les flèches y changent d'image : elle n'a pas d'anneau. */
+#legende:focus {
+  outline: none;
+}
+/* Raccourcis coupés : leurs touches ne s'affichent plus. */
+.sans-raccourcis :is([data-raccourci] kbd, .raccourcis .touche) {
+  display: none;
 }
 .edition-source {
   margin: var(--s5) 0;

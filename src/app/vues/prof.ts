@@ -1691,7 +1691,7 @@ export type ALegender = ImageVue & {
 export const legende = (i: ALegender | undefined, file: { id: string; titre: string }[] = []) =>
   i
     ? html`
-      <div id="legende" class="relecture">
+      <div id="legende" class="relecture" tabindex="-1">
         <nav class="file" aria-label="Légendes à relire">
           <p><strong>${i.restantes}</strong> à relire</p>
           <ol>${file.map(
@@ -1731,8 +1731,9 @@ export const legende = (i: ALegender | undefined, file: { id: string; titre: str
               </button>
             </div>
             <p class="raccourcis discret">
-              <span><kbd>E</kbd> modifier la légende</span>
-              <span><kbd>←</kbd> <kbd>→</kbd> changer d'image</span>
+              <span class="touche"><kbd>E</kbd> modifier la légende</span>
+              <span><kbd>←</kbd> <kbd>→</kbd> changer d'image depuis une vignette</span>
+              <label><input type="checkbox" id="raccourcis-actifs" checked> Raccourcis clavier V, R et E</label>
             </p>
           </form>
         </div>
