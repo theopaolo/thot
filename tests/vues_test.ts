@@ -172,6 +172,64 @@ test("un bloc tableau se rend en tableau, un passage à cheval sur deux cellules
   assertStringIncludes(String(await liste), '<p id="b2" class="lignes">un | deux\ntrois');
 });
 
+test("le code en ligne se rend en code, un passage qui le traverse s'y coupe sans le scinder", async () => {
+  const texte = "Garde tool_calls en mémoire.";
+  const a = texte.indexOf("tool_calls");
+  const bloc = { id: "b1", texte, section: "", debut: 0, fin: texte.length };
+  const [p] = texteDocument([{ ...bloc, codes: [[a, a + 10]] }], [0, a + 4]);
+  assertStringIncludes(
+    String(await p),
+    '<p id="b1"><mark id="passage">Garde </mark><code><mark>tool</mark>_calls</code> en mémoire.</p>',
+  );
+  // Une extraction antérieure, sans plages, reste du texte.
+  assertStringIncludes(String(await texteDocument([bloc])[0]), "Garde tool_calls en");
+});
+
+test("le panneau de vérification rend le passage dans son tableau, la ligne citée surlignée", async () => {
+  const texte = "Problème | Mécanisme\nPlusieurs destinataires | Observer";
+  const debut = 40 + texte.indexOf("Plusieurs");
+  const rendu = String(
+    await panneauSource({
+      titre: "Patterns",
+      citation: "Plusieurs destinataires",
+      source_id: "s1",
+      debut,
+      fin: debut + 23,
+      blocs: [{ id: "blk_3", texte, section: "S", debut: 40, fin: 40 + texte.length }],
+    }),
+  );
+  assertStringIncludes(rendu, '<div class="document">');
+  assertStringIncludes(rendu, '<div class="cadre-tableau"><table id="blk_3">');
+  // Le panneau ne vise pas l'ancre du lecteur.
+  assertStringIncludes(rendu, "<td><mark>Plusieurs destinataires</mark></td>");
+  assertEquals(rendu.includes(" | "), false);
+});
+
+test("un bloc animé de carnet devient un schéma, ses notes passent en liste sous le dessin", async () => {
+  const code = [
+    "sequenceDiagram",
+    "  accTitle: Deux tours",
+    "  participant H as Harness",
+    "  %% ctx: system 1200 Prompt",
+    "  %% note: Le harness ajoute la demande.",
+    "  H->>H: Contrôle",
+    "  %% note: Le modèle <b>répond</b>.",
+  ].join("\n");
+  const bloc = { id: "b1", section: "", debut: 0, fin: 200, code: true as const };
+  const [figure, texte] = texteDocument([
+    { ...bloc, texte: code, langage: "animated" },
+    { ...bloc, id: "b2", texte: "étape 1\nétape 2", langage: "animated" },
+  ]);
+  const rendu = String(await figure);
+  assertStringIncludes(rendu, '<figure class="figure-schema"><pre id="b1" data-mermaid=');
+  assertStringIncludes(
+    rendu,
+    '<ol class="notes-schema"><li>Le harness ajoute la demande.</li><li>Le modèle &lt;b&gt;répond&lt;/b&gt;.</li></ol><figcaption><strong>Deux tours</strong>',
+  );
+  // Un bloc animé qui n'est pas un diagramme de séquence reste du code.
+  assertStringIncludes(String(await texte), '<pre id="b2" data-langage="animated">');
+});
+
 test("un schéma du lecteur devient une figure légendée, le sommaire ancre chaque section", async () => {
   const code =
     "flowchart TB\n  accTitle: Les couches\n  accDescr: Le harness <b>appelle</b>\n  A --> B";

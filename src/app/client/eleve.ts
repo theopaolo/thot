@@ -332,6 +332,14 @@ export function installerEleve() {
   });
 
   document.addEventListener("htmx:afterSettle", (event) => {
+    // Le passage cité arrive dans ses blocs entiers : son cadre défile jusqu'à la marque, sans
+    // faire défiler la page qui garde la phrase citée en vue.
+    const marque = document.querySelector("#source .defile mark");
+    const cadre = marque?.closest(".defile");
+    if (marque && cadre) {
+      cadre.scrollTop +=
+        marque.getBoundingClientRect().top - cadre.getBoundingClientRect().top - 16;
+    }
     if (event.target instanceof Element) {
       const conversation = event.target.closest<HTMLElement>("#conversation");
       if (conversation && !event.target.closest(".avis")) suivreConversation();

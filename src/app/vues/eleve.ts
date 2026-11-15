@@ -1128,11 +1128,8 @@ export const panneauSource = (
     debut?: number;
     fin?: number;
     revision?: number;
-    avant?: string;
-    milieu?: string;
-    apres?: string;
-    coupeAvant?: boolean;
-    coupeApres?: boolean;
+    /** les blocs du document qui portent le passage `debut`..`fin` */
+    blocs?: Bloc[];
     enseignant?: string;
   },
   suite?: { id: string; n: number; total: number },
@@ -1176,14 +1173,17 @@ export const panneauSource = (
         }
         <div class="defile">
           ${
-            a.milieu !== undefined
-              ? html`
-              <blockquote
-                class="passage">${a.coupeAvant ? "… " : ""}${a.avant}<mark>${a.milieu}</mark>${
-                  a.apres
-                }${a.coupeApres ? " …" : ""}</blockquote>
-            `
-              : html`
+            a.blocs?.length && a.debut !== undefined && a.fin !== undefined
+              ? html`<div class="document">${texteDocument(
+                  a.blocs,
+                  [a.debut, a.fin],
+                  3,
+                  a.blocs[0].section,
+                  false,
+                )}</div>`
+              : a.debut !== undefined
+                ? html`<blockquote class="passage"><mark>${a.citation}</mark></blockquote>`
+                : html`
               <p class="discret">Légende d'image relue par l'enseignant :</p>
               <blockquote class="passage"><mark>${a.citation}</mark></blockquote>
             `

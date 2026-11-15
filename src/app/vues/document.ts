@@ -21,6 +21,17 @@ const intertitre = (texte: string, niveau: 2 | 3, id?: string) => {
 export const sansDirectives = (code: string) =>
   code.replace(/^\s*---\n[\s\S]*?\n---[ \t]*(?:\n|$)/, "").replace(/%%\{[\s\S]*?(?:\}%%|$)/g, "");
 
+/**
+ * Un schéma Mermaid, ou un bloc `animated` de carnet : un diagramme de séquence que le carnet
+ * déroule pas à pas. Ses lignes `%%` sont des commentaires pour Mermaid, qui en dessine l'état final.
+ */
+const schema = (b: Bloc) =>
+  b.langage === "mermaid" || (b.langage === "animated" && /^\s*sequenceDiagram\b/.test(b.texte));
+
+/** Les notes `%% note:` d'un bloc `animated`, qui commentent chaque pas du diagramme. */
+const notesSchema = (code: string) =>
+  [...code.matchAll(/^[ \t]*%%[ \t]*note[ \t]*:[ \t]*(.+?)[ \t]*$/gm)].map((m) => m[1]);
+
 /** Le titre et la description que l'auteur d'un schéma Mermaid lui donne (`accTitle`, `accDescr`). */
 export function legendeSchema(code: string) {
   const titre = code.match(/^[ \t]*accTitle[ \t]*:[ \t]*(.+?)[ \t]*$/m)?.[1];
@@ -70,24 +81,45 @@ export function sections(blocs: Bloc[], depuis = "") {
 /**
  * Blocs du document, avec intertitres et passage surligné entre `debut` et `fin`. `depuis` est la
  * section déjà titrée par la page : le titre du document n'est pas redit en intertitre.
+ * `avecAncre` pose `id="passage"` sur la marque, que seul le lecteur vise.
  */
 export const texteDocument = (
   blocs: Bloc[],
   marque?: [number, number],
   niveau: 2 | 3 = 3,
   depuis = "",
+  avecAncre = true,
 ) => {
   let section = depuis;
-  let ancrePosee = false;
-  // Le texte du bloc entre `debut` et `fin`, avec la part du passage `m` qui s'y trouve. Un
-  // passage à cheval sur plusieurs cellules a une marque par cellule, l'ancre sur la première.
-  const marquer = (t: string, debut: number, fin: number, m?: readonly [number, number]) => {
-    const a = m ? Math.max(debut, m[0]) : fin;
-    const z = m ? Math.min(fin, m[1]) : fin;
-    if (a >= z) return html`${tranche(t, debut, fin)}`;
-    const id = raw(ancrePosee ? "" : ' id="passage"');
-    ancrePosee = true;
-    return html`${tranche(t, debut, a)}<mark${id}>${tranche(t, a, z)}</mark>${tranche(t, z, fin)}`;
+  let ancrePosee = !avecAncre;
+  // Le texte du bloc entre `debut` et `fin`, avec la part du passage `m` et le code en ligne qui
+  // s'y trouvent. Un passage à cheval sur plusieurs cellules ou sur un code a une marque par
+  // morceau, l'ancre sur la première.
+  const marquer = (
+    t: string,
+    debut: number,
+    fin: number,
+    m?: readonly [number, number],
+    codes: readonly (readonly [number, number])[] = [],
+  ) => {
+    const bornes = [...new Set([debut, fin, ...(m ?? []), ...codes.flat()])]
+      .filter((x) => x >= debut && x <= fin)
+      .sort((x, y) => x - y);
+    // Les morceaux d'un même code restent dans un seul <code>, la marque se coupe à l'intérieur.
+    const groupes: { code: number; morceaux: unknown[] }[] = [];
+    for (const [i, a] of bornes.slice(0, -1).entries()) {
+      const z = bornes[i + 1];
+      let morceau = html`${tranche(t, a, z)}`;
+      if (m && m[0] <= a && z <= m[1]) {
+        morceau = html`<mark${raw(ancrePosee ? "" : ' id="passage"')}>${morceau}</mark>`;
+        ancrePosee = true;
+      }
+      const code = codes.findIndex(([c, d]) => c <= a && z <= d);
+      const dernier = groupes.at(-1);
+      if (dernier && code >= 0 && dernier.code === code) dernier.morceaux.push(morceau);
+      else groupes.push({ code, morceaux: [morceau] });
+    }
+    return groupes.map((g) => (g.code < 0 ? g.morceaux : html`<code>${g.morceaux}</code>`));
   };
   return blocs.map((b) => {
     const titre =
@@ -103,12 +135,17 @@ export const texteDocument = (
     const fin = longueur(b.texte);
     // Pas d'espace dans le <pre>: il s'afficherait. Le code d'un schéma reste visible sous la
     // légende, et remplace le dessin si celui-ci échoue.
-    if (b.langage === "mermaid") {
+    if (schema(b)) {
       const l = legendeSchema(b.texte);
+      const notes = notesSchema(b.texte);
       return html`
         ${titre}<figure class="figure-schema"><pre id="${b.id}" data-mermaid="${sansDirectives(
           b.texte,
         )}"><code>${marquer(b.texte, 0, fin, m)}</code></pre>${
+          notes.length
+            ? html`<ol class="notes-schema">${notes.map((n) => html`<li>${n}</li>`)}</ol>`
+            : ""
+        }${
           l.titre || l.description
             ? html`<figcaption>${l.titre ? html`<strong>${l.titre}</strong> ` : ""}${
                 l.description ?? ""
@@ -130,10 +167,13 @@ export const texteDocument = (
       return html`
         ${titre}<div class="cadre-tableau"><table id="${b.id}">
           <thead><tr>${entete.map(
-            ([a, z]) => html`<th scope="col">${marquer(b.texte, a, z, m)}</th>`,
+            ([a, z]) => html`<th scope="col">${marquer(b.texte, a, z, m, b.codes)}</th>`,
           )}</tr></thead>
           <tbody>${corps.map(
-            (r) => html`<tr>${r.map(([a, z]) => html`<td>${marquer(b.texte, a, z, m)}</td>`)}</tr>`,
+            (r) =>
+              html`<tr>${r.map(
+                ([a, z]) => html`<td>${marquer(b.texte, a, z, m, b.codes)}</td>`,
+              )}</tr>`,
           )}</tbody>
         </table></div>
       `;
@@ -141,7 +181,7 @@ export const texteDocument = (
     // Une liste extraite garde une entrée par ligne : les lignes restent des lignes à l'écran.
     const lignes = raw(b.texte.includes("\n") ? ' class="lignes"' : "");
     return html`
-      ${titre}<p id="${b.id}"${lignes}>${marquer(b.texte, 0, fin, m)}</p>
+      ${titre}<p id="${b.id}"${lignes}>${marquer(b.texte, 0, fin, m, b.codes)}</p>
     `;
   });
 };

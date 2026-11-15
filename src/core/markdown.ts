@@ -1,5 +1,6 @@
 import type { Extraction, Partie } from "./document.ts";
 import { decoder } from "./html.ts";
+import { longueur } from "./texte.ts";
 
 /** Front matter YAML en tête de fichier. Seuls `title` et `order` sont lus, `corps` est le reste. */
 export function lireFrontMatter(md: string): { titre?: string; ordre?: number; corps: string } {
@@ -21,11 +22,20 @@ export function lireFrontMatter(md: string): { titre?: string; ordre?: number; c
 const RE_IMAGE = /!\[[^\]]*\]\(\s*<?([^)\s>]*)[^)]*\)/g;
 const RELATIF = /^(?![a-z][a-z\d+.-]*:|\/\/)/i;
 
+type Lisible = { texte: string; codes: [number, number][] };
+
+// Bornes d'un code en ligne pendant la réduction, dans la zone d'usage privé d'Unicode.
+const OUVRE = "";
+const FERME = "";
+const BLANC = /[ \t  ]/;
+
 /**
  * Le texte qu'un lecteur voit: liens, emphases et code en ligne réduits à leur contenu, balises
- * HTML retirées (une cellule de tableau devient « | »), échappements et entités résolus.
+ * HTML retirées (une cellule de tableau devient « | »), échappements et entités résolus. Le code
+ * en ligne garde sa plage. Il est mis de côté avant les emphases, pour que `**` autour d'un code
+ * tombe aussi et que le contenu du code reste tel quel.
  */
-function lisible(s: string, images: string[]) {
+function lisible(s: string, images: string[]): Lisible {
   const sansLiens = s
     .replace(RE_IMAGE, (_, url: string) => {
       if (url && RELATIF.test(url)) images.push(url);
@@ -33,25 +43,48 @@ function lisible(s: string, images: string[]) {
     })
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1");
-  return sansLiens
-    .split(/(`[^`]+`)/)
-    .map((p, i) =>
-      i % 2
-        ? p.slice(1, -1)
-        : decoder(
-            p
-              .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, " | ")
-              .replace(/<!--.*?-->|<\/?[a-z][^>]*>/gi, " ")
-              .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
-              .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, "$1")
-              .replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1")
-              .replace(/(?<![\p{L}\p{N}])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}])/gu, "$1")
-              .replace(/\\([!-/:-@[-`{-~])/g, "$1"),
-          ),
-    )
-    .join("")
-    .replace(/[ \t\u00a0\u202f]+/g, " ")
-    .trim();
+  const codes: string[] = [];
+  const reduit = decoder(
+    sansLiens
+      .replace(/`([^`]+)`/g, (_, c: string) => `${OUVRE}${codes.push(c) - 1}${FERME}`)
+      .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, " | ")
+      .replace(/<!--.*?-->|<\/?[a-z][^>]*>/gi, " ")
+      .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
+      .replace(/~~(?=\S)(.+?)(?<=\S)~~/g, "$1")
+      .replace(/\*(?=\S)(.+?)(?<=\S)\*/g, "$1")
+      .replace(/(?<![\p{L}\p{N}])_(?=\S)(.+?)(?<=\S)_(?![\p{L}\p{N}])/gu, "$1")
+      .replace(/\\([!-/:-@[-`{-~])/g, "$1"),
+  ).replace(new RegExp(`${OUVRE}(\\d+)${FERME}`, "g"), (_, i) => OUVRE + codes[i] + FERME);
+  // Les blancs se réduisent à une espace, bornes comprises, et tombent aux deux bouts.
+  const sortie: string[] = [];
+  const plages: [number, number][] = [];
+  let debut = -1;
+  let blanc = false;
+  for (const c of reduit) {
+    if (c === OUVRE) debut = sortie.length + (blanc && sortie.length ? 1 : 0);
+    else if (c === FERME) {
+      if (debut < sortie.length) plages.push([debut, sortie.length]);
+    } else if (BLANC.test(c)) blanc = true;
+    else {
+      if (blanc && sortie.length) sortie.push(" ");
+      blanc = false;
+      sortie.push(c);
+    }
+  }
+  return { texte: sortie.join(""), codes: plages };
+}
+
+/** Des morceaux mis bout à bout, chaque plage décalée de ce qui la précède. */
+function joindre(morceaux: Lisible[], separateur: string): Lisible {
+  let texte = "";
+  const codes: [number, number][] = [];
+  for (const [i, m] of morceaux.entries()) {
+    if (i) texte += separateur;
+    const n = longueur(texte);
+    codes.push(...m.codes.map(([a, z]): [number, number] => [a + n, z + n]));
+    texte += m.texte;
+  }
+  return { texte, codes };
 }
 
 /**
@@ -67,16 +100,16 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
   const parties: Partie[] = [{ texte: titre, section: titre }];
   const images: string[] = [];
   let section = titre;
-  let lignes: string[] = [];
+  let bloc: Lisible = { texte: "", codes: [] };
   const fermer = () => {
-    if (lignes.length) parties.push({ texte: lignes.join("\n"), section });
-    lignes = [];
+    if (bloc.texte) {
+      parties.push({ texte: bloc.texte, section, ...(bloc.codes.length && { codes: bloc.codes }) });
+    }
+    bloc = { texte: "", codes: [] };
   };
   // Une ligne de plus dans le bloc courant, ou la suite de la dernière quand `nouvelle` est faux.
-  const ajouter = (l: string, nouvelle: boolean) => {
-    if (!l) return;
-    if (nouvelle || !lignes.length) lignes.push(l);
-    else lignes[lignes.length - 1] += " " + l;
+  const ajouter = (l: Lisible, nouvelle: boolean) => {
+    if (l.texte) bloc = bloc.texte ? joindre([bloc, l], nouvelle ? "\n" : " ") : l;
   };
 
   const brut = corps.split("\n");
@@ -101,7 +134,7 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
       parties.push({ texte: code.join("\n"), section, code: true, ...(langage && { langage }) });
     } else if (titreLigne) {
       fermer();
-      section = lisible(titreLigne[1], images);
+      section = lisible(titreLigne[1], images).texte;
       // Le premier titre qui répète le titre du document n'est pas redit.
       if (parties.length > 1 || section !== titre) parties.push({ texte: section, section });
     } else if (/^ {0,3}([-*_])( *\1){2,} *$/.test(ligne)) fermer();
@@ -109,7 +142,13 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
     else if (/^ {0,3}\[[^\]]+\]:\s*\S/.test(ligne)) continue;
     else if (t.startsWith("|")) {
       const cellules = t.replace(/^\||\|$/g, "").split("|");
-      ajouter(cellules.map((c) => lisible(c, images)).join(" | "), true);
+      ajouter(
+        joindre(
+          cellules.map((c) => lisible(c, images)),
+          " | ",
+        ),
+        true,
+      );
     } else {
       const item = ligne.match(/^\s*(?:[-*+]|\d+[.)])\s+(.*)$/);
       ajouter(lisible(item ? item[1] : ligne.replace(/^\s{0,3}(?:>\s?)+/, ""), images), !!item);

@@ -1038,6 +1038,25 @@ kbd {
 .figure-schema figcaption strong {
   color: var(--ink);
 }
+/* Les notes d'un schéma animé, une par pas du diagramme, sous le dessin. */
+.notes-schema {
+  margin: var(--s3) 0 0;
+  padding-left: var(--s5);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.notes-schema li + li {
+  margin-top: var(--s1);
+}
+/* Le code en ligne d'un cours : la chasse fixe des blocs, sur le ton du passe-partout. */
+:not(pre) > code {
+  padding: 0.05em 0.3em;
+  border-radius: 2px;
+  background: var(--surface-tinted);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  overflow-wrap: anywhere;
+}
 .code-schema {
   margin-top: var(--s3);
 }

@@ -3,7 +3,6 @@ import { getCookie, setCookie } from "hono/cookie";
 import type { Modeles } from "../../core/modeles.ts";
 import type { Affirmation } from "../../core/reponse.ts";
 import { CITABLE, type Lecteur, parametresCitable } from "../../core/recherche.ts";
-import { contexte } from "../../core/texte.ts";
 import { type Compte, lecteur } from "../comptes.ts";
 import { lireInstance } from "../instance.ts";
 import type { Db } from "../db.ts";
@@ -113,12 +112,13 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
       return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite));
     }
     const revision = a.revision ?? 1;
-    const texte = lireDocument(a.source_id, revision).texte;
+    const { debut, fin } = a;
+    // Les blocs qui portent le passage, rendus comme dans le lecteur : un tableau reste un tableau.
+    const blocs = lireDocument(a.source_id, revision).blocs.filter(
+      (b) => b.debut < fin && b.fin > debut,
+    );
     return c.html(
-      Eleve.panneauSource(
-        { ...a, revision, enseignant: source.enseignant, ...contexte(texte, a.debut, a.fin) },
-        suite,
-      ),
+      Eleve.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite),
     );
   };
   return {

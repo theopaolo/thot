@@ -289,6 +289,28 @@ test("Markdown: HTML brut, échappements et espaces insécables réduits au text
   assertEquals(ext.parties[1].section, "3. Stage production");
 });
 
+test("Markdown: le code en ligne garde sa plage, un gras qui l'entoure tombe", () => {
+  const ext = extraireMarkdown(
+    [
+      "# T",
+      "",
+      "**Le message garde ses `tool_calls`.** Puis `a  *b*`",
+      "et `x`.",
+      "",
+      "| Clé | Rôle |",
+      "|---|---|",
+      "| `id` | relie |",
+    ].join("\n"),
+    "repli",
+  );
+  const [p, tableau] = assembler(ext.parties).blocs.slice(2);
+  assertEquals(p.texte, "Le message garde ses tool_calls. Puis a *b* et x.");
+  const codes = (b: typeof p) => b.codes?.map(([a, z]) => tranche(b.texte, a, z));
+  assertEquals(codes(p), ["tool_calls", "a *b*", "x"]);
+  assertEquals(tableau.texte, "Clé | Rôle\nid | relie");
+  assertEquals(codes(tableau), ["id"]);
+});
+
 test("Markdown: les offsets assemblés retrouvent chaque bloc", () => {
   const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
   for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);

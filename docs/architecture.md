@@ -75,17 +75,22 @@ Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et
 vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou
 `.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur
 voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
-d'emphase disparaissent, les blocs de code et `mermaid` restent mot pour mot. Le langage nommé
-par la clôture d'un bloc est noté hors du texte : le lecteur dessine un bloc `mermaid` en
-figure, avec le moteur des réponses, sans le front matter ni les directives de l'auteur. Sa
-légende reprend l'`accTitle` et l'`accDescr` du code, et le code se replie sous la légende. Un
-dessin qui échoue laisse le code déplié. Le lecteur colore le code des autres langages que
+d'emphase disparaissent, même autour d'un code en ligne, et les blocs de code et `mermaid` restent
+mot pour mot. Le code en ligne garde son texte, et sa plage est notée hors du texte pour que le
+lecteur l'affiche en code. Le langage nommé par la clôture d'un bloc est noté hors du texte : le
+lecteur dessine un bloc `mermaid` en figure, avec le moteur des réponses, sans le front matter ni
+les directives de l'auteur. Un bloc `animated` de carnet qui commence par `sequenceDiagram` se
+dessine de même, dans son état final, et ses lignes `%% note:` passent en liste numérotée sous le
+dessin. La légende reprend l'`accTitle` et l'`accDescr` du code, et le code se replie sous la
+légende. Un dessin qui échoue laisse le code déplié. Le lecteur colore le code des autres langages que
 Shiki connaît, sans changer le texte du bloc. Le front matter fournit le titre et l'ordre de
 lecture (`order`), ses autres clés sont ignorées. Les images liées ne sont pas jointes, un avertissement les nomme.
 
 Le lecteur garde les lignes d'un bloc : une liste extraite garde une entrée par ligne. Un bloc
 dont toutes les lignes ont le même nombre de cellules séparées par « | » s'affiche en tableau,
-sa première ligne en en-tête. Le texte du bloc et ses offsets ne changent pas.
+sa première ligne en en-tête. Le texte du bloc et ses offsets ne changent pas. La feuille d'un
+passage cité rend les blocs qui le portent comme le lecteur, si bien qu'une ligne de tableau citée
+reste dans son tableau.
 
 Un zip est un document Word quand `[Content_Types].xml` déclare `word/document.xml` comme document
 principal, une présentation quand il déclare ainsi `ppt/presentation.xml`. Le dépôt refuse avec

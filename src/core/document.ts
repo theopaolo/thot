@@ -3,7 +3,8 @@ import { longueur } from "./texte.ts";
 /**
  * Un passage extrait, avant assemblage. `page` situe le passage dans l'original : page d'un PDF,
  * diapositive d'une présentation. `code` marque un bloc de code, rendu dans un `<pre>`, et
- * `langage` le langage que nomme sa clôture Markdown. Les extractions antérieures n'en ont pas.
+ * `langage` le langage que nomme sa clôture Markdown. `codes` donne les plages de code en ligne,
+ * en points de code du texte. Les extractions antérieures n'en ont pas.
  */
 export type Partie = {
   texte: string;
@@ -11,6 +12,7 @@ export type Partie = {
   page?: number;
   code?: true;
   langage?: string;
+  codes?: [number, number][];
 };
 
 export type Bloc = Partie & { id: string; debut: number; fin: number };
@@ -31,7 +33,7 @@ export function assembler(parties: Partie[]): Document {
   const blocs: Bloc[] = [];
   let texte = "";
   let curseur = 0;
-  for (const p of parties) {
+  for (const { codes, ...p } of parties) {
     const t = p.texte.trim();
     if (!t) continue;
     if (texte) {
@@ -39,7 +41,19 @@ export function assembler(parties: Partie[]): Document {
       curseur += SEPARATEUR.length;
     }
     const n = longueur(t);
-    blocs.push({ ...p, texte: t, id: `blk_${blocs.length}`, debut: curseur, fin: curseur + n });
+    // Les plages suivent le texte rogné.
+    const retrait = longueur(p.texte) - longueur(p.texte.trimStart());
+    const plages = codes
+      ?.map(([a, z]): [number, number] => [a - retrait, z - retrait])
+      .filter(([a, z]) => a >= 0 && a < z && z <= n);
+    blocs.push({
+      ...p,
+      ...(plages?.length && { codes: plages }),
+      texte: t,
+      id: `blk_${blocs.length}`,
+      debut: curseur,
+      fin: curseur + n,
+    });
     texte += t;
     curseur += n;
   }
