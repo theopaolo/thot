@@ -5,7 +5,7 @@ import type { Image, Partie } from "./document.ts";
 /**
  * Bornes d'un document Word ou PowerPoint. Le dépôt borne déjà le fichier à 25 Mo. Les tailles
  * décompressées se vérifient sur le répertoire central, avant toute décompression. La mémoire
- * d'une analyse suit surtout le nombre d'éléments XML (mesures dans docs/exploitation.md).
+ * d'une analyse suit le nombre de nœuds XML (mesures dans docs/exploitation.md).
  */
 export const BORNES = {
   entrees: 5000,
@@ -13,8 +13,10 @@ export const BORNES = {
   entree: 50 * 1024 * 1024,
   xml: 20 * 1024 * 1024,
   total: 100 * 1024 * 1024,
-  /** éléments XML de toutes les parties lues dans une archive */
+  /** éléments, commentaires et instructions XML de toutes les parties lues dans une archive */
   elements: 200_000,
+  /** attributs XML de ces parties, environ quatre fois plus légers qu'un élément */
+  attributs: 1_000_000,
   /** pixels d'une image, lus dans son en-tête */
   pixels: 50_000_000,
   /** caractères du texte extrait, comme pour un PDF */
@@ -22,7 +24,14 @@ export const BORNES = {
   delaiMs: 30_000,
 };
 
-export type Archive = { noms: string[]; lire(nom: string): Uint8Array | undefined };
+export type Archive = {
+  noms: string[];
+  lire(nom: string): Uint8Array | undefined;
+  /** Un zip des seules entrées contrôlées, pour un lecteur qui ne borne pas ce qu'il décompresse. */
+  reconstruire(): Uint8Array;
+};
+
+export const PARTIE_XML = /\.(xml|rels)$/i;
 
 type Entree = { methode: number; compresse: number; taille: number; crc: number; decalage: number };
 
@@ -32,7 +41,8 @@ const corrompue = (raison: string) => new Error(`Archive corrompue : ${raison}.`
 /**
  * Lit le répertoire central d'un zip et refuse une archive dont les tailles déclarées dépassent
  * les bornes. `lire` décompresse une entrée sans dépasser sa taille déclarée, puis vérifie
- * taille et CRC : une archive qui ment sur ses tailles s'arrête à la borne.
+ * taille et CRC : une archive qui ment sur ses tailles s'arrête à la borne. Un autre lecteur de
+ * zip peut trouver d'autres entrées dans les mêmes octets : il reçoit `reconstruire()`.
  */
 export function ouvrirArchive(octets: Uint8Array): Archive {
   const v = new DataView(octets.buffer, octets.byteOffset, octets.byteLength);
@@ -68,7 +78,7 @@ export function ouvrirArchive(octets: Uint8Array): Archive {
       p += 46 + longueurNom + v.getUint16(p + 30, true) + v.getUint16(p + 32, true);
       if (e.methode !== 0 && e.methode !== 8) throw corrompue(`compression ${e.methode} inconnue`);
       if (entrees.has(nom)) throw corrompue(`« ${nom} » en double`);
-      const max = /\.(xml|rels)$/i.test(nom) ? BORNES.xml : BORNES.entree;
+      const max = PARTIE_XML.test(nom) ? BORNES.xml : BORNES.entree;
       if (e.taille > max) {
         throw new Error(`« ${nom} » ferait ${mo(e.taille)} décompressé, ${mo(max)} au maximum.`);
       }
@@ -82,7 +92,18 @@ export function ouvrirArchive(octets: Uint8Array): Archive {
     throw e instanceof RangeError ? corrompue("archive tronquée") : e;
   }
 
+  /** Les octets compressés d'une entrée, après son en-tête local. */
+  const compresses = (nom: string, e: Entree) => {
+    if (v.getUint32(e.decalage, true) !== 0x04034b50) throw corrompue(`en-tête de « ${nom} »`);
+    const debut =
+      e.decalage + 30 + v.getUint16(e.decalage + 26, true) + v.getUint16(e.decalage + 28, true);
+    const brut = octets.subarray(debut, debut + e.compresse);
+    if (brut.length !== e.compresse) throw corrompue(`« ${nom} » tronqué`);
+    return brut;
+  };
+
   let elements = 0;
+  let attributs = 0;
   const comptees = new Set<string>();
   return {
     noms: [...entrees.keys()],
@@ -91,11 +112,7 @@ export function ouvrirArchive(octets: Uint8Array): Archive {
       if (!e) return undefined;
       let sortie: Uint8Array;
       try {
-        if (v.getUint32(e.decalage, true) !== 0x04034b50) throw corrompue(`en-tête de « ${nom} »`);
-        const debut =
-          e.decalage + 30 + v.getUint16(e.decalage + 26, true) + v.getUint16(e.decalage + 28, true);
-        const brut = octets.subarray(debut, debut + e.compresse);
-        if (brut.length !== e.compresse) throw corrompue(`« ${nom} » tronqué`);
+        const brut = compresses(nom, e);
         sortie =
           e.methode === 0 ? brut : inflateRawSync(brut, { maxOutputLength: Math.max(1, e.taille) });
       } catch (err) {
@@ -109,18 +126,64 @@ export function ouvrirArchive(octets: Uint8Array): Archive {
       if (sortie.length !== e.taille || crc32(sortie) !== e.crc) {
         throw corrompue(`« ${nom} » ne correspond pas à sa taille ou à sa somme de contrôle`);
       }
-      // Les balises ouvrantes d'une partie XML comptent une fois, même relue.
-      if (/\.(xml|rels)$/i.test(nom) && !comptees.has(nom)) {
+      // Ce que xmldom crée s'ouvre par « < » sans « / » (un élément de n'importe quel nom, un
+      // commentaire, une instruction) ou porte un « = » (un attribut). `analyserXml` refuse
+      // l'attribut sans valeur, qui n'en porte pas. Les nœuds de texte ne sont pas comptés : il
+      // y en a au plus deux par balise. Une partie compte une fois, même relue.
+      if (PARTIE_XML.test(nom) && !comptees.has(nom)) {
         comptees.add(nom);
-        for (let i = 0; i < sortie.length - 1; i++) {
-          const c = sortie[i + 1] | 0x20;
-          if (sortie[i] === 0x3c && c >= 0x61 && c <= 0x7a) elements++;
+        for (let i = 0; i < sortie.length; i++) {
+          if (sortie[i] === 0x3c && sortie[i + 1] !== 0x2f) elements++;
+          else if (sortie[i] === 0x3d) attributs++;
         }
         if (elements > BORNES.elements) {
           throw new Error(`Document de plus de ${BORNES.elements} éléments XML.`);
         }
+        if (attributs > BORNES.attributs) {
+          throw new Error(`Document de plus de ${BORNES.attributs} attributs XML.`);
+        }
       }
       return sortie;
+    },
+    reconstruire() {
+      const locaux: Uint8Array[] = [];
+      const centraux: Uint8Array[] = [];
+      let adresse = 0;
+      for (const [nom, e] of entrees) {
+        // Taille, CRC et nœuds XML de chaque entrée sont vérifiés avant qu'elle n'entre.
+        this.lire(nom);
+        const octetsNom = Buffer.from(nom);
+        const local = Buffer.alloc(30);
+        local.writeUInt32LE(0x04034b50, 0);
+        local.writeUInt16LE(20, 4);
+        // Bit 11 : le nom est en UTF-8, comme `ouvrirArchive` l'a lu.
+        local.writeUInt16LE(0x0800, 6);
+        local.writeUInt16LE(e.methode, 8);
+        local.writeUInt32LE(e.crc, 14);
+        local.writeUInt32LE(e.compresse, 18);
+        local.writeUInt32LE(e.taille, 22);
+        local.writeUInt16LE(octetsNom.length, 26);
+        // L'entrée du répertoire central reprend ces champs, deux octets plus loin.
+        const central = Buffer.alloc(46);
+        central.writeUInt32LE(0x02014b50, 0);
+        central.writeUInt16LE(20, 4);
+        local.copy(central, 6, 4, 30);
+        central.writeUInt32LE(adresse, 42);
+        const brut = compresses(nom, e);
+        locaux.push(local, octetsNom, brut);
+        centraux.push(central, octetsNom);
+        adresse += 30 + octetsNom.length + brut.length;
+      }
+      const fin = Buffer.alloc(22);
+      fin.writeUInt32LE(0x06054b50, 0);
+      fin.writeUInt16LE(entrees.size, 8);
+      fin.writeUInt16LE(entrees.size, 10);
+      fin.writeUInt32LE(
+        centraux.reduce((t, c) => t + c.length, 0),
+        12,
+      );
+      fin.writeUInt32LE(adresse, 16);
+      return Buffer.concat([...locaux, ...centraux, fin]);
     },
   };
 }
@@ -158,13 +221,16 @@ export const enfants = (n: Noeud, nom?: string) =>
 export const tous = (n: Noeud, nom: string) => Array.from(n.getElementsByTagNameNS("*", nom));
 export const premier = (n: Noeud, nom: string): Noeud | undefined => tous(n, nom)[0];
 
-/** Analyse un XML et lève une erreur lisible au premier défaut. */
+/**
+ * Analyse un XML et lève une erreur lisible au premier défaut. Un simple avertissement de xmldom
+ * arrête aussi l'analyse : il signale un attribut mal formé, que les bornes ne comptent pas.
+ */
 export function analyserXml(texte: string, nom: string) {
   const lever = (m: unknown) => {
     throw new Error(`XML illisible dans « ${nom} » : ${String(m).split("\n")[0]}`);
   };
   return new DOMParser({
-    errorHandler: { warning: () => {}, error: lever, fatalError: lever },
+    errorHandler: { warning: lever, error: lever, fatalError: lever },
   }).parseFromString(texte, "text/xml");
 }
 

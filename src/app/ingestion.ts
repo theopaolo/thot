@@ -13,7 +13,7 @@ import { extraireHtml, extrairePearltrees } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
 import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
-import { extrairePptx } from "../core/pptx.ts";
+import { extrairePptx, type Note } from "../core/pptx.ts";
 import {
   type ChunkIndexe,
   estAnglais,
@@ -33,6 +33,11 @@ import type { Profil } from "../core/profils.ts";
 
 const VERROU_MS = 5 * 60_000;
 const MAX_TENTATIVES = 3;
+/**
+ * Images légendées par extraction. Chaque légende est un appel payant d'au plus deux fois 90 s, et
+ * le worker ne traite qu'un document à la fois. Les images suivantes sont importées sans légende.
+ */
+export const MAX_LEGENDES = 50;
 
 const horodatage = (ms: number) => new Date(ms).toISOString().slice(0, 19) + "Z";
 
@@ -86,7 +91,7 @@ async function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
 const lireSource = (db: Db, id: string) =>
   db.prepare("SELECT * FROM sources WHERE id = ?").get(id) as unknown as Source;
 
-async function extraire(s: Source): Promise<Extraction> {
+async function extraire(s: Source): Promise<Extraction & { notes?: Note[] }> {
   const chemin = contenu(s.id, "original", s.fichier);
   if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
   if (s.format === "html") {
@@ -145,7 +150,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
 
     const dossier = contenu(s.id);
     await mkdir(`${dossier}/assets`, { recursive: true });
-    await enregistrer(db, s, doc, ext.avertissements);
+    await enregistrer(db, s, doc, ext.avertissements, ext.notes);
     // Une légende relue décrit des octets précis : d'autres octets à la même place repartent sans
     // légende. La ligne change avant le fichier, une légende ne décrit donc jamais d'autres octets.
     const ins = db.prepare(
@@ -171,10 +176,16 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     const aLegender = db
       .prepare(
         `SELECT id, fichier, mime FROM images
-       WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
+       WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed' ORDER BY position`,
       )
       .all(s.id) as { id: string; fichier: string; mime: string }[];
-    for (const img of aLegender) {
+    const reste = aLegender.length - MAX_LEGENDES;
+    if (reste > 0) {
+      avertissements.push(
+        `${reste} image${reste > 1 ? "s" : ""} sans légende proposée : Thot en légende ${MAX_LEGENDES} par extraction.`,
+      );
+    }
+    for (const img of aLegender.slice(0, MAX_LEGENDES)) {
       try {
         const { texte, modele } = await modeles.legender(
           await readFile(`${dossier}/assets/${img.fichier}`),
@@ -217,6 +228,26 @@ async function ecrireDocument(dossier: string, doc: Document) {
   await ecrireAtomique(`${dossier}/blocs.jsonl`, jsonl(doc.blocs));
 }
 
+/** Les notes de l'orateur d'une présentation, à côté du texte de la révision et hors de lui. */
+async function ecrireNotes(dossier: string, notes?: Note[]) {
+  if (!notes) return;
+  await mkdir(dossier, { recursive: true });
+  await ecrireAtomique(`${dossier}/notes.json`, JSON.stringify(notes));
+}
+
+/**
+ * Les notes de la révision servie. `undefined` pour une présentation extraite avant que le worker
+ * ne les garde.
+ */
+export function lireNotes(db: Db, sourceId: string): Note[] | undefined {
+  const dossier = dossierRevision(sourceId, lireSource(db, sourceId).revision);
+  try {
+    return JSON.parse(readFileSync(`${dossier}/notes.json`, "utf8"));
+  } catch {
+    return undefined;
+  }
+}
+
 /** La révision plus récente que la révision servie, qui attend la relecture d'un enseignant. */
 export const revisionEnAttente = (db: Db, sourceId: string) =>
   db
@@ -232,7 +263,13 @@ export const revisionEnAttente = (db: Db, sourceId: string) =>
  * révision en attente, vérifiée avant d'être enregistrée. La révision servie reste citée jusqu'à
  * ce qu'un enseignant certifie la nouvelle.
  */
-async function enregistrer(db: Db, s: Source, doc: Document, avertissements: string[]) {
+async function enregistrer(
+  db: Db,
+  s: Source,
+  doc: Document,
+  avertissements: string[],
+  notes?: Note[],
+) {
   const blocs = jsonl(doc.blocs);
   const servie = await lireFichiers(dossierRevision(s.id, s.revision));
   if (servie.texte === undefined || servie.texte === doc.texte) {
@@ -240,6 +277,9 @@ async function enregistrer(db: Db, s: Source, doc: Document, avertissements: str
       `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
        ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
     ).run(s.id, s.revision, JSON.stringify(avertissements), maintenant());
+    // Les notes s'écrivent même sans changement de texte : une présentation extraite avant que
+    // le worker ne les garde les reçoit à sa prochaine extraction.
+    await ecrireNotes(dossierRevision(s.id, s.revision), notes);
     if (servie.texte === doc.texte && servie.blocs === blocs) return "identique";
     await ecrireDocument(dossierRevision(s.id, s.revision), doc);
     return "mise_a_jour";
@@ -254,6 +294,7 @@ async function enregistrer(db: Db, s: Source, doc: Document, avertissements: str
   // Un dossier sans ligne en base reste d'un essai interrompu.
   await rm(dossier, { recursive: true, force: true });
   await ecrireDocument(dossier, doc);
+  await ecrireNotes(dossier, notes);
   if (!coherent(lireDocument(s.id, n))) {
     throw new Error(`Révision ${n} incohérente : un bloc ne retombe pas sur son texte.`);
   }
@@ -291,7 +332,7 @@ export async function reextraire(db: Db, sourceId: string) {
     return "ignoree";
   }
   const ext = await extraire(s);
-  const r = await enregistrer(db, s, assembler(ext.parties), ext.avertissements);
+  const r = await enregistrer(db, s, assembler(ext.parties), ext.avertissements, ext.notes);
   if (r === "mise_a_jour") indexer(db, s.id);
   return r;
 }

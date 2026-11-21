@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { LISIBLE, parametresLisible } from "../../core/recherche.ts";
-import { notesPptx } from "../../core/pptx.ts";
 import {
   type Compte,
   filtreModification,
@@ -21,6 +20,7 @@ import {
   fileLegendes,
   inclureDiapositivesMasquees,
   lireDocument,
+  lireNotes,
   modifierSource,
   relireLegende,
   revisionEnAttente,
@@ -342,18 +342,13 @@ export function routesProf(app: Hono<Env>, w: Web) {
   };
 
   const original = (d: Prof.Detail) => readFile(contenu(d.source.id, "original", d.source.fichier));
-  app.get("/prof/sources/:id", async (c) => {
+  app.get("/prof/sources/:id", (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     if (!d) return c.notFound();
-    // Les notes de l'orateur se lisent dans l'original, par ceux qui relisent la source seulement.
-    let notes: Prof.Detail["notes"];
-    if (d.modifiable && d.source.format === "pptx") {
-      try {
-        notes = notesPptx(await original(d));
-      } catch (e) {
-        notes = (e as Error).message;
-      }
-    }
+    // Les notes de l'orateur ne vont qu'à ceux qui relisent la source. Le worker les a lues à
+    // l'extraction : le serveur n'ouvre pas l'original.
+    const notes =
+      d.modifiable && d.source.format === "pptx" ? (lireNotes(db, d.source.id) ?? null) : undefined;
     return c.html(rendre(c, d.source.titre, Prof.detailSource({ ...d, notes })));
   });
   // Un original HTML ne s'ouvre pas: il lancerait ses scripts sur l'origine de Thot. Word et

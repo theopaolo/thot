@@ -1413,8 +1413,8 @@ export type Detail = {
   blocs: Bloc[];
   /** une extraction plus récente, dont le texte a changé */
   attente?: { n: number; cree_le: string; avertissements: string[]; blocs: Bloc[] };
-  /** notes de l'orateur d'une présentation, pour qui relit la source, ou l'erreur de lecture */
-  notes?: { diapositive: number; texte: string }[] | string;
+  /** notes de l'orateur d'une présentation, pour qui relit la source. `null` : pas encore lues */
+  notes?: { diapositive: number; texte: string }[] | null;
   catalogue?: Catalogue;
   affiliations?: Affiliation[];
 };
@@ -1669,8 +1669,8 @@ const diapositivesMasquees = (d: Detail) => {
     : "";
 };
 
-/** Les notes de l'orateur, lues dans l'original. Elles restent hors du texte extrait. */
-const notesOrateur = (notes: { diapositive: number; texte: string }[] | string) => html`
+/** Les notes de l'orateur, lues par le worker à l'extraction. Elles restent hors du texte extrait. */
+const notesOrateur = (notes: { diapositive: number; texte: string }[] | null) => html`
   <section aria-labelledby="notes-orateur">
     <h2 id="notes-orateur">Notes de l'orateur</h2>
     <p class="discret">
@@ -1678,8 +1678,8 @@ const notesOrateur = (notes: { diapositive: number; texte: string }[] | string) 
       recherche, ni dans les réponses, et les élèves ne les voient pas.
     </p>
     ${
-      typeof notes === "string"
-        ? html`<p role="alert">Notes illisibles : ${notes}</p>`
+      notes === null
+        ? html`<p>Les notes de cette présentation n'ont pas été lues à son extraction. Elles le seront à la prochaine.</p>`
         : notes.length
           ? notes.map(
               (n) => html`<h3>Diapositive ${n.diapositive}</h3><p class="passage">${n.texte}</p>`,

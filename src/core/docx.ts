@@ -7,8 +7,10 @@ import {
   enfants,
   imageOffice,
   imagesEcartees,
+  lireXml,
   type Noeud,
   ouvrirArchive,
+  PARTIE_XML,
 } from "./ooxml.ts";
 
 /** Ce que le texte ne reprend pas, repéré dans `word/document.xml`. */
@@ -48,9 +50,11 @@ const uneLigne = (s: string) => propre(s).replace(/\n/g, " ");
 export async function extraireDocx(octets: Uint8Array, titre: string): Promise<Extraction> {
   const limite = Date.now() + BORNES.delaiMs;
   const a = ouvrirArchive(octets);
-  // Mammoth décompresse avec JSZip, qui ne borne pas la décompression. Chaque entrée passe
-  // d'abord ici, sous sa taille déclarée : JSZip produira ensuite les mêmes octets.
-  for (const nom of a.noms) a.lire(nom);
+  // Mammoth décompresse avec JSZip, qui ne borne rien et lit le répertoire central à sa façon :
+  // il reçoit un zip refait des entrées contrôlées. Il analyse le XML avec xmldom sans s'arrêter
+  // aux défauts : chaque partie passe d'abord par l'analyse stricte.
+  const controle = a.reconstruire();
+  for (const nom of a.noms) if (PARTIE_XML.test(nom)) lireXml(a, nom);
   const xml = new TextDecoder().decode(a.lire("word/document.xml"));
   const avertissements = NON_EXTRAIT.filter(([re]) => re.test(xml)).map(([, m]) => m);
   if (/<w:comment[\s>]/.test(new TextDecoder().decode(a.lire("word/comments.xml")))) {
@@ -63,7 +67,7 @@ export async function extraireDocx(octets: Uint8Array, titre: string): Promise<E
   let html: string;
   try {
     ({ value: html } = await mammoth.convertToHtml(
-      { buffer: Buffer.from(octets.buffer, octets.byteOffset, octets.byteLength) },
+      { buffer: Buffer.from(controle.buffer, controle.byteOffset, controle.byteLength) },
       {
         // Une table de styles intégrée au document pourrait faire sortir les commentaires.
         includeEmbeddedStyleMap: false,

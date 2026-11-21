@@ -79,6 +79,8 @@ const REPETES = new Set(["ftr", "sldNum", "dt", "hdr"]);
 
 type Lu = { titre: string; blocs: string[]; medias: string[]; manques: Set<string> };
 
+export type Note = { diapositive: number; texte: string };
+
 /** Les éléments d'un arbre que `parcourir` lit. Les propriétés de l'arbre et les connecteurs n'ont pas de texte. */
 const FORMES = new Set(["sp", "grpSp", "graphicFrame", "pic", "AlternateContent"]);
 /** Un demi-pouce en EMU : deux formes dont le haut tombe dans la même bande sont sur une ligne. */
@@ -138,13 +140,15 @@ function parcourir(arbre: Noeud, rels: Map<string, { cible: string }>, lu: Lu, p
 /**
  * Présentation PowerPoint : une section par diapositive, « Diapositive n : titre », dans l'ordre
  * de la présentation. `page` porte le numéro de diapositive. Les diapositives masquées sont
- * écartées, sauf `masquees`. Cette fonction ne lit pas les notes de l'orateur : `notesPptx` les
- * lit à la demande pour la relecture.
+ * écartées, sauf `masquees`. Les notes de l'orateur sortent à part, dans `notes`, celles des
+ * diapositives masquées comprises : elles ne vont que dans la page de relecture, pas dans
+ * `document.txt`, l'index ou une réponse.
  */
-export function extrairePptx(octets: Uint8Array, masquees = false): Extraction {
+export function extrairePptx(octets: Uint8Array, masquees = false): Extraction & { notes: Note[] } {
   const limite = Date.now() + BORNES.delaiMs;
   const a = ouvrirArchive(octets);
   const parties: Partie[] = [];
+  const notes: Note[] = [];
   const images: Image[] = [];
   const ecartees: string[] = [];
   const medias = new Set<string>();
@@ -160,12 +164,23 @@ export function extrairePptx(octets: Uint8Array, masquees = false): Extraction {
       manques.set(m, [...(manques.get(m) ?? []), n]);
       continue;
     }
+    const rels = relations(a, chemin);
+    const note = [...rels.values()].find((r) => r.type.endsWith("/notesSlide"));
+    const pageNotes = note && lireXml(a, note.cible);
+    const texteNotes = pageNotes
+      ? tous(pageNotes, "sp")
+          .filter((sp) => premier(sp, "ph")?.getAttribute("type") === "body")
+          .map((sp) => texteCorps(premier(sp, "txBody")))
+          .filter(Boolean)
+          .join("\n")
+      : "";
+    if (texteNotes) notes.push({ diapositive: n, texte: texteNotes });
     const masquee = /^(0|false)$/.test(doc.documentElement.getAttribute("show") ?? "");
     if (masquee) cachees.push(n);
     if (masquee && !masquees) continue;
     const lu: Lu = { titre: "", blocs: [], medias: [], manques: new Set() };
     const arbre = premier(doc.documentElement, "spTree");
-    if (arbre) parcourir(arbre, relations(a, chemin), lu);
+    if (arbre) parcourir(arbre, rels, lu);
     if (doc.getElementsByTagNameNS(MATH, "oMath").length) lu.manques.add("Équations non extraites");
     if (tous(doc, "videoFile").length || tous(doc, "audioFile").length) {
       lu.manques.add("Vidéos et sons non extraits");
@@ -194,6 +209,7 @@ export function extrairePptx(octets: Uint8Array, masquees = false): Extraction {
     `${ns.length > 1 ? "diapositives" : "diapositive"} ${ns.join(", ")}`;
   return {
     parties: bornerTexte(parties),
+    notes,
     images,
     avertissements: [
       ...(cachees.length
@@ -205,25 +221,4 @@ export function extrairePptx(octets: Uint8Array, masquees = false): Extraction {
       ...imagesEcartees(ecartees),
     ],
   };
-}
-
-/**
- * Les notes de l'orateur, par diapositive, lues dans l'original. Elles ne vont que dans la page
- * de relecture, pas dans `document.txt`, l'index ou une réponse.
- */
-export function notesPptx(octets: Uint8Array) {
-  const a = ouvrirArchive(octets);
-  return diapositives(a).flatMap(({ n, chemin }) => {
-    const rel =
-      chemin && [...relations(a, chemin).values()].find((r) => r.type.endsWith("/notesSlide"));
-    const doc = rel && lireXml(a, rel.cible);
-    const texte = doc
-      ? tous(doc, "sp")
-          .filter((sp) => premier(sp, "ph")?.getAttribute("type") === "body")
-          .map((sp) => texteCorps(premier(sp, "txBody")))
-          .filter(Boolean)
-          .join("\n")
-      : "";
-    return texte ? [{ diapositive: n, texte }] : [];
-  });
 }

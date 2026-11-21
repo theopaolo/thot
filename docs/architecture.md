@@ -133,10 +133,10 @@ diapositives. Une diapositive masquée reste hors du texte et un avertissement l
 page de la source, « Les inclure » relance l'extraction : le texte changé devient une version à
 relire, comme toute réextraction.
 
-L'extraction ne lit pas les notes de l'orateur. Ni `document.txt`, ni l'index, ni les réponses,
-ni les pages élèves ne les contiennent. La page de la source les relit dans l'original pour ceux
-qui la modifient, et l'original d'une présentation ne se télécharge que par eux. Un élève ne
-télécharge aucun original.
+Le worker lit les notes de l'orateur à l'extraction et les écrit à part, dans le `notes.json` du
+dossier de la révision. Ni `document.txt`, ni l'index, ni les réponses, ni les pages élèves ne
+les contiennent. La page de la source les montre à ceux qui la modifient, et l'original d'une
+présentation ne se télécharge que par eux. Un élève ne télécharge aucun original.
 
 Une image d'un document Word ou d'une présentation garde la section où elle apparaît
 (`images.section`), et sa légende accompagne le premier passage de cette section. Une image

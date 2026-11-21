@@ -10,12 +10,15 @@ import {
 import { assembler, coherent } from "../src/core/document.ts";
 import { extraireDocx } from "../src/core/docx.ts";
 import { BORNES, detecterOffice, ouvrirArchive } from "../src/core/ooxml.ts";
-import { extrairePptx, notesPptx } from "../src/core/pptx.ts";
+import { extrairePptx } from "../src/core/pptx.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { tranche } from "../src/core/texte.ts";
+import { readFileSync, rmSync } from "node:fs";
+import { contenu } from "../src/app/config.ts";
 import type { Db } from "../src/app/db.ts";
 import {
   lireDocument,
+  MAX_LEGENDES,
   reextraire,
   revendiquer,
   revisionEnAttente,
@@ -381,10 +384,9 @@ test("PPTX : une diapositive masquée s'inclut sur demande, marquée comme telle
 });
 
 test("PPTX : les notes de l'orateur restent hors de l'extraction, lues à part pour la relecture", async () => {
-  const octets = await pptx(DECK, { medias: MEDIAS });
-  const ext = extrairePptx(octets, true);
+  const ext = extrairePptx(await pptx(DECK, { medias: MEDIAS }), true);
   assert(ext.parties.every((x) => !x.texte.includes("Corrigé") && !x.texte.includes("1907")));
-  assertEquals(notesPptx(octets), [
+  assertEquals(ext.notes, [
     { diapositive: 1, texte: "Corrigé de l'évaluation : la réponse est 1907." },
   ]);
 });
@@ -515,6 +517,63 @@ test("bornes : trop d'éléments XML, texte extrait trop long", async () => {
   assertThrows(() => extrairePptx(bavard), Error, "Texte extrait au-delà de 10 Mo");
 });
 
+/** Le répertoire central d'un zip sans commentaire : sa taille et son adresse. */
+const repertoire = (o: Uint8Array) => {
+  const v = new DataView(o.buffer, o.byteOffset, o.byteLength);
+  return { taille: v.getUint32(o.length - 10, true), debut: v.getUint32(o.length - 6, true) };
+};
+
+test("bornes : Mammoth lit les entrées contrôlées, pas un second répertoire central", async () => {
+  // L'enregistrement de fin annonce le répertoire du document contrôlé. Celui du document caché
+  // le suit : JSZip décale alors toutes les adresses et lit ce second répertoire.
+  const vu = await docx(p(t("Texte contrôlé")));
+  const cache = await docx(p(t("Texte caché")));
+  const a = repertoire(vu);
+  const b = repertoire(cache);
+  const second = cache.slice(b.debut, b.debut + b.taille);
+  const v = new DataView(second.buffer);
+  for (let i = 0; i < second.length;) {
+    v.setUint32(i + 42, v.getUint32(i + 42, true) + a.debut - b.taille, true);
+    i += 46 + v.getUint16(i + 28, true) + v.getUint16(i + 30, true) + v.getUint16(i + 32, true);
+  }
+  const fin = vu.slice(-22);
+  new DataView(fin.buffer).setUint32(16, a.debut + b.debut, true);
+  const double = Buffer.concat([
+    vu.subarray(0, a.debut),
+    cache.subarray(0, b.debut),
+    vu.subarray(a.debut, a.debut + a.taille),
+    second,
+    fin,
+  ]);
+  assertStringIncludes(
+    new TextDecoder().decode(ouvrirArchive(double).lire("word/document.xml")),
+    "Texte contrôlé",
+  );
+  assertEquals(
+    (await extraireDocx(double, "Repli")).parties.map((x) => x.texte),
+    ["Texte contrôlé"],
+  );
+});
+
+test("bornes : tout nœud XML compte, quel que soit son nom, et les attributs aussi", async () => {
+  const deck = (formes: string) => pptx([{ formes }]);
+  for (const noeud of ["<_/>", "<é/>", "<!---->", "<?i?>"]) {
+    const touffu = await deck(noeud.repeat(BORNES.elements));
+    assertThrows(() => extrairePptx(touffu), Error, "éléments XML", noeud);
+  }
+  const attributs = Array.from({ length: 20 }, (_, i) => `a${i}=""`).join(" ");
+  const pare = await deck(`<a:x ${attributs}/>`.repeat(BORNES.attributs / 20));
+  assertThrows(() => extrairePptx(pare), Error, "attributs XML");
+  // Un attribut sans valeur ne porte pas de « = » : l'analyse s'arrête au premier.
+  const sansValeur = await deck(`<a:x b c d/>`);
+  assertThrows(() => extrairePptx(sansValeur), Error, "XML illisible");
+  await assertRejects(
+    async () => extraireDocx(await docx(`<w:p b c d/>`), "Repli"),
+    Error,
+    "XML illisible dans « word/document.xml »",
+  );
+});
+
 // ------------------------------------------------------------ Dépôt, relecture et accès
 
 const deposer = (
@@ -632,6 +691,60 @@ test("PPTX : une note de l'orateur qui porte le corrigé n'atteint ni l'index ni
   assertEquals(vue.status, 200);
   assert(!(await vue.text()).includes("1907"));
   assertEquals((await collegue.requete(`/prof/sources/${s.id}/original`)).status, 403);
+
+  // Les notes viennent du dossier de la révision, écrit par le worker : la page ne rouvre pas
+  // l'original. `document.txt` ne les contient pas.
+  assertStringIncludes(readFileSync(contenu(s.id, "notes.json"), "utf8"), "1907");
+  rmSync(contenu(s.id, "original"), { recursive: true });
+  assertStringIncludes(
+    await (await auteur.requete(`/prof/sources/${s.id}`)).text(),
+    "la réponse est 1907.",
+  );
+  // Une présentation extraite avant ce fichier : la page le dit, sans lire l'original.
+  rmSync(contenu(s.id, "notes.json"));
+  assertStringIncludes(
+    await (await auteur.requete(`/prof/sources/${s.id}`)).text(),
+    "n'ont pas été lues",
+  );
+});
+
+test("légendes : au plus MAX_LEGENDES images légendées par extraction, les autres comptées", async () => {
+  const { db } = await environnement();
+  let appels = 0;
+  const modeles = {
+    ...fauxModeles().modeles,
+    legender: () => Promise.resolve({ texte: `Image ${++appels}.`, modele: "faux-vl" }),
+  };
+  const { requete } = await session(db, modeles, "enseignant");
+  const n = MAX_LEGENDES + 3;
+  const medias: Record<string, Uint8Array> = {};
+  for (let i = 0; i < n; i++) medias[`i${i}.png`] = png(2, 2 + i);
+  const deck = await pptx(
+    [
+      {
+        formes: Object.keys(medias)
+          .map((_, i) => photo(`rId${i}`))
+          .join(""),
+        rels: Object.keys(medias).map((nom, i): Rel => [`rId${i}`, "image", `../media/${nom}`]),
+      },
+    ],
+    { medias },
+  );
+  await deposer(requete, deck, "images.pptx");
+  await traiter(db, revendiquer(db)!, modeles);
+  assertEquals(appels, MAX_LEGENDES);
+  assertEquals(db.prepare("SELECT count(*) n FROM images").get()!.n, n);
+  assertEquals(
+    db.prepare("SELECT count(*) n FROM images WHERE legende IS NULL").get()!.n,
+    3,
+    "les premières images du document sont légendées",
+  );
+  assertEquals(
+    db.prepare("SELECT max(position) p FROM images WHERE legende IS NOT NULL").get()!.p,
+    MAX_LEGENDES - 1,
+  );
+  const { avertissements } = db.prepare("SELECT avertissements FROM ingestion_jobs").get()!;
+  assertStringIncludes(String(avertissements), "3 images sans légende proposée");
 });
 
 test("PPTX : inclure les diapositives masquées relance l'extraction en une version à relire", async () => {
