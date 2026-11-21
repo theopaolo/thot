@@ -8,7 +8,7 @@ type: [bug]
 ## Notes
 
 Le chat affiche « Dans : Développement / Lire, comprendre et améliorer une codebase / Lire,
-comprendre et améliorer une codebase ». `nomPerimetre()` dans `src/app/vues/eleve.ts` joint
+comprendre et améliorer une codebase ». `nomPerimetre()` dans `src/app/vues/commun.ts` joint
 matière, cours et thème, et l'import du jeu développement a créé dans chaque cours un thème du
 même nom que le cours.
 

@@ -22,7 +22,7 @@ Trois défauts du chat, lus dans le code.
   tête.
 - Un envoi rejoué avec la même clé rend le premier échange sans comparer le texte. Le formulaire
   de question rapide d'une page de thème porte une clé fixée au rendu (`cleEnvoi()` dans
-  `src/app/vues/eleve.ts`). L'élève qui envoie une question, revient en arrière et en envoie une
+  `src/app/vues/eleve-commun.ts`). L'élève qui envoie une question, revient en arrière et en envoie une
   autre est renvoyé vers la première conversation, et sa seconde question n'est pas enregistrée.
   À confirmer dans un navigateur.
 
