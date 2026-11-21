@@ -191,12 +191,14 @@ test("en-têtes de sécurité : une CSP limitée à l'instance sur chaque répon
       assertStringIncludes(csp, "font-src 'self' data:");
       assert(!/unsafe-eval|https?:|\*/.test(csp), csp);
       assert(!/script-src[^;]*unsafe-inline/.test(csp), csp);
+      assert(!csp.includes("localhost"), csp);
       assertEquals(r.headers.get("x-content-type-options"), "nosniff");
       // `no-referrer` viderait l'en-tête Origin des formulaires, que le contrôle CSRF exige.
       assertEquals(r.headers.get("referrer-policy"), "same-origin");
       assertEquals(r.headers.get("strict-transport-security"), null);
     }
-    // Sous pnpm dev, la CSP admet le script de rechargement, et lui seul, par son empreinte.
+    // Sous pnpm dev, la CSP admet le script de rechargement par son empreinte et les outils que
+    // l'atelier sert depuis un autre port de la machine. Aucun script en ligne de plus.
     config.dev = true;
     const script = String(page("Titre", null, "")).match(/<script>(.*?)<\/script>/s)![1];
     assertEquals(script, SCRIPT_RECHARGEMENT);

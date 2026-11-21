@@ -33,6 +33,10 @@ import { icone } from "./icones.ts";
 const MAX_CORPS = 1024 * 1024;
 const AVEC_FICHIERS = /^\/prof\/(depot|activites)(\/|$)/;
 
+// Sous `pnpm dev`, un outil de l'atelier (prévisualisation, inspection) sert son script depuis un
+// autre port de la machine. Hors dev, la page ne charge rien d'extérieur à l'instance.
+const OUTILS_LOCAUX = ["http://localhost:*", "http://127.0.0.1:*"];
+
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
 
@@ -48,9 +52,13 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
         scriptSrc: [
           "'self'",
           ...(config.dev
-            ? [`'sha256-${createHash("sha256").update(SCRIPT_RECHARGEMENT).digest("base64")}'`]
+            ? [
+                `'sha256-${createHash("sha256").update(SCRIPT_RECHARGEMENT).digest("base64")}'`,
+                ...OUTILS_LOCAUX,
+              ]
             : []),
         ],
+        ...(config.dev && { connectSrc: ["'self'", ...OUTILS_LOCAUX, "ws://localhost:*"] }),
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
         // Vite écrit la plus petite police de KaTeX dans sa feuille de style, en `data:`.
