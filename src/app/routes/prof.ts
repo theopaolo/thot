@@ -30,6 +30,7 @@ import {
 } from "../ingestion.ts";
 import { validerInformations } from "../../core/profils.ts";
 import * as Prof from "../vues/prof.ts";
+import * as ProfQuestions from "../vues/prof-questions.ts";
 import * as ProfLignes from "../vues/prof-lignes.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
@@ -258,7 +259,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
     );
   });
   app.get("/prof/questions", (c) =>
-    c.html(rendre(c, "Questions des élèves", Prof.questionsProf(questionsDesEleves(db, lu(c))))),
+    c.html(
+      rendre(c, "Questions des élèves", ProfQuestions.questionsProf(questionsDesEleves(db, lu(c)))),
+    ),
   );
   // Un échange de la liste, sans sa conversation. Hors de la liste, il répond 404.
   const echange = (c: Context<Env>) =>
@@ -267,7 +270,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const e = echange(c);
     if (!e) return c.notFound();
     const cat = Domaines.catalogueDe(db, c.get("compte"));
-    return c.html(rendre(c, `Question de ${e.nom}`, Prof.echangeProf(e, cat, libelles(db))));
+    return c.html(
+      rendre(c, `Question de ${e.nom}`, ProfQuestions.echangeProf(e, cat, libelles(db))),
+    );
   });
   app.get("/prof/questions/:echange/citations/:n", (c) => {
     const e = echange(c);
