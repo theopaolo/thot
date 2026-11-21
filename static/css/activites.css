@@ -1,0 +1,273 @@
+/* ------------------------------------------------------------ pratique d'une série */
+.question-serie {
+  max-width: 48rem;
+  margin-bottom: var(--s5);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.question-serie h2 {
+  margin-top: 0;
+}
+.question-serie h2 .discret {
+  font-weight: 400;
+}
+/* L'avancement reste en haut de l'écran : une série de 23 questions dépasse 10 000px sur téléphone. */
+.avancement {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  max-width: 48rem;
+  margin: 0 0 var(--s4);
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 0.9375rem;
+}
+.avancement a {
+  margin-left: var(--s3);
+}
+/* L'aperçu de l'enseignant garde le papier de bureau sous la ligne collée. */
+body.prof .avancement {
+  background: var(--bg-office);
+}
+/* Une question visée par son ancre ne passe pas sous l'avancement. */
+.question-serie {
+  scroll-margin-top: 3rem;
+}
+.image-question {
+  margin: 0 0 var(--s3);
+}
+.image-question img {
+  display: block;
+  max-width: 100%;
+  max-height: 50dvh;
+}
+.question-serie pre,
+textarea.code {
+  font:
+    0.875rem/1.6 ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  tab-size: 2;
+}
+.question-serie pre {
+  margin: 0 0 var(--s3);
+  padding: var(--s3);
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.corrige .deux {
+  row-gap: var(--s4);
+}
+.options-corrigees {
+  padding-left: 0;
+  list-style: none;
+}
+.options-corrigees li {
+  margin-bottom: var(--s1);
+}
+
+/* ------------------------------------------------------------ éditeur d'activité */
+/* Un réglage tient sur une ligne : le libellé à côté de son champ. */
+.reglage > label {
+  margin: 0;
+}
+.reglage input[type="date"] {
+  width: auto;
+}
+td .reglage {
+  margin: 0;
+}
+/* Les réglages d'une activité se replient sous leur résumé : les questions viennent d'abord. */
+details.reglages-activite {
+  margin: 0 0 var(--s5);
+  border-block: 1px solid var(--line);
+}
+.reglages-activite > summary {
+  color: var(--ink);
+  font-weight: 700;
+}
+.reglages-activite > summary .discret {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.reglages-activite > form {
+  display: grid;
+  column-gap: var(--s5);
+  max-width: 56rem;
+  padding-top: var(--s2);
+}
+@media (min-width: 48rem) {
+  .reglages-activite > form {
+    grid-template-columns: 2fr 1fr;
+  }
+  .reglages-activite > form > :is(fieldset, .barre) {
+    grid-column: 1 / -1;
+  }
+}
+.cours-activite ul {
+  margin: 0 0 var(--s3);
+  padding: 0;
+  list-style: none;
+}
+.cours-activite li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s3);
+  min-height: 36px;
+}
+.cours-activite > label {
+  display: block;
+  min-height: 0;
+  font-weight: 700;
+}
+.cours-activite > select {
+  max-width: 24rem;
+}
+.reglages-activite button.lien {
+  min-height: 36px;
+}
+.question-prof {
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.question-prof h4 {
+  margin: var(--s3) 0 var(--s1);
+  font-size: 1rem;
+}
+.question-prof > .barre {
+  margin-top: var(--s3);
+}
+/* Un passage ou une option : deux lignes suffisent. */
+.question-prof textarea[rows="2"] {
+  min-height: 0;
+}
+/* Une option tient sur une ligne : la case de la bonne réponse, puis son texte et ses passages. */
+.option-edition {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--s3);
+  align-items: start;
+  margin-bottom: var(--s2);
+}
+.option-edition > label {
+  margin: 0;
+  padding-top: var(--s2);
+  white-space: nowrap;
+}
+.option-edition > .champ {
+  margin: 0;
+}
+.option-edition > .champ > label:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.option-edition textarea {
+  field-sizing: content;
+}
+/*
+ * Préparer une activité : un groupe titré par fieldset. Une explication masque les réglages de la
+ * série, un objectif enregistré masque le champ du nouvel objectif, sans script.
+ */
+.preparation > fieldset {
+  margin-bottom: var(--s5);
+}
+.preparation > fieldset > legend {
+  margin-bottom: var(--s2);
+  font-size: 1.125rem;
+}
+.preparation fieldset fieldset {
+  margin: var(--s3) 0 0;
+}
+.preparation fieldset fieldset > legend,
+.preparation .champ > label {
+  display: block;
+  min-height: 0;
+  font-weight: 700;
+}
+.preparation input[type="number"] {
+  width: 6rem;
+}
+.preparation:has(input[name="type"][value="explication"]:checked) .pour-serie,
+.preparation:has(#objectif_id option:checked:not([value=""])) .nouvel-objectif {
+  display: none;
+}
+.sources-preparation {
+  columns: 2 14rem;
+  column-gap: var(--s5);
+}
+.sources-preparation label {
+  break-inside: avoid;
+}
+/* L'index de la série reprend le sommaire du lecteur : collé à droite quand il tient, absent sinon. */
+@media (min-width: 75rem) {
+  .questions-colonnes {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16rem;
+    gap: var(--s6);
+  }
+}
+/* Le texte d'une question se lit à la mesure, comme un document. */
+.question-prof > :is(p, ol, ul) {
+  max-width: var(--measure);
+}
+/* Sous une question : « Modifier », puis un menu pour les autres actions. */
+.menu-question {
+  min-width: 18rem;
+  padding: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgb(28 24 21 / 0.08);
+}
+.menu-question:popover-open {
+  display: grid;
+}
+@supports (position-area: bottom) {
+  .menu-question {
+    position-area: bottom span-right;
+    position-try-fallbacks: flip-block;
+    inset: auto;
+    margin: var(--s1) 0;
+  }
+}
+.menu-question button {
+  justify-content: flex-start;
+  border-color: transparent;
+  background: none;
+}
+.menu-question button:hover {
+  border-color: transparent;
+  background: var(--surface-tinted);
+}
+.menu-question button.danger:hover {
+  background: var(--rose-surface);
+}
+.menu-question .filet,
+.menu-question .filet:hover {
+  margin-top: var(--s1);
+  border-top-color: var(--line);
+  border-radius: 0;
+}
+.deplacer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s2);
+  padding-left: var(--s4);
+}
+.deplacer label {
+  margin: 0;
+  font-weight: 400;
+}
+.deplacer select {
+  width: auto;
+}

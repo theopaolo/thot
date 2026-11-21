@@ -209,8 +209,19 @@ components:
 
 # Design System: Thot
 
-`static/style.css` fait foi. Ce fichier reprend ses jetons pour les outils de conception et dit où
-chacun sert. Une valeur change d'abord dans la feuille de style, puis ici.
+Les feuilles de `static/css/` font foi. Ce fichier reprend leurs jetons pour les outils de
+conception et dit où chacun sert. Une valeur change d'abord dans sa feuille, puis ici.
+
+`FEUILLES` dans `src/app/vues/page.ts` charge les feuilles dans l'ordre de la cascade. Les jetons
+de `:root`, les polices et la typographie sont dans `base.css`. Chaque autre feuille porte les
+écrans que nomme son premier commentaire : `navigation.css` l'en-tête de l'élève et le rail de
+l'enseignant, `page.css` les composants communs, `documents.css` le texte d'une source,
+`lecture.css` l'accueil de l'élève, le chapitre et les feuilles de lecture, `chat.css` le chat et
+les conversations, `enseignant.css` les pages de l'enseignant et l'impression,
+`bibliotheque.css` la bibliothèque, `reponses.css` les réponses d'une série, `activites.css` la
+pratique et l'éditeur d'activité, `administration.css` les matières, la prise en main et le dépôt,
+`questions.css` les questions des élèves et la vue en dossiers, `eleves.css` les élèves, la
+relecture en colonnes et le sommaire d'un cours.
 
 ## Overview
 

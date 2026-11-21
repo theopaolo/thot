@@ -13,6 +13,26 @@ import {
 import { type Icone, icone } from "../icones.ts";
 import { type Profil, PROFILS } from "../../core/profils.ts";
 
+/**
+ * Les feuilles de `static/css/`, dans l'ordre de la cascade : à sélecteur égal, la règle d'une
+ * feuille l'emporte sur celle d'une feuille placée avant elle.
+ */
+const FEUILLES = [
+  "base",
+  "navigation",
+  "page",
+  "documents",
+  "lecture",
+  "chat",
+  "enseignant",
+  "bibliotheque",
+  "reponses",
+  "activites",
+  "administration",
+  "questions",
+  "eleves",
+];
+
 export const page = (
   titre: string,
   compte: Compte | null,
@@ -35,7 +55,7 @@ export const page = (
         <meta name="htmx-config" content='{"globalViewTransitions":true}'>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>${titre} · ${instance.nom}</title>
-        <link rel="stylesheet" href="/static/style.css">
+        ${FEUILLES.map((f) => html`<link rel="stylesheet" href="/static/css/${f}.css">`)}
         <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
         <script src="/static/vendor/htmx.min.js" defer></script>
         <script src="/static/vendor/htmx-ext-sse.js" defer></script>

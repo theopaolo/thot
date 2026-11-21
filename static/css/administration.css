@@ -1,0 +1,202 @@
+/* ------------------------------------------------- matières et cours (administration) */
+/* Une matière ouvre une section, ses cours se déplient l'un sous l'autre. */
+.actions-rapides {
+  margin-bottom: var(--s5);
+}
+.panneau {
+  width: min(36rem, 100vw - 2 * var(--gouttiere));
+  max-height: 90dvh;
+  padding: var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgb(28 24 21 / 0.12);
+  overflow: auto;
+}
+.panneau::backdrop {
+  background: rgb(28 24 21 / 0.2);
+}
+.panneau form {
+  margin-bottom: var(--s3);
+}
+section.matiere {
+  margin-bottom: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.matiere-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s3);
+  margin-bottom: var(--s2);
+}
+.matiere-tete h2 {
+  margin: 0;
+}
+details.cours {
+  border-bottom: 1px solid var(--line);
+}
+details.cours > summary {
+  flex-wrap: wrap;
+  padding: var(--s2) 0;
+  color: var(--ink);
+}
+details.cours > summary .discret {
+  flex: 1;
+}
+details.ajout .reglages > fieldset > legend {
+  font-size: 0.9375rem;
+}
+section.matiere > details.cours:last-child {
+  border-bottom: 0;
+}
+details.cours[open] {
+  padding-bottom: var(--s4);
+}
+.matiere-tete .espace {
+  margin-left: auto;
+}
+.matiere-tete > button .icone {
+  width: 1em;
+  height: 1em;
+}
+.cours-corps h3,
+details.ajout h3 {
+  margin-top: var(--s4);
+  font-size: 1rem;
+}
+details.ajout > summary .icone {
+  width: 1em;
+  height: 1em;
+}
+details.ajout[open] {
+  margin-bottom: var(--s4);
+}
+h2.reglages-communs {
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.panneau :is(input[type="text"], select, textarea) {
+  display: block;
+  width: 100%;
+  max-width: none;
+  margin-top: var(--s1);
+}
+
+/* ---------------------------------------------------------- prise en main (bibliothèque) */
+.premiers-pas {
+  max-width: var(--measure);
+  margin-bottom: var(--s5);
+}
+.premiers-pas h2 {
+  font-size: 1.125rem;
+}
+.premiers-pas ol {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.premiers-pas li.fait {
+  color: var(--ink-muted);
+}
+.premiers-pas li .icone {
+  margin-right: var(--s1);
+  color: var(--certified);
+  vertical-align: -0.2em;
+}
+
+/* ------------------------------------------------------------------- dépôt en étapes */
+.etapes-depot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  margin: 0 0 var(--s5);
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+  counter-reset: etape;
+}
+.etapes-depot li {
+  padding: var(--s2) 0 var(--s3);
+  color: var(--ink-muted);
+  font-weight: 700;
+  counter-increment: etape;
+}
+.etapes-depot li::before {
+  content: counter(etape) ". ";
+}
+/* Une étape faite troque son numéro contre la coche, comme dans « Pour commencer ». */
+.etapes-depot li.faite {
+  color: var(--ink);
+}
+.etapes-depot li.faite::before,
+.etapes-depot li:not(.faite) .fait {
+  display: none;
+}
+.etapes-depot .fait .icone {
+  margin-right: var(--s1);
+  color: var(--certified);
+  vertical-align: -0.2em;
+}
+.etapes-depot li[aria-current] {
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--ink);
+}
+.etape-depot {
+  margin-bottom: var(--s6);
+}
+.etape-depot h2:focus {
+  outline: none;
+}
+.navigation-etape {
+  margin-top: var(--s5);
+}
+form:not(.pas-a-pas) :is([data-suivant], [data-precedent]) {
+  display: none;
+}
+/* Avec JavaScript, le tableau des fichiers porte le titre de chacun. */
+.pas-a-pas .champ:has(#titre) {
+  display: none;
+}
+.matiere-depot {
+  margin: var(--s4) 0 var(--s1);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.rangement {
+  margin: 0;
+}
+.nouveau-cours {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.nouveau-cours > label .icone {
+  width: 1em;
+  height: 1em;
+}
+.nouveau-cours-champs {
+  margin: var(--s2) 0 0 calc(20px + var(--s2));
+}
+.nouveau-cours-champs label {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+  margin-bottom: var(--s3);
+  font-weight: 700;
+}
+.nouveau-cours:not(:has(> label input:checked)) .nouveau-cours-champs,
+.nouveau-cours:not(:has(option[value="nouvelle"]:checked)) .nouvelle-matiere.selon-choix {
+  display: none;
+}
+[data-lot-liste].ailleurs {
+  display: none;
+}
+[data-lot-liste] h2 {
+  font-size: 1.125rem;
+}

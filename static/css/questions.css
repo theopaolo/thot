@@ -1,0 +1,163 @@
+/* ------------------------------------------------- questions des élèves (bibliothèque) */
+.activite-eleves {
+  max-width: var(--measure);
+  margin-bottom: var(--s5);
+}
+.activite-eleves h2 {
+  font-size: 1.125rem;
+}
+.activite-eleves ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+/* Vue « Dossiers » : les cours et les thèmes en dossiers, les ressources en fichiers. */
+.fil ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s2);
+  margin: 0 0 var(--s4);
+  padding: 0;
+  list-style: none;
+}
+.fil li + li::before {
+  content: "/";
+  margin-right: var(--s2);
+  color: var(--ink-muted);
+}
+.fil [aria-current] {
+  font-weight: 700;
+}
+.bureau {
+  display: grid;
+  /* 8.5rem : « développeur·euses » tient sur une ligne en 14px. */
+  grid-template-columns: repeat(auto-fill, minmax(min(8.5rem, 40vw), 1fr));
+  gap: var(--s3) var(--s2);
+  margin: 0 0 var(--s5);
+  padding: 0;
+  list-style: none;
+}
+.bureau > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s2) var(--s1);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.bureau a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s1);
+  color: inherit;
+  text-decoration: none;
+}
+.bureau .pictogramme {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+}
+.bureau .pictogramme > * {
+  grid-area: 1 / 1;
+}
+.bureau .pictogramme .icone {
+  width: 100%;
+  height: 100%;
+}
+.bureau .dossier .icone {
+  color: var(--kraft);
+}
+.bureau .document .icone {
+  color: var(--ink-muted);
+}
+/* Le papier blanc sous le contour du document. */
+.bureau .document .icone:not(:last-of-type) {
+  color: var(--surface);
+}
+.bureau .activite .icone {
+  color: var(--ink);
+}
+.bureau .pictogramme img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.bureau .extension {
+  align-self: end;
+  justify-self: start;
+  margin: 0 0 0.6rem;
+  padding: 0 0.3rem;
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--surface);
+  font-family: var(--chiffres);
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.bureau .extension[data-format="pdf"] {
+  background: var(--rose);
+}
+.bureau .extension:is([data-format="pptx"], [data-format="ppt"]) {
+  background: var(--pending);
+}
+.bureau .nom {
+  display: -webkit-box;
+  overflow: hidden;
+  padding: 0 var(--s1);
+  border-radius: 2px;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+/* Un nom de cours ou de thème est la cible du clic : il s'affiche en entier. */
+.bureau .dossier .nom {
+  -webkit-line-clamp: unset;
+}
+.bureau a:hover .nom,
+.bureau a:focus-visible .nom {
+  text-decoration: underline;
+}
+.bureau .detail,
+.bureau .carte-etat {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+.bureau .carte-etat {
+  justify-content: center;
+}
+/* Comme dans un explorateur : la case cochée surligne le fichier et son nom. */
+.bureau > li:has(.carte-case:checked) {
+  background: var(--surface-tinted);
+}
+.bureau > li:has(.carte-case:checked) .nom {
+  background: var(--ink);
+  color: var(--surface);
+}
+.bureau .deposer .pictogramme {
+  place-items: center;
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+}
+.bureau .deposer .icone {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--ink-muted);
+}
+/* Le champ du dépôt accueille les fichiers glissés sur la page. */
+.zone-depot {
+  display: flex;
+  padding: var(--s4);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius);
+}
+form[data-survol] .zone-depot {
+  border-color: var(--ink);
+  background: var(--surface-tinted);
+}

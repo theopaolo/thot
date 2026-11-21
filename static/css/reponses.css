@@ -1,0 +1,155 @@
+/* Réponses d'une série */
+.reponses .defilable {
+  overflow-x: auto;
+  margin-bottom: var(--s3);
+}
+/* Une série de vingt questions défile de côté plutôt que de casser chaque case sur trois lignes. */
+.reponses table.grille th,
+.reponses table.grille td {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.reponses table.grille tfoot td {
+  font-weight: 400;
+}
+.reponses .case {
+  min-width: 2.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.reponses td.case a,
+.reponses .case a {
+  color: inherit;
+}
+.reponses .s-ok {
+  color: var(--certified);
+  background: color-mix(in srgb, var(--certified) 14%, var(--surface));
+}
+.reponses .s-half {
+  color: var(--pending);
+  background: color-mix(in srgb, var(--pending) 14%, var(--surface));
+}
+.reponses .s-ko {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+}
+.reponses .s-attente {
+  color: var(--rose);
+  background: var(--rose-surface);
+  font-weight: 700;
+}
+.reponses table.grille tfoot th,
+.reponses table.grille tfoot td {
+  border-top: 1px solid var(--ink);
+  border-bottom: 0;
+  font-weight: 700;
+}
+.reponses table.grille td form {
+  display: inline;
+}
+.reponses .legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s4);
+  margin: 0 0 var(--s5);
+  padding: 0;
+  list-style: none;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.reponses .legende .case {
+  display: inline-block;
+  padding: 0 var(--s1);
+}
+.reponses h2 {
+  margin-top: var(--s6);
+}
+.reponses-bloc {
+  margin-bottom: var(--s5);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.reponses-bloc pre,
+.reponses-liste pre {
+  margin: 0 0 var(--s2);
+  padding: var(--s3);
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font:
+    0.875rem/1.6 ui-monospace,
+    "SF Mono",
+    Menlo,
+    Consolas,
+    monospace;
+  tab-size: 2;
+}
+.reponses-liste {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.reponses-liste > li {
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.reponses .reponse-texte {
+  white-space: pre-wrap;
+}
+.note-reponse .barre {
+  margin-bottom: var(--s2);
+}
+.note-reponse textarea {
+  min-height: 3rem;
+  margin-bottom: var(--s2);
+}
+.note-reponse button[name="note"][aria-pressed="true"] {
+  border-color: var(--rose);
+  background: var(--rose);
+  color: var(--surface);
+}
+.reponses-questions {
+  padding-left: 0;
+  list-style: none;
+}
+.reponses-questions > li {
+  margin-bottom: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.distribution {
+  display: grid;
+  gap: var(--s1);
+  max-width: 48rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+.distribution li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(6rem, 30%) 2rem;
+  align-items: center;
+  gap: var(--s3);
+}
+.distribution-barre {
+  height: 8px;
+  overflow: hidden;
+  background: var(--line);
+}
+.distribution-barre span {
+  display: block;
+  height: 100%;
+  background: var(--ink-muted);
+}
+.distribution-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.distribution .juste {
+  color: var(--certified);
+  font-weight: 700;
+}
+.distribution .juste .distribution-barre span {
+  background: var(--certified);
+}

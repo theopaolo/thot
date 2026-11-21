@@ -1,0 +1,354 @@
+/* ------------------------------------------------------------ accueil élève */
+
+.question-rapide {
+  max-width: 44rem;
+  margin-bottom: var(--s6);
+}
+.accueil-grille {
+  display: grid;
+  gap: var(--s6);
+}
+@media (min-width: 900px) {
+  .accueil-grille {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    align-items: start;
+  }
+}
+.chapitres {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chapitre {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s5) 0;
+  border-top: 1px solid var(--line);
+}
+.chapitre:last-child {
+  border-bottom: 1px solid var(--line);
+}
+.chapitre-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s1) var(--s3);
+}
+.chapitre-tete h3 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.chapitre-tete a {
+  text-decoration: none;
+}
+.chapitre-tete a:hover {
+  text-decoration: underline;
+}
+.chapitre .idees {
+  margin: 0;
+}
+.chapitre > .bouton {
+  justify-self: start;
+}
+.apercu-oeuvres {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+  max-width: 32rem;
+}
+.saviez-vous {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.saviez-vous h2 {
+  font-size: 1.125rem;
+}
+.saviez-vous .passe-partout {
+  margin-bottom: var(--s3);
+}
+.saviez-vous blockquote {
+  margin: 0 0 var(--s2);
+  padding: var(--s3);
+  background: var(--yellow-surface);
+  font-size: 1.125rem;
+}
+
+.idees {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin: 0 0 var(--s4);
+}
+.idee-form {
+  margin: 0;
+}
+/* Une question longue passe sur deux lignes : l'interligne garde les lignes séparées. */
+button.idee {
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+button.idee .icone {
+  color: var(--ink-muted);
+}
+
+/* ------------------------------------------------------------ chapitre: mur et lecteur */
+
+.mur-lecteur {
+  display: grid;
+  gap: var(--s6);
+}
+/* La colonne du lecteur s'étire sur toute la hauteur du mur pour que le lecteur y reste collé. */
+@media (min-width: 1180px) {
+  .mur-lecteur {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+}
+.seance {
+  margin-bottom: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.seance h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  font-size: 1.125rem;
+}
+.seance h2 .discret {
+  font-weight: 400;
+}
+.tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: var(--s4) var(--s3);
+}
+.tuile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  text-decoration: none;
+}
+.tuile:hover .passe-partout {
+  background: var(--line);
+}
+.tuile:hover .tuile-titre {
+  text-decoration: underline;
+}
+.tuile[aria-current="true"] .passe-partout {
+  box-shadow: inset 0 0 0 3px var(--ink);
+}
+.tuile[aria-current="true"] .tuile-titre {
+  font-weight: 700;
+}
+.resultats {
+  grid-template-columns: repeat(auto-fill, minmax(min(11rem, 40vw), 1fr));
+}
+/* Une ressource sans image se lit en ligne pleine largeur, comme une entrée de liste. */
+.resultats .tuile:not(:has(.passe-partout)) {
+  grid-column: 1 / -1;
+  max-width: 48rem;
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+  font-size: 1rem;
+}
+.resultats .tuile:not(:has(.passe-partout)) .tuile-titre {
+  font-weight: 700;
+}
+.resultats .tuile:not(:has(.passe-partout)) .tuile-extrait {
+  -webkit-line-clamp: 2;
+}
+.tuile-extrait {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.tuile-titre {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.quiz {
+  max-width: 32rem;
+  margin: var(--s7) 0 0;
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
+}
+#quiz-resultat:empty {
+  display: none;
+}
+.quiz img {
+  display: block;
+  max-width: 100%;
+  max-height: 18rem;
+  margin-bottom: var(--s3);
+  object-fit: contain;
+}
+
+/* ------------------------------------------------------------ feuilles: source et lecteur */
+
+.feuille {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.feuille-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.feuille h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+#source > .feuille-tete h2,
+#source > h2 {
+  font-size: 1.375rem;
+}
+.feuille h3 {
+  margin: 0 0 var(--s1);
+}
+.feuille [tabindex="-1"]:focus {
+  outline: none;
+}
+.feuille-pied {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.feuille-pied form {
+  margin: 0;
+}
+.source-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+.passage {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+  line-height: 1.55;
+}
+.oeuvre-grande {
+  margin: 0 0 var(--s4);
+  padding: var(--s3);
+  background: var(--surface-tinted);
+}
+.oeuvre-grande img {
+  display: block;
+  max-width: 100%;
+  max-height: 50dvh;
+  margin: 0 auto;
+  border: 0;
+  object-fit: contain;
+}
+.cartel {
+  display: grid;
+  align-content: start;
+  grid-template-columns: auto 1fr;
+  gap: var(--s1) var(--s4);
+  margin: 0 0 var(--s4);
+  font-size: 0.9375rem;
+}
+.cartel dt {
+  color: var(--ink-muted);
+}
+.cartel dd {
+  margin: 0;
+}
+.extrait {
+  margin: 0;
+}
+
+@media (min-width: 1180px) {
+  .fermer-feuille {
+    display: none;
+  }
+  .defile {
+    overflow-y: auto;
+    min-height: 0;
+  }
+  /* Tient dans le premier écran avant défilement: l'œuvre, son cartel et « Lire le document ». */
+  #lecteur {
+    position: sticky;
+    top: var(--s4);
+    max-height: calc(100dvh - 6rem);
+    padding: var(--s5);
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  #lecteur .oeuvre-grande img {
+    max-height: min(22rem, 38dvh);
+  }
+  .colonne-source {
+    border-left: 1px solid var(--line);
+    background: var(--surface);
+  }
+  #source {
+    position: sticky;
+    top: 0;
+    max-height: 100dvh;
+    padding: var(--s5);
+  }
+}
+
+/* Sous 1180 px, la feuille s'ouvre au toucher et laisse visible ce qui l'a ouverte. */
+@media (max-width: 1179.98px) {
+  .feuille {
+    display: none;
+  }
+  .feuille-ouverte {
+    padding-bottom: var(--feuille);
+  }
+  .feuille-ouverte .feuille {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 10;
+    display: flex;
+    max-height: var(--feuille);
+    overflow: hidden;
+    padding: var(--s4) var(--gouttiere) calc(var(--s4) + env(safe-area-inset-bottom));
+    border-top: 4px solid var(--yellow);
+    background: var(--surface);
+    box-shadow: 0 -2px 8px rgb(28 24 21 / 0.08);
+  }
+  /* Dans la feuille, le passage ou l'œuvre reste l'élément le plus grand. */
+  .feuille-ouverte .feuille h2,
+  .feuille-ouverte #source > .feuille-tete h2 {
+    font-size: 1.125rem;
+  }
+  .feuille-ouverte .feuille h3 {
+    font-size: 1rem;
+  }
+  /* Le passage suit directement le titre: la navigation entre sources passe dessous. */
+  .feuille-ouverte #source .source-nav {
+    order: 1;
+  }
+  .feuille-ouverte #source .feuille-pied {
+    order: 2;
+  }
+  .feuille-ouverte .defile {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .oeuvre-grande img {
+    max-height: 28dvh;
+  }
+}

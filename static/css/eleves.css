@@ -1,0 +1,329 @@
+/* ------------------------------------------------------------ élèves */
+
+/* La liste mène. L'ajout se range à sa droite derrière un filet dès que la place le permet. */
+.effectifs {
+  display: grid;
+  gap: var(--s6);
+  align-items: start;
+}
+@media (min-width: 1180px) {
+  .effectifs {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+  }
+  .ajout {
+    padding-left: var(--s6);
+    border-left: 1px solid var(--line);
+  }
+}
+.liste-eleves h2 {
+  margin-top: var(--s7);
+}
+table.eleves .nom {
+  display: block;
+  font-weight: 700;
+}
+table.eleves .identifiant {
+  display: block;
+  color: var(--ink-muted);
+  font-family: var(--chiffres);
+  font-size: 0.875rem;
+}
+table.eleves td {
+  padding-block: var(--s3);
+}
+table.eleves td a {
+  white-space: nowrap;
+  text-decoration-color: var(--line);
+}
+table.eleves td a:hover {
+  text-decoration-color: currentColor;
+}
+/* Trente lignes de boutons cernés font une grille de cases : l'action se cerne au survol. */
+table.eleves button {
+  min-height: 36px;
+  padding: 0 var(--s3);
+  border-color: transparent;
+  background: none;
+  font-weight: 400;
+}
+table.eleves button:hover {
+  border-color: var(--ink);
+}
+table.eleves button.retirer:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.liste-eleves .vide {
+  padding: var(--s6) var(--s5);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.liste-eleves .vide p:last-child {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.ajout h2 {
+  margin-bottom: var(--s1);
+}
+.ajout > .aide {
+  margin-bottom: var(--s4);
+}
+.ajout > details {
+  border-top: 1px solid var(--line);
+}
+.ajout > details:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+.ajout > details > summary {
+  justify-content: space-between;
+  min-height: 3rem;
+  color: var(--ink);
+  font-weight: 700;
+}
+.ajout > details > form {
+  padding: var(--s1) 0 var(--s5);
+}
+.ajout form > .aide {
+  margin-bottom: var(--s4);
+}
+.ajout .deux {
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--s4);
+}
+.cours-ajout {
+  margin: 0 0 var(--s4);
+}
+details.cours-ajout > summary {
+  min-height: 36px;
+  font-size: 0.9375rem;
+}
+.cours-ajout label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  margin: 0;
+  font-weight: 400;
+}
+.ajout h3 {
+  margin-top: var(--s6);
+}
+.cours-eleves {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Un cours est un lien qui ouvre ses formulaires : souligné, et cliquable sur toute la ligne. */
+.cours-eleves li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s3);
+  border-top: 1px solid var(--line);
+}
+.cours-eleves a {
+  flex: 1;
+  padding: var(--s2) 0;
+}
+.liens-actifs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.liens-actifs li {
+  padding: var(--s3) 0;
+  border-top: 1px solid var(--line);
+}
+.liens-actifs p {
+  margin: 0;
+}
+.liens-actifs .barre {
+  margin: var(--s2) 0 0;
+}
+
+/* Relecture en colonnes */
+.relecture-sources {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s4) var(--s5);
+  align-items: start;
+}
+.relecture-liste {
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.relecture-liste > p {
+  margin: 0;
+  padding: var(--s2) var(--s3);
+}
+.relecture-liste h2 {
+  margin: 0;
+  padding: var(--s2) var(--s3) var(--s1);
+  background: var(--surface-tinted);
+  font-size: 0.9375rem;
+}
+.relecture-liste ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.relecture-liste li + li {
+  border-top: 1px solid var(--line);
+}
+.relecture-liste li a {
+  display: grid;
+  gap: 2px;
+  padding: var(--s2) var(--s3);
+  color: inherit;
+  text-decoration: none;
+}
+.relecture-liste li a:hover {
+  background: var(--surface-tinted);
+}
+.relecture-liste li a .titre {
+  font-weight: 700;
+}
+.relecture-liste li a[aria-current="true"] {
+  background: var(--ink);
+  color: var(--surface);
+}
+.relecture-liste li a[aria-current="true"] .discret {
+  color: var(--line);
+}
+.relecture-lecture h2 {
+  margin-top: 0;
+}
+@media (min-width: 900px) {
+  .relecture-sources {
+    grid-template-columns: 19rem minmax(0, 1fr);
+  }
+  .relecture-liste {
+    position: sticky;
+    top: var(--s4);
+    max-height: calc(100dvh - 2 * var(--s4));
+  }
+}
+
+/* Sommaire du cours et progression de lecture */
+.sommaire-cours,
+.liste-cours {
+  max-width: 44rem;
+}
+.sommaire-cours > h2 {
+  margin-bottom: var(--s1);
+}
+.sommaire-cours > p {
+  margin-bottom: var(--s1);
+}
+.sommaire-cours h3 {
+  margin: var(--s5) 0 0;
+  font-size: 1rem;
+}
+.sommaire-cours ol,
+.liste-cours {
+  margin: var(--s4) 0 var(--s5);
+  padding: 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+.sommaire-cours h3 + ol {
+  margin-top: var(--s2);
+}
+/* Numéro, titre et état sur la ligne. Le repère et le nombre de questions passent sous le titre. */
+.sommaire-cours li {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  column-gap: var(--s3);
+  align-items: baseline;
+  padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+}
+.sommaire-cours li > :is(.repere, .discret) {
+  grid-column: 2;
+}
+.sommaire-cours li > .statut {
+  grid-column: 3;
+  grid-row: 1;
+}
+:is(.sommaire-cours, .liste-cours) li > a {
+  color: var(--ink);
+  text-decoration: none;
+}
+:is(.sommaire-cours, .liste-cours) li > a:hover {
+  text-decoration: underline;
+}
+.sommaire-cours .numero {
+  justify-self: start;
+  min-width: 1.5rem;
+  padding: 0 var(--s1);
+  color: var(--ink-muted);
+  text-align: center;
+}
+.sommaire-cours li.lu .numero {
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--surface);
+}
+.sommaire-cours li.lu > a {
+  color: var(--ink-muted);
+}
+.sommaire-cours li.ici {
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+.sommaire-cours .repere {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.sommaire-cours li.activite .numero {
+  align-self: center;
+  color: var(--ink);
+}
+/* Le nom du cours et sa progression, puis son nombre de chapitres et ses activités à faire. */
+.liste-cours li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s1) var(--s4);
+  align-items: baseline;
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.liste-cours li > a {
+  font-weight: 700;
+}
+.liste-cours .lus {
+  grid-column: 2;
+  grid-row: 1;
+}
+.liste-cours .statut {
+  grid-column: 2;
+  justify-self: end;
+}
+.lus {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+.lus progress {
+  flex: 1 1 auto;
+  width: 5rem;
+  max-width: 12rem;
+  height: 4px;
+  border: 0;
+  background: var(--surface-tinted);
+  appearance: none;
+}
+.sommaire-cours .lus progress {
+  width: auto;
+}
+.lus progress::-webkit-progress-bar {
+  background: var(--surface-tinted);
+}
+.lus progress::-webkit-progress-value {
+  background: var(--ink);
+}
+.lus progress::-moz-progress-bar {
+  background: var(--ink);
+}

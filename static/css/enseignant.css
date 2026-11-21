@@ -1,0 +1,321 @@
+/* ------------------------------------------------------------ enseignant */
+
+/* File des légendes en bande de vignettes, puis l'image et sa proposition côte à côte. */
+.relecture {
+  display: grid;
+  gap: var(--s4);
+}
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-width: 0;
+}
+.file p {
+  flex: none;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.file p strong {
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+.file ol {
+  display: flex;
+  gap: var(--s2);
+  min-width: 0;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.file a {
+  display: block;
+  width: 3.5rem;
+  aspect-ratio: 1;
+  padding: 2px;
+  background: var(--surface-tinted);
+}
+.file img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.7;
+}
+.file a:hover img {
+  opacity: 1;
+}
+.file a[aria-current="true"] {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.file a[aria-current="true"] img {
+  opacity: 1;
+}
+/* La bande défile : un anneau à l'extérieur de la vignette serait rogné. */
+.file a:focus-visible {
+  outline-offset: -3px;
+}
+
+.relecture-plan {
+  display: grid;
+  gap: var(--s5);
+  align-items: start;
+}
+@media (min-width: 1000px) {
+  .relecture-plan {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+    gap: var(--s6);
+  }
+  .relecture-proposition {
+    position: sticky;
+    top: var(--s5);
+  }
+}
+.relecture-image {
+  height: max(24rem, calc(100dvh - 14rem));
+  margin: 0;
+  padding: var(--s5);
+  background: var(--surface-tinted);
+}
+.relecture-image img {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: contain;
+}
+@media (max-width: 999px) {
+  .relecture-image {
+    height: 60dvh;
+    padding: var(--s3);
+  }
+}
+.relecture-proposition > .discret {
+  margin: 0;
+}
+.relecture-proposition h2 {
+  margin-bottom: var(--s5);
+  font-size: 1.125rem;
+}
+.relecture-proposition .aide {
+  margin: 0 0 var(--s2);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.relecture-proposition textarea {
+  min-height: 10rem;
+  field-sizing: content;
+}
+.relecture-proposition .barre {
+  margin: var(--s3) 0 var(--s4);
+}
+.relecture-proposition button kbd {
+  min-width: 1.4em;
+  border-color: currentColor;
+  background: none;
+  color: inherit;
+  font-size: 0.8125rem;
+  opacity: 0.7;
+}
+.raccourcis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s4);
+}
+.raccourcis kbd {
+  font-size: 0.8125rem;
+}
+.raccourcis label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  margin: 0;
+  font-weight: 400;
+}
+/* La zone prend le focus pour que les flèches y changent d'image : elle n'a pas d'anneau. */
+#legende:focus {
+  outline: none;
+}
+/* Raccourcis coupés : leurs touches ne s'affichent plus. */
+.sans-raccourcis :is([data-raccourci] kbd, .raccourcis .touche) {
+  display: none;
+}
+.edition-source {
+  margin: var(--s5) 0;
+  padding: var(--s3) 0;
+  border-block: 1px solid var(--line);
+}
+.suppression-source {
+  margin-top: var(--s6);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+/* Sur grand écran, le texte à gauche, la fiche et la suppression dans la colonne de droite. */
+@media (min-width: 80rem) {
+  .fiche-source:has(> form) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-rows: auto 1fr;
+    gap: 0 var(--s6);
+    margin-top: var(--s5);
+  }
+  .fiche-source > .texte-source {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  .fiche-source > .edition-source {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    border-bottom: 0;
+  }
+  .fiche-source > .suppression-source {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+  }
+}
+.rattachement fieldset {
+  margin-bottom: var(--s3);
+}
+.rattachement fieldset legend {
+  margin-top: var(--s2);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.lien-cours .theme-cours {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+  margin: 0 0 var(--s3) calc(20px + var(--s2));
+}
+.lien-cours:not(:has(input:checked)) .theme-cours {
+  display: none;
+}
+.questions-prof {
+  margin: var(--s6) 0;
+  overflow-x: auto;
+}
+/* Sur téléphone, le tableau défile dans sa section plutôt que d'écraser la question. */
+.questions-prof table {
+  min-width: 36rem;
+}
+.questions-prof td:last-child {
+  white-space: nowrap;
+}
+/* Mêmes colonnes d'un chapitre à l'autre, là où la largeur le permet. */
+@media (min-width: 900px) {
+  .questions-prof table {
+    table-layout: fixed;
+  }
+  .questions-prof th:not(:first-child) {
+    width: 9rem;
+  }
+  .questions-prof th:last-child {
+    width: 11rem;
+  }
+}
+/* L'échange relu par l'enseignant espace la question et sa réponse comme le chat. */
+.echange-prof .question {
+  margin-bottom: var(--s5);
+}
+.feuilles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--s4);
+}
+.identifiants {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  break-inside: avoid;
+}
+.identifiants p {
+  margin: 0.4rem 0;
+}
+
+details summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+/* Les membres d'un cours se lisent sous sa ligne, pas avant le cours suivant. */
+.barre + details {
+  margin: calc(-1 * var(--s3)) 0 var(--s5);
+}
+details:not(.compte) > summary {
+  gap: var(--s2);
+}
+details:not(.compte) > summary::after {
+  content: "";
+  width: 0.4em;
+  height: 0.4em;
+  margin-top: -0.2em;
+  border-right: 1.5px solid;
+  border-bottom: 1.5px solid;
+  transform: rotate(45deg);
+}
+details:not(.compte)[open] > summary::after {
+  margin-top: 0.2em;
+  transform: rotate(-135deg);
+}
+details table,
+table.eleves {
+  margin-bottom: var(--s3);
+}
+details td,
+table.eleves td {
+  vertical-align: middle;
+}
+details td:last-child,
+table.eleves td:last-child {
+  width: 1%;
+}
+table.eleves .barre {
+  flex-wrap: nowrap;
+  margin: 0;
+}
+table.eleves button {
+  white-space: nowrap;
+}
+/* Sur téléphone, les actions s'empilent, chacune sur une ligne. Le choix du cours remplace la
+   colonne des cours. */
+@media (max-width: 640px) {
+  table.eleves .barre {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  table.eleves .cours-eleve {
+    display: none;
+  }
+}
+
+@media print {
+  header.site,
+  .rail,
+  .evitement,
+  .sans-impression {
+    display: none !important;
+  }
+  body,
+  body.prof {
+    display: block;
+    background: white;
+  }
+  main,
+  body.prof main {
+    max-width: none;
+    padding: 0;
+  }
+  .feuilles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

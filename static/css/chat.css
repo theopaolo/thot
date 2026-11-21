@@ -1,0 +1,408 @@
+/* ------------------------------------------------------------ chat */
+
+main.page-chat {
+  max-width: none;
+  padding: 0;
+}
+/* Un refus d'envoi reste visible au bas d'une longue conversation. */
+main.page-chat #erreur-reseau {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0;
+}
+/* Une colonne qui ne s'élargit pas : un tableau de réponse défile dans son cadre. */
+.chat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1180px) {
+  .chat {
+    grid-template-columns: minmax(0, 1fr) minmax(26rem, 40%);
+  }
+}
+.chat-principal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 48rem;
+  min-height: calc(100dvh - 4rem);
+  margin: 0 auto;
+  padding: var(--s5) var(--gouttiere) 0;
+}
+#conversation {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--s5);
+}
+.question {
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--radius);
+  background: var(--surface-tinted);
+  font-weight: 700;
+}
+.reponse {
+  max-width: var(--measure);
+}
+.reponse-note {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.texte-reponse {
+  margin: 0 0 var(--s3);
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+.texte-reponse h2 {
+  margin: var(--s4) 0 var(--s1);
+  font-size: 1.125rem;
+}
+.texte-reponse :is(ul, ol) {
+  margin: 0 0 var(--s3);
+  padding-left: 1.5em;
+}
+/* Un tableau ou un schéma défile dans son cadre plutôt que d'écraser son contenu sur un
+   téléphone. La liste d'un schéma le suit. */
+:is(.tableau-reponse, .schema-reponse) {
+  margin: 0 0 var(--s3);
+}
+.cadre-tableau,
+.schema {
+  overflow-x: auto;
+}
+.tableau-reponse table {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+:is(.tableau-reponse, .schema-reponse) figcaption {
+  max-width: none;
+  margin: 0 0 var(--s2);
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.tableau-reponse tbody td {
+  min-width: 14rem;
+}
+.schema {
+  margin: var(--s4) 0 var(--s2);
+}
+.schema svg {
+  display: block;
+}
+/* Une longue formule défile dans sa ligne au lieu d'élargir la réponse. */
+.formule-bloc {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* L'espace et la citation ne se séparent pas : le dernier mot de la phrase les suit à la ligne. */
+.lien-citation {
+  white-space: nowrap;
+}
+/* Marque de citation dans la phrase: petite à l'œil, 44 px au toucher. */
+.citation {
+  position: relative;
+  gap: 0.2em;
+  min-height: 0;
+  padding: 0.05em 0.4em;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  vertical-align: 0.1em;
+}
+.citation .icone {
+  width: 1em;
+  height: 1em;
+}
+.citation::after {
+  content: "";
+  position: absolute;
+  inset: -11px -4px;
+}
+.citation[aria-pressed="true"] {
+  border-color: var(--yellow);
+  background: var(--yellow-surface);
+}
+.image-reponse {
+  display: block;
+  max-width: min(100%, 18rem);
+  max-height: 13rem;
+  margin: var(--s2) 0;
+  object-fit: contain;
+}
+.provenance {
+  margin: var(--s3) 0;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.avis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.avis button {
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.avis button[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+  font-weight: 700;
+}
+.idees-reponse {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s2);
+  margin-top: var(--s4);
+}
+/* Hors cours et panne restent calmes: pas de couleur de statut côté élève. */
+.reponse.hors-corpus,
+.reponse.panne {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+/* « Arrêter » prend la ligne de l'étape quand elle tient. */
+.reponse[sse-connect] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--s4);
+}
+.reponse[sse-connect] .lien {
+  min-height: 44px;
+}
+.reponse .etape {
+  margin: 0;
+  color: var(--ink-muted);
+}
+.reponse .etape[role="status"] {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.reponse .etape::before {
+  content: "";
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-right: var(--s2);
+  background: var(--yellow);
+  animation: pulse 1s infinite alternate;
+}
+@keyframes pulse {
+  from {
+    opacity: 0.3;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reponse .etape::before {
+    animation: none;
+  }
+}
+/* Un champ qui prend le focus ne se cache pas sous le composeur collé. */
+:root:has(.page-chat) {
+  scroll-padding-bottom: 7rem;
+}
+/* Seul le composeur reste collé en bas : le périmètre et la mention défilent avec la conversation. */
+.pied-chat {
+  display: contents;
+}
+.pied-chat > :first-child {
+  margin: var(--s5) 0 var(--s2);
+}
+.composeur:has(*:not([hidden])) {
+  position: sticky;
+  bottom: 0;
+  padding: var(--s2) 0;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.composeur > [data-aller-reponse] {
+  margin-bottom: var(--s2);
+}
+.pied-chat > :is(small, p) {
+  margin: var(--s2) 0 var(--s4);
+}
+.pied-chat .idees {
+  margin: var(--s4) 0 var(--s4);
+}
+form.question-form label {
+  margin-bottom: 0;
+}
+form.question-form textarea {
+  max-height: 8rem;
+  min-height: 3rem;
+  field-sizing: content;
+}
+.question-rapide small {
+  display: block;
+  margin-top: var(--s2);
+}
+
+/* ------------------------------------------------------------ conversations */
+
+/* La liste vit dans sa colonne à partir de 1400 px, sur sa propre page en dessous. */
+.liste-conversations {
+  display: none;
+}
+.liens-conversations {
+  display: flex;
+  gap: var(--s4);
+}
+@media (min-width: 1400px) {
+  .chat {
+    grid-template-columns: 16rem minmax(0, 1fr) minmax(24rem, 34%);
+  }
+  .liste-conversations {
+    display: block;
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .liste-conversations > div {
+    position: sticky;
+    top: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding: var(--s5) var(--s3);
+  }
+  .liens-conversations {
+    display: none;
+  }
+}
+.recherche-conversations {
+  margin-top: var(--s4);
+}
+.conversations {
+  margin: var(--s4) 0;
+  padding: 0;
+  list-style: none;
+}
+/* Le repère jaune se pose dans la gouttière : le texte reste aligné sur le titre. */
+.conversations a {
+  display: flex;
+  flex-direction: column;
+  margin-left: calc(-1 * (var(--s2) + 4px));
+  padding: var(--s2);
+  border-left: 4px solid transparent;
+  text-decoration: none;
+}
+.conversations a:hover {
+  background: var(--surface-tinted);
+}
+.conversations a[aria-current="page"] {
+  border-left-color: var(--ink);
+}
+.conversation-titre {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.conversations .discret {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.page-conversations {
+  max-width: 44rem;
+}
+.tete-conversation {
+  margin-bottom: var(--s5);
+}
+/* Le titre reprend souvent la première question : il reste court pour laisser voir la réponse. */
+#titre-chat:not(.visuellement-cache) {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 1.125rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+#titre-chat:focus {
+  outline: none;
+}
+.actions-conversation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s4);
+}
+.actions-conversation form,
+.renommer {
+  margin: 0;
+}
+.changement-perimetre {
+  margin: 0;
+  padding-top: var(--s2);
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.perimetre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s3);
+  margin-bottom: var(--s2);
+  font-size: 0.875rem;
+}
+#perimetre {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.perimetre summary {
+  min-height: 32px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.perimetre details[open] {
+  flex-basis: 100%;
+}
+.perimetre form {
+  display: grid;
+  gap: var(--s2) var(--s3);
+  padding-bottom: var(--s3);
+}
+.perimetre form button {
+  justify-self: start;
+}
+/* Comparer : une case par matière, à la suite, sous les trois listes. */
+.perimetre fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  gap: 0 var(--s4);
+  margin: 0;
+}
+.perimetre legend {
+  margin-bottom: var(--s1);
+  padding: 0;
+  font-weight: 700;
+}
+@media (min-width: 900px) {
+  .perimetre form {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .perimetre form button {
+    grid-column: 1 / -1;
+  }
+}

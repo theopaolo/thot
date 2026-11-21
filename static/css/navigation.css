@@ -1,0 +1,352 @@
+/* ------------------------------------------------------------ en-tête élève */
+
+header.site {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+  min-height: 4rem;
+  padding: var(--s2) var(--gouttiere);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.marque {
+  overflow-wrap: anywhere;
+  margin-right: auto;
+  font-size: 1.375rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+header.site nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+header.site nav > a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+header.site nav > a:hover {
+  border-color: var(--ink);
+}
+header.site nav > a[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+.recherche-entete {
+  display: flex;
+  flex: 0 1 22rem;
+}
+.recherche-entete input {
+  min-width: 0;
+  border-right: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.recherche-entete button {
+  flex: none;
+  width: 44px;
+  padding: 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.libelle-court {
+  display: none;
+}
+@media (max-width: 640px) {
+  .recherche-entete {
+    order: 3;
+    flex-basis: 100%;
+    margin-bottom: var(--s1);
+  }
+  header.site {
+    gap: 0 var(--s2);
+    min-height: 3.5rem;
+    padding-block: var(--s1);
+  }
+  header.site .marque {
+    font-size: 1.125rem;
+  }
+  header.site nav {
+    gap: var(--s1);
+  }
+  header.site nav > a {
+    padding: 0 var(--s2);
+    border-color: transparent;
+    background: none;
+  }
+  header.site nav > a .icone,
+  .libelle-long {
+    display: none;
+  }
+  .libelle-court {
+    display: inline;
+  }
+}
+
+.compte {
+  position: relative;
+}
+.compte summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 44px;
+  max-width: 10rem;
+  padding: 0 var(--s2);
+  color: var(--ink-muted);
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.compte summary::-webkit-details-marker {
+  display: none;
+}
+.compte summary::after {
+  content: "";
+  flex: none;
+  width: 0.4em;
+  height: 0.4em;
+  margin-top: -0.2em;
+  border-right: 1.5px solid;
+  border-bottom: 1.5px solid;
+  transform: rotate(45deg);
+}
+.compte[open] summary {
+  color: var(--ink);
+}
+.compte form {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgb(28 24 21 / 0.08);
+  white-space: nowrap;
+}
+.compte form button {
+  min-height: 44px;
+}
+@media (max-width: 640px) {
+  .compte summary {
+    max-width: 5.5rem;
+  }
+}
+
+/* ------------------------------------------------------------ rail enseignant */
+
+body.prof {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-height: 100dvh;
+}
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  padding: var(--s5) var(--s4);
+  border-right: 1px solid var(--line);
+}
+.rail .marque {
+  margin: 0;
+}
+.rail-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+button.rail-bascule {
+  flex: none;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-color: transparent;
+  background: none;
+  color: var(--ink-muted);
+}
+button.rail-bascule:hover {
+  border-color: transparent;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Rail replié: des icônes seules, le libellé apparaît en bulle au survol et reste lu par les lecteurs d'écran. */
+@media (min-width: 901px) {
+  body.prof.rail-replie {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+  }
+  .rail-replie .rail {
+    align-items: center;
+    padding-inline: var(--s2);
+  }
+  .rail-replie .rail-tete {
+    flex-direction: column;
+    width: 100%;
+  }
+  .rail-replie .rail .marque {
+    font-size: 1.125rem;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .rail-replie .rail > .discret,
+  .rail-replie .rail-pied strong {
+    display: none;
+  }
+  .rail-replie .rail nav a,
+  .rail-replie .rail-pied > a,
+  .rail-replie .rail-pied button {
+    position: relative;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    text-decoration: none;
+  }
+  .rail-replie .rail nav a > span,
+  .rail-replie .rail-pied > a > span,
+  .rail-replie .rail-pied button > span {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + var(--s2));
+    z-index: 20;
+    translate: 0 -50%;
+    padding: var(--s1) var(--s2);
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 0.875rem;
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .rail-replie .rail :is(a, button):is(:hover, :focus-visible) > span {
+    opacity: 1;
+  }
+  .rail-replie .rail-pied {
+    align-items: center;
+  }
+}
+.rail > .discret {
+  margin: 0 0 var(--s4);
+}
+.rail nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.rail nav a,
+.rail-pied > a {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border-radius: var(--radius);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.rail nav a:hover,
+.rail-pied > a:hover {
+  background: var(--surface);
+}
+/* Le jaune pâle marque la page courante, le blanc du survol ne s'y confond pas. */
+.rail nav a[aria-current="page"] {
+  background: var(--yellow-surface);
+}
+.rail-pied {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-top: auto;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.rail-pied form {
+  margin: 0;
+}
+body.prof main {
+  max-width: 90rem;
+  margin: 0;
+  padding: var(--s5) var(--s6) var(--s7);
+}
+@media (max-width: 900px) {
+  body.prof {
+    display: block;
+  }
+  /* Marque, vue élève et déconnexion sur une ligne, les cinq liens en deux rangées. */
+  .rail {
+    position: static;
+    height: auto;
+    display: grid;
+    /* minmax(0, …) : un long nom d'instance passe à la ligne au lieu d'élargir la page. */
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--gouttiere) var(--s3);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .rail > .discret,
+  .rail-pied strong,
+  .rail-bascule {
+    display: none;
+  }
+  .rail nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .rail nav a {
+    gap: var(--s2);
+    padding: 0 var(--s2);
+  }
+  .rail-pied {
+    flex-direction: row;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  body.prof main {
+    padding: var(--s4) var(--gouttiere) var(--s7);
+  }
+}
+
+@media (max-width: 640px) {
+  .rail nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* Le nom de l'instance garde sa ligne : vue élève et déconnexion passent en icônes. */
+  .rail-pied :is(a, button) > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}

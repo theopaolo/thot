@@ -1,0 +1,372 @@
+/* ------------------------------------------------------------ page */
+
+main {
+  max-width: 76rem;
+  margin: 0 auto;
+  padding: var(--s5) var(--gouttiere) var(--s7);
+}
+.document {
+  max-width: 52rem;
+}
+.document-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3) var(--s5);
+  margin-bottom: var(--s5);
+}
+.document-tete form {
+  margin: 0;
+}
+
+button,
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 44px;
+  padding: var(--s2) var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+button:hover,
+.bouton:hover {
+  border-color: var(--ink);
+}
+button:active,
+.bouton:active {
+  background: var(--surface-tinted);
+}
+button.principal,
+.bouton.principal {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+button.principal:hover,
+.bouton.principal:hover {
+  background: var(--ink-hover);
+}
+/* Certifier, c'est apposer le tampon de l'enseignant. */
+button.certifier {
+  border-color: var(--certified);
+  background: var(--certified);
+  color: var(--surface);
+}
+button.certifier:hover {
+  background: color-mix(in srgb, var(--certified) 85%, var(--ink));
+}
+/* La chasse fixe sert aux codes courts : un format, un compteur. Une durée garde le texte. */
+.chiffres {
+  font-variant-numeric: tabular-nums;
+}
+.format {
+  font-family: var(--chiffres);
+}
+button.lien {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 400;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+/* Une action qui efface pour de bon. */
+button.danger,
+button.danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+button.danger:hover {
+  background: var(--rose-surface);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.htmx-request button,
+button.htmx-request {
+  opacity: 0.6;
+  cursor: progress;
+}
+.retour {
+  margin-bottom: var(--s4);
+}
+
+label {
+  display: block;
+  margin-bottom: var(--s1);
+  font-weight: 700;
+}
+.champ {
+  margin-bottom: var(--s4);
+}
+.aide {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+.champ .aide,
+.reglages .aide {
+  margin: 0.15rem 0 0.35rem;
+}
+.champ .erreur {
+  margin: var(--s1) 0 0;
+  color: var(--danger);
+  font-size: 0.9375rem;
+}
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="date"],
+select,
+textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-muted);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--ink);
+}
+textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+fieldset {
+  margin: 0 0 var(--s4);
+  padding: 0;
+  border: 0;
+}
+legend {
+  padding: 0;
+}
+fieldset label {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 36px;
+  font-weight: 400;
+}
+.deux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0 var(--s5);
+}
+form.etroit {
+  max-width: 44rem;
+}
+/* Le corrigé d'un exercice : les deux colonnes s'empilent sur mobile. */
+#corrige .deux {
+  row-gap: var(--s4);
+}
+#corrige > form {
+  margin-block-end: var(--s5);
+}
+/* Réglages : un groupe titré par fieldset, chaque libellé au-dessus de son champ. */
+.reglages legend {
+  margin-bottom: var(--s2);
+  padding: 0;
+  font-weight: 700;
+}
+.reglages > fieldset > legend {
+  font-size: 1.125rem;
+}
+.reglages .champ > label {
+  display: block;
+  min-height: 0;
+  font-weight: 700;
+}
+/* Les services, en lecture seule, se lisent comme un groupe des réglages. */
+.traitements {
+  margin: 0 0 var(--s5);
+}
+.traitements h2 {
+  margin: 0 0 var(--s1);
+  font-size: 1.125rem;
+}
+.pied-reglages {
+  max-width: 44rem;
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.saisie {
+  display: flex;
+  align-items: stretch;
+  gap: var(--s2);
+}
+.saisie > input,
+.saisie > textarea {
+  flex: 1;
+  min-width: 0;
+}
+.saisie > button {
+  flex: none;
+}
+
+[role="alert"],
+.alerte {
+  margin: 0 0 var(--s4);
+  padding: 0.6rem 0.9rem;
+  border-left: 1px solid var(--danger);
+  background: var(--rose-surface);
+}
+[role="status"],
+.note {
+  margin: 0 0 var(--s4);
+  padding: 0.6rem 0.9rem;
+  border-left: 1px solid var(--certified);
+  background: var(--surface);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+th,
+td {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+/* Sans marge : la case s'aligne sur le texte au-dessus d'elle. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  accent-color: var(--ink);
+}
+
+.statut {
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.statut.a_relire,
+.statut.unreviewed,
+.statut.en-cours {
+  color: var(--pending);
+}
+.statut.certifiee,
+.statut.certified {
+  color: var(--certified);
+}
+.statut.rejetee,
+.statut.rejected,
+.statut.failed {
+  color: var(--danger);
+}
+.statut.nouvelle {
+  color: var(--ink);
+}
+
+/* Liste des fichiers d'un lot : le titre prend la place, le statut passe à la ligne. */
+table.lot {
+  margin-bottom: var(--s2);
+}
+table.lot td:nth-child(2) {
+  width: 40%;
+}
+table.lot input[type="text"] {
+  min-width: 10rem;
+}
+table.lot .statut {
+  white-space: normal;
+}
+.resultats {
+  padding-left: 0;
+  list-style: none;
+}
+.resultats li {
+  margin-bottom: var(--s1);
+}
+@media (max-width: 640px) {
+  table.lot thead {
+    display: none;
+  }
+  table.lot tr,
+  table.lot td {
+    display: block;
+  }
+  table.lot td {
+    padding: var(--s1) var(--s3);
+    border: 0;
+  }
+  table.lot td:nth-child(2) {
+    width: auto;
+  }
+  table.lot input[type="text"] {
+    width: 100%;
+  }
+  table.lot tr {
+    padding: var(--s2) 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+.barre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0 0 var(--s4);
+}
+.barre .espace {
+  margin-left: auto;
+}
+/* Une aide en paragraphe passe sous les boutons de la barre. */
+.barre > p.aide {
+  flex-basis: 100%;
+  margin: 0;
+}
+.barre input[type="text"],
+.barre > select {
+  flex: 1 1 18rem;
+  width: auto;
+  max-width: 24rem;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 0.3em;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+}

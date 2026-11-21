@@ -19,7 +19,7 @@ export function routesRechargement(app: Hono<Env>) {
   let attente: ReturnType<typeof setTimeout> | undefined;
   watch(join(RACINE, "static"), { recursive: true }, (_, fichier) => {
     // Une reconstruction écrit plusieurs fichiers d'un coup : la rafale ne donne qu'un signal.
-    feuilleSeule &&= fichier === "style.css";
+    feuilleSeule &&= !!fichier?.startsWith("css/");
     clearTimeout(attente);
     attente = setTimeout(() => {
       for (const envoyer of abonnes) envoyer(feuilleSeule ? "css" : "page");
