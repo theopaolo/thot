@@ -5,7 +5,7 @@ import { cours, matiere } from "../src/app/domaines.ts";
 import { chercher, chercherFts, indexerSource, racines } from "../src/core/recherche.ts";
 import { demander } from "../src/core/reponse.ts";
 import { PanneModele } from "../src/core/modeles.ts";
-import { environnement, fauxModeles } from "./outils.ts";
+import { environnement, fauxModeles, session } from "./outils.ts";
 import { ressource } from "./domaines_outils.ts";
 
 test("sonde lexicale français / anglais : chaque source racinisée dans sa langue, les autres signalées", async () => {
@@ -189,6 +189,38 @@ test("langues : une question française trouve un passage anglais par ses racine
     const repli = await demander(db, f.modeles, question, p(lire), 0.5);
     assertEquals(repli.resultat.etat, "answered");
     assertEquals(repli.journal.traduction, undefined);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("la page de recherche dit qu'une traduction en panne la laisse incomplète, au lieu de « rien dans le cours »", async () => {
+  const { db, dir } = await environnement();
+  try {
+    await ressource(
+      db,
+      { langue: "en" },
+      undefined,
+      "Short term memory holds information for thirty seconds.",
+    );
+    const adresse = `/eleve/recherche?q=${encodeURIComponent("Combien de temps dure le souvenir immédiat ?")}`;
+    // La traduction trouve le passage anglais, que les mots français seuls ne trouvent pas.
+    const traduit = fauxModeles();
+    traduit.modeles.traduire = () =>
+      Promise.resolve("How long does short term memory hold information?");
+    const trouve = await (
+      await (await session(db, traduit.modeles, "eleve")).requete(adresse)
+    ).text();
+    assertStringIncludes(trouve, "Un document proche");
+    assert(!trouve.includes("recherche est incomplète"));
+
+    const panne = fauxModeles();
+    panne.modeles.traduire = () => Promise.reject(new PanneModele("traduction indisponible"));
+    const page = await (await (await session(db, panne.modeles, "eleve")).requete(adresse)).text();
+    assert(!page.includes("Rien dans le cours ne ressemble"), "panne montrée comme une limite");
+    assertStringIncludes(page, "recherche est incomplète");
+    assertStringIncludes(page, "Réessayer");
   } finally {
     db.close();
     await rm(dir, { recursive: true });

@@ -725,7 +725,9 @@ Une relance se reformule pour se comprendre seule, et une question se traduit qu
 contient une source anglaise. Si l'un de ces appels échoue, Thot cherche la question telle quelle
 et le journal garde la cause sous `reformulation_indisponible` ou `traduction_indisponible`. Une
 recherche sans résultat, ou un refus du générateur, donne alors `failed` : une relance comme
-« Et pourquoi ? » n'a aucun mot à chercher, et son échec ne dit rien du cours.
+« Et pourquoi ? » n'a aucun mot à chercher, et son échec ne dit rien du cours. La page de recherche
+de l'élève suit la même règle : après une traduction en panne, elle dit que la recherche est
+incomplète et propose de réessayer, au lieu d'annoncer que rien ne ressemble à la demande.
 
 L'affirmation reste l'unité de preuve. Le profil général peut ranger les affirmations d'une
 réponse en blocs : paragraphe, liste, étapes ou tableau. Un bloc ne désigne que des affirmations

@@ -1,6 +1,6 @@
 ---
 title: RECH-103 Dire que la traduction est en panne sur la page de recherche
-status: not_started
+status: done
 scope: [recherche, eleve]
 type: [bug]
 ---
@@ -16,5 +16,5 @@ et le chat en fait un échec que l'élève relance. La page `/eleve/recherche`
 (`src/app/routes/eleve.ts`) appelle `chercher()` sans lire ce champ. Dans un périmètre où seules
 des sources anglaises répondent, elle affiche une liste vide, comme si le cours n'avait rien.
 
-- [ ] la page dit que la recherche est incomplète et propose de réessayer
-- [ ] un test : une traduction en panne sur un périmètre anglais n'affiche pas « aucun résultat »
+- [x] la page dit que la recherche est incomplète et propose de réessayer
+- [x] un test : une traduction en panne sur un périmètre anglais n'affiche pas « aucun résultat »

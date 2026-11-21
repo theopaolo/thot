@@ -301,11 +301,22 @@ export type Trouve = {
 };
 
 /** Les documents les plus proches de la recherche, du plus proche au moins proche. */
-export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
+/**
+ * `incomplete` : la traduction de la recherche est en panne, les ressources en anglais n'ont été
+ * cherchées qu'avec les mots français. Ne rien trouver ne dit alors rien du cours.
+ */
+export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope, incomplete = false) =>
   html`
     <a class="bouton retour" href="/eleve">${icone("arrow-left")}Ressources</a>
     <h1>Chercher une ressource</h1>
     ${formRecherche(q, p)}
+    ${
+      incomplete
+        ? html`<p class="note">Cette recherche est incomplète. Une panne technique a empêché de
+            chercher dans les ressources en anglais, ce n'est pas une limite du cours.
+            <a href="">Réessayer</a></p>`
+        : ""
+    }
     ${
       !q
         ? ""
@@ -339,7 +350,9 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
           `,
         )}</div>
       `
-          : html`
+          : incomplete
+            ? ""
+            : html`
         <p>Rien dans le cours ne ressemble à « ${q} ». Essaie d'autres mots.</p>
         ${idee(q, false, "Poser la question à Thot")}
       `

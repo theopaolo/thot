@@ -467,7 +467,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           "/eleve/recherche",
           libelles(db),
           { q },
-        )}${EleveRessources.recherche(q, trouves, scope(c))}`,
+        )}${EleveRessources.recherche(q, trouves, scope(c), !!r.panneTraduction)}`,
       ),
     );
   });
