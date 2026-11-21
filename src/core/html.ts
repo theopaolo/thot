@@ -254,12 +254,36 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
   let listes = 0;
   let tables = 0;
   let cellules = 0;
+  // La rangée de tableau en cours : où elle commence dans le bloc, la longueur et le dernier
+  // caractère du bloc à ce moment, et si elle a reçu autre chose que des blancs et des « | ».
   let rangee = 0;
+  let nRangee = 0;
+  let dernierRangee = "";
+  let pleine = false;
+  // Les séparateurs de cellules qui attendent le premier mot à leur suite. Une rangée de cellules
+  // vides n'écrit ainsi rien, et n'a rien à retirer du bloc.
+  let attente = "";
 
+  const poser = () => {
+    if (!attente) return;
+    texte += attente;
+    n += longueur(attente);
+    attente = "";
+  };
   const ecrire = (s: string) => {
+    poser();
     texte += s;
     n += longueur(s);
     dernier = s.at(-1) ?? dernier;
+    if (!pleine && /[^|\s]/.test(s)) pleine = true;
+  };
+  const ouvrirRangee = () => {
+    rangee = texte.length;
+    nRangee = n;
+    dernierRangee = dernier;
+    pleine = false;
+    attente = "";
+    cellules = 0;
   };
   const vider = () => {
     texte = "";
@@ -268,8 +292,11 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
     codes = [];
     blanc = false;
     code = undefined;
+    attente = "";
   };
   const fermer = () => {
+    // Un tableau que la page ne ferme pas garde les séparateurs de sa dernière rangée.
+    poser();
     const t = texte.trimEnd();
     if (t) parties.push({ texte: t, section, ...(codes.length && { codes }) });
     vider();
@@ -285,22 +312,27 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
         blanc = true;
         continue;
       }
+      poser();
       if (blanc && texte && dernier !== " " && dernier !== "\n") ecrire(" ");
       blanc = false;
       if (code === -1) code = n;
       ecrire(m);
     }
   };
-  // Une rangée sans texte, cellules vides comprises, ne laisse rien.
+  // Une rangée sans texte, cellules vides comprises, ne laisse rien. Le bloc n'est ni relu ni
+  // mesuré : ce que la rangée a reçu se sait au fil de l'écriture.
+  // ponytail: une rangée faite des seuls « | » d'un texte recopie encore le bloc pour s'en
+  // retirer. Un tampon par rangée si un tel tableau se présente.
   const finRangee = () => {
-    if (!/[^|\s]/.test(texte.slice(rangee))) {
-      texte = texte.slice(0, rangee);
-      n = longueur(texte);
-      dernier = texte.at(-1) ?? "";
+    if (pleine) poser();
+    else {
+      if (texte.length > rangee) texte = texte.slice(0, rangee);
+      n = nRangee;
+      dernier = dernierRangee;
+      attente = "";
     }
     ligne();
-    rangee = texte.length;
-    cellules = 0;
+    ouvrirRangee();
   };
   const image = (attributs: string) => {
     const src = decoderHtml(attributs.match(/\bsrc\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "").trim();
@@ -325,8 +357,7 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
       if (!tables++) {
         if (listes) ligne();
         else fermer();
-        rangee = texte.length;
-        cellules = 0;
+        ouvrirRangee();
       }
     } else if (nom === "table" && tables) {
       if (!--tables) {
@@ -337,7 +368,10 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
       // Dans un tableau, seules les rangées et les cellules du premier niveau comptent.
       if (tables === 1 && nom === "tr") finRangee();
       else if (tables === 1 && !ferme && (nom === "td" || nom === "th")) {
-        if (cellules++) ecrire(" | ");
+        if (cellules++) {
+          attente += " | ";
+          dernier = " ";
+        }
         blanc = false;
       } else blanc = true;
     } else if (LISTES.has(nom)) {
@@ -421,11 +455,18 @@ export function pageVide(html: string): { fichier?: string } | undefined {
 export function rubriquesSommaire(html: string): Map<string, string> {
   const out = new Map<string, string>();
   let rubrique = "";
-  for (const m of html.matchAll(/<div class="(section|pearl)">([\s\S]*?)<\/div>/g)) {
+  // La fermeture se cherche depuis l'ouverture, et la lecture reprend après elle. Sans
+  // fermeture, aucune ouverture suivante n'en trouverait non plus.
+  const ouverture = /<div class="(section|pearl)">/g;
+  for (let m; (m = ouverture.exec(html));) {
+    const fin = html.indexOf("</div>", ouverture.lastIndex);
+    if (fin < 0) break;
+    const contenu = html.slice(ouverture.lastIndex, fin);
+    ouverture.lastIndex = fin + "</div>".length;
     if (m[1] === "section") {
-      rubrique = sansBalises(m[2]).replace(/_+/g, " ").trim() || rubrique;
+      rubrique = sansBalises(contenu).replace(/_+/g, " ").trim() || rubrique;
     } else {
-      const href = m[2].match(/href="([^"]+)"/)?.[1];
+      const href = contenu.match(/href="([^"]+)"/)?.[1];
       if (href) out.set(decoder(href), rubrique);
     }
   }

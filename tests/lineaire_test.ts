@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { test } from "vite-plus/test";
 import { assert } from "@std/assert";
-import { extraireHtml, extrairePearltrees } from "../src/core/html.ts";
+import { extraireHtml, extrairePearltrees, rubriquesSommaire } from "../src/core/html.ts";
 import { extraireMarkdown, lireFrontMatter } from "../src/core/markdown.ts";
 import { detecterOffice } from "../src/core/ooxml.ts";
 
@@ -57,7 +57,26 @@ const CAS: [string, (s: string) => unknown, string][] = [
     markdown,
     `- ${repete(" ", MO / 2)}${repete("a", MO / 2)} b`,
   ],
+  ["Markdown : paragraphe de lignes courtes", markdown, repete("a\n")],
+  ["Markdown : liste d'entrées courtes", markdown, repete("- a\n")],
+  ["Markdown : rangée de tableau aux nombreuses cellules", markdown, `|${repete("a|")}`],
   ["HTML : `<!--` sans `-->`", html, repete("<!--")],
+  ["HTML : rangées de tableau", html, `<table>${repete("<tr><td>a</td></tr>")}</table>`],
+  [
+    "HTML : rangées vides après un long texte",
+    html,
+    `<table><tr><td>${repete("a ", MO / 2)}</td></tr>${repete("<tr></tr>", MO / 2)}</table>`,
+  ],
+  [
+    "HTML : rangées de cellules vides après un long texte",
+    html,
+    `<table><tr><td>${repete("a ", MO / 2)}</td></tr>${repete("<tr><td></td><td></td></tr>", MO / 2)}</table>`,
+  ],
+  [
+    "Sommaire Pearltrees : rubriques sans fermeture",
+    rubriquesSommaire,
+    repete('<div class="pearl">'),
+  ],
   ["HTML : `<title>` sans `</title>`", html, repete("<title>")],
   ["HTML : `<title ` sans `>`", html, repete("<title ")],
   ["HTML : `<main>` sans `</main>`", html, repete("<main>")],

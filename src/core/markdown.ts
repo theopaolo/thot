@@ -104,17 +104,20 @@ function lisible(s: string, images: string[]): Lisible {
   return { texte: sortie.join(""), codes: plages };
 }
 
-/** Des morceaux mis bout à bout, chaque plage décalée de ce qui la précède. */
+/**
+ * Des morceaux mis bout à bout, chaque plage décalée de ce qui la précède. Le décalage se compte
+ * au fil des morceaux : mesurer le texte déjà joint à chaque tour le relirait en entier.
+ */
 function joindre(morceaux: Lisible[], separateur: string): Lisible {
-  let texte = "";
   const codes: [number, number][] = [];
+  const pas = longueur(separateur);
+  let n = 0;
   for (const [i, m] of morceaux.entries()) {
-    if (i) texte += separateur;
-    const n = longueur(texte);
-    codes.push(...m.codes.map(([a, z]): [number, number] => [a + n, z + n]));
-    texte += m.texte;
+    if (i) n += pas;
+    for (const [a, z] of m.codes) codes.push([a + n, z + n]);
+    n += longueur(m.texte);
   }
-  return { texte, codes };
+  return { texte: morceaux.map((m) => m.texte).join(separateur), codes };
 }
 
 /**
@@ -131,15 +134,25 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
   const images: string[] = [];
   let section = titre;
   let bloc: Lisible = { texte: "", codes: [] };
+  // La longueur du bloc en points de code, tenue à jour : la mesurer à chaque ligne ajoutée
+  // relirait tout le bloc.
+  let taille = 0;
   const fermer = () => {
     if (bloc.texte) {
       parties.push({ texte: bloc.texte, section, ...(bloc.codes.length && { codes: bloc.codes }) });
     }
     bloc = { texte: "", codes: [] };
+    taille = 0;
   };
   // Une ligne de plus dans le bloc courant, ou la suite de la dernière quand `nouvelle` est faux.
   const ajouter = (l: Lisible, nouvelle: boolean) => {
-    if (l.texte) bloc = bloc.texte ? joindre([bloc, l], nouvelle ? "\n" : " ") : l;
+    if (!l.texte) return;
+    // Le séparateur compte pour un point de code.
+    const decalage = bloc.texte ? taille + 1 : 0;
+    if (bloc.texte) bloc.texte += (nouvelle ? "\n" : " ") + l.texte;
+    else bloc.texte = l.texte;
+    for (const [a, z] of l.codes) bloc.codes.push([a + decalage, z + decalage]);
+    taille = decalage + longueur(l.texte);
   };
 
   const brut = corps.split("\n");
