@@ -335,7 +335,7 @@ export const publier = (db: Db, compte: Compte, id: string, revision: number) =>
 /**
  * Signale à revoir les activités qui citent ou montrent la source et dont une preuve ne tient plus
  * dans un de leurs cours : nouvelle révision servie, rejet, lecteurs ou cours retirés. Les
- * changements d'une source dans `ingestion.ts` l'appellent. La page de l'élève revérifie aussi à
+ * changements d'une source dans `ingestion/sources.ts` l'appellent. La page de l'élève revérifie aussi à
  * chaque affichage.
  */
 export function revoirActivites(db: Db, sourceId: string) {
