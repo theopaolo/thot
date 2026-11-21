@@ -29,10 +29,11 @@ import {
   supprimerSource,
 } from "../ingestion.ts";
 import { validerInformations } from "../../core/profils.ts";
-import * as Prof from "../vues/prof.ts";
 import * as ProfBibliotheque from "../vues/prof-bibliotheque.ts";
-import * as ProfQuestions from "../vues/prof-questions.ts";
+import * as ProfLegendes from "../vues/prof-legendes.ts";
 import * as ProfLignes from "../vues/prof-lignes.ts";
+import * as ProfQuestions from "../vues/prof-questions.ts";
+import * as ProfSource from "../vues/prof-source.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import type { Env, Web } from "./web.ts";
@@ -327,11 +328,11 @@ export function routesProf(app: Hono<Env>, w: Web) {
     }
     return c.redirect(`/prof?${retour}`, 303);
   });
-  const detail = (id: string, compte: Compte): Prof.Detail | undefined => {
+  const detail = (id: string, compte: Compte): ProfSource.Detail | undefined => {
     const source = db
       .prepare(`SELECT * FROM sources s WHERE s.id = ? AND ${LISIBLE}`)
       .get(parametresLisible(instance.school_id, lecteur(compte)), id) as
-      | (Prof.Detail["source"] & {
+      | (ProfSource.Detail["source"] & {
           metadonnees: string;
           revision: number;
           proprietaire_id: string | null;
@@ -341,7 +342,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const job = db
       .prepare("SELECT etat, erreur, avertissements FROM ingestion_jobs WHERE source_id = ?")
       .get(id) as { etat: string; erreur: string | null; avertissements: string } | undefined;
-    let blocs: Prof.Detail["blocs"] = [];
+    let blocs: ProfSource.Detail["blocs"] = [];
     try {
       blocs = lireDocument(id, source.revision).blocs;
     } catch {
@@ -368,12 +369,13 @@ export function routesProf(app: Hono<Env>, w: Web) {
       job: job && { ...job, avertissements: JSON.parse(job.avertissements) },
       images: db
         .prepare("SELECT * FROM images WHERE source_id = ? ORDER BY position")
-        .all(id) as unknown as Prof.ImageVue[],
+        .all(id) as unknown as ProfSource.ImageVue[],
       blocs,
     };
   };
 
-  const original = (d: Prof.Detail) => readFile(contenu(d.source.id, "original", d.source.fichier));
+  const original = (d: ProfSource.Detail) =>
+    readFile(contenu(d.source.id, "original", d.source.fichier));
   app.get("/prof/sources/:id", (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     if (!d) return c.notFound();
@@ -381,7 +383,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     // l'extraction : le serveur n'ouvre pas l'original.
     const notes =
       d.modifiable && d.source.format === "pptx" ? (lireNotes(db, d.source.id) ?? null) : undefined;
-    return c.html(rendre(c, d.source.titre, Prof.detailSource({ ...d, notes })));
+    return c.html(rendre(c, d.source.titre, ProfSource.detailSource({ ...d, notes })));
   });
   // Un original HTML ne s'ouvre pas: il lancerait ses scripts sur l'origine de Thot. Word et
   // PowerPoint se téléchargent. Une présentation peut porter des notes de l'orateur : son
@@ -491,7 +493,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
       if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
       return c.text((e as Error).message, 409);
     }
-    return c.html(Prof.statutSource(detail(id, c.get("compte"))!.source));
+    return c.html(ProfSource.statutSource(detail(id, c.get("compte"))!.source));
   });
   app.post("/prof/sources/:id/supprimer", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
@@ -530,7 +532,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Légendes",
-        Prof.pageLegendes(
+        ProfLegendes.pageLegendes(
           aLegender(db, c.get("compte"), c.req.query("image")),
           fileLegendes(db, c.get("compte")),
         ),
@@ -552,6 +554,8 @@ export function routesProf(app: Hono<Env>, w: Web) {
       c.get("compte").nom,
       String(b.credit ?? ""),
     );
-    return c.html(Prof.legende(aLegender(db, c.get("compte")), fileLegendes(db, c.get("compte"))));
+    return c.html(
+      ProfLegendes.legende(aLegender(db, c.get("compte")), fileLegendes(db, c.get("compte"))),
+    );
   });
 }

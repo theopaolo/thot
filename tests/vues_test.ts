@@ -1,11 +1,12 @@
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
-import { detailSource, pageLegendes } from "../src/app/vues/prof.ts";
+import { sources } from "../src/app/vues/prof-bibliotheque.ts";
 import { depot } from "../src/app/vues/prof-depot.ts";
 import { eleves } from "../src/app/vues/prof-eleves.ts";
-import { sources } from "../src/app/vues/prof-bibliotheque.ts";
+import { pageLegendes } from "../src/app/vues/prof-legendes.ts";
 import { lignesSources } from "../src/app/vues/prof-lignes.ts";
+import { detailSource } from "../src/app/vues/prof-source.ts";
 import { panneauSource, reponse } from "../src/app/vues/echange.ts";
 import { chat, pageChapitre } from "../src/app/vues/eleve.ts";
 import {
