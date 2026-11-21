@@ -1,5 +1,5 @@
-import { readFileSync, rmSync } from "node:fs";
-import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { readFile, mkdir, rm } from "node:fs/promises";
 import {
   assembler,
   type Bloc,
@@ -81,11 +81,24 @@ export function revendiquer(db: Db, maintenantMs = Date.now()): Job | undefined 
     .get(horodatage(maintenantMs + VERROU_MS), t, t) as Job | undefined;
 }
 
-async function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
+/**
+ * La tentative qui tient le travail. Chaque revendication incrémente `tentatives` : une tentative
+ * dont le travail a été repris, terminé ou supprimé avec sa source ne retrouve plus sa ligne.
+ */
+const TENU = "id = ? AND tentatives = ? AND etat IN ('extracting', 'enriching')";
+
+/** Prolonge le verrou de la tentative. Rend `false` quand elle ne tient plus le travail. */
+const prolonger = (db: Db, job: Job) =>
+  db
+    .prepare(`UPDATE ingestion_jobs SET verrou_expire_le = ? WHERE ${TENU}`)
+    .run(horodatage(Date.now() + VERROU_MS), job.id, job.tentatives).changes > 0;
+
+const REMPLACEE = "Tentative remplacée.";
+
+function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
   const tmp = `${chemin}.partiel`;
-  if (typeof donnees === "string") await writeFile(tmp, donnees);
-  else await writeFile(tmp, donnees);
-  await rename(tmp, chemin);
+  writeFileSync(tmp, donnees);
+  renameSync(tmp, chemin);
 }
 
 const lireSource = (db: Db, id: string) =>
@@ -120,26 +133,49 @@ async function extraire(s: Source): Promise<Extraction & { notes?: Note[] }> {
   };
 }
 
+/** Change l'état du travail. Lève si la tentative ne le tient plus. */
 function etat(db: Db, job: Job, etat: string, avertissements: string[], fin = false) {
-  db.prepare(
-    `UPDATE ingestion_jobs SET etat = ?, etape = ?, avertissements = ?, maj_le = ?,
-       progression = ?, verrou_expire_le = CASE WHEN ? THEN NULL ELSE verrou_expire_le END
-     WHERE id = ?`,
-  ).run(
-    etat,
-    etat,
-    JSON.stringify(avertissements),
-    maintenant(),
-    fin ? 1 : 0.5,
-    fin ? 1 : 0,
-    job.id,
-  );
+  const { changes } = db
+    .prepare(
+      `UPDATE ingestion_jobs SET etat = ?, etape = ?, avertissements = ?, maj_le = ?,
+         progression = ?, verrou_expire_le = CASE WHEN ? THEN NULL ELSE verrou_expire_le END
+       WHERE ${TENU}`,
+    )
+    .run(
+      etat,
+      etat,
+      JSON.stringify(avertissements),
+      maintenant(),
+      fin ? 1 : 0.5,
+      fin ? 1 : 0,
+      job.id,
+      job.tentatives,
+    );
+  if (!changes) throw new Error(REMPLACEE);
 }
 
-/** Extraction puis légendes. Un échec de légende devient un avertissement, pas un échec du travail. */
+/**
+ * Extraction puis légendes. Un échec de légende devient un avertissement, pas un échec du travail.
+ * La tentative prolonge son verrou tant qu'elle travaille : aucun autre worker ne reprend le
+ * travail, et `supprimerSource` refuse la source. Une tentative qui a perdu le travail n'écrit
+ * plus rien, ni fichier, ni ligne, ni échec.
+ */
 export async function traiter(db: Db, job: Job, modeles: Modeles) {
   const s = lireSource(db, job.source_id);
+  // Appelé avant chaque écriture : elle se fait alors sous un verrou qui vient d'être prolongé.
+  const tenir = () => {
+    if (!prolonger(db, job)) throw new Error(REMPLACEE);
+  };
+  // Une extraction ou une légende peut durer plus longtemps que le verrou.
+  const minuteur = setInterval(() => {
+    try {
+      prolonger(db, job);
+    } catch (e) {
+      console.error(`verrou du travail ${job.id}:`, e);
+    }
+  }, VERROU_MS / 4);
   try {
+    tenir();
     const ext = await extraire(s);
     const doc = assembler(ext.parties);
     const avertissements = [...ext.avertissements];
@@ -148,7 +184,8 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     }
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");
 
-    await enregistrer(db, s, doc, ext.avertissements, ext.notes);
+    tenir();
+    enregistrer(db, s, doc, ext.avertissements, ext.notes);
     // L'extraction vient de devenir la révision en attente, ou de confirmer la révision servie.
     const attente = revisionEnAttente(db, s.id);
     const n = attente?.n ?? s.revision;
@@ -168,10 +205,14 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
       const checksum = await sha256(img.octets);
       if (parOctets.has(checksum)) continue;
       const fichier = `${checksum}.${img.extension}`;
-      if (!servies.has(checksum)) await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
+      if (!servies.has(checksum)) {
+        tenir();
+        ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
+      }
       parOctets.set(checksum, { checksum, fichier, mime: img.mime, section: img.section ?? null });
     }
     const images = [...parOctets.values()];
+    tenir();
     if (!attente) retirer(transaction(db, () => servirImages(db, s.id, n, images)));
     etat(db, job, "enriching", avertissements);
 
@@ -211,28 +252,38 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
       );
     }
     for (const img of aLegender.slice(0, MAX_LEGENDES)) {
+      // Hors du `try` des légendes : un travail perdu s'arrête, il ne devient pas un avertissement.
+      tenir();
+      let legende;
       try {
-        const { texte, modele } = await modeles.legender(
-          await readFile(img.chemin),
-          img.mime,
-          s.profil,
-        );
-        img.garder(texte, modele);
+        legende = await modeles.legender(await readFile(img.chemin), img.mime, s.profil);
       } catch (e) {
         avertissements.push(`Légende non produite: ${(e as Error).message}`);
+        continue;
       }
+      tenir();
+      img.garder(legende.texte, legende.modele);
     }
+    tenir();
     // Les images d'une révision en attente restent dans son dossier, avec leur légende proposée :
     // `statuer` les sert quand un enseignant la certifie, `ecarterRevision` les efface avec elle.
-    if (attente) await ecrireAtomique(`${dossier}/images.jsonl`, jsonl(images));
-    etat(db, job, "awaiting_review", avertissements, true);
-    // Une source déjà certifiée qu'on réingère se réindexe avec ses sections et légendes.
-    if (s.statut === "certifiee") indexer(db, s.id);
+    if (attente) ecrireAtomique(`${dossier}/images.jsonl`, jsonl(images));
+    // Une source déjà certifiée qu'on réingère se réindexe avec ses sections et légendes. Un
+    // échec de l'index annule la fin du travail, qui passe alors en échec.
+    transaction(db, () => {
+      etat(db, job, "awaiting_review", avertissements, true);
+      if (s.statut === "certifiee") reindexer(db, s.id);
+    });
   } catch (e) {
-    db.prepare(
-      `UPDATE ingestion_jobs SET etat = 'failed', erreur = ?, verrou_expire_le = NULL, maj_le = ?
-       WHERE id = ?`,
-    ).run((e as Error).message, maintenant(), job.id);
+    const { changes } = db
+      .prepare(
+        `UPDATE ingestion_jobs SET etat = 'failed', erreur = ?, verrou_expire_le = NULL, maj_le = ?
+         WHERE ${TENU}`,
+      )
+      .run((e as Error).message, maintenant(), job.id, job.tentatives);
+    if (!changes) console.error(`travail ${job.id} abandonné : ${(e as Error).message}`);
+  } finally {
+    clearInterval(minuteur);
   }
 }
 
@@ -327,22 +378,30 @@ function servirImages(db: Db, sourceId: string, n: number, images: ImageRevision
 
 const retirer = (chemins: string[]) => chemins.forEach((c) => rmSync(c, { force: true }));
 
-const lireFichiers = async (dossier: string) => ({
-  texte: await readFile(`${dossier}/document.txt`, "utf8").catch(() => undefined),
-  blocs: await readFile(`${dossier}/blocs.jsonl`, "utf8").catch(() => undefined),
+function lireSiPresent(chemin: string) {
+  try {
+    return readFileSync(chemin, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+const lireFichiers = (dossier: string) => ({
+  texte: lireSiPresent(`${dossier}/document.txt`),
+  blocs: lireSiPresent(`${dossier}/blocs.jsonl`),
 });
 
-async function ecrireDocument(dossier: string, doc: Document) {
-  await mkdir(dossier, { recursive: true });
-  await ecrireAtomique(`${dossier}/document.txt`, doc.texte);
-  await ecrireAtomique(`${dossier}/blocs.jsonl`, jsonl(doc.blocs));
+function ecrireDocument(dossier: string, doc: Document) {
+  mkdirSync(dossier, { recursive: true });
+  ecrireAtomique(`${dossier}/document.txt`, doc.texte);
+  ecrireAtomique(`${dossier}/blocs.jsonl`, jsonl(doc.blocs));
 }
 
 /** Les notes de l'orateur d'une présentation, à côté du texte de la révision et hors de lui. */
-async function ecrireNotes(dossier: string, notes?: Note[]) {
+function ecrireNotes(dossier: string, notes?: Note[]) {
   if (!notes) return;
-  await mkdir(dossier, { recursive: true });
-  await ecrireAtomique(`${dossier}/notes.json`, JSON.stringify(notes));
+  mkdirSync(dossier, { recursive: true });
+  ecrireAtomique(`${dossier}/notes.json`, JSON.stringify(notes));
 }
 
 /**
@@ -372,51 +431,61 @@ export const revisionEnAttente = (db: Db, sourceId: string) =>
  * servie, s'écrit en place : les offsets des citations ne bougent pas, et une révision en attente
  * est écartée. Un autre texte devient une révision en attente, vérifiée avant d'être enregistrée.
  * La révision servie reste citée jusqu'à ce qu'un enseignant certifie la nouvelle.
+ *
+ * Tout se fait dans une transaction, fichiers compris, et la révision servie s'y relit : un
+ * enseignant a pu certifier la révision en attente pendant l'extraction, et le numéro calculé
+ * d'après une lecture plus ancienne désignerait alors le dossier de la révision servie.
  */
-async function enregistrer(
-  db: Db,
-  s: Source,
-  doc: Document,
-  avertissements: string[],
-  notes?: Note[],
-) {
+function enregistrer(db: Db, s: Source, doc: Document, avertissements: string[], notes?: Note[]) {
   const blocs = jsonl(doc.blocs);
-  const servie = await lireFichiers(dossierRevision(s.id, s.revision));
-  if (servie.texte === undefined || servie.texte === doc.texte) {
-    // Le texte servi est revenu : la révision en attente n'a plus rien à faire relire.
-    const perimee = revisionEnAttente(db, s.id);
-    if (perimee) await ecarterRevision(db, s.id, perimee.n);
+  // La révision en attente que cette extraction écarte. Son dossier part une fois sa ligne
+  // retirée pour de bon.
+  let ecartee: number | undefined;
+  const ecarter = (n: number) => {
+    db.prepare("DELETE FROM revisions WHERE source_id = ? AND n = ?").run(s.id, n);
+    ecartee = n;
+  };
+  const resultat = transaction(db, () => {
+    const revision = lireSource(db, s.id).revision;
+    const attente = revisionEnAttente(db, s.id);
+    const servie = lireFichiers(dossierRevision(s.id, revision));
+    if (servie.texte === undefined || servie.texte === doc.texte) {
+      // Le texte servi est revenu : la révision en attente n'a plus rien à faire relire.
+      if (attente) ecarter(attente.n);
+      db.prepare(
+        `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
+         ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
+      ).run(s.id, revision, JSON.stringify(avertissements), maintenant());
+      // Les notes s'écrivent même sans changement de texte : une présentation extraite avant que
+      // le worker ne les garde les reçoit à sa prochaine extraction.
+      ecrireNotes(dossierRevision(s.id, revision), notes);
+      if (servie.texte === doc.texte && servie.blocs === blocs) return "identique";
+      ecrireDocument(dossierRevision(s.id, revision), doc);
+      return "mise_a_jour";
+    }
+    if (attente) {
+      const fichiers = lireFichiers(dossierRevision(s.id, attente.n));
+      if (fichiers.texte === doc.texte && fichiers.blocs === blocs) return "identique";
+    }
+    const n = (attente?.n ?? revision) + 1;
+    const dossier = contenu(s.id, "revisions", String(n));
+    // Un dossier sans ligne en base reste d'un essai interrompu.
+    rmSync(dossier, { recursive: true, force: true });
+    ecrireDocument(dossier, doc);
+    ecrireNotes(dossier, notes);
+    if (!coherent(lireDocument(s.id, n))) {
+      throw new Error(`Révision ${n} incohérente : un bloc ne retombe pas sur son texte.`);
+    }
     db.prepare(
-      `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
-       ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
-    ).run(s.id, s.revision, JSON.stringify(avertissements), maintenant());
-    // Les notes s'écrivent même sans changement de texte : une présentation extraite avant que
-    // le worker ne les garde les reçoit à sa prochaine extraction.
-    await ecrireNotes(dossierRevision(s.id, s.revision), notes);
-    if (servie.texte === doc.texte && servie.blocs === blocs) return "identique";
-    await ecrireDocument(dossierRevision(s.id, s.revision), doc);
-    return "mise_a_jour";
-  }
-  const attente = revisionEnAttente(db, s.id);
-  if (attente) {
-    const fichiers = await lireFichiers(dossierRevision(s.id, attente.n));
-    if (fichiers.texte === doc.texte && fichiers.blocs === blocs) return "identique";
-  }
-  const n = (attente?.n ?? s.revision) + 1;
-  const dossier = contenu(s.id, "revisions", String(n));
-  // Un dossier sans ligne en base reste d'un essai interrompu.
-  await rm(dossier, { recursive: true, force: true });
-  await ecrireDocument(dossier, doc);
-  await ecrireNotes(dossier, notes);
-  if (!coherent(lireDocument(s.id, n))) {
-    throw new Error(`Révision ${n} incohérente : un bloc ne retombe pas sur son texte.`);
-  }
-  db.prepare(
-    "INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)",
-  ).run(s.id, n, JSON.stringify(avertissements), maintenant());
-  // L'ancienne révision en attente n'a jamais servi : la nouvelle la remplace.
-  if (attente) await ecarterRevision(db, s.id, attente.n);
-  return "revision";
+      "INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)",
+    ).run(s.id, n, JSON.stringify(avertissements), maintenant());
+    // L'ancienne révision en attente n'a jamais servi : la nouvelle la remplace.
+    if (attente) ecarter(attente.n);
+    return "revision";
+  });
+  if (ecartee)
+    rmSync(contenu(s.id, "revisions", String(ecartee)), { recursive: true, force: true });
+  return resultat;
 }
 
 /** Écarte la révision en attente, avec ses images. Elle n'a jamais servi, personne ne la cite. */
@@ -445,7 +514,7 @@ export async function reextraire(db: Db, sourceId: string) {
     return "ignoree";
   }
   const ext = await extraire(s);
-  const r = await enregistrer(db, s, assembler(ext.parties), ext.avertissements, ext.notes);
+  const r = enregistrer(db, s, assembler(ext.parties), ext.avertissements, ext.notes);
   if (r === "mise_a_jour") indexer(db, s.id);
   return r;
 }
@@ -606,12 +675,27 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
   const s = lireSource(db, sourceId);
   if (s.profil !== "arts-appliques") return;
   const meta = JSON.parse(s.metadonnees) as Meta;
+  let texte: string;
+  try {
+    texte = lireDocument(sourceId, s.revision).texte;
+  } catch (e) {
+    // Un fichier de la révision manque ou est abîmé, par exemple après la restauration d'une
+    // sauvegarde prise pendant une suppression. Le travail passe en échec : la source ne revient
+    // plus ici, sa page affiche la cause, et le worker continue.
+    const cause = `Texte extrait illisible : ${(e as Error).message}`;
+    console.error(`informations ${sourceId}: ${cause}`);
+    db.prepare(
+      `UPDATE ingestion_jobs SET etat = 'failed', erreur = ?, maj_le = ?
+       WHERE source_id = ? AND etat = 'awaiting_review'`,
+    ).run(cause, maintenant(), sourceId);
+    return;
+  }
   const fiche = [
     `Titre : ${s.titre}`,
     `Fichier : ${s.fichier}`,
     `Séquence : ${regroupement(db, s) ?? ""}`,
     `Séance : ${meta.seance ?? ""}`,
-    `Texte : ${lireDocument(sourceId, s.revision).texte.slice(0, 2000)}`,
+    `Texte : ${texte.slice(0, 2000)}`,
   ].join("\n");
   let propositions = {};
   try {

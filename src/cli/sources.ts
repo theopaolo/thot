@@ -1,11 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { opendir, readFile, stat } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { decoder, pageVide, rubriquesSommaire } from "../core/html.ts";
 import { lireFrontMatter } from "../core/markdown.ts";
+import { transaction } from "../core/recherche.ts";
 import { lireInstance } from "../app/instance.ts";
 import { contenu } from "../app/config.ts";
-import type { Db } from "../app/db.ts";
+import { type Db, maintenant } from "../app/db.ts";
 import { controlerFichier, deposer, nomSur, sha256, valider } from "../app/depot.ts";
 import {
   indexer,
@@ -233,6 +234,59 @@ function importerLegendes(db: Db, chemin: string) {
   console.log(`${n} légende(s) importée(s) sur ${Object.keys(json.legendes).length}.`);
 }
 
+/**
+ * Les restes d'une écriture interrompue : les dossiers de `content/` sans source en base, laissés
+ * par un dépôt ou une suppression arrêtés entre le fichier et la ligne, et les fichiers
+ * `.partiel`. Un reste de moins d'une heure peut être une écriture en cours, `deposer()` écrit
+ * l'original avant sa ligne : il n'est ni listé ni effacé.
+ */
+function orphelins(db: Db, supprimer: boolean) {
+  const racine = contenu();
+  const ancien = (chemin: string) => Date.now() - statSync(chemin).mtimeMs > 3_600_000;
+  const aUneSource = (id: string) => !!db.prepare("SELECT 1 FROM sources WHERE id = ?").get(id);
+  // Le worker écrit dans le dossier d'une source tant qu'il tient son travail.
+  const enTravail = (id: string) =>
+    !!db
+      .prepare(
+        `SELECT 1 FROM ingestion_jobs WHERE source_id = ? AND etat IN ('extracting', 'enriching')
+         AND verrou_expire_le > ?`,
+      )
+      .get(id, maintenant());
+  const dossiers: string[] = [];
+  const partiels: { id: string; chemin: string }[] = [];
+  for (const e of existsSync(racine) ? readdirSync(racine, { withFileTypes: true }) : []) {
+    if (!e.isDirectory()) continue;
+    const dossier = join(racine, e.name);
+    if (!aUneSource(e.name)) {
+      if (ancien(dossier)) dossiers.push(e.name);
+    } else if (!enTravail(e.name)) {
+      for (const f of readdirSync(dossier, { recursive: true, encoding: "utf8" })) {
+        if (f.endsWith(".partiel") && ancien(join(dossier, f))) {
+          partiels.push({ id: e.name, chemin: join(e.name, f) });
+        }
+      }
+    }
+  }
+  console.log(`Dossiers de content/ sans source : ${dossiers.length}`);
+  dossiers.forEach((d) => console.log(`  ${d}`));
+  console.log(`Fichiers .partiel de plus d'une heure : ${partiels.length}`);
+  partiels.forEach((f) => console.log(`  ${f.chemin}`));
+  if (!dossiers.length && !partiels.length) return;
+  if (!supprimer) return console.log("Rien n'est effacé sans --supprimer.");
+  // Chaque reste se revérifie sous le verrou d'écriture de la base, juste avant d'être effacé :
+  // aucun dépôt ni aucune revendication ne s'enregistre entre la vérification et l'effacement.
+  let n = 0;
+  const effacer = (chemin: string, garder: () => boolean) =>
+    transaction(db, () => {
+      if (garder()) return;
+      rmSync(join(racine, chemin), { recursive: true, force: true });
+      n++;
+    });
+  for (const d of dossiers) effacer(d, () => aUneSource(d));
+  for (const f of partiels) effacer(f.chemin, () => enTravail(f.id));
+  console.log(`${n} reste(s) effacé(s).`);
+}
+
 /** Les sources désignées, ou avec `--tout` toutes celles de l'établissement dans `statut`. */
 const designees = (db: Db, statut: string, tout: boolean | undefined, ids: string[]) =>
   tout
@@ -327,6 +381,12 @@ export const sources: Record<string, Commande> = {
         if (etat === "revision") fichiers.forEach((f) => console.log(`  ${f}`));
       }
     },
+  },
+  orphelins: {
+    aide: `  orphelins [--supprimer]                   liste les dossiers de content/ sans source et les fichiers
+                                            .partiel de plus d'une heure, et les efface sur demande`,
+    lancer: (db, _, argv) =>
+      orphelins(db, lire(argv, { supprimer: oui }).values.supprimer === true),
   },
   backup: {
     aide: `  backup <destination>                      copie base, contenu, images d'activités et secret dans un

@@ -22,16 +22,19 @@ test("le convertisseur est arrêté et attendu en cas de délai, mémoire ou sor
   try {
     for (const cas of ["delai", "sortie", ...(process.platform === "darwin" ? ["memoire"] : [])]) {
       const stdout = new PassThrough();
+      const stderr = new PassThrough();
       if (cas === "sortie") stdout.write(new Uint8Array(10 * 1024 * 1024 + 1));
       let signal: string | undefined;
       const enfant = Object.assign(new EventEmitter(), {
         pid: 123,
         stdout,
+        stderr,
         kill(s: string) {
           assertEquals(s, "SIGKILL");
           if (signal) return;
           signal = s;
           stdout.end();
+          stderr.end();
           setImmediate(() => enfant.emit("close", null, s));
         },
       });
@@ -57,5 +60,53 @@ test("le convertisseur est arrêté et attendu en cas de délai, mémoire ou sor
   } finally {
     globalThis.setTimeout = timeout;
     globalThis.setInterval = interval;
+  }
+});
+
+/** Un faux pdftotext : ses flux, et ce que Node émet quand il se termine. */
+function faux(pid: number | undefined) {
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const enfant = Object.assign(new EventEmitter(), { pid, stdout, stderr, kill: () => true });
+  enfants.courant = enfant;
+  return enfant;
+}
+
+test("un pdftotext introuvable devient une erreur d'extraction, sans rejet non géré", async () => {
+  const enfant = faux(undefined);
+  const rejets: unknown[] = [];
+  const noter = (e: unknown) => rejets.push(e);
+  process.on("unhandledRejection", noter);
+  try {
+    // Node émet « error », ferme les flux au tour suivant, puis émet « close ».
+    setImmediate(() => {
+      enfant.emit("error", new Error("spawn pdftotext ENOENT"));
+      setImmediate(() => {
+        enfant.stdout.end();
+        enfant.stderr.end();
+        setImmediate(() => enfant.emit("close", -2, null));
+      });
+    });
+    await assertRejects(() => extrairePdf("document.pdf"), Error, "spawn pdftotext ENOENT");
+    await new Promise((r) => setImmediate(r));
+    assertEquals(rejets, []);
+  } finally {
+    process.off("unhandledRejection", noter);
+  }
+});
+
+test("l'échec de pdftotext porte sa sortie d'erreur et son signal", async () => {
+  for (const [code, signal, attendu] of [
+    [1, null, "(code 1) : Command Line Error: Incorrect password"],
+    [null, "SIGSEGV", "(signal SIGSEGV)"],
+  ] as const) {
+    const enfant = faux(123);
+    setImmediate(() => {
+      if (code) enfant.stderr.write("Command Line Error: Incorrect password\n");
+      enfant.stderr.end();
+      enfant.stdout.end();
+      setImmediate(() => enfant.emit("close", code, signal));
+    });
+    await assertRejects(() => extrairePdf("document.pdf"), Error, attendu);
   }
 });

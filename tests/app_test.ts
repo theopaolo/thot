@@ -226,7 +226,11 @@ test("un travail interrompu reprend après expiration du verrou, sans image en d
   assertEquals(repris.id, premier.id);
   assertEquals(repris.tentatives, 2);
   await traiter(db, repris, fauxModeles().modeles);
-  await traiter(db, repris, fauxModeles().modeles);
+  // Un worker mort après avoir tout écrit sauf la fin du travail : la reprise refait l'extraction.
+  db.prepare(
+    "UPDATE ingestion_jobs SET etat = 'enriching', verrou_expire_le = '2000-01-01T00:00:00Z'",
+  ).run();
+  await traiter(db, revendiquer(db)!, fauxModeles().modeles);
   assertEquals(db.prepare("SELECT count(*) n FROM images").get()!.n, 1);
   assertEquals(db.prepare("SELECT etat FROM ingestion_jobs").get()!.etat, "awaiting_review");
 });

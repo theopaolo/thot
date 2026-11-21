@@ -65,6 +65,17 @@ la tentative renouvelle son verrou. Un renouvellement refusé interrompt son app
 son `AbortSignal`. Avant de publier, la boucle revérifie les preuves avec les droits actuels de
 l'élève. Une réponse interrompue plusieurs fois échoue avec la cause `INTERRUPTED`.
 
+Un travail d'ingestion suit la même règle (`traiter()` dans `src/app/ingestion.ts`). Chaque
+revendication incrémente `tentatives`, et ce numéro désigne la tentative. Le worker prolonge le
+verrou sur une minuterie et avant chaque écriture : une extraction ou des légendes plus longues
+que le verrou ne sont pas reprises par un autre processus. Une tentative dont le travail a été
+repris, terminé ou supprimé n'écrit plus rien, ni fichier, ni ligne, ni échec. L'appel de légende
+en cours va à son terme, `legender()` ne prend pas de signal, et son résultat est écarté.
+
+`enregistrer()` range une extraction dans une seule transaction, fichiers compris, et y relit la
+révision servie. Le worker et `thot reextraire` attendent l'extraction avant d'enregistrer : un
+enseignant qui certifie la révision en attente pendant ce temps ne voit pas son dossier réécrit.
+
 `src/core/` porte l'ingestion, la recherche et la réponse. Il n'importe rien de `src/app/`
 (`pnpm frontiere`) et reçoit le périmètre des sources consultables en paramètre. Il ne reçoit
 ni session ni requête HTTP.
@@ -371,7 +382,8 @@ extraits. Questions et titres de conversation restent : ils viennent de l'élèv
 Une réponse en cours qui a retrouvé la source ne publie rien d'elle. La revérification avant
 publication la rend indisponible, et la boucle retire du journal les sources supprimées pendant le
 calcul. Une suggestion en cours échoue sur la clé étrangère. La suppression est refusée tant que
-le worker extrait la source sous un verrou valide : il réécrirait ses fichiers et le cache.
+le worker extrait la source sous un verrou valide : il réécrirait ses fichiers et le cache. Le
+worker prolonge ce verrou jusqu'à la fin du travail.
 
 Le texte de la source quitte aussi le fichier de la base : `secure_delete` sur chaque connexion,
 l'option `secure-delete` de l'index plein texte (migration 0017), puis un point de contrôle qui
@@ -608,6 +620,7 @@ stateDiagram-v2
     enriching --> awaiting_review: légendes tentées
     extracting --> failed: erreur ou tentatives épuisées
     enriching --> failed
+    awaiting_review --> failed: texte extrait illisible
   }
 ```
 

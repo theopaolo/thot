@@ -1,5 +1,4 @@
 import { execFile, spawn } from "node:child_process";
-import { once } from "node:events";
 import { promisify } from "node:util";
 import type { Extraction, Partie } from "./document.ts";
 import { sansAccents } from "./texte.ts";
@@ -17,14 +16,29 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
   const processus = spawn(
     linux ? "/usr/bin/prlimit" : "pdftotext",
     [...(linux ? ["--as=536870912", "--cpu=30", "--", "pdftotext"] : []), chemin, "-"],
-    { stdio: ["ignore", "pipe", "ignore"] },
+    { stdio: ["ignore", "pipe", "pipe"] },
   );
   let termine = false;
-  const statut = once(processus, "close").then(([code]) => {
-    termine = true;
-    return code as number | null;
-  });
   let erreur: Error | undefined;
+  // Un binaire absent arrive par « error », pas par une exception de `spawn`. La promesse ne
+  // rejette pas : personne ne l'attend encore pendant la lecture de la sortie, et Node arrêterait
+  // le worker sur ce rejet.
+  const statut = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((fin) => {
+    const finir = (code: number | null, signal: NodeJS.Signals | null) => {
+      termine = true;
+      fin({ code, signal });
+    };
+    processus.once("error", (e) => {
+      erreur ??= new Error(`pdftotext n'a pas pu être lancé : ${e.message}`);
+      finir(null, null);
+    });
+    processus.once("close", finir);
+  });
+  // pdftotext y nomme la cause d'un échec, un mot de passe par exemple. Le début suffit.
+  let sortieErreur = "";
+  processus.stderr.setEncoding("utf8").on("data", (bloc: string) => {
+    if (sortieErreur.length < 2000) sortieErreur += bloc;
+  });
   const arreter = (raison: string) => {
     erreur ??= new Error(raison);
     processus.kill("SIGKILL");
@@ -67,11 +81,16 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
       }
       texte += decoder.decode(bloc, { stream: true });
     }
-    const code = await statut;
+    const { code, signal } = await statut;
     clearInterval(memoire);
     await controleEnCours;
     if (erreur) throw erreur;
-    if (code !== 0) throw new Error(`pdftotext a échoué (code ${code})`);
+    if (code !== 0) {
+      const detail = sortieErreur.trim().slice(0, 2000);
+      throw new Error(
+        `pdftotext a échoué (${signal ? `signal ${signal}` : `code ${code}`})${detail ? ` : ${detail}` : ""}`,
+      );
+    }
     return decouperPdf(texte + decoder.decode(), profil);
   } finally {
     clearTimeout(minuteur);
