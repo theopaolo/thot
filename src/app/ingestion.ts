@@ -1,25 +1,19 @@
 import { readFile, mkdir, rm } from "node:fs/promises";
-import { assembler, decouper, type Extraction } from "../core/document.ts";
+import { assembler, type Extraction } from "../core/document.ts";
 import { extraireDocx } from "../core/docx.ts";
 import { extraireHtml, extrairePearltrees } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
 import { cleLegende, type Modeles } from "../core/modeles.ts";
 import { extrairePdf } from "../core/pdf.ts";
 import { extrairePptx, type Note } from "../core/pptx.ts";
-import {
-  type ChunkIndexe,
-  estAnglais,
-  indexerSource,
-  retirerSource,
-  transaction,
-} from "../core/recherche.ts";
+import { estAnglais, retirerSource, transaction } from "../core/recherche.ts";
 import { journalSans, type Resultat, resultatSans } from "../core/reponse.ts";
 import { oublierSource, revoirActivites } from "./activites.ts";
 import { config, contenu } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
 import { type Audience, sha256 } from "./depot.ts";
 import { filtreModification, parametresModification, type Compte } from "./comptes.ts";
-import { type Affiliation, affiliations, nomTheme, renommer } from "./domaines.ts";
+import { type Affiliation, affiliations, nomTheme } from "./domaines.ts";
 import { lireInstance } from "./instance.ts";
 import {
   type Source,
@@ -38,9 +32,11 @@ import {
   servirImages,
   retirer,
 } from "./ingestion/images.ts";
+import { type Meta, regroupement, reindexer, indexer } from "./ingestion/indexation.ts";
 
 export * from "./ingestion/revisions.ts";
 export * from "./ingestion/images.ts";
+export * from "./ingestion/indexation.ts";
 
 const VERROU_MS = 5 * 60_000;
 const MAX_TENTATIVES = 3;
@@ -294,90 +290,6 @@ export async function reextraire(db: Db, sourceId: string) {
   return r;
 }
 
-export type Meta = { sequence?: string; seance?: string };
-
-/**
- * Ce qui range la source : les noms de ses thèmes, tous, par ordre alphabétique. Une source dans
- * plusieurs cours a un thème par cours, et chaque nom donne un mot de plus à la recherche. Une
- * source sans thème garde l'ancienne séquence.
- */
-function regroupement(db: Db, s: Source) {
-  const noms = db
-    .prepare(
-      `SELECT DISTINCT t.nom FROM source_cours sc JOIN themes t ON t.id = sc.theme_id
-       WHERE sc.source_id = ? ORDER BY t.nom`,
-    )
-    .all(s.id)
-    .map((t) => t.nom as string);
-  return noms.length ? noms.join(" / ") : (JSON.parse(s.metadonnees) as Meta).sequence;
-}
-
-/**
- * Renomme une matière, un cours, un thème ou un champ. L'en-tête des passages porte le nom de
- * leurs thèmes : les sources d'un thème renommé se réindexent dans la même transaction.
- */
-export function renommerEntree(db: Db, genre: string, id: string, nom: string) {
-  transaction(db, () => {
-    renommer(db, genre, id, nom);
-    if (genre !== "theme") return;
-    const ids = db.prepare("SELECT source_id FROM source_cours WHERE theme_id = ?").all(id);
-    for (const { source_id } of ids) reindexer(db, source_id as string);
-  });
-}
-
-/**
- * Chunks d'une révision, la servie par défaut: texte de recherche avec toutes les légendes,
- * preuve avec les certifiées. Titres et légendes sont ceux d'aujourd'hui, même pour une ancienne.
- */
-export function chunksSource(db: Db, sourceId: string, revision?: number): ChunkIndexe[] {
-  const s = lireSource(db, sourceId);
-  const n = revision ?? s.revision;
-  const meta = JSON.parse(s.metadonnees) as Meta;
-  const contexte = [
-    s.profil === "arts-appliques" ? regroupement(db, s)?.replace(/^ATC /, "") : regroupement(db, s),
-    meta.seance,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-  const images = db
-    .prepare(
-      `SELECT legende, legende_statut, section FROM images
-     WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
-    )
-    .all(sourceId) as { legende: string; legende_statut: string; section: string | null }[];
-  const chunks = decouper(lireDocument(sourceId, n));
-  // Une image accompagne le premier passage de sa section, une diapositive par exemple. Sans
-  // section connue, ou si la révision n'a plus cette section, le premier passage du document.
-  const place = (section: string | null) =>
-    Math.max(0, section === null ? 0 : chunks.findIndex((c) => c.section === section));
-  return chunks.map((c, i) => {
-    const legendes = images.filter((l) => place(l.section) === i);
-    const titre =
-      c.section && c.section !== s.titre && c.section !== "Introduction"
-        ? `${s.titre} : ${c.section}`
-        : s.titre;
-    return {
-      id: c.id,
-      source_id: s.id,
-      school_id: s.school_id,
-      titre,
-      debut: c.debut,
-      fin: c.fin,
-      texte: c.texte,
-      rappel: [contexte, titre, c.texte, ...legendes.map((l) => l.legende)]
-        .filter(Boolean)
-        .join("\n"),
-      preuve: [
-        c.texte,
-        ...legendes
-          .filter((l) => l.legende_statut === "certified")
-          .map((l) => `Image : ${l.legende}`),
-      ].join("\n\n"),
-      revision: n,
-    };
-  });
-}
-
 const INFORMATIONS = ["date", "artiste", "mouvement"] as const;
 
 const CONSIGNE_INFORMATIONS = `Tu lis la fiche d'un document de cours d'arts appliqués : titre,
@@ -480,14 +392,6 @@ export async function proposerInformations(db: Db, modeles: Modeles, sourceId: s
      WHERE id = ? AND json_type(metadonnees, '$.artiste') IS NULL`,
   ).run(JSON.stringify(propositions), sourceId);
 }
-
-/** Seule une source certifiée entre dans l'index. Toute autre en sort. Sans transaction. */
-function reindexer(db: Db, sourceId: string) {
-  const s = lireSource(db, sourceId);
-  indexerSource(db, sourceId, s.statut === "certifiee" ? chunksSource(db, sourceId) : []);
-}
-
-export const indexer = (db: Db, sourceId: string) => transaction(db, () => reindexer(db, sourceId));
 
 /**
  * Ce qui empêche de certifier la source, ou `undefined` : seule une extraction qui attend sa
