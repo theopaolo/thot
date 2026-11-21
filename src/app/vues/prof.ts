@@ -605,14 +605,19 @@ const tableEleves = (
   `;
 
 export type Lien = {
-  jeton: string;
+  /** Absent pour qui n'est pas membre de tous les cours du lien. */
+  jeton?: string;
+  cle: string;
   places: number;
   expire_le: string;
   createur: string;
   cours: string[];
 };
 
-/** Les liens actifs. Un cours du lien ne se nomme qu'à ses enseignants. */
+/**
+ * Les liens actifs. Un cours du lien ne se nomme qu'à ses enseignants, et l'adresse du lien, dont
+ * la page nomme tous ses cours, ne se copie que par les enseignants de tous ses cours.
+ */
 const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Cours) =>
   html`
     <h3 id="liens">Liens actifs</h3>
@@ -626,9 +631,18 @@ const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Co
             return html`<li>
               <p>${l.places} place${l.places > 1 ? "s" : ""} restante${l.places > 1 ? "s" : ""}, expire le ${jour(l.expire_le)}.</p>
               <p class="discret">${!actuel || l.cours.length > 1 ? `${noms}. ` : ""}Créé par ${l.createur}.</p>
+              ${
+                l.jeton
+                  ? ""
+                  : html`<p class="discret">Ce lien ouvre aussi un cours dont vous n'êtes pas membre. Les enseignants de tous ses cours copient son adresse.</p>`
+              }
               <div class="barre">
-                <button type="button" data-copier="${adresse}/inscription/${l.jeton}" aria-label="Copier le lien pour ${noms}">Copier le lien</button>
-                <form method="post" action="/prof/eleves/liens/${l.jeton}/revoquer">
+                ${
+                  l.jeton
+                    ? html`<button type="button" data-copier="${adresse}/inscription/${l.jeton}" aria-label="Copier le lien pour ${noms}">Copier le lien</button>`
+                    : ""
+                }
+                <form method="post" action="/prof/eleves/liens/${l.cle}/revoquer">
                   <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs cours.">Révoquer</button>
                 </form>
               </div>

@@ -436,21 +436,23 @@ export const nomTheme = (s: string) =>
   `(SELECT min(t.nom) FROM source_cours sc JOIN themes t ON t.id = sc.theme_id WHERE sc.source_id = ${s}.id)`;
 /**
  * Le thème qui remplace un ancien chapitre, c'est-à-dire une séquence : celui où sont rangées le
- * plus de sources de cette séquence, dans un cours du compte d'abord. Vide si aucun ne convient.
- * La migration 0018 fait le même choix pour les conversations.
+ * plus de sources de cette séquence, dans un cours du compte d'abord. Seules comptent les sources
+ * que le lecteur lit, dans les cours qu'on lui nomme : une séquence qu'il ne lit pas ne mène nulle
+ * part, comme une séquence inconnue. Vide si aucun thème ne convient. La migration 0018 fait le
+ * même choix pour les conversations.
  */
-export const themeDuChapitre = (db: Db, nom: string, compteId: string) =>
+export const themeDuChapitre = (db: Db, nom: string, l: Lecteur) =>
   (db
     .prepare(
       `SELECT sc.theme_id FROM source_cours sc JOIN sources s ON s.id = sc.source_id
        JOIN themes t ON t.id = sc.theme_id
-     WHERE json_extract(s.metadonnees, '$.sequence') = ?
+     WHERE json_extract(s.metadonnees, '$.sequence') = ? AND ${FILTRE_ACCES} AND ${MES_COURS}
      GROUP BY sc.theme_id
      ORDER BY EXISTS (SELECT 1 FROM membres_cours m WHERE m.cours_id = t.cours_id
-       AND m.compte_id = ?) DESC, count(*) DESC
+       AND m.compte_id = $lecteur) DESC, count(*) DESC
      LIMIT 1`,
     )
-    .get(nom, compteId)?.theme_id as string | undefined) ?? "";
+    .get({ ...parametresAcces(l), ...mesCours(l) }, nom)?.theme_id as string | undefined) ?? "";
 /**
  * Range une source sans cours choisi dans le premier cours de sa matière, sous le thème du nom de
  * sa séquence. Seul l'import CLI remplit encore la séquence, avec le nom du dossier. L'import et un

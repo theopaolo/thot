@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Lecteur, transaction } from "../core/recherche.ts";
@@ -87,6 +88,13 @@ export function eleveSaisi(identifiant = "", nom = "") {
   return { identifiant, nom };
 }
 
+/**
+ * Le refus d'un identifiant à l'inscription par lien. Un identifiant pris reçoit le même message
+ * qu'un identifiant invalide : la page ne dit pas quels comptes existent.
+ */
+export const IDENTIFIANT_REFUSE =
+  "Identifiant ou nom refusé. Choisis un autre identifiant, de 3 à 40 caractères parmi a-z, 0-9, point, tiret et tiret bas, et un nom de 100 caractères au maximum. Si tu as déjà un compte, connecte-toi d'abord.";
+
 /** CSV UTF-8 avec colonnes identifiant,nom. Les guillemets et retours de ligne sont permis. */
 export function lireListe(csv: string): { identifiant: string; nom: string }[] {
   const lignes: string[][] = [];
@@ -152,9 +160,11 @@ export const importerEleves = (db: Db, csv: string, cours: string[] = []) =>
   creerEleves(db, lireListe(csv), cours);
 
 /**
- * Crée les comptes élèves et les inscrit aux cours donnés, dans la même transaction. Un compte
- * existant ne s'inscrit pas par son identifiant : les enseignants d'un cours réinitialisent le mot
- * de passe de ses élèves, et inscrire un compte existant leur ouvrirait ce compte.
+ * Crée les comptes élèves et les inscrit aux cours donnés, dans la même transaction. Le mot de
+ * passe rendu est provisoire : l'enseignant le remet, l'élève choisit le sien à sa première
+ * connexion. Un compte existant ne s'inscrit pas par son identifiant : les enseignants d'un cours
+ * réinitialisent le mot de passe de ses élèves, et inscrire un compte existant leur ouvrirait ce
+ * compte.
  */
 export async function creerEleves(
   db: Db,
@@ -188,7 +198,7 @@ export async function creerEleves(
   }
   transaction(db, () => {
     const insert = db.prepare(
-      "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, 'eleve', ?, ?, ?)",
+      "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le, renouveler_mdp) VALUES (?, ?, ?, 'eleve', ?, ?, ?, 1)",
     );
     for (const c of resultats) {
       insert.run(c.id, c.identifiant, c.nom, c.sel, c.empreinte, maintenant());
@@ -271,9 +281,7 @@ export async function inscrireParLien(
       nouveau &&
       db.prepare("SELECT 1 FROM comptes WHERE identifiant = ?").get(nouveau.identifiant)
     ) {
-      throw new Error(
-        `Identifiant déjà utilisé : ${nouveau.identifiant}. Si c'est ton compte, connecte-toi.`,
-      );
+      throw new Error(IDENTIFIANT_REFUSE);
     }
     const siens = coursDuCompte(db, id);
     const manquants = cours.filter((c) => !siens.has(c));
@@ -313,12 +321,22 @@ export function elevesSansCours(db: Db, compte: Compte) {
     .all() as { id: string; identifiant: string; nom: string }[];
 }
 
-/** Les liens actifs que le compte gère, avec leurs cours décodés. */
+/** Désigne un lien dans une page sans donner son jeton, qui suffit à s'inscrire. */
+const cleLien = (jeton: string) => createHash("sha256").update(jeton).digest("hex").slice(0, 32);
+
+/**
+ * Les liens actifs que le compte gère, avec leurs cours décodés. Le jeton, donc l'adresse du lien
+ * et la page qui nomme ses cours, ne va qu'aux membres de tous ses cours et aux administrateurs.
+ * Les autres désignent le lien par sa clé.
+ */
 export function liensGeres(db: Db, compte: Compte) {
   const liens = db
     .prepare(
       `SELECT liens.jeton, places, expire_le, a.nom AS createur,
-         json_group_array(lc.cours_id) AS cours
+         json_group_array(lc.cours_id) AS cours,
+         $administrateur OR NOT EXISTS (SELECT 1 FROM liens_cours x WHERE x.jeton = liens.jeton
+           AND x.cours_id NOT IN (SELECT cours_id FROM membres_cours WHERE compte_id = $lecteur))
+           AS entier
        FROM liens JOIN comptes a ON a.id = liens.createur_id
        JOIN liens_cours lc ON lc.jeton = liens.jeton
        WHERE revoque_le IS NULL AND expire_le > ? AND ${LIENS_GERES}
@@ -330,18 +348,25 @@ export function liensGeres(db: Db, compte: Compte) {
     expire_le: string;
     createur: string;
     cours: string;
+    entier: number;
   }[];
-  return liens.map((l) => ({ ...l, cours: JSON.parse(l.cours) as string[] }));
+  return liens.map(({ jeton, entier, ...l }) => ({
+    ...l,
+    cle: cleLien(jeton),
+    jeton: entier ? jeton : undefined,
+    cours: JSON.parse(l.cours) as string[],
+  }));
 }
 
-/** Révoque un lien que le compte gère. Rend `false` si aucun lien ne correspond. */
-export function revoquerLien(db: Db, compte: Compte, jeton: string) {
-  const { changes } = db
-    .prepare(
-      `UPDATE liens SET revoque_le = ? WHERE jeton = ? AND revoque_le IS NULL AND ${LIENS_GERES}`,
-    )
-    .run(parametresGeres(compte), maintenant(), jeton);
-  return !!changes;
+/** Révoque le lien de cette clé si le compte le gère. Rend `false` si aucun lien ne correspond. */
+export function revoquerLien(db: Db, compte: Compte, cle: string) {
+  const lien = db
+    .prepare(`SELECT jeton FROM liens WHERE revoque_le IS NULL AND ${LIENS_GERES}`)
+    .all(parametresGeres(compte))
+    .find((l) => cleLien(l.jeton as string) === cle);
+  if (!lien) return false;
+  db.prepare("UPDATE liens SET revoque_le = ? WHERE jeton = ?").run(maintenant(), lien.jeton);
+  return true;
 }
 
 /** Vrai si le compte est élève du cours donné. */
@@ -359,6 +384,10 @@ export const eleveGere = (db: Db, compte: Compte, id: string) =>
     .prepare(`SELECT identifiant, nom FROM comptes WHERE id = ? AND ${ELEVES_GERES}`)
     .get(parametresGeres(compte), id) as { identifiant: string; nom: string } | undefined;
 
+/**
+ * Remplace le mot de passe par un code provisoire et ferme les sessions du compte. Qui remet le
+ * code ne garde pas l'accès : la première connexion le consomme et impose d'en choisir un autre.
+ */
 export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "eleve") {
   const compte = db.prepare("SELECT role FROM comptes WHERE id = ?").get(id);
   if (compte?.role !== role) return undefined;
@@ -366,7 +395,7 @@ export async function reinitialiserMotDePasse(db: Db, id: string, role: Role = "
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   db.prepare(
     `UPDATE comptes SET sel = ?, empreinte = ?, session_version = session_version + 1,
-      renouveler_mdp = administrateur WHERE id = ?`,
+      renouveler_mdp = 1 WHERE id = ?`,
   ).run(sel, await deriver(motDePasse, sel), id);
   return motDePasse;
 }
@@ -423,17 +452,24 @@ function verifierMotDePasse(motDePasse: string) {
   }
 }
 
-export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: string) {
+/**
+ * Enregistre le mot de passe que le compte choisit et ferme toutes ses sessions. Un code
+ * provisoire a déjà été vérifié et consommé à la connexion. Sinon l'ancien mot de passe est exigé.
+ */
+export async function choisirMotDePasse(db: Db, compte: Compte, motDePasse: string, ancien = "") {
   verifierMotDePasse(motDePasse);
+  if (!compte.renouveler_mdp && !(await authentifier(db, compte.identifiant, ancien))) {
+    throw new Error("Mot de passe actuel incorrect.");
+  }
   const sel = hex(crypto.getRandomValues(new Uint8Array(16)));
   const { changes } = db
     .prepare(
       `UPDATE comptes SET sel = ?, empreinte = ?, renouveler_mdp = 0,
        session_version = session_version + 1
-     WHERE id = ? AND session_version = ? AND renouveler_mdp = 1`,
+     WHERE id = ? AND session_version = ?`,
     )
     .run(sel, await deriver(motDePasse, sel), compte.id, compte.session_version);
-  if (!changes) throw new Error("Session expirée. Demander une récupération à l'opérateur.");
+  if (!changes) throw new Error("Session expirée : le mot de passe n'a pas changé.");
 }
 
 export async function authentifier(db: Db, identifiant: string, motDePasse: string) {

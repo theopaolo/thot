@@ -12,6 +12,7 @@ import {
   reinitialiserMotDePasse,
   revoquerLien,
 } from "../comptes.ts";
+import { config } from "../config.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import * as Prof from "../vues/prof.ts";
 import * as Domaines from "../domaines.ts";
@@ -19,6 +20,8 @@ import type { Env, Web } from "./web.ts";
 
 export function routesProfEleves(app: Hono<Env>, w: Web) {
   const { db, rendre } = w;
+  // Derrière un proxy TLS, la requête arrive en HTTP : l'origine configurée donne la bonne adresse.
+  const adresse = (c: Context<Env>) => config.origine || new URL(c.req.url).origin;
   /**
    * Les élèves d'un cours, ou de tous les cours de l'enseignant. Le cours vient de l'adresse, ou du
    * périmètre retenu quand un formulaire refusé rend la page. Un enseignant d'un seul cours y est
@@ -52,7 +55,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
         groupes,
         sansCours: actuel ? undefined : elevesSansCours(db, compte),
         liens,
-        adresse: url.origin,
+        adresse: adresse(c),
         l: libelles(db),
         matiere,
         erreur,
@@ -76,11 +79,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       const comptes = await creer();
       c.header("Cache-Control", "no-store");
       return c.html(
-        rendre(
-          c,
-          "Identifiants élèves",
-          Prof.feuilleIdentifiants(comptes, new URL(c.req.url).origin),
-        ),
+        rendre(c, "Identifiants élèves", Prof.feuilleIdentifiants(comptes, adresse(c))),
       );
     } catch (e) {
       return c.html(pageEleves(c, (e as Error).message), 400);
@@ -127,8 +126,8 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     return c.redirect("/prof/eleves#liens", 303);
   });
   // Révoquer garde les élèves que le lien a inscrits.
-  app.post("/prof/eleves/liens/:jeton/revoquer", (c) =>
-    revoquerLien(db, c.get("compte"), c.req.param("jeton"))
+  app.post("/prof/eleves/liens/:cle/revoquer", (c) =>
+    revoquerLien(db, c.get("compte"), c.req.param("cle"))
       ? c.redirect("/prof/eleves#liens", 303)
       : c.notFound(),
   );
@@ -152,10 +151,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Nouveau mot de passe",
-        Prof.feuilleIdentifiants(
-          [{ ...eleve, motDePasse: motDePasse! }],
-          new URL(c.req.url).origin,
-        ),
+        Prof.feuilleIdentifiants([{ ...eleve, motDePasse: motDePasse! }], adresse(c)),
       ),
     );
   });

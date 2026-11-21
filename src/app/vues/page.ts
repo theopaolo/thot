@@ -118,6 +118,7 @@ const compteMenu = (c: Compte) =>
     <details class="compte">
       <summary>${c.nom}</summary>
       <form method="post" action="/deconnexion">
+        ${c.renouveler_mdp ? "" : html`<p><a href="/mot-de-passe">Mot de passe</a></p>`}
         <button class="lien">${icone("sign-out")}Se déconnecter</button>
       </form>
     </details>
@@ -248,6 +249,7 @@ const rail = (
           false,
         )}
         <strong>${c.nom}</strong>
+        <a href="/mot-de-passe" hx-boost="false">${icone("pencil-simple")}<span>Mot de passe</span></a>
         <form method="post" action="/deconnexion">
           <button class="lien">${icone("sign-out")}<span>Se déconnecter</span></button>
         </form>
@@ -347,12 +349,33 @@ export const inscription = (
       </form>
     `;
 
-export const motDePasse = (erreur?: string) =>
-  html`
+/**
+ * Le choix d'un mot de passe. Après un code provisoire, la connexion l'a déjà vérifié. Sinon le
+ * compte donne son mot de passe actuel. Dans les deux cas, il se reconnecte ensuite.
+ */
+export const motDePasse = (compte: Compte, erreur?: string) => {
+  const tu = compte.role === "eleve";
+  return html`
     <form method="post" action="/mot-de-passe" class="etroit">
-      <h1>Choisir un mot de passe</h1>
-      <p>Le code provisoire a été utilisé. Choisissez votre mot de passe, puis reconnectez-vous.</p>
+      <h1>${compte.renouveler_mdp ? "Choisir un mot de passe" : "Changer de mot de passe"}</h1>
+      <p>${
+        compte.renouveler_mdp
+          ? tu
+            ? "Le code que ton enseignant t'a remis ne sert qu'une fois. Choisis ton mot de passe, puis reconnecte-toi."
+            : "Le code provisoire a été utilisé. Choisissez votre mot de passe, puis reconnectez-vous."
+          : tu
+            ? "Le changement ferme tes sessions sur tous tes appareils. Tu te reconnectes ensuite."
+            : "Le changement ferme vos sessions sur tous vos appareils. Vous vous reconnectez ensuite."
+      }</p>
       ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
+      ${
+        compte.renouveler_mdp
+          ? ""
+          : html`<div class="champ">
+              <label for="ancien">Mot de passe actuel</label>
+              <input id="ancien" name="ancien" type="password" autocomplete="current-password" required>
+            </div>`
+      }
       <div class="champ">
         <label for="mot_de_passe">Nouveau mot de passe (12 caractères minimum)</label>
         <input id="mot_de_passe" name="mot_de_passe" type="password" autocomplete="new-password" minlength="12" maxlength="200" required>
@@ -364,6 +387,7 @@ export const motDePasse = (erreur?: string) =>
       <button class="principal">Enregistrer et se reconnecter</button>
     </form>
   `;
+};
 
 export const domainesDe = (l: Pick<Libelles, "matieres" | "cours_pluriel">) =>
   `${l.matieres} et ${minuscule(l.cours_pluriel)}`;

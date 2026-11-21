@@ -321,9 +321,18 @@ n'inscrit pas un compte existant :
 l'inscription lui donnerait la réinitialisation de son mot de passe, donc le compte. Un élève qui a
 déjà un compte rejoint un cours en ouvrant lui-même un lien d'inscription. Le lien inscrit des
 élèves seulement, aux cours dont son créateur est encore membre. Sa page nomme ces cours à
-quiconque détient le lien. Après la connexion, l'adresse de retour n'accepte qu'un lien
+quiconque détient le lien. `/prof/eleves` ne donne donc son adresse qu'aux enseignants membres de
+tous ses cours. L'enseignant d'une partie de ses cours voit que le lien existe et le révoque.
+L'inscription refuse un identifiant déjà pris avec le message d'un identifiant invalide : la page
+ne dit pas quels comptes existent. Après la connexion, l'adresse de retour n'accepte qu'un lien
 d'inscription. Les administrateurs lisent tout. Une image se revalide à chaque affichage : un accès
 retiré s'applique aussitôt.
+
+Un élève choisit son mot de passe. Celui qu'un enseignant lui remet, à la création du compte ou
+après une réinitialisation, est un code provisoire. La première connexion le consomme et impose
+d'en choisir un autre : la feuille d'identifiants que garde l'enseignant n'ouvre plus le compte.
+Avec un lien d'inscription, l'élève saisit le sien en créant son compte. Un élève ou un enseignant
+change ensuite son mot de passe depuis son menu en donnant l'ancien, ce qui ferme ses sessions.
 
 Le nom de déposant d'une source importée ou migrée désigne son propriétaire quand un seul
 enseignant le porte. Sinon, la source reste sans propriétaire et le nom reste affiché.

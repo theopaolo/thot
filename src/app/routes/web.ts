@@ -72,7 +72,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
   const scopeChapitre = (c: Context<Env>, champs: Record<string, unknown>) => {
     const p = Domaines.lireScope(champs);
     if (champs.chapitre && !p.theme_id) {
-      p.theme_id = Domaines.themeDuChapitre(db, String(champs.chapitre), c.get("compte").id);
+      p.theme_id = Domaines.themeDuChapitre(db, String(champs.chapitre), lu(c));
     }
     return p;
   };

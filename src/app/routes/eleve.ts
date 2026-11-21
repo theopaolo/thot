@@ -206,7 +206,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
 
   // Un lien partagé avant les thèmes nomme une séquence : il mène au thème de ses sources.
   app.get("/eleve/sequences/:nom", (c) => {
-    const id = Domaines.themeDuChapitre(db, c.req.param("nom"), c.get("compte").id);
+    const id = Domaines.themeDuChapitre(db, c.req.param("nom"), lu(c));
     const doc = c.req.query("doc");
     return c.redirect(
       `${id ? `/eleve/themes/${id}` : "/eleve/sans-sequence"}${

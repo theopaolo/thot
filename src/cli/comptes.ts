@@ -53,7 +53,7 @@ export const comptes: Record<string, Commande> = {
     },
   },
   reinitialiser: {
-    aide: "  reinitialiser <identifiant>               renouvelle le mot de passe enseignant",
+    aide: "  reinitialiser <identifiant>               remet un code provisoire à un enseignant",
     async lancer(db, _, argv) {
       const reste = lire(argv, {}).positionals;
       const identifiant = reste[0]?.trim().toLowerCase();
@@ -69,7 +69,8 @@ export const comptes: Record<string, Commande> = {
         process.exit(1);
       }
       const motDePasse = await reinitialiserMotDePasse(db, compte.id as string, "enseignant");
-      console.log(`Nouveau mot de passe de ${identifiant}: ${motDePasse}`);
+      console.log(`Code provisoire de ${identifiant}: ${motDePasse}`);
+      console.log("À utiliser une seule fois pour choisir un mot de passe.");
     },
   },
 };

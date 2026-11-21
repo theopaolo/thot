@@ -15,7 +15,7 @@ import { resultatActuel } from "../src/app/conversations.ts";
 import { cleLegende, type Modeles } from "../src/core/modeles.ts";
 import type { Profil } from "../src/core/profils.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../src/app/suggestions.ts";
-import { creerCompte, lecteur, lireCompte } from "../src/app/comptes.ts";
+import { creerCompte, creerLien, lecteur, lireCompte } from "../src/app/comptes.ts";
 import {
   affiliations,
   cours,
@@ -25,6 +25,7 @@ import {
   matiere,
   theme,
 } from "../src/app/domaines.ts";
+import { creerApp } from "../src/app/routes.ts";
 import { environnement, fauxModeles, ORIGINE, session } from "./outils.ts";
 
 const TEXTE =
@@ -1184,19 +1185,18 @@ test("élèves : un enseignant ajoute un élève à ses cours et l'en retire, le
     assertEquals((await ajouter(profA, "LÉA", [c1])).status, 400);
     assertEquals(comptes(), avant);
 
-    // Le mot de passe s'affiche une fois. L'élève s'en sert pour lire les ressources du cours.
+    // Le code s'affiche une fois. L'élève choisit son mot de passe, puis lit les ressources du cours.
     const feuille = await ajouter(profA, "lea.martin", [c1]);
     assertEquals(feuille.status, 200);
     assertEquals(feuille.headers.get("cache-control"), "no-store");
-    const motDePasse = (await feuille.text()).match(/Mot de passe : <strong>([0-9a-f]+)</)![1];
     const lea = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea.martin'").get()!
       .id as string;
-    const connexion = await profA.app.request("/connexion", {
-      method: "POST",
-      headers: { origin: "http://localhost" },
-      body: new URLSearchParams({ identifiant: "lea.martin", mot_de_passe: motDePasse }),
-    });
-    const cookie = connexion.headers.get("set-cookie")!.split(";")[0];
+    const cookie = await premiereConnexion(
+      profA,
+      "lea.martin",
+      await codeRemis(feuille),
+      "le secret de léa",
+    );
     const lit = (id: string) =>
       statut(profA.app.request(`/eleve/sources/${id}`, { headers: { cookie } }));
     assertEquals(await lit(publie), 200);
@@ -1329,8 +1329,13 @@ test("lien d'inscription : expiré, révoqué ou complet, il n'inscrit personne"
     const revoque = dernierJeton(db);
     const max = { ...LEA, identifiant: "max.roux" };
     assertEquals(await statut(visiteur(profA, `/inscription/${revoque}`, max)), 303);
-    assertEquals(await statut(envoyer(profB, `/prof/eleves/liens/${revoque}/revoquer`)), 404);
-    assertEquals(await statut(envoyer(profA, `/prof/eleves/liens/${revoque}/revoquer`)), 303);
+    // La page désigne le lien par une clé : le jeton ne révoque rien.
+    assertEquals(await statut(envoyer(profA, `/prof/eleves/liens/${revoque}/revoquer`)), 404);
+    const revoquer = (await texteDe(profA, "/prof/eleves")).match(
+      new RegExp(`/inscription/${revoque}".*?action="([^"]+/revoquer)"`, "s"),
+    )![1];
+    assertEquals(await statut(envoyer(profB, revoquer)), 404);
+    assertEquals(await statut(envoyer(profA, revoquer)), 303);
     assert(!(await texteDe(profA, "/prof/eleves")).includes(revoque));
     await inutile(revoque);
     const maxId = db.prepare("SELECT id FROM comptes WHERE identifiant = 'max.roux'").get()!;
@@ -1393,6 +1398,242 @@ test("lien d'inscription : une session enseignant n'est pas inscrite, la connexi
       assertEquals(await retour(adresse), "/", adresse);
     }
   } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+/** Une connexion sans session, avec ce mot de passe. */
+const entrer = (qui: Qui, identifiant: string, mot_de_passe: string) =>
+  visiteur(qui, "/connexion", { identifiant, mot_de_passe });
+const cookieDe = (r: Response) => r.headers.get("set-cookie")!.split(";")[0];
+/** L'élève consomme le code remis, choisit son mot de passe et se reconnecte. Rend son cookie. */
+async function premiereConnexion(qui: Qui, identifiant: string, code: string, choisi: string) {
+  const provisoire = cookieDe(await entrer(qui, identifiant, code));
+  await qui.app.request("/mot-de-passe", {
+    method: "POST",
+    headers: { origin: ORIGINE, cookie: provisoire },
+    body: new URLSearchParams({ mot_de_passe: choisi, confirmation: choisi }),
+  });
+  return cookieDe(await entrer(qui, identifiant, choisi));
+}
+const codeRemis = async (feuille: Response) =>
+  (await feuille.text()).match(/Mot de passe : <strong>([0-9a-f]+)</)![1];
+
+test("mot de passe : celui que remet un enseignant est provisoire, l'élève choisit le sien", async () => {
+  const { db, dir, c1, profA, publie } = await deuxCours();
+  try {
+    const corps = new URLSearchParams({ identifiant: "lea.martin", nom: "Léa Martin", cours: c1 });
+    const code = await codeRemis(
+      await profA.requete("/prof/eleves/ajouter", { method: "POST", body: corps }),
+    );
+    const lea = db.prepare("SELECT id FROM comptes WHERE identifiant = 'lea.martin'").get()!
+      .id as string;
+    const avec = (cookie: string, chemin: string, init: RequestInit = {}) =>
+      profA.app.request(chemin, { ...init, headers: { origin: ORIGINE, cookie } });
+
+    // Le code ne sert qu'une fois et n'ouvre que la page du choix.
+    const entree = await entrer(profA, "lea.martin", code);
+    assertEquals(entree.headers.get("location"), "/mot-de-passe");
+    const provisoire = cookieDe(entree);
+    assertEquals(await statut(entrer(profA, "lea.martin", code)), 401);
+    assertEquals((await avec(provisoire, "/eleve")).headers.get("location"), "/mot-de-passe");
+    const choix = await (await avec(provisoire, "/mot-de-passe")).text();
+    assertStringIncludes(choix, "Choisis ton mot de passe");
+    assert(!choix.includes('name="ancien"'));
+    const choisir = (mot_de_passe: string) =>
+      avec(provisoire, "/mot-de-passe", {
+        method: "POST",
+        body: new URLSearchParams({ mot_de_passe, confirmation: mot_de_passe }),
+      });
+    assertEquals(await statut(choisir("court")), 400);
+    assertEquals((await choisir("le secret de léa")).headers.get("location"), "/connexion");
+    // L'enseignant qui garde la feuille ne se connecte plus avec.
+    assertEquals(await statut(entrer(profA, "lea.martin", code)), 401);
+    const cookie = cookieDe(await entrer(profA, "lea.martin", "le secret de léa"));
+    assertEquals(await statut(avec(cookie, `/eleve/sources/${publie}`)), 200);
+
+    // Une réinitialisation ferme la session et remet un code, provisoire lui aussi.
+    const nouveau = await codeRemis(await envoyer(profA, `/prof/eleves/${lea}/reinitialiser`));
+    assertEquals(await statut(avec(cookie, "/eleve")), 302);
+    assertEquals(await statut(entrer(profA, "lea.martin", "le secret de léa")), 401);
+    assertEquals(
+      (await entrer(profA, "lea.martin", nouveau)).headers.get("location"),
+      "/mot-de-passe",
+    );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("mot de passe : un élève et un enseignant le changent en donnant l'ancien", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const app = creerApp(db, fauxModeles().modeles);
+    for (const [role, accueil] of [
+      ["eleve", "/eleve"],
+      ["enseignant", "/prof"],
+    ] as const) {
+      const ancien = await creerCompte(db, role, `Compte ${role}`, role);
+      const entrer = (mot_de_passe: string) =>
+        app.request("/connexion", {
+          method: "POST",
+          headers: { origin: ORIGINE },
+          body: new URLSearchParams({ identifiant: role, mot_de_passe }),
+        });
+      const cookie = cookieDe(await entrer(ancien));
+      const avec = (chemin: string, corps?: Record<string, string>) =>
+        app.request(chemin, {
+          method: corps ? "POST" : "GET",
+          headers: { origin: ORIGINE, cookie },
+          body: corps && new URLSearchParams(corps),
+        });
+      assertStringIncludes(await (await avec(accueil)).text(), 'href="/mot-de-passe"');
+      const formulaire = await avec("/mot-de-passe");
+      assertEquals(formulaire.status, 200);
+      assertStringIncludes(await formulaire.text(), 'name="ancien"');
+      const changer = (ancien: string, mot_de_passe = "un nouveau secret") =>
+        avec("/mot-de-passe", { ancien, mot_de_passe, confirmation: mot_de_passe });
+      assertEquals(await statut(changer("pas le bon")), 400);
+      assertEquals(await statut(changer("")), 400);
+      assertEquals(await statut(changer(ancien, "court")), 400);
+      assertEquals(await statut(avec(accueil)), 200, "un refus a fermé la session");
+      assertEquals((await changer(ancien)).headers.get("location"), "/connexion");
+      // Le changement ferme toutes les sessions du compte.
+      assertEquals(await statut(avec(accueil)), 302);
+      assertEquals(await statut(entrer(ancien)), 401);
+      assertEquals((await entrer("un nouveau secret")).headers.get("location"), "/");
+    }
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lien d'inscription : son adresse ne se montre qu'aux enseignants de tous ses cours", async () => {
+  const { db, dir, c1, c2, profA, profB } = await deuxCours();
+  try {
+    const deux = await compte(db, "enseignant", undefined, [c1, c2]);
+    const admin = await administrateur(db);
+    assertEquals(await statut(lienDe(deux, [c1, c2])), 303);
+    const jeton = dernierJeton(db);
+    for (const qui of [deux, admin]) {
+      assertStringIncludes(await texteDe(qui, "/prof/eleves"), `/inscription/${jeton}`);
+    }
+    // L'enseignant d'un seul de ses cours sait que le lien existe, sans son adresse ni l'autre
+    // cours. Il le révoque quand même : le lien ouvre son cours.
+    for (const [qui, autre] of [
+      [profA, "Histoire de l'art"],
+      [profB, "Design"],
+    ] as const) {
+      const page = await texteDe(qui, "/prof/eleves");
+      assertStringIncludes(page, "40 places restantes");
+      assert(!page.includes(jeton), "le jeton est dans la page");
+      assert(!nomme(page, autre), `la page nomme ${autre}`);
+    }
+    const revoquer = (await texteDe(profA, "/prof/eleves")).match(
+      /action="(\/prof\/eleves\/liens\/[^"]+\/revoquer)"/,
+    )![1];
+    const etranger = await compte(db, "enseignant");
+    assertEquals(await statut(envoyer(etranger, revoquer)), 404);
+    assertEquals(await statut(envoyer(profA, revoquer)), 303);
+    assertEquals(await statut(visiteur(profA, `/inscription/${jeton}`)), 404);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lien d'inscription : un identifiant pris est refusé comme un identifiant invalide", async () => {
+  const { db, dir, c1, profA } = await deuxCours();
+  try {
+    await lienDe(profA, [c1]);
+    const jeton = dernierJeton(db);
+    const pris = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(profA.id)!
+      .identifiant as string;
+    const comptes = () => db.prepare("SELECT count(*) n FROM comptes").get()!.n;
+    const avant = comptes();
+    const refus = async (identifiant: string) => {
+      const r = await visiteur(profA, `/inscription/${jeton}`, { ...LEA, identifiant });
+      assertEquals(r.status, 400);
+      return (await r.text()).match(/<p role="alert">(.*?)<\/p>/s)![1];
+    };
+    const message = await refus(pris);
+    assert(!/utilisé|existe/.test(message), message);
+    assertEquals(message, await refus("x"));
+    assertEquals(comptes(), avant);
+    assertEquals(db.prepare("SELECT places FROM liens").get()!.places, 40);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("ancienne séquence : son adresse ne mène qu'à un thème que le lecteur peut ouvrir", async () => {
+  const { db, dir, c2, profB, eleveA, eleveB } = await deuxCours();
+  try {
+    const t = theme(db, c2, "Corrigés d'histoire");
+    const ranger = async (titre: string, audience: Audience, sequence: string) => {
+      const id = await source(db, titre, audience, profB.id, c2);
+      affiliations(db, id, [{ cours_id: c2, theme_id: t }]);
+      db.prepare(
+        "UPDATE sources SET metadonnees = json_set(metadonnees, '$.sequence', ?) WHERE id = ?",
+      ).run(sequence, id);
+    };
+    await ranger("Cours de l'autre classe", "eleves", "Renaissance");
+    await ranger("Corrigé privé", "prive", "Corrigés");
+    const mene = async (qui: Qui, nom: string) =>
+      (await qui.requete(`/eleve/sequences/${encodeURIComponent(nom)}`)).headers.get("location");
+    assertEquals(await mene(eleveB, "Renaissance"), `/eleve/themes/${t}`);
+    assertEquals(await mene(profB, "Corrigés"), `/eleve/themes/${t}`);
+    // Ni une source d'un autre cours ni une source privée ne confirment le nom d'une séquence.
+    assertEquals(await mene(eleveA, "Renaissance"), "/eleve/sans-sequence");
+    assertEquals(await mene(eleveB, "Corrigés"), "/eleve/sans-sequence");
+    assertEquals(await mene(eleveA, "Inconnue"), "/eleve/sans-sequence");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("lien d'inscription : son adresse part de l'origine configurée, pas de la requête", async () => {
+  const { db, dir } = await environnement();
+  const avant = config.origine;
+  try {
+    config.origine = "https://thot.example.org";
+    const c1 = cours(db, matiere(db, "Arts appliqués"), "Design");
+    const mot_de_passe = await creerCompte(db, "prof", "Prof", "enseignant", [c1]);
+    const app = creerApp(db, fauxModeles().modeles);
+    // Le proxy termine TLS : l'application reçoit la requête en HTTP.
+    const requete = (chemin: string, init: RequestInit = {}, cookie = "") =>
+      app.request(`http://thot.example.org${chemin}`, {
+        ...init,
+        headers: { origin: config.origine, cookie },
+      });
+    const cookie = cookieDe(
+      await requete("/connexion", {
+        method: "POST",
+        body: new URLSearchParams({ identifiant: "prof", mot_de_passe }),
+      }),
+    );
+    const id = db.prepare("SELECT id FROM comptes").get()!.id as string;
+    const jeton = creerLien(db, id, [c1], 14, 40);
+    assertStringIncludes(
+      await (await requete("/prof/eleves", {}, cookie)).text(),
+      `data-copier="https://thot.example.org/inscription/${jeton}"`,
+    );
+    const feuille = await requete(
+      "/prof/eleves/ajouter",
+      {
+        method: "POST",
+        body: new URLSearchParams({ identifiant: "lea.martin", nom: "Léa Martin", cours: c1 }),
+      },
+      cookie,
+    );
+    assertStringIncludes(await feuille.text(), "Adresse : <span>https://thot.example.org</span>");
+  } finally {
+    config.origine = avant;
     db.close();
     await rm(dir, { recursive: true });
   }

@@ -6,6 +6,7 @@ import {
   consommerProvisoire,
   coursDuLien,
   eleveSaisi,
+  IDENTIFIANT_REFUSE,
   inscrireParLien,
   lireCompte,
 } from "../comptes.ts";
@@ -67,14 +68,26 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
       lireInstance(db).mode === "personal" || c.get("compte").role === "eleve" ? "/eleve" : "/prof",
     ),
   );
-  app.get("/mot-de-passe", (c) => c.html(rendre(c, "Choisir un mot de passe", motDePasse())));
+  // Après un code provisoire, la page impose le choix. Sinon elle demande l'ancien mot de passe.
+  const pageMotDePasse = (c: Context<Env>, erreur?: string) =>
+    rendre(
+      c,
+      c.get("compte").renouveler_mdp ? "Choisir un mot de passe" : "Changer de mot de passe",
+      motDePasse(c.get("compte"), erreur),
+    );
+  app.get("/mot-de-passe", (c) => c.html(pageMotDePasse(c)));
   app.post("/mot-de-passe", async (c) => {
     const b = await c.req.parseBody();
     try {
       if (b.mot_de_passe !== b.confirmation) throw new Error("Les mots de passe diffèrent.");
-      await choisirMotDePasse(db, c.get("compte"), String(b.mot_de_passe ?? ""));
+      await choisirMotDePasse(
+        db,
+        c.get("compte"),
+        String(b.mot_de_passe ?? ""),
+        String(b.ancien ?? ""),
+      );
     } catch (e) {
-      return c.html(rendre(c, "Choisir un mot de passe", motDePasse((e as Error).message)), 400);
+      return c.html(pageMotDePasse(c, (e as Error).message), 400);
     }
     session.fermer(c);
     return c.redirect("/connexion");
@@ -140,11 +153,7 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
       if (compte) id = await inscrireParLien(db, c.req.param("jeton"), compte.id);
       else {
         const eleve = eleveSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
-        if (!eleve) {
-          throw new Error(
-            "Choisis un identifiant de 3 à 40 caractères parmi a-z, 0-9, point, tiret et tiret bas, et un nom de 100 caractères au maximum.",
-          );
-        }
+        if (!eleve) throw new Error(IDENTIFIANT_REFUSE);
         const motDePasse = String(b.mot_de_passe ?? "");
         id = await inscrireParLien(db, c.req.param("jeton"), { ...eleve, motDePasse });
       }
