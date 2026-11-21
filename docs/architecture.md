@@ -367,7 +367,7 @@ citent restent, et elle peut être certifiée de nouveau. Supprimer est définit
 d'auteur, une erreur ou une demande RGPD. Seuls son propriétaire et les administrateurs la
 suppriment. Les enseignants de ses cours la modifient et la rejettent, mais ne suppriment pas un
 original qu'ils n'ont pas déposé. Le web et `thot supprimer source` passent par
-`supprimerSource()` dans `src/app/ingestion.ts`.
+`supprimerSource()` dans `src/app/ingestion/sources.ts`.
 
 Une transaction retire la ligne de la source et tout ce qui en dérive : révisions, chunks et index
 plein texte, images et légendes, rattachements, suggestions, travail d'ingestion et légendes en
@@ -534,10 +534,10 @@ points comptent ce qui a été pratiqué : ils ne mesurent pas un niveau.
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
 publiée à ses élèves et utilisée par Thot. Une source qu'une question montre sans la citer, par son
 image ou comme source où chercher, doit rester citable de la même façon. Chaque changement d'une
-source passe par `src/app/ingestion.ts`, par le web comme par la CLI : la même transaction écrit,
-réindexe et signale à revoir les activités dont une preuve ne tient plus dans un de leurs cours.
-La page de l'élève revérifie les preuves à chaque affichage. Une activité à revoir n'est plus
-servie. L'enseignant fait rechercher ses passages dans la révision servie, ou retire le cours
+source passe par `src/app/ingestion/sources.ts`, par le web comme par la CLI : la même transaction
+écrit, réindexe et signale à revoir les activités dont une preuve ne tient plus dans un de leurs
+cours. La page de l'élève revérifie les preuves à chaque affichage. Une activité à revoir n'est
+plus servie. L'enseignant fait rechercher ses passages dans la révision servie, ou retire le cours
 fautif, et l'activité redevient un brouillon à relire si son contenu n'a pas d'erreur. Une tentative
 garde la version de l'exercice à laquelle elle répondait.
 
