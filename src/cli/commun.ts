@@ -6,6 +6,8 @@ import type { Db } from "../app/db.ts";
 export type Commande = {
   aide: string;
   lancer: (db: Db, modeles: Modeles, argv: string[]) => unknown;
+  /** La commande lit la base telle qu'elle est, sans appliquer les migrations du code présent. */
+  sansMigration?: true;
 };
 
 /** Les arguments d'une commande. Une option qu'elle ne déclare pas est refusée. */

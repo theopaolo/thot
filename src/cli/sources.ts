@@ -329,13 +329,19 @@ export const sources: Record<string, Commande> = {
     },
   },
   backup: {
-    aide: `  backup <destination>                      copie base, contenu et secret dans un répertoire vide,
-                                            serveur et worker peuvent tourner`,
+    aide: `  backup <destination>                      copie base, contenu, images d'activités et secret dans un
+                                            répertoire vide, serveur et worker peuvent tourner`,
+    // La sauvegarde d'avant une mise à jour garde le schéma que sert encore l'ancien code.
+    sansMigration: true,
     lancer(db, _, argv) {
       const reste = lire(argv, {}).positionals;
       if (reste.length !== 1) throw new Error("usage: thot backup <destination>");
-      sauvegarder(db, reste[0]);
+      const disparus = sauvegarder(db, reste[0]);
       console.log(`Sauvegarde dans ${resolve(reste[0])}`);
+      if (disparus.length) {
+        console.log(`Fichiers disparus pendant la copie, absents de la sauvegarde :`);
+        disparus.forEach((f) => console.log(`  ${f}`));
+      }
     },
   },
 };

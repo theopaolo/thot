@@ -17,10 +17,15 @@ if (!Object.hasOwn(COMMANDES, nom)) {
       .map((c) => c.aide)
       .join("\n")}`,
   );
+  // `thot` seul demande l'aide. Un nom inconnu est une erreur, qu'une tâche planifiée doit voir.
+  if (nom) {
+    console.error(`\nCommande inconnue : ${nom}`);
+    process.exitCode = 1;
+  }
 } else {
   preparerDonnees();
   const db = connexion();
-  migrer(db);
+  if (!COMMANDES[nom].sansMigration) migrer(db);
   try {
     await COMMANDES[nom].lancer(db, openrouter(config.modeles, cacheModeles(db)), argv);
   } finally {
