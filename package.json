@@ -9,7 +9,7 @@
     "test": "vp test run",
     "check": "vp check && vp build && pnpm frontiere && pnpm taille && vp test run",
     "frontiere": "! grep -rnE \"from ['\\\"](\\\\.\\\\./)+app/\" src/core/ && ! grep -rnE \"FILTRE_ACCES|filtreAcces|parametresAcces|statut = 'certifiee'|legende_statut = 'certified'|school_id =|membres_cours|role = '\" src/app/routes/",
-    "taille": "! find src -name '*.ts' | xargs wc -l | awk '$1 > 800 && $2 != \"total\"' | grep .",
+    "taille": "! find src tests -name '*.ts' | xargs wc -l | awk '$1 > 800 && $2 != \"total\"' | grep .",
     "board": "npx -y github:theopaolo/repoboard"
   },
   "dependencies": {
