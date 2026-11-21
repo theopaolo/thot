@@ -30,6 +30,7 @@ import {
 } from "../ingestion.ts";
 import { validerInformations } from "../../core/profils.ts";
 import * as Prof from "../vues/prof.ts";
+import * as ProfBibliotheque from "../vues/prof-bibliotheque.ts";
 import * as ProfQuestions from "../vues/prof-questions.ts";
 import * as ProfLignes from "../vues/prof-lignes.ts";
 import * as Domaines from "../domaines.ts";
@@ -110,7 +111,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     f: ReturnType<typeof filtres>,
     ressources: ProfLignes.LigneSource[],
     cat: Domaines.Catalogue,
-  ): { rangement: Prof.Rangement; fichiers: ProfLignes.LigneSource[] } => {
+  ): { rangement: ProfBibliotheque.Rangement; fichiers: ProfLignes.LigneSource[] } => {
     const p = scope(c);
     const racine = { nom: "Bibliothèque", portee: { matiere_id: "", cours_id: "", theme_id: "" } };
     const cours = cat.cours.find((x) => x.id === p.cours_id);
@@ -222,7 +223,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
         html`${DomaineVue.filtre(cat, scope(c), "/prof", libelles(db), {
           statut: f.statut,
           vue: f.vue,
-        })}${Prof.sources(
+        })}${ProfBibliotheque.sources(
           bureau?.fichiers ?? montrees,
           f,
           repartition,

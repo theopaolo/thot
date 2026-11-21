@@ -25,9 +25,9 @@ import type { Catalogue } from "../domaines.ts";
 import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
 import { filtre as filtreCours } from "./domaines.ts";
-import { ongletsBibliotheque } from "./prof.ts";
 import { enrichi, enrichiLigne, imageQuestion, LANGAGES, lettre, NOMS_TYPE } from "./questions.ts";
 import { jour } from "./commun.ts";
+import { ongletsBibliotheque } from "./prof-bibliotheque.ts";
 
 export const ETATS: Record<Activite["etat"], [string, string]> = {
   brouillon: ["Brouillon", "a_relire"],
