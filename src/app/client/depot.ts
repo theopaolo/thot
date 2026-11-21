@@ -1,4 +1,4 @@
-import { lireFrontMatter } from "../../core/markdown.ts";
+import { lireFrontMatter } from "../../core/frontmatter.ts";
 
 /** Fichiers envoyés en même temps. Chacun a sa requête, la mémoire du serveur n'en porte que trois. */
 const SIMULTANES = 3;

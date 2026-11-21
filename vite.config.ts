@@ -9,6 +9,18 @@ export default defineConfig({
   base: "/static/dist/",
   plugins: [
     {
+      // Le script des pages tourne dans le navigateur, qui n'a pas les modules de Node. Vite les
+      // remplacerait par un module vide, et le script s'arrêterait à son chargement.
+      name: "sans-node",
+      apply: "build",
+      enforce: "pre",
+      resolveId(id, importateur) {
+        if (id.startsWith("node:")) {
+          throw new Error(`${importateur} importe ${id}, absent du navigateur.`);
+        }
+      },
+    },
+    {
       // Les navigateurs pris en charge lisent le WOFF2 : les copies WOFF et TTF de KaTeX restent
       // hors du dossier servi.
       name: "katex-woff2",
