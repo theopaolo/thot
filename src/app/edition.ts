@@ -12,6 +12,7 @@ import {
   transformer,
 } from "../core/activite.ts";
 import { erreursQuestion } from "../core/questions.ts";
+import { texte } from "../core/texte.ts";
 import {
   type Activite,
   ancrerPassage,
@@ -19,7 +20,6 @@ import {
   imagesCitables,
   MAX_IMAGE,
   sourcesCitables,
-  texte,
 } from "./activites.ts";
 import type { Db } from "./db.ts";
 import { LANGAGES } from "./vues/questions.ts";

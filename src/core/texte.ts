@@ -126,3 +126,11 @@ export function mots(texte: string): string[] {
   }
   return out;
 }
+
+export const texte = (v: unknown, nom: string, max: number, requis = true) => {
+  const t = String(v ?? "").trim();
+  if ((requis && !t) || t.length > max) {
+    throw new Error(`${nom} : ${requis ? "1" : "0"} à ${max} caractères.`);
+  }
+  return t;
+};

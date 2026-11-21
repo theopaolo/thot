@@ -29,7 +29,7 @@ import {
   transaction,
 } from "../core/recherche.ts";
 import { demander } from "../core/reponse.ts";
-import { sansAccents } from "../core/texte.ts";
+import { sansAccents, texte } from "../core/texte.ts";
 import { type Compte, lecteur, lireCompte } from "./comptes.ts";
 import { config } from "./config.ts";
 import { type Db, maintenant } from "./db.ts";
@@ -355,14 +355,6 @@ export function passages(db: Db, a: Cible, objectif: string, ids: string[]) {
           .all(id, k) as ChunkIndexe[]);
   });
 }
-
-export const texte = (v: unknown, nom: string, max: number, requis = true) => {
-  const t = String(v ?? "").trim();
-  if ((requis && !t) || t.length > max) {
-    throw new Error(`${nom} : ${requis ? "1" : "0"} à ${max} caractères.`);
-  }
-  return t;
-};
 
 export type Insertion = {
   type: Activite["type"];
