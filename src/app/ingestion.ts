@@ -1,13 +1,6 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { readFile, mkdir, rm } from "node:fs/promises";
-import {
-  assembler,
-  type Bloc,
-  coherent,
-  decouper,
-  type Document,
-  type Extraction,
-} from "../core/document.ts";
+import { assembler, decouper, type Extraction } from "../core/document.ts";
 import { extraireDocx } from "../core/docx.ts";
 import { extraireHtml, extrairePearltrees } from "../core/html.ts";
 import { extraireMarkdown } from "../core/markdown.ts";
@@ -29,7 +22,18 @@ import { type Audience, sha256 } from "./depot.ts";
 import { filtreModification, parametresModification, type Compte } from "./comptes.ts";
 import { type Affiliation, affiliations, nomTheme, renommer } from "./domaines.ts";
 import { lireInstance } from "./instance.ts";
-import type { Profil } from "../core/profils.ts";
+import {
+  type Source,
+  ecrireAtomique,
+  lireSource,
+  dossierRevision,
+  jsonl,
+  revisionEnAttente,
+  enregistrer,
+  lireDocument,
+} from "./ingestion/revisions.ts";
+
+export * from "./ingestion/revisions.ts";
 
 const VERROU_MS = 5 * 60_000;
 const MAX_TENTATIVES = 3;
@@ -42,20 +46,6 @@ export const MAX_LEGENDES = 50;
 const horodatage = (ms: number) => new Date(ms).toISOString().slice(0, 19) + "Z";
 
 export type Job = { id: string; source_id: string; tentatives: number };
-
-type Source = {
-  id: string;
-  school_id: string;
-  titre: string;
-  metadonnees: string;
-  fichier: string;
-  format: string;
-  statut: string;
-  profil: Profil;
-  langue: string;
-  /** la révision servie aux lecteurs et à l'index */
-  revision: number;
-};
 
 /**
  * Revendique le plus ancien travail en attente, ou un travail dont le verrou a expiré parce que
@@ -94,15 +84,6 @@ const prolonger = (db: Db, job: Job) =>
     .run(horodatage(Date.now() + VERROU_MS), job.id, job.tentatives).changes > 0;
 
 const REMPLACEE = "Tentative remplacée.";
-
-function ecrireAtomique(chemin: string, donnees: string | Uint8Array) {
-  const tmp = `${chemin}.partiel`;
-  writeFileSync(tmp, donnees);
-  renameSync(tmp, chemin);
-}
-
-const lireSource = (db: Db, id: string) =>
-  db.prepare("SELECT * FROM sources WHERE id = ?").get(id) as unknown as Source;
 
 async function extraire(s: Source): Promise<Extraction & { notes?: Note[] }> {
   const chemin = contenu(s.id, "original", s.fichier);
@@ -287,12 +268,6 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
   }
 }
 
-/** La révision 1 garde les fichiers du pilote, à la racine de la source. */
-const dossierRevision = (sourceId: string, n: number) =>
-  n === 1 ? contenu(sourceId) : contenu(sourceId, "revisions", String(n));
-
-const jsonl = (lignes: unknown[]) => lignes.map((l) => JSON.stringify(l)).join("\n");
-
 /**
  * Une image d'une extraction, à sa place dans le document. `legende` et `modele` : la légende
  * proposée pour une image que la source ne sert pas encore.
@@ -378,128 +353,6 @@ function servirImages(db: Db, sourceId: string, n: number, images: ImageRevision
 
 const retirer = (chemins: string[]) => chemins.forEach((c) => rmSync(c, { force: true }));
 
-function lireSiPresent(chemin: string) {
-  try {
-    return readFileSync(chemin, "utf8");
-  } catch {
-    return undefined;
-  }
-}
-
-const lireFichiers = (dossier: string) => ({
-  texte: lireSiPresent(`${dossier}/document.txt`),
-  blocs: lireSiPresent(`${dossier}/blocs.jsonl`),
-});
-
-function ecrireDocument(dossier: string, doc: Document) {
-  mkdirSync(dossier, { recursive: true });
-  ecrireAtomique(`${dossier}/document.txt`, doc.texte);
-  ecrireAtomique(`${dossier}/blocs.jsonl`, jsonl(doc.blocs));
-}
-
-/** Les notes de l'orateur d'une présentation, à côté du texte de la révision et hors de lui. */
-function ecrireNotes(dossier: string, notes?: Note[]) {
-  if (!notes) return;
-  mkdirSync(dossier, { recursive: true });
-  ecrireAtomique(`${dossier}/notes.json`, JSON.stringify(notes));
-}
-
-/**
- * Les notes de la révision servie. `undefined` pour une présentation extraite avant que le worker
- * ne les garde.
- */
-export function lireNotes(db: Db, sourceId: string): Note[] | undefined {
-  const dossier = dossierRevision(sourceId, lireSource(db, sourceId).revision);
-  try {
-    return JSON.parse(readFileSync(`${dossier}/notes.json`, "utf8"));
-  } catch {
-    return undefined;
-  }
-}
-
-/** La révision plus récente que la révision servie, qui attend la relecture d'un enseignant. */
-export const revisionEnAttente = (db: Db, sourceId: string) =>
-  db
-    .prepare(
-      `SELECT r.n, r.avertissements, r.cree_le FROM revisions r JOIN sources s ON s.id = r.source_id
-     WHERE r.source_id = ? AND r.n > s.revision ORDER BY r.n DESC`,
-    )
-    .get(sourceId) as { n: number; avertissements: string; cree_le: string } | undefined;
-
-/**
- * Range une extraction. Une première extraction, ou un texte identique à celui de la révision
- * servie, s'écrit en place : les offsets des citations ne bougent pas, et une révision en attente
- * est écartée. Un autre texte devient une révision en attente, vérifiée avant d'être enregistrée.
- * La révision servie reste citée jusqu'à ce qu'un enseignant certifie la nouvelle.
- *
- * Tout se fait dans une transaction, fichiers compris, et la révision servie s'y relit : un
- * enseignant a pu certifier la révision en attente pendant l'extraction, et le numéro calculé
- * d'après une lecture plus ancienne désignerait alors le dossier de la révision servie.
- */
-function enregistrer(db: Db, s: Source, doc: Document, avertissements: string[], notes?: Note[]) {
-  const blocs = jsonl(doc.blocs);
-  // La révision en attente que cette extraction écarte. Son dossier part une fois sa ligne
-  // retirée pour de bon.
-  let ecartee: number | undefined;
-  const ecarter = (n: number) => {
-    db.prepare("DELETE FROM revisions WHERE source_id = ? AND n = ?").run(s.id, n);
-    ecartee = n;
-  };
-  const resultat = transaction(db, () => {
-    const revision = lireSource(db, s.id).revision;
-    const attente = revisionEnAttente(db, s.id);
-    const servie = lireFichiers(dossierRevision(s.id, revision));
-    if (servie.texte === undefined || servie.texte === doc.texte) {
-      // Le texte servi est revenu : la révision en attente n'a plus rien à faire relire.
-      if (attente) ecarter(attente.n);
-      db.prepare(
-        `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
-         ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
-      ).run(s.id, revision, JSON.stringify(avertissements), maintenant());
-      // Les notes s'écrivent même sans changement de texte : une présentation extraite avant que
-      // le worker ne les garde les reçoit à sa prochaine extraction.
-      ecrireNotes(dossierRevision(s.id, revision), notes);
-      if (servie.texte === doc.texte && servie.blocs === blocs) return "identique";
-      ecrireDocument(dossierRevision(s.id, revision), doc);
-      return "mise_a_jour";
-    }
-    if (attente) {
-      const fichiers = lireFichiers(dossierRevision(s.id, attente.n));
-      if (fichiers.texte === doc.texte && fichiers.blocs === blocs) return "identique";
-    }
-    const n = (attente?.n ?? revision) + 1;
-    const dossier = contenu(s.id, "revisions", String(n));
-    // Un dossier sans ligne en base reste d'un essai interrompu.
-    rmSync(dossier, { recursive: true, force: true });
-    ecrireDocument(dossier, doc);
-    ecrireNotes(dossier, notes);
-    if (!coherent(lireDocument(s.id, n))) {
-      throw new Error(`Révision ${n} incohérente : un bloc ne retombe pas sur son texte.`);
-    }
-    db.prepare(
-      "INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)",
-    ).run(s.id, n, JSON.stringify(avertissements), maintenant());
-    // L'ancienne révision en attente n'a jamais servi : la nouvelle la remplace.
-    if (attente) ecarter(attente.n);
-    return "revision";
-  });
-  if (ecartee)
-    rmSync(contenu(s.id, "revisions", String(ecartee)), { recursive: true, force: true });
-  return resultat;
-}
-
-/** Écarte la révision en attente, avec ses images. Elle n'a jamais servi, personne ne la cite. */
-export async function ecarterRevision(db: Db, sourceId: string, n: number) {
-  const { changes } = db
-    .prepare(
-      `DELETE FROM revisions WHERE source_id = ? AND n = ?
-       AND n > (SELECT revision FROM sources WHERE id = ?)`,
-    )
-    .run(sourceId, n, sourceId);
-  if (!changes) throw new Error("Cette version n'attend plus de relecture.");
-  await rm(contenu(sourceId, "revisions", String(n)), { recursive: true, force: true });
-}
-
 /**
  * Rejoue l'extraction d'une source extraite, après une amélioration de l'extracteur. Un texte
  * changé devient une révision en attente : les citations déjà données gardent la leur.
@@ -548,16 +401,6 @@ export function renommerEntree(db: Db, genre: string, id: string, nom: string) {
     const ids = db.prepare("SELECT source_id FROM source_cours WHERE theme_id = ?").all(id);
     for (const { source_id } of ids) reindexer(db, source_id as string);
   });
-}
-
-export function lireDocument(sourceId: string, revision: number): Document {
-  const dossier = dossierRevision(sourceId, revision);
-  const texte = readFileSync(`${dossier}/document.txt`, "utf8");
-  const blocs = readFileSync(`${dossier}/blocs.jsonl`, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((l) => JSON.parse(l) as Bloc);
-  return { texte, blocs };
 }
 
 /**
