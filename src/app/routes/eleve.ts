@@ -14,6 +14,8 @@ import { config } from "../config.ts";
 import { imagesLues, lireDocument } from "../ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Eleve from "../vues/eleve.ts";
+import * as EleveRessources from "../vues/eleve-ressources.ts";
+import * as EleveAccueil from "../vues/eleve-accueil.ts";
 import * as EleveCommun from "../vues/eleve-commun.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
@@ -149,8 +151,8 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           </form>
           ${
             c.req.query("vue") === "grille"
-              ? Eleve.bureauEleve(chapitres, activites, scope(c))
-              : Eleve.sommaireEleve(
+              ? EleveRessources.bureauEleve(chapitres, activites, scope(c))
+              : EleveRessources.sommaireEleve(
                   chapitres,
                   activites,
                   scope(c),
@@ -191,7 +193,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Accueil",
-        html`${filtresDomaines}${Eleve.accueilEleve(
+        html`${filtresDomaines}${EleveAccueil.accueilEleve(
           prenom,
           chapitres,
           oeuvre ? undefined : fait,
@@ -402,7 +404,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
             scope(c),
             "/eleve/recherche",
             libelles(db),
-          )}${Eleve.recherche("", [], scope(c))}`,
+          )}${EleveRessources.recherche("", [], scope(c))}`,
         ),
       );
     }
@@ -436,7 +438,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           },
           ...ids,
         )
-        .map((s) => [s.id as string, s as unknown as Eleve.Trouve]),
+        .map((s) => [s.id as string, s as unknown as EleveRessources.Trouve]),
     );
     const trouves = ids
       .filter((id) => sources.has(id))
@@ -462,7 +464,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           "/eleve/recherche",
           libelles(db),
           { q },
-        )}${Eleve.recherche(q, trouves, scope(c))}`,
+        )}${EleveRessources.recherche(q, trouves, scope(c))}`,
       ),
     );
   });

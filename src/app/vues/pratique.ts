@@ -13,7 +13,7 @@ import { type Activite, corrigee, type Tentative } from "../activites.ts";
 import { icone } from "../icones.ts";
 import { passages, TYPES } from "./activites.ts";
 import { panneauSource, reponse } from "./echange.ts";
-import { type ActiviteListee, ligneActivite } from "./eleve.ts";
+import { type ActiviteListee, ligneActivite } from "./eleve-ressources.ts";
 import { jour } from "./commun.ts";
 import { enrichi, enrichiLigne, imageQuestion, lettre } from "./questions.ts";
 
