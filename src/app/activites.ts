@@ -20,7 +20,7 @@ import {
   typesDeSerie,
 } from "../core/activite.ts";
 import type { Modeles } from "../core/modeles.ts";
-import { erreursQuestion, finie, juste, valeur } from "../core/questions.ts";
+import { erreursQuestion, finie, juste, refusee, valeur } from "../core/questions.ts";
 import {
   type ChunkIndexe,
   chercherFts,
@@ -82,12 +82,14 @@ const SELECT = `SELECT a.id, a.cours_id, a.objectif_id, a.auteur_id, a.audience,
 
 /**
  * Une tentative `t` qu'un enseignant lit : celles de l'auteur d'une activité privée, ou celles des
- * élèves qui partagent avec lui un cours de l'activité. Paramètres : l'enseignant, deux fois.
+ * élèves qui partagent avec lui un cours de l'activité. L'essai d'un collègue du cours n'en fait
+ * pas partie. Paramètres : l'enseignant, deux fois.
  */
 const LUE = `(CASE a.audience WHEN 'prive' THEN a.auteur_id = ? ELSE EXISTS (
   SELECT 1 FROM activite_cours ac
   JOIN membres_cours mp ON mp.cours_id = ac.cours_id AND mp.compte_id = ?
   JOIN membres_cours me ON me.cours_id = ac.cours_id AND me.compte_id = t.compte_id
+  JOIN comptes ce ON ce.id = me.compte_id AND ce.role = 'eleve'
   WHERE ac.activite_id = a.id) END)`;
 
 type Cible = Pick<Activite, "cours_id" | "audience" | "auteur_id"> & { id?: string };
@@ -926,30 +928,38 @@ const lireTentative = (l: LigneTentative): Tentative => ({
   a_reprendre: l.a_reprendre === 1,
 });
 
-/** La dernière tentative du compte sur la version actuelle : elle seule ouvre le corrigé. */
+/**
+ * Une tentative `t` que son auteur retrouve sur l'activité `a` : celle de la version actuelle, ou
+ * une tentative remise sur une version précédente. Un brouillon d'une version précédente ne revient
+ * pas, parce qu'il répondait à des questions qui ont pu changer.
+ */
+const RETROUVEE = "(t.revision = a.revision OR t.rendue_le IS NOT NULL)";
+
+/** La dernière tentative que le compte retrouve : elle seule ouvre le corrigé. */
 export const tentative = (db: Db, c: Compte, a: Activite) => {
   const l = db
     .prepare(
-      `SELECT ${COLONNES} FROM tentatives t
-       WHERE t.activite_id = ? AND t.compte_id = ? AND t.revision = ? ORDER BY t.rowid DESC LIMIT 1`,
+      `SELECT ${COLONNES} FROM tentatives t JOIN activites a ON a.id = t.activite_id
+       WHERE t.activite_id = ? AND t.compte_id = ? AND ${RETROUVEE} ORDER BY t.rowid DESC LIMIT 1`,
     )
-    .get(a.id, c.id, a.revision) as LigneTentative | undefined;
+    .get(a.id, c.id) as LigneTentative | undefined;
   return l && lireTentative(l);
 };
 
 /**
- * Vrai si le corrigé de la question peut sortir du serveur : la série remise, ou, quand la
- * correction suit chaque question, cette question finie.
+ * Vrai si le corrigé de la question peut sortir du serveur : la tentative a fini cette question,
+ * et la série est remise quand le corrigé suit la série. Une question ajoutée ou rédigée de nouveau
+ * après la remise n'est finie dans aucune tentative : son corrigé reste sur le serveur.
  */
 export const corrigee = (c: Contenu, t: Tentative | undefined, questionId: string) =>
-  !!t && (c.correction === "serie" ? !!t.rendue_le : !!t.reponses[questionId]?.finie);
+  !!t?.reponses[questionId]?.finie && (c.correction === "question" || !!t.rendue_le);
 
 const ecrire = (db: Db, t: Pick<Tentative, "id" | "reponses" | "rendue_le">) =>
   db
     .prepare("UPDATE tentatives SET reponses = ?, rendue_le = ? WHERE id = ?")
     .run(JSON.stringify(t.reponses), t.rendue_le, t.id);
 
-/** La tentative en cours du compte, créée vide s'il n'en a pas sur cette version. */
+/** La tentative que le compte retrouve, créée vide sur la version actuelle s'il n'en a pas. */
 function enCours(db: Db, c: Compte, a: Activite) {
   const t = tentative(db, c, a);
   if (t) return t;
@@ -962,8 +972,9 @@ function enCours(db: Db, c: Compte, a: Activite) {
 
 /**
  * Enregistre les réponses d'une série corrigée après sa remise : la valeur saisie à chaque
- * question remplace la précédente, une saisie vide ou invalide n'en garde aucune. `remettre` finit
- * toutes les questions, répondues ou non, et ouvre le corrigé. Refusé une fois la série remise.
+ * question remplace la précédente, et une saisie vide n'en garde aucune. `remettre` finit toutes
+ * les questions, répondues ou non, et ouvre le corrigé. Une saisie que `valeur()` refuse laisse la
+ * réponse déjà enregistrée et empêche la remise : `refusee`. `refus` une fois la série remise.
  */
 export function enregistrerReponses(
   db: Db,
@@ -971,19 +982,26 @@ export function enregistrerReponses(
   a: Activite,
   brutes: Record<string, unknown>,
   remettre: boolean,
-): "enregistree" | "rendue" | "refus" {
+): "enregistree" | "rendue" | "refus" | "refusee" {
   const contenu = JSON.parse(a.contenu) as Contenu;
   if (contenu.correction !== "serie") return "refus";
+  const refus = contenu.questions.some((q) => refusee(q, brutes[q.id]));
+  const rendre = remettre && !refus;
   return transaction(db, () => {
     const t = enCours(db, c, a);
     if (t.rendue_le) return "refus";
     for (const q of contenu.questions) {
       const v = valeur(q, brutes[q.id]);
-      t.reponses[q.id] = { essais: v === null ? [] : [v], ...(remettre ? { finie: true } : {}) };
+      const essais = refusee(q, brutes[q.id])
+        ? (t.reponses[q.id]?.essais ?? [])
+        : v === null
+          ? []
+          : [v];
+      t.reponses[q.id] = { essais, ...(rendre ? { finie: true } : {}) };
     }
-    t.rendue_le = remettre ? maintenant() : null;
+    t.rendue_le = rendre ? maintenant() : null;
     ecrire(db, t);
-    return remettre ? "rendue" : "enregistree";
+    return refus ? "refusee" : rendre ? "rendue" : "enregistree";
   });
 }
 
@@ -1011,7 +1029,7 @@ export function essayer(db: Db, c: Compte, a: Activite, questionId: string, brut
   });
 }
 
-/** Les critères que l'élève coche sur une réponse rédigée corrigée de sa tentative actuelle. */
+/** Les critères que l'élève coche sur une réponse rédigée corrigée de la tentative qu'il retrouve. */
 export function cocher(
   db: Db,
   c: Compte,
@@ -1034,7 +1052,7 @@ export function cocher(
   return true;
 }
 
-/** Une tentative rendue et marquée à reprendre laisse l'élève en commencer une autre. */
+/** Une tentative rendue et marquée à reprendre laisse l'élève en commencer une autre, sur la version actuelle. */
 export function recommencer(db: Db, c: Compte, a: Activite) {
   return transaction(db, () => {
     const t = tentative(db, c, a);
@@ -1168,10 +1186,12 @@ export const suiviObjectifs = (db: Db, c: Compte) =>
   }[];
 
 /**
- * Rédige de nouveau une question de la série (même type, même identifiant) ou en ajoute une du
- * type demandé, d'après l'objectif de l'activité et les sources que la série cite, ou à défaut les
- * premières sources citables du cours. L'ensemble devient une nouvelle version par `enregistrer`.
- * Une demande invalide ou une génération sans question lève une erreur lisible.
+ * Rédige de nouveau une question de la série, du même type, ou en ajoute une du type demandé,
+ * d'après l'objectif de l'activité et les sources que la série cite, ou à défaut les premières
+ * sources citables du cours. Une question rédigée de nouveau prend un nouvel identifiant : les
+ * réponses données à l'ancienne ne se comptent pas contre elle. L'ensemble devient une nouvelle
+ * version par `enregistrer`. Une demande invalide ou une génération sans question lève une erreur
+ * lisible.
  */
 export async function regenerer(
   db: Db,
@@ -1220,13 +1240,13 @@ export async function regenerer(
   }
   const questions = [...contenu.questions];
   if (rang < 0) questions.push(g.question);
-  else questions[rang] = { ...g.question, id: contenu.questions[rang].id } as Question;
+  else questions[rang] = g.question;
   return enregistrer(db, modeles, compte, a, revision, { ...contenu, questions });
 }
 
 // Pratique de l'élève : où il en est de chaque exercice, et les activités d'une ressource.
 
-/** D'après la dernière tentative du compte sur la version actuelle de l'exercice. */
+/** D'après la dernière tentative que le compte retrouve sur l'exercice. */
 export type Avancement = "a_faire" | "en_cours" | "remise" | "retour";
 
 /**
@@ -1244,7 +1264,7 @@ export function avecAvancement<T extends Pick<Activite, "id" | "type">>(
       db
         .prepare(
           `SELECT t.activite_id, t.rendue_le IS NOT NULL AS rendue, t.retours != '{}' AS retour
-           FROM tentatives t JOIN activites a ON a.id = t.activite_id AND a.revision = t.revision
+           FROM tentatives t JOIN activites a ON a.id = t.activite_id AND ${RETROUVEE}
            WHERE t.compte_id = ? AND t.activite_id IN (SELECT value FROM json_each(?))
            ORDER BY t.rowid`,
         )

@@ -234,7 +234,7 @@ async function activite(sorties: string[], types = ["redigee"]) {
   return { ...c, id: identifiant(r) };
 }
 
-test("régénérer une question garde son identifiant, change son contenu et crée une version en brouillon", async () => {
+test("régénérer une question lui donne un nouvel identifiant, change son contenu et crée une version en brouillon", async () => {
   const c = await activite([redigee(), redigee("Quelle est la matière de la façade ?")]);
   const avant = serie(c.db, c.id).questions[0];
   const revision = String(ligne(c.db, c.id).revision);
@@ -244,10 +244,11 @@ test("régénérer une question garde son identifiant, change son contenu et cr�
     revision,
   });
   assertEquals(r.status, 303);
-  assertEquals(r.headers.get("location"), `/prof/activites/${c.id}#q-${avant.id}`);
   const apres = serie(c.db, c.id).questions;
   assertEquals(apres.length, 1);
-  assertEquals(apres[0].id, avant.id);
+  // Une réponse donnée à l'ancienne question ne se rattache pas à la nouvelle.
+  assert(apres[0].id !== avant.id);
+  assertEquals(r.headers.get("location"), `/prof/activites/${c.id}#q-${apres[0].id}`);
   assertEquals(apres[0].consigne.texte, "Quelle est la matière de la façade ?");
   assertEquals(ligne(c.db, c.id).revision, 2);
   assertEquals(ligne(c.db, c.id).etat, "brouillon");

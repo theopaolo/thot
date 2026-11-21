@@ -1,4 +1,5 @@
 import { type Context, Hono } from "hono";
+import type { Contenu } from "../../core/activite.ts";
 import { PanneModele } from "../../core/modeles.ts";
 import { depuisCarnet } from "../../core/questions.ts";
 import { libelles, lireInstance } from "../instance.ts";
@@ -87,7 +88,10 @@ export function routesPreparation(app: Hono<Env>, w: Web) {
       if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
       return retour((e as Error).message);
     }
-    const id = "question" in cible ? cible.question : "";
+    // Une question rédigée de nouveau change d'identifiant : l'ancre vise celle qui a pris son rang.
+    const lire = (x: Activites.Activite) => (JSON.parse(x.contenu) as Contenu).questions;
+    const rang = "question" in cible ? lire(a).findIndex((q) => q.id === cible.question) : -1;
+    const id = rang < 0 ? "" : lire(Activites.activiteProf(db, c.get("compte"), a.id)!)[rang].id;
     return c.redirect(`/prof/activites/${a.id}${id ? `#q-${id}` : ""}`, 303);
   };
   app.post("/prof/activites/:id/questions/proposer", async (c) =>

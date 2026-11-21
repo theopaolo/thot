@@ -444,12 +444,29 @@ Un élève pratique les exercices publiés des cours dont il est membre. L'ensei
 corrigé sort : après la remise de la série, ou après chaque question. Avant, la page ne contient
 que les consignes, les options et les images. La réponse attendue, les critères, le retour, les
 bonnes options, les réponses acceptées et les passages cités d'une question ne sortent du serveur
-qu'avec une tentative de ce compte sur la version actuelle, où cette question est finie. Les
-options se mélangent pour chaque élève, et le navigateur envoie la lettre affichée, pas
+qu'avec une tentative de ce compte où cette question est finie, la série une fois remise quand le
+corrigé la suit. Les options se mélangent pour chaque élève, et le navigateur envoie la lettre affichée, pas
 l'identifiant de l'option : l'ordre des identifiants trahirait la bonne réponse. Quand le corrigé
 suit chaque question, une question fermée laisse deux essais, l'indice apparaît après une première
 erreur et le deuxième essai vaut 0,5 point. Quand il suit la série, l'élève enregistre ses
 réponses, revient, puis remet, avec un essai par question.
+
+Chaque formulaire de réponse porte la version que l'élève lit, et une tentative garde la version à
+laquelle elle répond. Si l'enseignant publie une autre version entre-temps, l'envoi reçoit 409 et
+rien n'est enregistré, parce que les lettres reçues désignent les options de l'ancienne version. La
+page de la nouvelle version s'affiche alors avec ce que l'élève avait écrit dans les réponses à
+taper et rédigées, et ses choix sont à refaire. Un texte trop long laisse en place la réponse déjà
+enregistrée et empêche la remise : la page le dit et garde la saisie. Sa longueur se mesure avec
+des fins de ligne d'un caractère, comme le navigateur la compte.
+
+Après une nouvelle version, l'élève retrouve sa dernière tentative remise, avec la version à
+laquelle il répondait, ses points, la note et le commentaire de l'enseignant. Le corrigé ne sort
+que pour les questions que cette tentative a finies. Une question ajoutée depuis reste sans corrigé
+et sans champ, et ne compte pas dans ses points. Une question que Thot rédige de nouveau prend un
+nouvel identifiant : elle compte donc comme ajoutée, pour l'élève comme dans la grille de
+l'enseignant. La note et le commentaire d'une question retirée restent dans le bilan. L'élève ne
+répond à la nouvelle version que si l'enseignant marque sa tentative à reprendre. Un brouillon
+qu'il n'avait pas remis ne revient pas, et il repart d'une série vierge.
 
 Thot corrige les questions fermées d'après les réponses de l'enseignant. Une réponse à taper se
 compare mot à mot avec chaque réponse acceptée, sans casse, sans accents ni ponctuation
@@ -465,7 +482,8 @@ critères qu'il pense remplir. Un modèle ne note rien.
 
 Un enseignant lit les tentatives des élèves de ses propres cours parmi ceux de l'activité, toutes
 versions confondues. L'auteur d'une activité privée lit les siennes. Être administrateur ne suffit
-pas. La page « Réponses » montre une ligne par élève suivi, sa dernière tentative et une case par
+pas. L'essai d'un enseignant sur la série publiée n'est pas une remise : il ne se compte pas et un
+collègue ne le note pas. La page « Réponses » montre une ligne par élève suivi, sa dernière tentative et une case par
 question. L'enseignant note une réponse 0, 0,5 ou 1, ce qui remplace la note automatique, la
 commente, et peut marquer la tentative à reprendre : l'élève en commence alors une autre. Sous la
 grille, la page liste les réponses fermées que Thot a refusées, pour que l'enseignant puisse leur

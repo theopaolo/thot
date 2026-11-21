@@ -94,10 +94,19 @@ export function valeur(q: Question, brut: unknown): string | null {
       return null;
     return liste.length ? idsTries(liste) : null;
   }
-  const texte = typeof brut === "string" ? brut.trim() : "";
+  // Le navigateur envoie les fins de ligne en CRLF, alors que `maxlength` les compte pour un caractère.
+  const texte = typeof brut === "string" ? brut.replace(/\r\n?/g, "\n").trim() : "";
   const max = q.type === "redigee" ? 4000 : 200;
   return texte && texte.length <= max ? texte : null;
 }
+
+/** Vrai pour une saisie que `valeur()` refuse alors qu'elle n'est pas vide : un texte trop long, une option inconnue. */
+export const refusee = (q: Question, brut: unknown) =>
+  valeur(q, brut) === null &&
+  !(
+    brut === undefined ||
+    (typeof brut === "string" ? !brut.trim() : Array.isArray(brut) && !brut.length)
+  );
 
 /** Une réponse rédigée n'est jamais notée par Thot. */
 export function juste(q: Question, v: string): boolean {

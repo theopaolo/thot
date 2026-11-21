@@ -6,7 +6,9 @@ import {
   ajouterCours,
   ancrerPassage,
   aReprendre,
+  avecAvancement,
   deposerImage,
+  enregistrer,
   inserer,
   noter,
   publier,
@@ -33,9 +35,13 @@ async function compte(db: Db, role: Role, inscrit = true): Promise<Session> {
   return { ...s, id, compte: lireCompte(db, id)! };
 }
 
+/** Un formulaire de réponse de l'élève porte la version lue : la version 1, sauf si `corps` en dit une autre. */
 const envoyer = (s: Session, url: string, corps: Record<string, string | string[]> = {}) => {
   const f = new URLSearchParams();
   for (const [k, v] of Object.entries(corps)) for (const x of [v].flat()) f.append(k, x);
+  if (/^\/eleve\/activites\/[^/]+\/(reponses|questions\/)/.test(url) && !("revision" in corps)) {
+    f.append("revision", "1");
+  }
   return s.requete(url, { method: "POST", body: f });
 };
 const page = async (s: Session, url: string) => (await s.requete(url)).text();
@@ -88,6 +94,16 @@ function publie(db: Db, prof: Compte, id: string) {
   assert(relire(db, prof, a, a.revision));
   assertEquals(publier(db, prof, id, a.revision), "publiee");
   return activiteProf(db, prof, id)!;
+}
+
+/** L'enseignant enregistre un nouveau contenu, le relit et le publie. */
+async function nouvelleVersion(db: Db, prof: Compte, id: string, contenu: Contenu) {
+  const a = activiteProf(db, prof, id)!;
+  assertEquals(
+    await enregistrer(db, fauxModeles().modeles, prof, a, a.revision, contenu),
+    "modifie",
+  );
+  return publie(db, prof, id);
 }
 
 /**
@@ -440,6 +456,181 @@ test("question par question : choix multiple, réponse à taper sans accents ni 
     assertStringIncludes(texte(section(html, "t")), "Juste, 1 point.");
     assertStringIncludes(texte(section(html, "t")), "Réponse attendue : Céramique irisée");
     assertStringIncludes(html, "1,5 point sur 2.");
+  } finally {
+    await fermer(db, dir);
+  }
+});
+
+test("version périmée : la réponse reçoit 409, rien n'est enregistré et le texte reste dans son champ", async () => {
+  const { db, dir, coursId, prof, eleve, passage } = await cadre();
+  try {
+    const contenu = serie("serie", passage);
+    const id = exercice(db, prof.compte, coursId, contenu);
+    publie(db, prof.compte, id);
+    const url = `/eleve/activites/${id}`;
+    assertStringIncludes(await page(eleve, url), 'name="revision" value="1"');
+    // L'enseignant publie la version 2 pendant que l'élève lit la version 1.
+    const [qc, ...reste] = contenu.questions;
+    assert(qc.type === "choix");
+    await nouvelleVersion(db, prof.compte, id, {
+      ...contenu,
+      questions: [{ ...qc, options: qc.options.toReversed() }, ...reste],
+    });
+    const lue = {
+      qc: lettres(qc, eleve.id, "opt-b-qc"),
+      qt: "mon terme",
+      qr: "Mon long texte\r\nsur deux lignes",
+      remettre: "1",
+      confirmer: "1",
+    };
+    // La version 1, puis un formulaire sans version.
+    for (const corps of [lue, { ...lue, revision: [] }]) {
+      const r = await envoyer(eleve, `${url}/reponses`, corps);
+      assertEquals(r.status, 409);
+      const html = await r.text();
+      assertStringIncludes(html, "Cette série a changé pendant que tu répondais");
+      assertStringIncludes(html, 'value="mon terme"');
+      assertStringIncludes(html, "Mon long texte\nsur deux lignes</textarea>");
+      assert(!html.includes("checked"), "un choix lu sur l'ancienne version n'est pas repris");
+      assertStringIncludes(html, 'name="revision" value="2"');
+      for (const q of ["qc", "qm", "qt", "qr"]) sansCorrige(html, q, true);
+    }
+    assertEquals(db.prepare("SELECT count(*) AS n FROM tentatives").get()!.n, 0);
+    assertEquals(await statut(envoyer(eleve, `${url}/reponses`, { ...lue, revision: "2" })), 303);
+
+    // Une question corrigée seule porte aussi sa version.
+    const pas = serie("question", passage);
+    const id2 = exercice(db, prof.compte, coursId, pas, "Question par question");
+    publie(db, prof.compte, id2);
+    assertStringIncludes(
+      section(await page(eleve, `/eleve/activites/${id2}`), "qt"),
+      'name="revision" value="1"',
+    );
+    await nouvelleVersion(db, prof.compte, id2, {
+      ...pas,
+      questions: pas.questions.map((q) =>
+        q.id === "qt" ? { ...q, consigne: libre("CONSIGNE-qt corrigée") } : q,
+      ),
+    });
+    const r = await envoyer(eleve, `/eleve/activites/${id2}/questions/qt`, { qt: "accepte qt" });
+    assertEquals(r.status, 409);
+    const html = await r.text();
+    assertStringIncludes(html, "Cette série a changé pendant que tu répondais");
+    assertStringIncludes(html, 'value="accepte qt"');
+    sansCorrige(html, "qt", true);
+    assertEquals(
+      db.prepare("SELECT count(*) AS n FROM tentatives WHERE activite_id = ?").get(id2)!.n,
+      0,
+    );
+  } finally {
+    await fermer(db, dir);
+  }
+});
+
+test("nouvelle version : l'élève retrouve sa remise, sa note et le commentaire, avec la version à laquelle il répondait", async () => {
+  const { db, dir, coursId, prof, eleve, passage } = await cadre();
+  try {
+    const contenu = serie("serie", passage);
+    const id = exercice(db, prof.compte, coursId, contenu);
+    const v1 = publie(db, prof.compte, id);
+    const url = `/eleve/activites/${id}`;
+    const [qc, qm, qt, qr] = contenu.questions;
+    const reponses = {
+      qc: lettres(qc, eleve.id, "opt-juste-qc"),
+      qm: lettres(qm, eleve.id, "opt-juste1-qm", "opt-juste2-qm"),
+      qt: "accepte qt",
+      qr: "Ma réponse rédigée.",
+    };
+    assertEquals(
+      await statut(envoyer(eleve, `${url}/reponses`, { ...reponses, remettre: "1" })),
+      303,
+    );
+    // Un camarade s'arrête au brouillon.
+    const camarade = await compte(db, "eleve");
+    assertEquals(await statut(envoyer(camarade, `${url}/reponses`, { qt: "brouillon" })), 303);
+    const t = tentative(db, eleve.compte, v1)!;
+    assert(noter(db, prof.compte, v1, t.id, "qm", 0, "COMMENTAIRE-qm"));
+
+    // Version 2 : une faute corrigée dans qt, qm retirée, une question ajoutée.
+    const ajoutee: Question = {
+      id: "qn",
+      type: "terme",
+      consigne: libre("CONSIGNE-qn"),
+      retour: libre("RETOUR-qn"),
+      accepte: ["ACCEPTE-qn"],
+    };
+    const v2 = await nouvelleVersion(db, prof.compte, id, {
+      ...contenu,
+      questions: [qc, { ...qt, consigne: libre("CONSIGNE-qt corrigée") }, qr, ajoutee],
+    });
+    assert(noter(db, prof.compte, v2, t.id, "qr", 0.5, "COMMENTAIRE-qr"));
+
+    const html = await page(eleve, url);
+    assertStringIncludes(html, "Série remise le");
+    assertStringIncludes(texte(html), "Tu répondais à la version 1 de cette série");
+    assertStringIncludes(texte(section(html, "qr")), "Note de ton enseignant : 0,5 point.");
+    for (const s of ["COMMENTAIRE-qr", "COMMENTAIRE-qm", "RETOUR-qc", "ACCEPTE-qt"]) {
+      assertStringIncludes(html, s);
+    }
+    // qc et qt justes, qr notée 0,5. La question ajoutée n'a pas été posée : elle ne compte pas.
+    assertStringIncludes(html, "2,5 points sur 3.");
+    // Rien de la question ajoutée ne sort, et elle n'a pas de champ.
+    for (const s of ["RETOUR-qn", "ACCEPTE-qn", 'name="qn"']) assert(!html.includes(s), s);
+    assertStringIncludes(texte(section(html, "qn")), "pas dans la version que tu as remise");
+    assertEquals(avecAvancement(db, eleve.compte, [v2])[0].avancement, "retour");
+    assertEquals(
+      await statut(envoyer(eleve, `${url}/reponses`, { qn: "accepte qn", revision: "2" })),
+      409,
+      "une série remise ne se rouvre pas sans l'enseignant",
+    );
+
+    // Le brouillon du camarade répondait à la version 1 : il repart d'une série vierge.
+    const vierge = await page(camarade, url);
+    assert(!vierge.includes('value="brouillon"'));
+    assertEquals(avecAvancement(db, camarade.compte, [v2])[0].avancement, "a_faire");
+
+    // À reprendre : l'élève recommence sur la version actuelle.
+    assert(aReprendre(db, prof.compte, v2, t.id, true));
+    assertEquals(await statut(envoyer(eleve, `${url}/recommencer`)), 303);
+    assertEquals(tentative(db, eleve.compte, v2)!.revision, 2);
+    const reprise = await page(eleve, url);
+    assertStringIncludes(reprise, 'name="qn"');
+    for (const q of ["qc", "qt", "qr"]) sansCorrige(reprise, q, true);
+  } finally {
+    await fermer(db, dir);
+  }
+});
+
+test("réponse refusée : le texte déjà enregistré reste, la page le dit et garde la saisie", async () => {
+  const { db, dir, coursId, prof, eleve, passage } = await cadre();
+  try {
+    const id = exercice(db, prof.compte, coursId, serie("serie", passage));
+    const a = publie(db, prof.compte, id);
+    const url = `/eleve/activites/${id}`;
+    // 3 990 caractères sur 20 lignes : le navigateur les envoie avec des fins de ligne CRLF.
+    const lignes = Array.from({ length: 20 }, (_, i) => "x".repeat(i ? 199 : 190));
+    assertEquals(lignes.join("\n").length, 3990);
+    assertEquals(await statut(envoyer(eleve, `${url}/reponses`, { qr: lignes.join("\r\n") })), 303);
+    assertEquals(tentative(db, eleve.compte, a)!.reponses.qr.essais, [lignes.join("\n")]);
+
+    const trop = "y".repeat(4001);
+    const refusees: Record<string, string>[] = [
+      { qr: trop, qt: "accepte qt" },
+      { qr: trop, qt: "accepte qt", remettre: "1", confirmer: "1" },
+    ];
+    for (const corps of refusees) {
+      const r = await envoyer(eleve, `${url}/reponses`, corps);
+      assertEquals(r.status, 400);
+      const html = await r.text();
+      assertStringIncludes(html, "La réponse à la question 4 n&#39;est pas enregistrée");
+      assertStringIncludes(html, `${trop}</textarea>`);
+      assert(!html.includes("Tes réponses sont enregistrées."));
+      for (const q of ["qc", "qm", "qt", "qr"]) sansCorrige(html, q, true);
+      const t = tentative(db, eleve.compte, a)!;
+      assertEquals(t.reponses.qr.essais, [lignes.join("\n")], "le texte précédent reste");
+      assertEquals(t.reponses.qt.essais, ["accepte qt"], "les autres réponses s'enregistrent");
+      assertEquals(t.rendue_le, null, "une série ne se remet pas avec une réponse refusée");
+    }
   } finally {
     await fermer(db, dir);
   }

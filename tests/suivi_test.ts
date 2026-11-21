@@ -7,8 +7,11 @@ import {
   enregistrer,
   enregistrerReponses,
   inserer,
+  noter,
   publier,
   relire,
+  suiviObjectifs,
+  activitesProf,
   tentativesLues,
 } from "../src/app/activites.ts";
 import { creerCompte, lireCompte, type Role } from "../src/app/comptes.ts";
@@ -281,6 +284,28 @@ test("note sur une réponse fermée : la note de l'enseignant remplace les point
   const apres = await page();
   assertStringIncludes(apres, `<td class="case s-ok"><a href="#r-${t.id}-q2">1</a></td>`);
   assertStringIncludes(apres, "1 / 1");
+  db.close();
+});
+
+test("essai d'un enseignant : il ne compte pas comme une remise et un collègue ne le note pas", async () => {
+  const { db, c2, prof, prof2, e2 } = await cadre();
+  const a = serie(db, prof, c2, [terme]);
+  assertEquals(enregistrerReponses(db, prof2, a, { q2: "Gaudí" }, true), "rendue");
+  const essai = db.prepare("SELECT id FROM tentatives WHERE compte_id = ?").get(prof2.id)!
+    .id as string;
+
+  assertEquals(tentativesLues(db, prof, a), []);
+  assertEquals(activitesProf(db, prof)[0].remises, 0);
+  assertEquals(suiviObjectifs(db, prof)[0].tentatives, 0);
+  assert(!noter(db, prof, a, essai, "q2", 0, ""));
+  const s = await connecter(db, prof);
+  const detail = await (await s.lire(`/prof/activites/${a.id}`)).text();
+  assertStringIncludes(detail, "0 élève sur 1 a remis");
+
+  enregistrerReponses(db, e2, a, { q2: "Gaudí" }, true);
+  assertEquals(tentativesLues(db, prof, a)!.length, 1);
+  assertEquals(activitesProf(db, prof)[0].remises, 1);
+  assertEquals(suiviObjectifs(db, prof)[0].tentatives, 1);
   db.close();
 });
 

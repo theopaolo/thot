@@ -88,6 +88,9 @@ test("valeurs envoyées", () => {
   assertEquals(valeur(redigee, "x".repeat(4000))?.length, 4000);
   assertEquals(valeur(redigee, "x".repeat(4001)), null);
   assertEquals(valeur(redigee, 12), null);
+  // `maxlength` compte une fin de ligne pour un caractère, le navigateur en envoie deux.
+  assertEquals(valeur(redigee, `${"x".repeat(1999)}\r\n${"x".repeat(2000)}`)?.length, 4000);
+  assertEquals(valeur(redigee, "a\r\nb\rc"), "a\nb\nc");
 });
 
 test("correction de chaque type", () => {

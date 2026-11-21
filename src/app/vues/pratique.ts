@@ -38,6 +38,13 @@ export type Pratique = {
   confirmer?: boolean;
   /** les réponses de la série viennent d'être enregistrées */
   enregistree?: boolean;
+  /** pourquoi les réponses envoyées n'ont pas été enregistrées */
+  alerte?: string;
+  /**
+   * Le texte d'une saisie refusée, par identifiant de question : il remplit le champ à la place de
+   * la réponse enregistrée, pour que l'élève ne le retape pas.
+   */
+  saisie?: Record<string, string>;
 };
 
 const nombre = (n: number) => n.toLocaleString("fr-FR");
@@ -260,6 +267,7 @@ function essaiQuestion(p: Pratique, q: Question) {
   const reste = essaisMax(q, "question") - r.essais.length;
   // Une question pas finie après un essai : cet essai était faux, l'indice peut sortir.
   return html`<form method="post" action="/eleve/activites/${p.a.id}/questions/${q.id}">
+    <input type="hidden" name="revision" value="${p.a.revision}">
     ${
       r.essais.length
         ? html`<p class="note">Pas tout à fait.${
@@ -267,20 +275,29 @@ function essaiQuestion(p: Pratique, q: Question) {
           } Il te reste ${pluriel(reste, "essai")}.</p>`
         : ""
     }
-    ${saisie(q, p.compteId, r.essais.at(-1), !p.apercu, true)}
+    ${saisie(q, p.compteId, p.saisie?.[q.id] ?? r.essais.at(-1), !p.apercu, true)}
     <button class="principal" ${p.apercu ? "disabled" : ""}>${
       q.type === "redigee" ? "Envoyer ma réponse" : "Vérifier"
     }</button>
   </form>`;
 }
 
-/** Le bilan d'une tentative rendue : les points des questions notées et ce qui attend l'enseignant. */
+/**
+ * Le bilan d'une tentative rendue : les points des questions notées et ce qui attend l'enseignant.
+ * Une tentative d'une version précédente ne compte que les questions qu'elle a finies, et garde la
+ * note et le commentaire d'une question retirée depuis.
+ */
 function bilan(a: Activite, contenu: Contenu, t: Tentative & { rendue_le: string }) {
-  const notes = contenu.questions.map((q) =>
-    points(q, t.reponses[q.id]?.essais ?? [], contenu.correction, t.retours[q.id]?.note ?? null),
-  );
+  const notes = contenu.questions
+    .filter((q) => t.reponses[q.id]?.finie)
+    .map((q) =>
+      points(q, t.reponses[q.id].essais, contenu.correction, t.retours[q.id]?.note ?? null),
+    );
   const notees = notes.filter((n) => n !== null);
   const attente = notes.length - notees.length;
+  const retirees = Object.entries(t.retours).flatMap(([id, r]) =>
+    contenu.questions.some((q) => q.id === id) ? [] : [r],
+  );
   return html`<section id="bilan" class="note" aria-label="Bilan">
     <p>${contenu.correction === "serie" ? "Série remise" : "Série finie"} le ${jour(t.rendue_le)}.${
       notees.length ? ` ${enPoints(notees.reduce((x, y) => x + y, 0))} sur ${notees.length}.` : ""
@@ -288,7 +305,17 @@ function bilan(a: Activite, contenu: Contenu, t: Tentative & { rendue_le: string
       attente
         ? ` ${attente} réponse${attente > 1 ? "s rédigées attendent" : " rédigée attend"} la note de ton enseignant.`
         : ""
+    }${
+      t.revision === a.revision
+        ? ""
+        : ` Tu répondais à la version ${t.revision} de cette série, que ton enseignant a modifiée depuis.`
     }</p>
+    ${retirees.map(
+      (r) => html`<p>Une question à laquelle tu avais répondu n'est plus dans la série.${
+        r.note === undefined ? "" : ` Note de ton enseignant : ${enPoints(r.note)}.`
+      }${r.commentaire ? " Son commentaire :" : ""}</p>
+      ${r.commentaire ? html`<blockquote class="passage">${r.commentaire}</blockquote>` : ""}`,
+    )}
     ${
       t.a_reprendre
         ? html`<form method="post" action="/eleve/activites/${a.id}/recommencer">
@@ -304,7 +331,8 @@ function bilan(a: Activite, contenu: Contenu, t: Tentative & { rendue_le: string
  * La page de l'élève. Le corrigé d'une question n'y entre que lorsque `corrigee()` est vrai :
  * avant, la page porte la consigne, l'image, les options dans l'ordre de l'élève et le lien où
  * chercher. L'indice ne sort qu'après un premier essai faux, quand la correction suit chaque
- * question.
+ * question. Une question que la tentative remise n'a pas finie, parce qu'elle est entrée dans la
+ * série après, reste sans corrigé et sans champ.
  */
 export const pratique = (p: Pratique) => {
   const { a, contenu, tentative: t } = p;
@@ -332,14 +360,17 @@ export const pratique = (p: Pratique) => {
       ${
         corrigee(contenu, t, q.id)
           ? corrige(a, contenu, t!, q, p.compteId)
-          : parQuestion
-            ? essaiQuestion(p, q)
-            : saisie(q, p.compteId, t?.reponses[q.id]?.essais[0], !p.apercu)
+          : t?.rendue_le
+            ? html`<p class="discret">Cette question n'était pas dans la version que tu as remise.</p>`
+            : parQuestion
+              ? essaiQuestion(p, q)
+              : saisie(q, p.compteId, p.saisie?.[q.id] ?? t?.reponses[q.id]?.essais[0], !p.apercu)
       }
     </section>`,
   );
   return html`
     ${entete(a, p.relecteur, p.apercu, contenu)}
+    ${p.alerte ? html`<p class="alerte" role="alert">${p.alerte}</p>` : ""}
     ${
       // Collée en haut de l'écran : une série de 23 questions dépasse 10 000px sur téléphone.
       t?.rendue_le || n < 2
@@ -354,6 +385,7 @@ export const pratique = (p: Pratique) => {
     ${
       enSaisie
         ? html`<form method="post" action="/eleve/activites/${a.id}/reponses" class="serie">
+          <input type="hidden" name="revision" value="${a.revision}">
           ${questions}
           <div id="remise">
             ${p.enregistree ? html`<p role="status">Tes réponses sont enregistrées.</p>` : ""}
