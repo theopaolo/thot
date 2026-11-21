@@ -3,7 +3,7 @@ import { assert, assertAlmostEquals, assertEquals } from "@std/assert";
 import { lireVerdict, probabiliteOui } from "../src/core/modeles.ts";
 import { assembler, decouper } from "../src/core/document.ts";
 import { type Candidat, documentsProches, racines, type Recherche } from "../src/core/recherche.ts";
-import { contexte, longueur, tranche, trouver, trouverFragments } from "../src/core/texte.ts";
+import { contexte, longueur, tranche, trouver } from "../src/core/texte.ts";
 
 test("les offsets comptent des points de code, pas des unités UTF-16", () => {
   const s = "Clé 𝄞 de sol";
@@ -73,24 +73,41 @@ test("la racinisation retire l'élision et rapproche les formes", () => {
   assertEquals(racines("peintres")[0], racines("peintre")[0]);
 });
 
-test("une citation coupée par des points de suspension passe si chaque fragment est dans l'ordre", () => {
+test("une citation se retrouve d'un seul tenant, sur des frontières de mot", () => {
   const texte =
     "Il possède un savoir-faire et une marge de manoeuvre créative. Son travail est donc émancipateur et non aliénant.";
-  const r = trouverFragments(
-    texte,
-    "Il possède un savoir‑faire et une marge… Son travail est donc émancipateur",
-  );
-  assertEquals(r && tranche(texte, r[0], r[1]).startsWith("Il possède"), true);
-  assertEquals(r && tranche(texte, r[0], r[1]).endsWith("émancipateur"), true);
-  assertEquals(trouverFragments(texte, "Son travail est donc… Il possède un savoir-faire"), null);
-  assertEquals(trouverFragments(texte, "Il possède un savoir-fait et une marge"), null);
-  const facade = "La façade est bleue et blanche.";
-  for (const fragment of ["plutonium", "plutonium radioactif"]) {
-    assertEquals(trouverFragments(facade, `La façade est bleue … ${fragment}`), null);
-    assertEquals(trouverFragments(facade, `${fragment} … La façade est bleue`), null);
-  }
-  assertEquals(trouverFragments(facade, "… La façade … blanche …"), [0, facade.length - 1]);
-  assertEquals(trouverFragments(facade, "… […] ..."), null);
+  const [a, b] = trouver(texte, "Il possède un savoir‑faire et une marge")!;
+  assertEquals(tranche(texte, a, b), "Il possède un savoir-faire et une marge");
+  assertEquals(trouver(texte, "Il possède un savoir‑faire et une marge… Son travail"), null);
+  assertEquals(trouver(texte, "Il possède un savoir-fait et une marge"), null);
+  assertEquals(trouver(texte, "possède un savoir-faire et une mar"), null);
+  assertEquals(trouver(texte, "ravail est donc émancipateur"), null);
+  // La première occurrence coupe un mot, la seconde non.
+  const deux = "Renoir est mortel. Renoir est mort.";
+  assertEquals(trouver(deux, "Renoir est mort"), [19, 34]);
+  // Un signe au bord de la citation n'exige rien de son voisin.
+  assertEquals(trouver("la toile (1876) est signée", "(1876)"), [9, 15]);
+});
+
+test("une citation se retrouve malgré la forme Unicode et les caractères invisibles", () => {
+  // « café » en NFD dans le document, en NFC dans la citation, après un caractère astral.
+  const nfd = "𝄞 Le cafe\u0301 est ouvert.";
+  const [a, b] = trouver(nfd, "le café est ouvert")!;
+  assertEquals(tranche(nfd, a, b), "Le cafe\u0301 est ouvert");
+  // La portée garde l'accent combinant du dernier mot.
+  assertEquals(tranche(nfd, ...trouver(nfd, "le café")!), "Le cafe\u0301");
+  assertEquals(trouver(nfd, "le cafe"), null);
+  const nfc = "𝄞 Le café est ouvert.";
+  assertEquals(tranche(nfc, ...trouver(nfc, "le cafe\u0301 est ouvert")!), "Le café est ouvert");
+  // Trait d'union conditionnel et espace sans chasse, dans le document ou dans la citation.
+  const coupe = "😀 Une céra\u00ADmique iri\u200Bsée couvre la façade.";
+  const [c, d] = trouver(coupe, "céramique irisée")!;
+  assertEquals(tranche(coupe, c, d), "céra\u00ADmique iri\u200Bsée");
+  assertEquals(trouver(coupe, "une céra"), null);
+  assertEquals(tranche(nfc, ...trouver(nfc, "ca\u00ADfé est ou\u200Bvert")!), "café est ouvert");
+  // Une ligature d'imprimerie vaut ses lettres.
+  const ligature = "𝄞 L'of\uFB01ce du tourisme";
+  assertEquals(tranche(ligature, ...trouver(ligature, "l'office du tourisme")!), ligature.slice(3));
 });
 
 test("le contexte d'une citation reste dans son paragraphe et coupe sur un mot", () => {

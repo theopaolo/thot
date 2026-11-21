@@ -413,9 +413,13 @@ export async function jugerChamps(modeles: Modeles, liste: Champ[], signal?: Abo
  * Rend la citation du premier chunk qui le contient, ou `undefined`.
  */
 export function ancrer(citation: string, chunks: ChunkIndexe[]): Citation | undefined {
-  const v = verifier(
-    { affirmations: chunks.map((_, i) => ({ texte: "-", extrait: i + 1, citation })) },
-    chunks,
-  );
-  return v.affirmations.map(enCitation).find((c) => c !== undefined);
+  // Un appel par chunk : `verifier` ne lit pas plus d'affirmations qu'une réponse n'en a.
+  for (const c of chunks) {
+    const [a] = verifier({ affirmations: [{ texte: "-", extrait: 1, citation }] }, [
+      c,
+    ]).affirmations;
+    const trouvee = a && enCitation(a);
+    if (trouvee) return trouvee;
+  }
+  return undefined;
 }

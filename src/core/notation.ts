@@ -68,7 +68,9 @@ export type Formule = { tex: string; bloc: boolean; source: string };
 
 /**
  * Une phrase découpée en texte et formules. Une formule est un fait : elle ne se rend que si la
- * citation de la phrase écrit la même expression, espaces mis à part. Sinon elle reste du texte.
+ * citation de la phrase écrit la même expression, casse comprise et espaces mis à part. Sinon elle
+ * reste du texte. La citation est le passage du document, que `verifier()` garde à la place de la
+ * copie du modèle.
  */
 export function formules(texte: string, citation: string): (string | Formule)[] {
   const plat = (s: string) => s.replace(/\s+/g, "");

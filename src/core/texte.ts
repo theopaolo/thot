@@ -40,10 +40,14 @@ export function contexte(texte: string, debut: number, fin: number, marge = 300)
 }
 
 /**
- * Forme de comparaison: apostrophes et guillemets unifiés, espaces réduites, casse ignorée.
- * Une puce compte comme une espace: le modèle recolle les listes en une phrase.
+ * Forme de comparaison d'un point de code: apostrophes et guillemets unifiés, espaces réduites,
+ * casse ignorée. Une puce compte comme une espace: le modèle recolle les listes en une phrase.
+ * Le trait d'union conditionnel, les espaces sans chasse et les liants disparaissent, une ligature
+ * d'imprimerie redevient ses lettres: un PDF en met là où le modèle n'en recopie pas.
  */
 const plier = (c: string) => {
+  if ("\u00AD\u200B\u200C\u200D\u2060\uFEFF".includes(c)) return "";
+  if (c >= "\uFB00" && c <= "\uFB06") return c.normalize("NFKC");
   if ("’‘ʼ`´".includes(c)) return "'";
   if ("«»“”„".includes(c)) return '"';
   if ("‐‑‒–—−".includes(c)) return "-";
@@ -51,54 +55,53 @@ const plier = (c: string) => {
   return c.toLowerCase();
 };
 
-/**
- * Cherche `citation` dans `texte` sans tenir compte des espaces, de la casse et de la forme des
- * apostrophes. Rend les offsets en points de code dans `texte`, ou null.
- */
-export function trouver(texte: string, citation: string): [number, number] | null {
-  const src: string[] = [];
-  const pos: number[] = [];
-  let i = 0;
-  for (const c of texte) {
-    for (const p of plier(c)) {
-      if (!(p === " " && src.at(-1) === " ")) {
-        src.push(p);
-        pos.push(i);
-      }
-    }
-    i++;
-  }
-  const cible = Array.from(citation).map(plier).join("").replace(/ +/g, " ").trim();
-  if (!cible) return null;
-  const at = src.join("").indexOf(cible);
-  if (at < 0) return null;
-  // indexOf compte des unités UTF-16 sur une chaîne de points de code repliés: on repasse
-  // par la longueur en points de code du préfixe.
-  const debut = longueur(src.join("").slice(0, at));
-  const fin = debut + longueur(cible) - 1;
-  return [pos[debut], pos[fin] + 1];
-}
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+// Un accent combinant resté seul après NFC appartient au mot qu'il suit.
+const DE_MOT = /[\p{L}\p{N}\p{M}_]/u;
+const colles = (a?: string, b?: string) =>
+  a !== undefined && b !== undefined && DE_MOT.test(a) && DE_MOT.test(b);
 
 /**
- * Citation coupée par des points de suspension: chaque fragment doit se trouver mot pour mot,
- * dans l'ordre. Rend la portée du premier au dernier fragment.
+ * Cherche `citation` d'un seul tenant dans `texte`, sans tenir compte des espaces, de la casse,
+ * de la forme des apostrophes ni de la forme Unicode (NFC ou NFD). La citation commence et finit
+ * sur une frontière de mot: « mort » ne se trouve pas dans « mortel ». Rend les offsets en points
+ * de code dans `texte`, ou null.
  */
-export function trouverFragments(texte: string, citation: string): [number, number] | null {
-  const fragments = citation
-    .split(/\s*(?:\[…\]|\(…\)|…|\.\.\.)\s*/)
-    .map((f) => f.trim())
-    .filter(Boolean);
-  if (!fragments.length) return null;
-  let debut = -1;
-  let fin = 0;
-  for (const f of fragments) {
-    const reste = tranche(texte, fin, longueur(texte));
-    const t = trouver(reste, f);
-    if (!t) return null;
-    if (debut < 0) debut = fin + t[0];
-    fin += t[1];
+export function trouver(texte: string, citation: string): [number, number] | null {
+  // La forme NFC d'un graphème n'a pas toujours autant de points de code que lui: chaque point
+  // de code replié garde les bornes de son graphème dans `texte`.
+  // ponytail: le texte est replié à chaque appel. Garder la forme repliée d'un chunk si l'ancrage
+  // d'une longue source ralentit.
+  const src: string[] = [];
+  const debuts: number[] = [];
+  const fins: number[] = [];
+  let i = 0;
+  for (const { segment } of GRAPHEMES.segment(texte)) {
+    const fin = i + longueur(segment);
+    for (const c of segment.normalize("NFC")) {
+      for (const p of plier(c)) {
+        if (!(p === " " && src.at(-1) === " ")) {
+          src.push(p);
+          debuts.push(i);
+          fins.push(fin);
+        }
+      }
+    }
+    i = fin;
   }
-  return [debut, fin];
+  const cible = Array.from(citation.normalize("NFC"), plier).join("").replace(/ +/g, " ").trim();
+  if (!cible) return null;
+  const plie = src.join("");
+  for (let at = plie.indexOf(cible); at >= 0; at = plie.indexOf(cible, at + 1)) {
+    // indexOf compte des unités UTF-16 sur une chaîne de points de code repliés: on repasse
+    // par la longueur en points de code du préfixe.
+    const debut = longueur(plie.slice(0, at));
+    const fin = debut + longueur(cible) - 1;
+    if (!colles(src[debut - 1], src[debut]) && !colles(src[fin], src[fin + 1])) {
+      return [debuts[debut], fins[fin]];
+    }
+  }
+  return null;
 }
 
 const STOP = new Set(

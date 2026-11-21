@@ -7,9 +7,11 @@ modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
 ## Règles du produit
 
 1. Une affirmation cite un passage retrouvé mot pour mot dans une source certifiée, que son
-   lecteur peut lire et que Thot peut citer. `verifier()` dans `src/core/reponse.ts` le contrôle. Un
-   juge (`juger()`, même fichier) contrôle ensuite que ce passage, lu sous le titre de son
-   extrait, prouve toute la phrase. Un juge injoignable ou plus lent que 4 s laisse passer
+   lecteur peut lire et que Thot peut citer. Le passage est d'un seul tenant, sans points de
+   suspension, et commence et finit sur un mot entier. `verifier()` dans `src/core/reponse.ts` le
+   contrôle et garde le texte du document à la place de la copie du modèle. Un juge (`juger()`,
+   même fichier) contrôle ensuite que ce passage, lu sous le titre de son extrait, prouve toute la
+   phrase. Un juge injoignable ou plus lent que 4 s laisse passer
    l'affirmation et le note au journal. La réponse affiche alors « Vérification partielle » au
    lieu de « Réponse vérifiée ». Le dépassement du délai annule la requête du juge.
    Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau,
@@ -661,8 +663,9 @@ un nom y garde ses caractères, sauf les signes qui ont un rôle dans sa syntaxe
 relations citées s'affiche toujours. Le navigateur dessine le schéma au-dessus, avec Mermaid en
 mode strict puis DOMPurify sur le SVG. Un échec laisse la liste.
 
-Une formule est un fait. Une phrase ne rend une formule `$…$` ou `$$…$$` avec KaTeX que si sa
-citation écrit la même expression, espaces mis à part. Sinon la formule reste du texte. KaTeX
+Une formule est un fait. Une phrase ne rend une formule `$…$` ou `$$…$$` avec KaTeX que si le
+passage cité l'écrit dans le document, casse comprise et espaces mis à part. Sinon la formule
+reste du texte. KaTeX
 tourne sans confiance, avec des macros neuves à chaque formule et une expansion bornée
 (`optionsKatex()`). Rendre une formule ne vérifie ni son raisonnement, ni ses unités, ni son
 résultat.

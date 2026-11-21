@@ -62,6 +62,7 @@ test("une formule ne se rend que si sa citation l'écrit, sinon elle reste du te
   // Une formule que la citation n'écrit pas, ou n'écrit qu'en morceau, reste du texte.
   assertEquals(formules("Donc $v = 2d/t$.", "on note $v=d/t$ la vitesse"), ["Donc $v = 2d/t$."]);
   assertEquals(formules("On a $x$.", "x vaut deux"), ["On a $x$."]);
+  assertEquals(formules("On a $\\Delta X$.", "on note $\\delta x$"), ["On a $\\Delta X$."]);
   // Des montants ne sont pas des formules.
   assertEquals(formules("Entre 5 $ et 10 $.", "Entre 5 $ et 10 $."), ["Entre 5 $ et 10 $."]);
   assertEquals(formules("De $5 à $10.", "De $5 à $10."), ["De $5 à $10."]);

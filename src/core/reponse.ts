@@ -8,12 +8,16 @@ import {
   type Perimetre,
   revisionCitable,
 } from "./recherche.ts";
-import { trouverFragments } from "./texte.ts";
+import { tranche, trouver } from "./texte.ts";
 import type { Profil } from "./profils.ts";
 import { type Lien, LIENS, type Schema } from "./notation.ts";
 
 export type Affirmation = {
   texte: string;
+  /**
+   * Le passage tel que le document l'écrit, espaces réduites, et non la copie qu'en fait le
+   * modèle : le juge et l'affichage lisent la source.
+   */
   citation: string;
   source_id: string;
   chunk_id: string;
@@ -171,7 +175,10 @@ export function lire(sortie: string): Brute | null {
   }
 }
 
-/** Contrôles déterministes: chaque citation existe mot pour mot dans l'extrait qu'elle désigne. */
+/**
+ * Contrôles déterministes: chaque citation existe mot pour mot, d'un seul tenant, dans l'extrait
+ * qu'elle désigne. Les affirmations au-delà de `MAX_AFFIRMATIONS` ne sont pas lues.
+ */
 export function verifier(
   brute: Brute | null,
   retenus: (ChunkIndexe & Pick<Candidat, "matieres">)[],
@@ -182,7 +189,9 @@ export function verifier(
   const parRang: (Affirmation | undefined)[] = [];
   if (!brute) return { erreurs: ["La sortie n'est pas un objet JSON."], affirmations: [], parRang };
   if (brute.refus) return { erreurs, affirmations: [], parRang, refus: true };
-  const liste: BruteAffirmation[] = Array.isArray(brute.affirmations) ? brute.affirmations : [];
+  const liste: BruteAffirmation[] = Array.isArray(brute.affirmations)
+    ? brute.affirmations.slice(0, MAX_AFFIRMATIONS)
+    : [];
   if (!liste.length) erreurs.push("Aucune affirmation.");
   parRang.length = liste.length;
   liste.forEach((a, i) => {
@@ -196,22 +205,24 @@ export function verifier(
     }
     const base = {
       texte,
-      citation,
       source_id: c.source_id,
       chunk_id: c.id,
       revision: c.revision,
       ...(c.matieres && { matiere: c.matieres.join(", ") }),
     };
-    const dansTexte = trouverFragments(c.texte, citation);
+    const lu = (t: string, [a, b]: [number, number]) => tranche(t, a, b).replace(/\s+/g, " ");
+    const dansTexte = trouver(c.texte, citation);
+    const dansPreuve = dansTexte ? null : trouver(c.preuve, citation);
     if (dansTexte) {
       parRang[i] = {
         ...base,
+        citation: lu(c.texte, dansTexte),
         titre: c.titre,
         debut: c.debut + dansTexte[0],
         fin: c.debut + dansTexte[1],
       };
-    } else if (trouverFragments(c.preuve, citation)) {
-      parRang[i] = { ...base, titre: c.titre };
+    } else if (dansPreuve) {
+      parRang[i] = { ...base, citation: lu(c.preuve, dansPreuve), titre: c.titre };
     } else {
       erreurs.push(
         `Affirmation ${
@@ -338,7 +349,8 @@ export function ranger(brutes: unknown, parRang: (Affirmation | undefined)[]): R
 /**
  * Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. Une
  * citation d'une révision qui ne sert plus se revérifie dans les chunks que `ancienne` rend pour
- * cette révision.
+ * cette révision. Chaque citation est rendue telle que le document l'écrit : une réponse conservée
+ * peut encore porter la copie du modèle.
  */
 export function actualiserResultat(
   db: DatabaseSync,
@@ -347,6 +359,7 @@ export function actualiserResultat(
   ancienne: (sourceId: string, revision: number) => ChunkIndexe[],
 ): Resultat {
   if (resultat.etat !== "answered") return resultat;
+  const affirmations: Affirmation[] = [];
   for (const a of resultat.affirmations) {
     const n = a.revision ?? 1;
     let c = lireChunk(db, a.source_id, a.chunk_id, p);
@@ -366,8 +379,9 @@ export function actualiserResultat(
           "Une source de cette réponse a été retirée ou modifiée. Pose à nouveau ta question.",
       };
     }
+    affirmations.push({ ...a, citation: valide.citation });
   }
-  return resultat;
+  return { ...resultat, affirmations };
 }
 
 /**
@@ -493,7 +507,7 @@ export async function demander(
             a.debut === undefined &&
             i.legende_statut === "certified" &&
             i.legende &&
-            trouverFragments(i.legende, a.citation),
+            trouver(i.legende, a.citation),
         ) ?? images[0];
       if (image) {
         a.image_id = image.id;
