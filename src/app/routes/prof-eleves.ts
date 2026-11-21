@@ -14,7 +14,7 @@ import {
 } from "../comptes.ts";
 import { config } from "../config.ts";
 import { libelles, lireInstance } from "../instance.ts";
-import * as Prof from "../vues/prof.ts";
+import * as ProfEleves from "../vues/prof-eleves.ts";
 import * as Domaines from "../domaines.ts";
 import type { Env, Web } from "./web.ts";
 
@@ -49,7 +49,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     return rendre(
       c,
       "Élèves",
-      Prof.eleves({
+      ProfEleves.eleves({
         cat,
         actuel,
         groupes,
@@ -79,7 +79,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       const comptes = await creer();
       c.header("Cache-Control", "no-store");
       return c.html(
-        rendre(c, "Identifiants élèves", Prof.feuilleIdentifiants(comptes, adresse(c))),
+        rendre(c, "Identifiants élèves", ProfEleves.feuilleIdentifiants(comptes, adresse(c))),
       );
     } catch (e) {
       return c.html(pageEleves(c, (e as Error).message), 400);
@@ -151,7 +151,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Nouveau mot de passe",
-        Prof.feuilleIdentifiants([{ ...eleve, motDePasse: motDePasse! }], adresse(c)),
+        ProfEleves.feuilleIdentifiants([{ ...eleve, motDePasse: motDePasse! }], adresse(c)),
       ),
     );
   });
