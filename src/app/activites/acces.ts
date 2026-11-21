@@ -100,6 +100,16 @@ const montrees = (contenu: string) => {
   return "affirmations" in c ? [] : sourcesMontrees(c);
 };
 
+/** Les images de sources que montrent les questions : leur identifiant et leur source. */
+const imagesMontrees = (contenu: string) => {
+  const c = lireContenu(contenu);
+  return "affirmations" in c
+    ? []
+    : c.questions.flatMap((q) =>
+        q.image?.media ? [{ id: q.image.media, source: q.image.source ?? "" }] : [],
+      );
+};
+
 /** La révision que sert aujourd'hui chaque source citée dans le cours, `undefined` si elle n'est plus citable. */
 export function servies(db: Db, a: Cible & Pick<Activite, "contenu">, coursId = a.cours_id) {
   const p = perimetre(db, a, coursId);
@@ -109,18 +119,25 @@ export function servies(db: Db, a: Cible & Pick<Activite, "contenu">, coursId = 
 
 /**
  * Les titres des sources qui ne tiennent plus dans le cours : une citation qui vise une autre
- * révision que celle servie, ou une source montrée qui n'est plus citable.
+ * révision que celle servie, ou une source montrée qui n'est plus citable. Une source qui tient
+ * mais ne sert plus l'image montrée est nommée avec « (image retirée) ».
  */
 export function bloquantes(db: Db, a: Cible & Pick<Activite, "contenu">, coursId: string) {
   const s = servies(db, a, coursId);
   const titre = db.prepare("SELECT titre FROM sources WHERE id = ?");
+  const nom = (id: string) => String(titre.get(id)?.titre ?? "source supprimée");
   const ids = new Set([
     ...citations(a.contenu)
       .filter((c) => s.get(c.source_id) !== c.revision)
       .map((c) => c.source_id),
     ...montrees(a.contenu).filter((id) => s.get(id) === undefined),
   ]);
-  return [...ids].map((id) => String(titre.get(id)?.titre ?? "source supprimée"));
+  // Le numéro d'une image retirée ne revient pas : une ligne trouvée est l'image choisie.
+  const servie = db.prepare("SELECT 1 FROM images WHERE id = ? AND source_id = ?");
+  const retirees = imagesMontrees(a.contenu)
+    .filter((i) => !ids.has(i.source) && !servie.get(i.id, i.source))
+    .map((i) => `${nom(i.source)} (image retirée)`);
+  return [...new Set([...[...ids].map(nom), ...retirees])];
 }
 
 /** Vrai si les preuves tiennent dans le cours, ou dans chacun des cours de l'activité. */

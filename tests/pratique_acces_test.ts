@@ -196,6 +196,10 @@ test("lecteur : « S'entraîner » liste les activités qui citent la ressource,
   try {
     const seconde = await publierSource(db, "Casa Milà", coursId);
     const seule = await publierSource(db, "Parc Güell", coursId);
+    // Une image montrée doit être servie par sa source.
+    db.prepare(
+      "INSERT INTO images (id, source_id, position, fichier, mime, checksum) VALUES ('x', ?, 0, 'x.png', 'image/png', 'x')",
+    ).run(seconde);
     const q = (id: string, extra: Partial<Question>): Question =>
       ({
         id,

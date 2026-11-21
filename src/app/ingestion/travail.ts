@@ -152,13 +152,6 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     }
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");
 
-    tenir();
-    enregistrer(db, s, doc, ext.avertissements, ext.notes);
-    // L'extraction vient de devenir la révision en attente, ou de confirmer la révision servie.
-    const attente = revisionEnAttente(db, s.id);
-    const n = attente?.n ?? s.revision;
-    const dossier = dossierRevision(s.id, n);
-    await mkdir(`${dossier}/assets`, { recursive: true });
     const servies = new Set(
       db
         .prepare("SELECT checksum FROM images WHERE source_id = ?")
@@ -169,15 +162,29 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     // le nom de ses octets : un nom ne désigne jamais d'autres octets, et une image que la source
     // sert déjà garde le sien.
     const parOctets = new Map<string, ImageRevision>();
+    const nouvelles: [string, Uint8Array][] = [];
     for (const img of ext.images) {
       const checksum = await sha256(img.octets);
       if (parOctets.has(checksum)) continue;
       const fichier = `${checksum}.${img.extension}`;
-      if (!servies.has(checksum)) {
-        tenir();
-        ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
-      }
+      if (!servies.has(checksum)) nouvelles.push([fichier, img.octets]);
       parOctets.set(checksum, { checksum, fichier, mime: img.mime, section: img.section ?? null });
+    }
+    // Les élèves lisent une source certifiée : ses images n'entrent ni ne sortent sans relecture.
+    // Les mêmes images dans un autre ordre se rangent en place.
+    const autresImages =
+      s.statut === "certifiee" && (nouvelles.length > 0 || parOctets.size !== servies.size);
+
+    tenir();
+    enregistrer(db, s, doc, ext.avertissements, ext.notes, autresImages);
+    // L'extraction vient de devenir la révision en attente, ou de confirmer la révision servie.
+    const attente = revisionEnAttente(db, s.id);
+    const n = attente?.n ?? s.revision;
+    const dossier = dossierRevision(s.id, n);
+    await mkdir(`${dossier}/assets`, { recursive: true });
+    for (const [fichier, octets] of nouvelles) {
+      tenir();
+      ecrireAtomique(`${dossier}/assets/${fichier}`, octets);
     }
     const images = [...parOctets.values()];
     tenir();

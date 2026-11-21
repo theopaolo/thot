@@ -37,10 +37,12 @@ modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
    L'index de recherche se reconstruit depuis les révisions servies par `thot rebuild`.
 6. Le `document.txt` d'une révision est le système de coordonnées de ses citations, et son texte
    ne change plus. Une extraction dont le texte diffère de la révision servie devient une
-   révision en attente, vérifiée bloc par bloc. Elle ne sert qu'une fois certifiée par un
-   enseignant, ses images comprises, et l'index ne contient que la révision servie. Une
-   extraction qui redonne le texte servi écarte la révision en attente. Une ancienne révision se
-   lit avec les mêmes droits que la source : retirer l'accès à la source la retire aussi.
+   révision en attente, vérifiée bloc par bloc. Une extraction qui rend le texte servi avec
+   d'autres images que celles d'une source certifiée en devient une aussi. Elle ne sert qu'une
+   fois certifiée par un enseignant, ses images comprises, et l'index ne contient que la révision
+   servie. Une extraction qui redonne le texte servi et ses images écarte la révision en attente.
+   Une ancienne révision se lit avec les mêmes droits que la source : retirer l'accès à la source
+   la retire aussi.
    Les offsets comptent des points de code, les chaînes JavaScript des unités UTF-16. Tout
    découpage passe par `src/core/texte.ts`.
 7. Le choix d'un modèle est un réglage d'environnement. Il ne traverse pas le domaine.
@@ -157,14 +159,24 @@ répétée sur plusieurs diapositives entre une fois, avec la première. Seuls P
 importés, sous une borne de pixels. Les autres formats (EMF, WMF, SVG…) donnent un avertissement.
 
 La table `images` ne porte que les images servies, et chaque ligne garde la révision qui l'a
-apportée (`images.revision`). Une extraction qui redonne le texte servi range ses images en
-place. Une extraction qui devient une révision en attente écrit dans le dossier de cette
-révision ses images nouvelles et leur liste (`images.jsonl`), avec la légende proposée pour
-chacune. Certifier la révision sert cette liste, et les images que la révision n'a plus sortent
-avec leurs fichiers. La rejeter efface son dossier. Une image se reconnaît à ses octets : tant
-qu'une extraction la rend, elle garde son identifiant, sa légende et sa relecture, même à une
-autre place. Une image répétée dans un document entre donc une fois. `thot reextraire` ne lit
-pas les images : certifier sa révision laisse celles de la source telles quelles.
+apportée (`images.revision`). Une source certifiée ne change pas d'images sans relecture : une
+extraction qui en ajoute ou en retire devient une révision en attente, même sous le texte servi.
+Les mêmes images dans un autre ordre se rangent en place, comme toutes celles d'une source qui
+n'est pas certifiée, qu'aucun élève ne lit. Une extraction qui devient une révision en attente
+écrit dans le dossier de cette révision ses images nouvelles et leur liste (`images.jsonl`), avec
+la légende proposée pour chacune. La page de la source montre à qui relit la révision les images
+qu'elle ajoute et nomme celles qu'elle retire. Une image ajoutée ne sort du serveur que pour ceux
+qui modifient la source. Certifier la révision sert cette liste, et les images que la révision
+n'a plus sortent avec leurs fichiers. La rejeter efface son dossier. Une révision qui ne change
+que les images se certifie comme une autre : la source sert alors un nouveau numéro de révision,
+et une activité qui citait l'ancien devient à revoir, bien que ses passages s'y retrouvent.
+
+Une image se reconnaît à ses octets : tant qu'une extraction la rend, elle garde son identifiant,
+sa légende et sa relecture, même à une autre place. Une image répétée dans un document entre donc
+une fois. Le numéro d'un identifiant vient d'un compteur de la source (`sources.images_numero`)
+qui ne redescend pas : l'identifiant d'une image retirée ne désigne pas une autre image.
+`thot reextraire` ne lit pas les images : certifier sa révision laisse celles de la source telles
+quelles, et un texte identique laisse en attente une révision qui ne change que les images.
 
 Le dépôt web prend plusieurs fichiers. Chacun passe par `deposer()` seul : une source, un travail
 d'ingestion, aucune dépendance entre fichiers. Avec JavaScript, le navigateur envoie un fichier
@@ -533,12 +545,14 @@ points comptent ce qui a été pratiqué : ils ne mesurent pas un niveau.
 
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,
 publiée à ses élèves et utilisée par Thot. Une source qu'une question montre sans la citer, par son
-image ou comme source où chercher, doit rester citable de la même façon. Chaque changement d'une
+image ou comme source où chercher, doit rester citable de la même façon, et servir encore l'image
+montrée. Chaque changement d'une
 source passe par `src/app/ingestion/sources.ts`, par le web comme par la CLI : la même transaction
 écrit, réindexe et signale à revoir les activités dont une preuve ne tient plus dans un de leurs
 cours. La page de l'élève revérifie les preuves à chaque affichage. Une activité à revoir n'est
-plus servie. L'enseignant fait rechercher ses passages dans la révision servie, ou retire le cours
-fautif, et l'activité redevient un brouillon à relire si son contenu n'a pas d'erreur. Une tentative
+plus servie. L'enseignant fait rechercher ses passages dans la révision servie, remplace l'image
+que la source ne sert plus, ou retire le cours fautif, et l'activité redevient un brouillon à
+relire si son contenu n'a pas d'erreur. Une tentative
 garde la version de l'exercice à laquelle elle répondait.
 
 Supprimer une source retire de chaque exercice ses passages, le texte des champs qui les citaient,
@@ -659,9 +673,9 @@ stateDiagram-v2
   direction LR
   state "Révision" as Revision {
     [*] --> servie: première extraction
-    [*] --> en_attente: texte changé
+    [*] --> en_attente: texte ou images changés
     en_attente --> servie: certifiée
-    en_attente --> [*]: rejetée, remplacée ou texte servi revenu
+    en_attente --> [*]: rejetée, remplacée ou texte et images servis revenus
     servie --> conservee: une autre est certifiée
   }
   note right of Revision: certifier une révision certifie aussi sa source
@@ -676,10 +690,10 @@ stateDiagram-v2
     relue --> publiee: publié
     relue --> brouillon: modifié
     publiee --> brouillon: modifié
-    brouillon --> a_revoir: citation retirée
-    relue --> a_revoir: citation retirée
-    publiee --> a_revoir: citation retirée
-    a_revoir --> brouillon: passages retrouvés ou cours retiré
+    brouillon --> a_revoir: citation ou image retirée
+    relue --> a_revoir: citation ou image retirée
+    publiee --> a_revoir: citation ou image retirée
+    a_revoir --> brouillon: passages retrouvés, image remplacée ou cours retiré
   }
 ```
 

@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
 import { LISIBLE, parametresLisible } from "../../core/recherche.ts";
-import { cheminImage } from "../ingestion.ts";
+import { peutModifier } from "../comptes.ts";
+import { cheminImage, imageEnAttente } from "../ingestion.ts";
 import type { Env, Web } from "./web.ts";
 
 export function routesMedia(app: Hono<Env>, w: Web) {
@@ -23,5 +24,16 @@ export function routesMedia(app: Hono<Env>, w: Web) {
     if (c.req.header("if-none-match") === entetes.etag) return c.body(null, 304, entetes);
     const octets = await readFile(cheminImage(i.source_id, i));
     return c.body(octets, 200, { ...entetes, "content-type": i.mime });
+  });
+
+  // Une image d'une version à relire. Aucun enseignant ne l'a certifiée : elle ne sort que pour
+  // ceux qui modifient la source, sous `/prof` que la session ferme aux élèves, et sans cache.
+  app.get("/prof/sources/:id/revisions/:n{[0-9]+}/images/:fichier", async (c) => {
+    const id = c.req.param("id");
+    const i =
+      peutModifier(db, c.get("compte"), id) &&
+      imageEnAttente(db, id, Number(c.req.param("n")), c.req.param("fichier"));
+    if (!i) return c.notFound();
+    return c.body(await readFile(i.chemin), 200, { "content-type": i.mime });
   });
 }

@@ -128,6 +128,7 @@ test("migration 0026 : un exercice devient une série d'une question, sa tentati
       "0027_lectures.sql",
       "0028_connexions.sql",
       "0029_images_revision.sql",
+      "0030_images_numero.sql",
     ]);
     const a = db.prepare("SELECT contenu, titre FROM activites").get()!;
     assertEquals(JSON.parse(a.contenu as string), {

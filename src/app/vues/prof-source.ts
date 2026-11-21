@@ -2,6 +2,7 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import { type Audience, AUDIENCES } from "../depot.ts";
 import type { Affiliation, Catalogue } from "../domaines.ts";
+import type { imagesEnAttente } from "../ingestion.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import type { Libelles } from "../instance.ts";
 import * as Domaines from "./domaines.ts";
@@ -38,8 +39,14 @@ export type Detail = {
   images: ImageVue[];
   /** blocs de la révision servie */
   blocs: Bloc[];
-  /** une extraction plus récente, dont le texte a changé */
-  attente?: { n: number; cree_le: string; avertissements: string[]; blocs: Bloc[] };
+  /** une extraction plus récente, dont le texte ou les images ont changé */
+  attente?: {
+    n: number;
+    cree_le: string;
+    avertissements: string[];
+    blocs: Bloc[];
+    images?: ReturnType<typeof imagesEnAttente>;
+  };
   /** notes de l'orateur d'une présentation, pour qui relit la source. `null` : pas encore lues */
   notes?: { diapositive: number; texte: string }[] | null;
   catalogue?: Catalogue;
@@ -102,6 +109,8 @@ export const detailSource = (d: Detail) => {
   // Une proposition de Thot remplit un champ encore vide. Enregistrer la valide.
   const propositions = (d.meta.propositions ?? {}) as Record<string, string>;
   const propose = (nom: string) => !d.meta[nom] && Boolean(propositions[nom]);
+  // Une version qui ne change que les images reprend le texte servi : il ne s'affiche qu'une fois.
+  const memeTexte = !!d.attente && JSON.stringify(d.attente.blocs) === JSON.stringify(d.blocs);
   return html`
     <p><a href="/prof">Bibliothèque</a></p>
     <h1>${d.source.titre}</h1>
@@ -202,9 +211,15 @@ export const detailSource = (d: Detail) => {
         <section aria-labelledby="revision-attente">
           <h2 id="revision-attente">Nouvelle version à relire</h2>
           <p class="note">
-            L'extraction du ${jour(d.attente.cree_le)} a changé le texte. Les lecteurs et Thot
-            gardent le texte actuel tant que cette version n'est pas certifiée. Les réponses déjà
-            données gardent le passage qu'elles citent.
+            ${
+              memeTexte
+                ? html`L'extraction du ${jour(d.attente.cree_le)} garde le texte et change les
+                  images. Les lecteurs et Thot gardent les images actuelles tant que cette version
+                  n'est pas certifiée.`
+                : html`L'extraction du ${jour(d.attente.cree_le)} a changé le texte. Les lecteurs et
+                  Thot gardent le texte actuel tant que cette version n'est pas certifiée. Les
+                  réponses déjà données gardent le passage qu'elles citent.`
+            }
           </p>
           ${avertissements(d.attente.avertissements)} ${
             d.modifiable
@@ -222,7 +237,8 @@ export const detailSource = (d: Detail) => {
             `
               : ""
           }
-          <div class="document">${texteDocument(d.attente.blocs)}</div>
+          ${imagesAttente(d)}
+          ${memeTexte ? "" : html`<div class="document">${texteDocument(d.attente.blocs)}</div>`}
         </section>
       `
         : ""
@@ -251,7 +267,7 @@ export const detailSource = (d: Detail) => {
       `
         : ""
     }
-    <h2>${d.attente ? "Texte actuel" : "Texte extrait"}</h2>
+    <h2>${d.attente && !memeTexte ? "Texte actuel" : "Texte extrait"}</h2>
     <div class="document">${texteDocument(d.blocs)}</div>
     </div>
     ${d.notes === undefined ? "" : notesOrateur(d.notes)}
@@ -281,6 +297,44 @@ const avertissements = (liste: string[]) =>
         (a) => html`<li>${a}</li>`,
       )}</ul></div>`
     : "";
+
+/**
+ * Les images que la version à relire ajoute, et le nom de celles qu'elle retire. Une image ajoutée
+ * ne sort du serveur que pour ceux qui modifient la source : les autres en lisent le nombre.
+ */
+const imagesAttente = (d: Detail) => {
+  const { ajoutees = [], retirees = [] } = d.attente?.images ?? {};
+  const s = (n: number) => (n > 1 ? "s" : "");
+  return html`${
+    !ajoutees.length
+      ? ""
+      : !d.modifiable
+        ? html`<p>Cette version ajoute ${ajoutees.length} image${s(ajoutees.length)}. Seuls ceux
+            qui modifient la source les voient avant sa certification.</p>`
+        : html`<h3>Images ajoutées</h3>${ajoutees.map(
+            (i) => html`
+              <figure>
+                <img src="/prof/sources/${d.source.id}/revisions/${d.attente!.n}/images/${i.fichier}"
+                  alt="Image ajoutée à ${d.source.titre}" loading="lazy">
+                <figcaption>
+                  ${i.section ? html`<small>${i.section}</small>` : ""}
+                  <span class="statut unreviewed">${LEGENDES.unreviewed}</span>
+                  ${i.legende ?? "Pas de légende."}
+                </figcaption>
+              </figure>
+            `,
+          )}`
+  }${
+    retirees.length
+      ? html`<p>Certifier cette version retire ${retirees.length} image${s(retirees.length)} de
+            la source :</p>
+          <ul>${retirees.map(
+            (i) =>
+              html`<li><a href="/media/${i.id}" target="_blank">${i.legende ?? "Image sans légende"}</a></li>`,
+          )}</ul>`
+      : ""
+  }`;
+};
 
 /** Le choix d'inclure les diapositives masquées, quand la présentation en a. */
 const diapositivesMasquees = (d: Detail) => {

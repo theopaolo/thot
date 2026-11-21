@@ -90,6 +90,10 @@ export const revisionEnAttente = (db: Db, sourceId: string) =>
  * est écartée. Un autre texte devient une révision en attente, vérifiée avant d'être enregistrée.
  * La révision servie reste citée jusqu'à ce qu'un enseignant certifie la nouvelle.
  *
+ * `autresImages` : l'extraction rend d'autres images que celles qu'une source certifiée sert. Elle
+ * devient alors une révision en attente même sous le texte servi. `undefined` : l'extraction n'a
+ * pas lu les images, et laisse en attente une révision qui ne change qu'elles.
+ *
  * Tout se fait dans une transaction, fichiers compris, et la révision servie s'y relit : un
  * enseignant a pu certifier la révision en attente pendant l'extraction, et le numéro calculé
  * d'après une lecture plus ancienne désignerait alors le dossier de la révision servie.
@@ -100,6 +104,7 @@ export function enregistrer(
   doc: Document,
   avertissements: string[],
   notes?: Note[],
+  autresImages?: boolean,
 ) {
   const blocs = jsonl(doc.blocs);
   // La révision en attente que cette extraction écarte. Son dossier part une fois sa ligne
@@ -113,9 +118,13 @@ export function enregistrer(
     const revision = lireSource(db, s.id).revision;
     const attente = revisionEnAttente(db, s.id);
     const servie = lireFichiers(dossierRevision(s.id, revision));
-    if (servie.texte === undefined || servie.texte === doc.texte) {
-      // Le texte servi est revenu : la révision en attente n'a plus rien à faire relire.
-      if (attente) ecarter(attente.n);
+    const enAttente = attente && lireFichiers(dossierRevision(s.id, attente.n));
+    if (servie.texte === undefined || (servie.texte === doc.texte && !autresImages)) {
+      // Le texte servi est revenu, avec ses images si l'extraction les a lues : la révision en
+      // attente n'a plus rien à faire relire.
+      if (attente && (autresImages === false || enAttente!.texte !== doc.texte)) {
+        ecarter(attente.n);
+      }
       db.prepare(
         `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
          ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
@@ -127,10 +136,7 @@ export function enregistrer(
       ecrireDocument(dossierRevision(s.id, revision), doc);
       return "mise_a_jour";
     }
-    if (attente) {
-      const fichiers = lireFichiers(dossierRevision(s.id, attente.n));
-      if (fichiers.texte === doc.texte && fichiers.blocs === blocs) return "identique";
-    }
+    if (enAttente?.texte === doc.texte && enAttente.blocs === blocs) return "identique";
     const n = (attente?.n ?? revision) + 1;
     const dossier = contenu(s.id, "revisions", String(n));
     // Un dossier sans ligne en base reste d'un essai interrompu.

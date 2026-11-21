@@ -1,6 +1,6 @@
 import { readFileSync, rmSync } from "node:fs";
 import type { Db } from "../db.ts";
-import { dossierRevision } from "./revisions.ts";
+import { dossierRevision, revisionEnAttente } from "./revisions.ts";
 
 /**
  * Une image d'une extraction, à sa place dans le document. `legende` et `modele` : la légende
@@ -32,6 +32,34 @@ export function lireInventaire(sourceId: string, n: number): ImageRevision[] | u
 }
 
 /**
+ * Ce que certifier la révision en attente `n` changerait aux images servies : celles qu'elle
+ * ajoute, avec leur légende proposée, et celles qu'elle retire. `undefined` sans inventaire.
+ */
+export function imagesEnAttente(db: Db, sourceId: string, n: number) {
+  const inventaire = lireInventaire(sourceId, n);
+  if (!inventaire) return undefined;
+  const servies = db
+    .prepare("SELECT id, checksum, legende FROM images WHERE source_id = ? ORDER BY position")
+    .all(sourceId) as { id: string; checksum: string; legende: string | null }[];
+  const deja = new Set(servies.map((i) => i.checksum));
+  const gardees = new Set(inventaire.map((i) => i.checksum));
+  return {
+    ajoutees: inventaire.filter((i) => !deja.has(i.checksum)),
+    retirees: servies.filter((i) => !gardees.has(i.checksum)),
+  };
+}
+
+/**
+ * Une image que la révision en attente `n` ajoute, pour qui la relit. `undefined` si la révision
+ * n'attend plus ou si son inventaire ne nomme pas ce fichier.
+ */
+export function imageEnAttente(db: Db, sourceId: string, n: number, fichier: string) {
+  if (revisionEnAttente(db, sourceId)?.n !== n) return undefined;
+  const i = imagesEnAttente(db, sourceId, n)?.ajoutees.find((x) => x.fichier === fichier);
+  return i && { mime: i.mime, chemin: `${dossierRevision(sourceId, n)}/assets/${i.fichier}` };
+}
+
+/**
  * Fait des images de la révision `n` celles que la source sert. Une image suit ses octets : celle
  * que la source servait déjà garde son identifiant, sa légende et sa relecture, et prend sa
  * nouvelle place. Les autres entrent avec la légende proposée. Celles que la révision n'a plus
@@ -39,14 +67,10 @@ export function lireInventaire(sourceId: string, n: number): ImageRevision[] | u
  * Sans transaction.
  */
 export function servirImages(db: Db, sourceId: string, n: number, images: ImageRevision[]) {
-  // ponytail: le numéro repart du plus grand encore servi. Celui d'une image retirée peut donc
-  // revenir à une autre, et une activité qui montrait la première montrerait la seconde. Un
-  // compteur par source l'éviterait.
-  let numero = db
-    .prepare(
-      "SELECT coalesce(max(CAST(substr(id, ?) AS INTEGER)), -1) + 1 AS n FROM images WHERE source_id = ?",
-    )
-    .get(sourceId.length + 2, sourceId)!.n as number;
+  // Le compteur de la source ne redescend pas : le numéro d'une image retirée ne revient à aucune
+  // autre, et une activité qui la montrait ne montre pas la suivante à sa place.
+  let numero = db.prepare("SELECT images_numero AS n FROM sources WHERE id = ?").get(sourceId)!
+    .n as number;
   // Les places passent sous zéro le temps du rangement : `(source_id, position)` est unique, et
   // ce qui reste sous zéro à la fin n'est plus dans la révision.
   db.prepare("UPDATE images SET position = -1 - position WHERE source_id = ?").run(sourceId);
@@ -76,6 +100,7 @@ export function servirImages(db: Db, sourceId: string, n: number, images: ImageR
       i.modele ?? null,
     );
   }
+  db.prepare("UPDATE sources SET images_numero = ? WHERE id = ?").run(numero, sourceId);
   return (
     db
       .prepare(

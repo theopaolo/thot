@@ -240,6 +240,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       "0027_lectures.sql",
       "0028_connexions.sql",
       "0029_images_revision.sql",
+      "0030_images_numero.sql",
     ]);
     assertEquals(
       db

@@ -1,10 +1,13 @@
 import { existsSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
+import { bloquantes } from "../src/app/activites.ts";
 import { contenu } from "../src/app/config.ts";
 import type { Db } from "../src/app/db.ts";
 import { deposer, valider } from "../src/app/depot.ts";
+import { cours, matiere } from "../src/app/domaines.ts";
 import {
+  lireDocument,
   reextraire,
   relireLegende,
   revendiquer,
@@ -14,6 +17,8 @@ import {
 } from "../src/app/ingestion.ts";
 import { lireInstance } from "../src/app/instance.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
+import { modifier } from "./activites_outils.ts";
+import { compte, exercice, libre, page as lire, publie } from "./pratique_outils.ts";
 
 /** Un PNG réduit à son en-tête, distingué par sa hauteur. */
 const png = (n: number) => {
@@ -35,7 +40,7 @@ const modeles = {
 };
 
 /** Une page HTML certifiée, avec les croquis 1 et 2. */
-async function source(db: Db) {
+async function source(db: Db, coursId?: string) {
   const v = valider({ titre: "Les croquis", type_document: "cours" });
   assert("meta" in v);
   const { source_id: id } = await deposer(db, {
@@ -46,6 +51,7 @@ async function source(db: Db) {
     enseignant: "Prof",
     audience: "eleves",
     reponses: true,
+    liens: coursId ? [{ cours_id: coursId, theme_id: null }] : undefined,
     octets: new TextEncoder().encode(page([1, 2])),
   });
   await traiter(db, revendiquer(db)!, modeles);
@@ -73,20 +79,21 @@ test("une légende relue suit les octets de son image, pas sa place", async () =
   const id = await source(db);
   relireLegende(db, `${id}-1`, "certified", "Croquis relu", "Test");
 
-  // Même texte, autre ordre, une image de plus : la révision servie reçoit ses images en place.
+  // Même texte, autre ordre, une image de plus : une version à relire, que l'enseignant certifie.
   await redeposer(db, id, page([2, 1, 3]));
-  assertEquals(revisionEnAttente(db, id), undefined);
+  statuer(db, id, "certifiee", "Test", 2);
   assertEquals(images(db), [
     [`${id}-1`, 1, "Croquis relu", "certified"],
     [`${id}-0`, 1, "Croquis 1", "unreviewed"],
-    [`${id}-2`, 1, "Croquis 3", "unreviewed"],
+    [`${id}-2`, 2, "Croquis 3", "unreviewed"],
   ]);
-  assertEquals(fichiers(id), 3);
+  assertEquals([fichiers(id), fichiers(id, "revisions", "2")], [2, 1]);
 
-  // Une image que l'extraction ne rend plus sort, avec son fichier.
+  // Une image que la version certifiée ne rend plus sort, avec son fichier.
   await redeposer(db, id, page([2]));
+  statuer(db, id, "certifiee", "Test", 3);
   assertEquals(images(db), [[`${id}-1`, 1, "Croquis relu", "certified"]]);
-  assertEquals(fichiers(id), 1);
+  assertEquals([fichiers(id), fichiers(id, "revisions", "2")], [1, 0]);
   const { requete } = await session(db, modeles, "eleve");
   assertEquals((await requete(`/media/${id}-1`)).status, 200);
   assertEquals((await requete(`/media/${id}-0`)).status, 404);
@@ -152,4 +159,132 @@ test("les images d'une version à relire ne sont servies qu'une fois la version 
   assert(!existsSync(contenu(id, "revisions", "3", "images.jsonl")));
   statuer(db, id, "certifiee", "Test", 3);
   assertEquals(images(db).length, 2);
+});
+
+test("des images différentes sous un texte identique font une version à relire", async () => {
+  const { db } = await environnement();
+  const id = await source(db);
+  const avant = images(db);
+  const { requete } = await session(db, modeles, "eleve");
+
+  await redeposer(db, id, page([1, 3]));
+  assertEquals(revisionEnAttente(db, id)?.n, 2);
+  assertEquals(images(db), avant, "les images servies attendent la relecture");
+  assertEquals(lireDocument(id, 2).texte, lireDocument(id, 1).texte);
+  assertEquals((await requete(`/media/${id}-2`)).status, 404);
+  assert(!(await (await requete(`/eleve/sources/${id}`)).text()).includes("Croquis 3"));
+  // `reextraire` ne lit pas les images : elle ne sait pas si celles de la version sont revenues.
+  assertEquals(await reextraire(db, id), "identique");
+  assertEquals(revisionEnAttente(db, id)?.n, 2);
+
+  // Les images servies reviennent, dans un autre ordre : plus rien à relire.
+  await redeposer(db, id, page([2, 1]));
+  assertEquals(revisionEnAttente(db, id), undefined);
+  assert(!existsSync(contenu(id, "revisions", "2")));
+  assertEquals(images(db), [avant[1], avant[0]]);
+
+  await redeposer(db, id, page([1, 3]));
+  statuer(db, id, "certifiee", "Test", 2);
+  assertEquals(images(db), [
+    [`${id}-0`, 1, "Croquis 1", "unreviewed"],
+    [`${id}-2`, 2, "Croquis 3", "unreviewed"],
+  ]);
+  assertEquals((await requete(`/media/${id}-2`)).status, 200);
+
+  // Aucun élève ne lit une source rejetée : ses images se rangent en place, comme à la première
+  // extraction.
+  statuer(db, id, "rejetee", "Test");
+  await redeposer(db, id, page([3]));
+  assertEquals(revisionEnAttente(db, id), undefined);
+  assertEquals(images(db), [[`${id}-2`, 2, "Croquis 3", "unreviewed"]]);
+});
+
+test("la relecture d'une version montre les images qu'elle ajoute et nomme celles qui partent", async () => {
+  const { db } = await environnement();
+  const coursId = cours(db, matiere(db, "Arts appliqués"), "Design");
+  const id = await source(db, coursId);
+  const prof = await compte(db, "enseignant");
+  const collegue = await compte(db, "enseignant", false);
+  const eleve = await compte(db, "eleve");
+  await redeposer(db, id, page([1, 3]));
+
+  const [ajoutee] = readdirSync(contenu(id, "revisions", "2", "assets"));
+  const adresse = `/prof/sources/${id}/revisions/2/images/${ajoutee}`;
+  const fiche = await lire(prof, `/prof/sources/${id}`);
+  assert(fiche.includes(`src="${adresse}"`), "l'image ajoutée");
+  assert(fiche.includes("Croquis 3"), "sa légende proposée");
+  assert(/retire 1 image.*Croquis 2/s.test(fiche), "l'image qui part est nommée");
+
+  const servie = await prof.requete(adresse);
+  assertEquals(servie.status, 200);
+  assertEquals(servie.headers.get("cache-control"), "no-store");
+  assertEquals(new Uint8Array(await servie.arrayBuffer()), png(3));
+  // Seuls ceux qui modifient la source voient les images d'une version que personne n'a certifiée.
+  assertEquals((await collegue.requete(adresse)).status, 404);
+  assert(!(await lire(collegue, `/prof/sources/${id}`)).includes(adresse));
+  assertEquals((await eleve.requete(adresse)).status, 403);
+  assert(!(await lire(eleve, `/eleve/sources/${id}`)).includes(ajoutee));
+  for (const autre of [
+    `/prof/sources/${id}/revisions/3/images/${ajoutee}`,
+    `/prof/sources/${id}/revisions/2/images/images.jsonl`,
+    `/prof/sources/${id}/revisions/2/images/..%2Fdocument.txt`,
+  ]) {
+    assertEquals((await prof.requete(autre)).status, 404, autre);
+  }
+
+  statuer(db, id, "certifiee", "Test", 2);
+  assertEquals((await prof.requete(adresse)).status, 404, "la version n'attend plus");
+  assertEquals((await eleve.requete(`/media/${id}-2`)).status, 200);
+});
+
+test("une activité qui montre une image retirée devient à revoir, et son numéro ne revient pas", async () => {
+  const { db } = await environnement();
+  const coursId = cours(db, matiere(db, "Arts appliqués"), "Design");
+  const id = await source(db, coursId);
+  const prof = await compte(db, "enseignant");
+  const eleve = await compte(db, "eleve");
+  const activite = publie(
+    db,
+    prof.compte,
+    exercice(db, prof.compte, coursId, {
+      correction: "serie",
+      questions: [
+        {
+          id: "q1",
+          type: "terme",
+          consigne: libre("Que montre ce croquis ?"),
+          retour: libre(""),
+          accepte: ["la façade"],
+          image: { media: `${id}-1`, source: id, alt: "Un croquis" },
+        },
+      ],
+    }),
+  );
+  const etat = () => db.prepare("SELECT etat FROM activites").get()!.etat;
+
+  // La version en attente ne change rien pour l'élève.
+  await redeposer(db, id, page([1]));
+  assertEquals(etat(), "publiee");
+  assert((await lire(eleve, `/eleve/activites/${activite.id}`)).includes(`/media/${id}-1`));
+
+  statuer(db, id, "certifiee", "Test", 2);
+  assertEquals(etat(), "a_revoir");
+  assertEquals(bloquantes(db, activite, coursId), ["Les croquis (image retirée)"]);
+  // La page de l'élève revérifie à chaque affichage, sans attendre le signalement.
+  db.prepare("UPDATE activites SET etat = 'publiee'").run();
+  assertEquals((await eleve.requete(`/eleve/activites/${activite.id}`)).status, 404);
+
+  // Le numéro 1 était le plus grand : une image nouvelle ne le reprend pas.
+  await redeposer(db, id, page([1, 3]));
+  statuer(db, id, "certifiee", "Test", 3);
+  assertEquals(images(db), [
+    [`${id}-0`, 1, "Croquis 1", "unreviewed"],
+    [`${id}-2`, 3, "Croquis 3", "unreviewed"],
+  ]);
+  assertEquals(bloquantes(db, activite, coursId), ["Les croquis (image retirée)"]);
+
+  // L'enseignant retire l'image de la question : l'activité redevient un brouillon à relire.
+  db.prepare("UPDATE activites SET etat = 'a_revoir'").run();
+  assertEquals((await modifier(prof, db, activite.id, { image_retirer: "1" })).status, 303);
+  assertEquals(etat(), "brouillon");
 });

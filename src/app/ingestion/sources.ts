@@ -27,7 +27,8 @@ export function refusCertification(db: Db, sourceId: string) {
 /**
  * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
  * celle-ci et ses images dans la transaction de l'index : un échec laisse servir l'ancienne. Un
- * exercice qui citait une autre révision, ou une source rejetée, devient à revoir.
+ * exercice qui citait une autre révision, montrait une image qu'elle retire, ou tenait à une
+ * source rejetée, devient à revoir.
  */
 export function statuer(
   db: Db,

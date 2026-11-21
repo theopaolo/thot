@@ -241,8 +241,8 @@ texte. Ses lectures ne se montrent qu'à lui.
 Document sans matière attribuée. Il reste visible et peut être organisé plus tard.
 
 **Version d'une ressource**
-Texte extrait d'un document à un moment donné. Une nouvelle extraction qui change le texte
-devient une « nouvelle version à relire » : élèves et Thot lisent la version actuelle jusqu'à ce
+Texte extrait d'un document à un moment donné. Une nouvelle extraction qui change le texte, ou
+les images d'une ressource certifiée, devient une « nouvelle version à relire » : élèves et Thot lisent la version actuelle jusqu'à ce
 qu'un enseignant certifie la nouvelle. Une réponse garde la version qu'elle cite, et l'élève la
 relit comme « version citée par une réponse précédente ». La bibliothèque marque ces sources
 « Nouvelle version à relire » et le filtre « À relire » les retrouve.
