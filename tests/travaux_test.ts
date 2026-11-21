@@ -34,7 +34,7 @@ async function deposee(db: Db, titre = "Casa Batlló") {
     reponses: true,
     octets: new TextEncoder().encode(
       `<html><head><title>t</title></head><body><h1>${titre}</h1>
-<img src="data:image/jpeg;base64,/9j/4AAQ" />
+<img src="data:image/jpeg;base64,/9j/wAARCAACAAIDAREAAhEAAxEA/9kA" />
 <p>La façade de la Casa Batlló est couverte de céramique irisée.</p></body></html>`,
     ),
   });
