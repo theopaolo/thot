@@ -56,7 +56,7 @@ source apart from same-language search ([[lang-101]]).
 ## Code touchpoints
 
 [Evaluation guidance](../../evaluation/README.md), [test helpers](../../tests/outils.ts),
-[application tests](../../tests/app_test.ts), [view tests](../../tests/vues_test.ts),
+[application tests](../../tests/), [view tests](../../tests/vues_test.ts),
 [extraction tests](../../tests/extraction_test.ts), [project checks](../../package.json).
 
 ## Acceptance
