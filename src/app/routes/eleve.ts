@@ -14,6 +14,7 @@ import { config } from "../config.ts";
 import { imagesLues, lireDocument } from "../ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Eleve from "../vues/eleve.ts";
+import * as EleveCommun from "../vues/eleve-commun.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import * as Activites from "../activites.ts";
@@ -55,10 +56,10 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       )
       .all(
         parametresCitable({ schoolId: instance.school_id, lecteur: lu(c), bibliotheque: true }),
-      ) as Eleve.SourceChapitre[];
+      ) as EleveCommun.SourceChapitre[];
     const selection = idsScope(c);
     const visibles = rangs.filter((r) => selection.has(r.id));
-    const chapitres: Eleve.ChapitreVue[] = [];
+    const chapitres: EleveCommun.ChapitreVue[] = [];
     const rattachements = db
       .prepare(
         `SELECT sc.*, c.nom AS cours, t.nom AS theme, c.matiere_id, m.nom AS matiere
@@ -141,7 +142,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
               : "Les ressources publiées par tes enseignants. Thot répond à tes questions en citant uniquement ces ressources."
           }</p>${filtresDomaines}
           <form method="post" action="/eleve/questions" class="question-rapide">
-            ${DomaineVue.champsScope(scope(c))}${Eleve.cleEnvoi()}
+            ${DomaineVue.champsScope(scope(c))}${EleveCommun.cleEnvoi()}
             <label for="texte">Une question sur ces ressources ?</label>
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
@@ -235,7 +236,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           themeId,
         }),
         ...Domaines.mesCours(l),
-      }) as Eleve.SourceChapitre[];
+      }) as EleveCommun.SourceChapitre[];
   /**
    * Le cours où se lit une source sans thème : le premier des cours du lecteur qui la rattachent,
    * et ses ressources rangées directement dans ce cours, dans l'ordre de lecture.

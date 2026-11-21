@@ -9,6 +9,7 @@ import type { Db } from "../db.ts";
 import { lireDocument, nombreLegendes } from "../ingestion.ts";
 import { boucleReponses } from "../reponses.ts";
 import { page } from "../vues/page.ts";
+import * as Echange from "../vues/echange.ts";
 import * as Eleve from "../vues/eleve.ts";
 import * as Domaines from "../domaines.ts";
 
@@ -111,10 +112,10 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
     const n = Number(c.req.param("n"));
     const a = affirmations[n];
     const source = a && sourceCertifiee(a.source_id, lu(c));
-    if (!a || !source) return c.html(Eleve.panneauSource(undefined, undefined, tete));
+    if (!a || !source) return c.html(Echange.panneauSource(undefined, undefined, tete));
     const suite = { id, n, total: affirmations.length };
     if (a.debut === undefined || a.fin === undefined) {
-      return c.html(Eleve.panneauSource({ ...a, enseignant: source.enseignant }, suite, tete));
+      return c.html(Echange.panneauSource({ ...a, enseignant: source.enseignant }, suite, tete));
     }
     const revision = a.revision ?? 1;
     const { debut, fin } = a;
@@ -123,7 +124,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
       (b) => b.debut < fin && b.fin > debut,
     );
     return c.html(
-      Eleve.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite, tete),
+      Echange.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite, tete),
     );
   };
   return {

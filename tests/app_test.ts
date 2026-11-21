@@ -45,7 +45,7 @@ import { config, RACINE } from "../src/app/config.ts";
 import { boucleReponses, revendiquerReponse } from "../src/app/reponses.ts";
 import { creerApp } from "../src/app/routes.ts";
 import { affiliations, cours, matiere, theme } from "../src/app/domaines.ts";
-import { reponse } from "../src/app/vues/eleve.ts";
+import { reponse } from "../src/app/vues/echange.ts";
 import { BONNE, environnement, fauxModeles, ORIGINE, publier, session } from "./outils.ts";
 
 const CHAMPS = {

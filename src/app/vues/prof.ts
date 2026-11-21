@@ -9,8 +9,8 @@ import type { Libelles } from "../instance.ts";
 import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 import { type Dossier, type Etape, dossier, fichier, fil } from "./bureau.ts";
-import { panneauSource, question, reponse } from "./eleve.ts";
 import { champ, champFichier, jour, lecteurs, nombre, nomPerimetre } from "./commun.ts";
+import { panneauSource, question, reponse } from "./echange.ts";
 
 const ETATS_JOB: Record<string, string> = {
   received: "en file",

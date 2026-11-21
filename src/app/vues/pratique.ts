@@ -12,7 +12,8 @@ import { essaisMax, juste, melanger, points } from "../../core/questions.ts";
 import { type Activite, corrigee, type Tentative } from "../activites.ts";
 import { icone } from "../icones.ts";
 import { passages, TYPES } from "./activites.ts";
-import { type ActiviteListee, ligneActivite, panneauSource, reponse } from "./eleve.ts";
+import { panneauSource, reponse } from "./echange.ts";
+import { type ActiviteListee, ligneActivite } from "./eleve.ts";
 import { jour } from "./commun.ts";
 import { enrichi, enrichiLigne, imageQuestion, lettre } from "./questions.ts";
 

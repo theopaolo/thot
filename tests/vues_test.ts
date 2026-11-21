@@ -9,7 +9,8 @@ import {
   pageLegendes,
   sources,
 } from "../src/app/vues/prof.ts";
-import { chat, pageChapitre, panneauSource, reponse } from "../src/app/vues/eleve.ts";
+import { panneauSource, reponse } from "../src/app/vues/echange.ts";
+import { chat, pageChapitre } from "../src/app/vues/eleve.ts";
 import {
   legendeSchema,
   sansDirectives,

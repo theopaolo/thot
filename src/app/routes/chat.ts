@@ -11,6 +11,7 @@ import { attendreChangement } from "../reponses.ts";
 import { questionsProches } from "../../core/suggestions.ts";
 import { suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Commun from "../vues/commun.ts";
+import * as Echange from "../vues/echange.ts";
 import * as Eleve from "../vues/eleve.ts";
 import * as Conversations from "../conversations.ts";
 import * as Domaines from "../domaines.ts";
@@ -316,7 +317,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
       !c.req.header("HX-Request") || c.req.header("HX-Boosted")
         ? c.redirect(`/eleve/chat/${conversationId}`, 303)
         : c.html(html`
-            ${Eleve.question(question)}${Eleve.attente(id)}
+            ${Echange.question(question)}${Echange.attente(id)}
           `);
     const deja = cle ? Conversations.echangeParCle(db, compte, cle) : undefined;
     if (deja) return envoye(deja.conversation_id, deja.id, deja.question);
@@ -343,7 +344,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const refus = Conversations.relancer(db, c.get("compte"), c.req.param("id"));
     if (refus) return refuser(c, refus);
     reponses.reveiller();
-    return c.html(Eleve.attente(c.req.param("id")));
+    return c.html(Echange.attente(c.req.param("id")));
   });
 
   app.post("/eleve/messages/:id/arreter", (c) => {
@@ -352,7 +353,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     if (Conversations.arreter(db, compte, id)) reponses.annuler(id);
     // Une réponse publiée juste avant l'arrêt s'affiche telle quelle.
     const m = Conversations.echange(db, compte, id);
-    return m?.resultat ? c.html(Eleve.reponse(id, m.resultat, m.avis)) : c.notFound();
+    return m?.resultat ? c.html(Echange.reponse(id, m.resultat, m.avis)) : c.notFound();
   });
 
   /**
@@ -375,7 +376,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
           await flux.writeSSE({
             event: "reponse",
             data: String(
-              await Eleve.reponse(
+              await Echange.reponse(
                 id,
                 r,
                 null,
@@ -400,7 +401,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const avis = String((await c.req.parseBody()).avis ?? "");
     if (!["utile", "confus", "faux"].includes(avis)) return c.text("Avis invalide.", 400);
     return Conversations.donnerAvis(db, c.get("compte"), c.req.param("id"), avis)
-      ? c.html(Eleve.avis(c.req.param("id"), avis))
+      ? c.html(Echange.avis(c.req.param("id"), avis))
       : c.notFound();
   });
 
