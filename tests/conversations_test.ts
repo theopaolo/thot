@@ -30,6 +30,7 @@ const conversationDe = (db: Db, message: string) =>
   db.prepare("SELECT conversation_id FROM messages WHERE id = ?").get(message)!
     .conversation_id as string;
 const texteDe = async (qui: Session, chemin: string) => (await qui.requete(chemin)).text();
+const PARTOUT = { matiere_id: "", cours_id: "", theme_id: "" };
 
 test("deux conversations : historique, reformulation et sources ne se mêlent pas", async () => {
   const { db, dir } = await environnement();
@@ -557,6 +558,45 @@ test("envoi : la même clé avec un autre texte ouvre un autre échange", async 
         .map((m) => m.question),
       ["Pourquoi pas de ligne droite ?", "Et la céramique de la façade ?"],
     );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("quota : la question de trop reçoit 429 et l'attente, une heure plus tard elle passe", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const compte = lireCompte(db, db.prepare("SELECT id FROM comptes").get()!.id as string)!;
+    const question = { texte: "Une question", cle: null, perimetre: PARTOUT };
+    const echanges = Array.from({ length: Conversations.MAX_QUESTIONS_HEURE }, () => {
+      const r = Conversations.poser(db, compte, question);
+      assert(typeof r !== "string");
+      // Arrêtée, la question ne part pas vers la boucle de réponses et reste relançable.
+      Conversations.arreter(db, compte, r.echange);
+      return r.echange;
+    });
+    assertEquals(Conversations.poser(db, compte, question), "quota");
+    assertEquals(Conversations.relancer(db, compte, echanges[0]), "quota");
+
+    const refus = await poser(eleve, { texte: "La question de trop ?" });
+    assertEquals(refus.statut, 429);
+    assertStringIncludes(refus.texte, "dans 60 minutes");
+    const relance = await envoyer(eleve, `/eleve/messages/${echanges[0]}/relancer`, {});
+    assertEquals(relance.status, 429);
+    assertEquals(
+      db.prepare("SELECT count(*) AS n FROM messages").get()!.n,
+      Conversations.MAX_QUESTIONS_HEURE,
+    );
+
+    // La plus ancienne question sort de l'heure : une place se libère.
+    db.prepare("UPDATE messages SET cree_le = ? WHERE id = ?").run(
+      new Date(Date.now() - 3601_000).toISOString(),
+      echanges[0],
+    );
+    assert(typeof Conversations.poser(db, compte, question) !== "string");
+    assertEquals(Conversations.poser(db, compte, question), "quota");
   } finally {
     db.close();
     await rm(dir, { recursive: true });

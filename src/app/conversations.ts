@@ -35,7 +35,13 @@ export type Resume = Scope & {
   nouvelle: number;
 };
 /** Ce qu'une écriture refuse. */
-export type Refus = "introuvable" | "archivee" | "en_cours";
+export type Refus = "introuvable" | "archivee" | "en_cours" | "quota";
+
+/**
+ * Les questions qu'un compte met en file en une heure. Une séance de classe en pose bien moins :
+ * la limite arrête un script ou un onglet qui boucle, pas un élève.
+ */
+export const MAX_QUESTIONS_HEURE = 60;
 
 export const ARRETEE: Resultat = { etat: "failed", code: "CANCELLED", message: "Réponse arrêtée." };
 
@@ -191,6 +197,22 @@ const reponseEnCours = (db: Db, conversationId: string) =>
     .get(conversationId);
 
 /**
+ * L'instant, en millisecondes, où le compte pourra remettre une question en file, s'il a atteint
+ * `MAX_QUESTIONS_HEURE` : une heure après la plus ancienne des questions comptées.
+ * ponytail: une relance ne crée pas de ligne. La limite la refuse mais ne la compte pas, et un
+ * compte sous la limite relance un même échec sans borne. Une colonne de relances si cela arrive.
+ */
+export const finQuota = (db: Db, compte: Compte) => {
+  const ancienne = db
+    .prepare(
+      `SELECT cree_le FROM messages WHERE compte_id = ? AND cree_le > ?
+       ORDER BY cree_le DESC LIMIT 1 OFFSET ?`,
+    )
+    .get(compte.id, maintenant(Date.now() - 3600_000), MAX_QUESTIONS_HEURE - 1);
+  return ancienne && Date.parse(ancienne.cree_le as string) + 3600_000;
+};
+
+/**
  * Pose une question dans la conversation `conversation`, ou en ouvre une, titrée par la question,
  * dans `perimetre`. L'échange attend la boucle de réponses.
  */
@@ -207,6 +229,9 @@ export const poser = (
       const refus = refusEcriture(conversationDe(db, compte, conversation));
       if (refus) return refus;
       if (reponseEnCours(db, conversation)) return "en_cours";
+    }
+    if (finQuota(db, compte)) return "quota";
+    if (conversation) {
       db.prepare("UPDATE conversations SET active_le = ? WHERE id = ?").run(t, conversation);
     } else {
       conversation = crypto.randomUUID();
@@ -280,6 +305,7 @@ export const relancer = (db: Db, compte: Compte, id: string): Refus | undefined 
       return "introuvable";
     if (m.archivee_le) return "archivee";
     if (reponseEnCours(db, m.conversation_id)) return "en_cours";
+    if (finQuota(db, compte)) return "quota";
     const r = db
       .prepare(
         `UPDATE messages SET etat = 'en_attente', resultat = NULL, avis = NULL, generation_id = NULL,

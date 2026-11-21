@@ -494,7 +494,7 @@ un, selon les cours de l'enseignant, sans passer par la conversation. L'enseigna
 échange en lecture seule : la question, la réponse et ses passages, relus avec ses propres droits.
 Cette page ne nomme pas la conversation, ne montre pas ses autres échanges et n'y mène pas. Elle
 suit la règle d'accès de la liste, et un échange absent de la liste répond 404. Ces règles vivent
-dans `src/app/conversations.ts`, et les routes traduisent ses refus en 404 ou 409.
+dans `src/app/conversations.ts`, et les routes traduisent ses refus en 404, 409 ou 429.
 
 La liste se filtre par le titre ou le texte d'une question (`?q=`, LIKE sans joker). Les
 conversations archivées ne sortent que de leur propre vue. Le navigateur garde, par compte et par
@@ -515,7 +515,12 @@ ses échanges gardent la liste des matières comparées.
 Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. L'envoi et la
 relance le vérifient dans la transaction qui met la question en file : deux onglets n'en mettent
 pas deux. Un envoi pendant une réponse, ou dans une conversation archivée, reçoit 409 et l'élève
-garde sa saisie. Un envoi rejoué avec la même clé et le même texte retrouve son premier échange.
+garde sa saisie. Un compte met en file `MAX_QUESTIONS_HEURE` questions par heure au plus. La
+même transaction compte ses échanges de l'heure écoulée : au-delà, l'envoi et la relance reçoivent
+429 avec l'attente avant la prochaine question, et l'élève garde aussi sa saisie. Une relance ne
+crée pas d'échange, donc elle ne compte pas dans cette limite.
+
+Un envoi rejoué avec la même clé et le même texte retrouve son premier échange.
 Sous la même clé, un autre texte est une autre question et ouvre un autre échange : une page que
 le navigateur ressort de son historique garde la clé de son premier affichage. Une conversation
 vidée par la purge disparaît avec son titre, qui reprend souvent une question. Une réponse en

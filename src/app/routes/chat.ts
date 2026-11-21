@@ -106,15 +106,22 @@ export function routesChat(app: Hono<Env>, w: Web) {
     c: Context<Env>,
     refus: Conversations.Refus,
     archivee = "Cette conversation est archivée.",
-  ) =>
-    refus === "introuvable"
-      ? c.notFound()
-      : c.text(
-          refus === "archivee"
-            ? archivee
-            : "Une réponse est déjà en cours dans cette conversation.",
-          409,
-        );
+  ) => {
+    if (refus === "introuvable") return c.notFound();
+    if (refus === "quota") {
+      const fin = Conversations.finQuota(db, c.get("compte")) ?? Date.now();
+      const minutes = Math.max(1, Math.ceil((fin - Date.now()) / 60_000));
+      return c.text(
+        `Tu as atteint la limite de ${Conversations.MAX_QUESTIONS_HEURE} questions par heure. ` +
+          `Tu pourras en poser une autre dans ${minutes} minute${minutes > 1 ? "s" : ""}.`,
+        429,
+      );
+    }
+    return c.text(
+      refus === "archivee" ? archivee : "Une réponse est déjà en cours dans cette conversation.",
+      409,
+    );
+  };
 
   /** Pourquoi le compte ne peut pas poser de question dans ce périmètre, sinon rien. */
   const perimetreRefuse = (c: Context<Env>, perimetre: Perimetre) => {

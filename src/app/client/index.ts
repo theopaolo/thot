@@ -70,6 +70,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 // Un conflit (409) dit pourquoi en clair : conversation archivée ailleurs, réponse déjà en cours.
+// La limite de questions par heure (429) dit quand revenir.
 for (const nom of ["htmx:beforeRequest", "htmx:responseError", "htmx:sendError"]) {
   document.addEventListener(nom, (event) => {
     const erreur = document.getElementById("erreur-reseau");
@@ -79,7 +80,9 @@ for (const nom of ["htmx:beforeRequest", "htmx:responseError", "htmx:sendError"]
     if (!erreur || fond) return;
     erreur.dataset.defaut ??= erreur.textContent ?? "";
     const xhr = (event as CustomEvent<{ xhr?: XMLHttpRequest }>).detail.xhr;
-    erreur.textContent = xhr?.status === 409 ? xhr.responseText : erreur.dataset.defaut;
+    erreur.textContent = [409, 429].includes(xhr?.status ?? 0)
+      ? xhr!.responseText
+      : erreur.dataset.defaut;
     erreur.hidden = nom === "htmx:beforeRequest";
   });
 }
