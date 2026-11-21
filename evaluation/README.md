@@ -160,9 +160,10 @@ en donne un valide. Le modèle y donne à un nœud la preuve de sa relation, et 
 
 ## Langues et profils
 
-`tests/domaines_test.ts` contient une sonde lexicale synthétique français/anglais et les contrôles
-sans fournisseur des prompts génériques, du profil arts et des périmètres de recherche. Il
-vérifie que les consignes du profil arts ont l'empreinte des mesures ml4. Chaque source se
+`tests/langues_test.ts` contient une sonde lexicale synthétique français/anglais.
+`tests/profils_test.ts` et `tests/perimetres_test.ts` portent les contrôles sans fournisseur des
+prompts génériques, du profil arts et des périmètres de recherche. Le premier vérifie que les
+consignes du profil arts ont l'empreinte des mesures ml4. Chaque source se
 racinise dans sa langue : la sonde trouve trois cibles sur quatre en français, comme avant, et
 quatre sur quatre en anglais. Le pluriel irrégulier français reste une limite du moteur. La
 recherche entre une question française et une source anglaise se mesure à part, dans le jeu
