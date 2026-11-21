@@ -22,20 +22,17 @@ export function routesPreparation(app: Hono<Env>, w: Web) {
     const voulu = String(saisie.cours_id ?? c.req.query("cours_id") ?? "");
     const cours = cat.cours.find((x) => x.id === voulu) ?? cat.cours[0];
     const personnel = lireInstance(db).mode === "personal";
-    const cible = {
-      cours_id: cours?.id ?? "",
-      audience: personnel ? ("prive" as const) : ("cours" as const),
-      auteur_id: compte.id,
-    };
     return rendre(
       c,
       "Préparer une activité",
       PreparationVue.preparation({
         catalogue: cat,
         libelles: libelles(db),
-        coursId: cible.cours_id,
+        coursId: cours?.id ?? "",
         objectifs: cours ? Activites.objectifs(db, cours.id) : [],
-        sources: cours ? Activites.sourcesCitables(db, cible) : [],
+        sources: cours
+          ? Activites.sourcesCitables(db, Activites.cibleDe(db, compte, cours.id))
+          : [],
         personnel,
         saisie,
         erreur,
