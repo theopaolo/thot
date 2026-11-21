@@ -2,6 +2,7 @@ import { type Context, Hono } from "hono";
 import type { Contenu, Explication, Question } from "../../core/activite.ts";
 import { refusee, valeur } from "../../core/questions.ts";
 import * as Activites from "../activites.ts";
+import { secretSession } from "../comptes.ts";
 import * as PratiqueVue from "../vues/pratique.ts";
 import { lettre } from "../vues/questions.ts";
 import type { Env, Web } from "./web.ts";
@@ -10,9 +11,9 @@ import type { Env, Web } from "./web.ts";
  * La valeur d'une question telle que `valeur()` l'attend. Le navigateur envoie, pour une question
  * à choix, les lettres affichées à l'élève : elles redeviennent des identifiants d'options.
  */
-function recue(q: Question, compteId: string, brut: unknown) {
+function recue(q: Question, compteId: string, secret: string, brut: unknown) {
   if (q.type !== "choix" && q.type !== "choix_multiple") return brut;
-  const options = PratiqueVue.optionsAffichees(q, compteId);
+  const options = PratiqueVue.optionsAffichees(q, compteId, secret);
   const ids = [brut ?? []].flat().map((l) => options.find((_, i) => lettre(i) === l)?.id ?? "");
   return q.type === "choix" ? ids[0] : ids;
 }
@@ -45,6 +46,7 @@ const INVALIDE: Record<Question["type"], string> = {
 /** La page de l'élève, son aperçu par l'enseignant, les réponses de l'élève et les images. */
 export function routesPratique(app: Hono<Env>, w: Web) {
   const { db, rendre, feuilleCitation } = w;
+  const secret = secretSession();
   const activiteProf = (c: Context<Env>) =>
     Activites.activiteProf(db, c.get("compte"), c.req.param("id")!);
   const titres = (contenu: Contenu) =>
@@ -85,6 +87,7 @@ export function routesPratique(app: Hono<Env>, w: Web) {
         ...commun,
         contenu,
         compteId: compte.id,
+        secret,
         tentative: apercu ? undefined : Activites.tentative(db, compte, a),
         titres: titres(contenu),
         confirmer: c.req.query("confirmer") !== undefined,
@@ -144,7 +147,7 @@ export function routesPratique(app: Hono<Env>, w: Web) {
     if (contenu.correction !== "serie") return c.notFound();
     const compte = c.get("compte");
     const brutes = Object.fromEntries(
-      contenu.questions.map((q) => [q.id, recue(q, compte.id, corps[q.id])]),
+      contenu.questions.map((q) => [q.id, recue(q, compte.id, secret, corps[q.id])]),
     );
     const sansReponse = contenu.questions.some((q) => valeur(q, brutes[q.id]) === null);
     const remettre =
@@ -176,7 +179,7 @@ export function routesPratique(app: Hono<Env>, w: Web) {
     const q = contenu.questions.find((y) => y.id === c.req.param("q"));
     if (!q || contenu.correction !== "question") return c.notFound();
     const compte = c.get("compte");
-    const r = Activites.essayer(db, compte, a, q.id, recue(q, compte.id, corps[q.id]));
+    const r = Activites.essayer(db, compte, a, q.id, recue(q, compte.id, secret, corps[q.id]));
     if (r === "invalide") return c.text(INVALIDE[q.type], 400);
     if (r === "refus") return c.text("Cette question est déjà finie.", 409);
     return c.redirect(`/eleve/activites/${a.id}#q-${q.id}`, 303);

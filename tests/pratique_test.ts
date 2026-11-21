@@ -16,7 +16,7 @@ import {
   relire,
   tentative,
 } from "../src/app/activites.ts";
-import { type Compte, lireCompte, type Role } from "../src/app/comptes.ts";
+import { type Compte, lireCompte, type Role, secretSession } from "../src/app/comptes.ts";
 import type { Db } from "../src/app/db.ts";
 import { cours, matiere } from "../src/app/domaines.ts";
 import { configurerInstance } from "../src/app/instance.ts";
@@ -196,7 +196,11 @@ const sansCorrige = (html: string, id: string, indice = false) => {
 
 /** La lettre que l'élève voit devant chaque option demandée. */
 const lettres = (q: Question, compteId: string, ...ids: string[]) => {
-  const affichees = optionsAffichees(q as Question & { options: Option[] }, compteId);
+  const affichees = optionsAffichees(
+    q as Question & { options: Option[] },
+    compteId,
+    secretSession(),
+  );
   return ids.map((id) => lettre(affichees.findIndex((o) => o.id === id)));
 };
 
@@ -221,7 +225,15 @@ test("série : le corrigé ne sort qu'à la remise, ni l'aperçu ni le brouillon
     assertStringIncludes(vierge, "Le corrigé s&#39;affiche quand tu remets la série.");
     // Les options suivent l'ordre mélangé de l'élève, lettrées dans cet ordre.
     const qc = contenu.questions[0] as Question & { options: Option[] };
-    const ordre = optionsAffichees(qc, eleve.id);
+    const ordre = optionsAffichees(qc, eleve.id, secretSession());
+    // Sans le secret de l'instance, le compte et la question ne donnent pas cet ordre.
+    const huit = {
+      ...qc,
+      options: Array.from({ length: 8 }, (_, i) => ({ ...qc.options[0], id: String(i) })),
+    };
+    const ids = (secret: string) => optionsAffichees(huit, eleve.id, secret).map((o) => o.id);
+    assertEquals(ids("un secret"), ids("un secret"));
+    assert(ids("un secret").join() !== ids("un autre secret").join());
     ordre.forEach((o, i) =>
       assert(
         new RegExp(`value="${lettre(i)}"[^>]*> ${lettre(i)}\\. ${o.texte.texte}<`).test(vierge),

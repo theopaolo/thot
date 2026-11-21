@@ -318,21 +318,33 @@ test("un quiz carnet inutilisable renvoie ses erreurs numérotées", () => {
   );
 });
 
-test("les identifiants de question restent uniques", () => {
+test("les identifiants d'un quiz carnet sont ceux de Thot, pas ceux du fichier", () => {
   const q = {
     question: "Q",
     options: [
-      { id: "A", label: "a" },
-      { id: "B", label: "b" },
+      { id: "x,y", label: "a" },
+      { id: "remettre", label: "b" },
     ],
-    correctAnswer: "A",
+    correctAnswer: "remettre",
   };
-  const r = depuisCarnet({ title: "T", questions: [{ ...q, id: "x" }, { ...q, id: "x" }, q] });
+  const r = depuisCarnet({
+    title: "T",
+    questions: [{ ...q, id: "a/b?c" }, { ...q, id: "a/b?c" }, { ...q, id: "confirmer" }, q],
+  });
   assert("questions" in r);
   assertEquals(
-    r.questions.map((q) => q.id),
-    ["x", "q2-x", "q3"],
+    r.questions.map((x) => x.id),
+    ["q1", "q2", "q3", "q4"],
   );
+  for (const x of r.questions) {
+    assertEquals(x.type === "choix" && x.options.map((o) => [o.id, o.juste]), [
+      ["A", false],
+      ["B", true],
+    ]);
+  }
+  // Deux options du fichier sous le même identifiant restent une erreur.
+  const double = { ...q, options: q.options.map((o) => ({ ...o, id: "A" })), correctAnswer: "A" };
+  assert("erreurs" in depuisCarnet({ title: "T", questions: [double] }));
 });
 
 test("les vrais decks de carnet-quiz se convertissent sans erreur", () => {

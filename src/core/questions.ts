@@ -313,17 +313,19 @@ export function depuisCarnet(
   if (!titre) erreurs.push("Il manque le titre (title).");
   if (!bruts.length) erreurs.push("Il n'y a aucune question.");
 
-  const pris = new Set<string>();
+  // Les identifiants du fichier ne sont pas repris. Celui d'une question entre dans une adresse et
+  // nomme un champ du formulaire de l'élève, ceux des options se joignent par une virgule.
   const questions: Question[] = [];
   bruts.forEach((b, i) => {
-    const n = i + 1;
-    let id = chaine(b.id) || `q${n}`;
-    if (pris.has(id)) id = `q${n}-${id}`;
-    pris.add(id);
-    const q = convertir(b, id);
+    const q = convertir(b, `q${i + 1}`);
     const problemes = typeof q === "string" ? [q] : erreursQuestion(q);
-    for (const p of problemes) erreurs.push(`Question ${n} : ${p}`);
-    if (typeof q !== "string") questions.push(q);
+    for (const p of problemes) erreurs.push(`Question ${i + 1} : ${p}`);
+    if (typeof q === "string") return;
+    questions.push(
+      "options" in q
+        ? { ...q, options: q.options.map((o, j) => ({ ...o, id: LETTRES[j] ?? String(j + 1) })) }
+        : q,
+    );
   });
   if (erreurs.length) return { erreurs };
 

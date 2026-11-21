@@ -389,7 +389,10 @@ L'enseignant écrit aussi ses propres champs, sans citation, et la page dit alor
 l'enseignant ». Il ajoute, duplique, déplace et supprime des questions. Chaque passage qu'il colle
 est recherché mot pour mot dans la version servie de sa source, et le formulaire ne reprend rien
 d'autre d'une citation (`src/app/edition.ts`). Un quiz de carnet-quiz s'importe comme une série de
-champs rédigés par l'enseignant, sans ses pièges, son chrono ni ses images.
+champs rédigés par l'enseignant, sans ses pièges, son chrono ni ses images. Thot donne ses propres
+identifiants aux questions et aux options, parce que ceux du fichier entreraient tels quels dans
+les adresses et les formulaires. Un quiz plus long qu'une série (`MAX_QUESTIONS`) est refusé, avec
+cette raison.
 
 Une citation retrouvée ne prouve que son passage : un premier essai réel gardait un retour qui en
 disait plus que ses citations. Le juge de soutien des réponses lit donc chaque champ cité contre
@@ -411,7 +414,8 @@ Une activité est brouillon, relue, publiée ou à revoir. Une relecture vaut po
 l'activité. Chaque modification crée une version en brouillon, et la relecture précédente ne vaut
 plus pour elle. Le titre et la date à rendre, qui ne bloque rien, ne créent pas de version. Une
 relecture, une publication ou une modification partie d'une version périmée est refusée. Publier
-demande une version relue et des preuves qui tiennent encore. L'historique garde qui a relu, publié
+demande une version relue et des preuves qui tiennent encore. Une série dont une question a une
+erreur, une consigne vide par exemple, ne se relit pas et ne se publie pas. L'historique garde qui a relu, publié
 ou modifié chaque version, et quand. Une activité archivée n'est plus servie, et ses tentatives
 restent lisibles. Seul un brouillon jamais publié et sans tentative se supprime.
 
@@ -446,7 +450,9 @@ que les consignes, les options et les images. La réponse attendue, les critère
 bonnes options, les réponses acceptées et les passages cités d'une question ne sortent du serveur
 qu'avec une tentative de ce compte où cette question est finie, la série une fois remise quand le
 corrigé la suit. Les options se mélangent pour chaque élève, et le navigateur envoie la lettre affichée, pas
-l'identifiant de l'option : l'ordre des identifiants trahirait la bonne réponse. Quand le corrigé
+l'identifiant de l'option : l'ordre des identifiants trahirait la bonne réponse. Le mélange dépend
+du secret de l'instance, donc un élève qui connaît le code, son compte et la question ne retrouve
+pas l'ordre d'origine. Quand le corrigé
 suit chaque question, une question fermée laisse deux essais, l'indice apparaît après une première
 erreur et le deuxième essai vaut 0,5 point. Quand il suit la série, l'élève enregistre ses
 réponses, revient, puis remet, avec un essai par question.
@@ -499,13 +505,17 @@ source passe par `src/app/ingestion.ts`, par le web comme par la CLI : la même 
 réindexe et signale à revoir les activités dont une preuve ne tient plus dans un de leurs cours.
 La page de l'élève revérifie les preuves à chaque affichage. Une activité à revoir n'est plus
 servie. L'enseignant fait rechercher ses passages dans la révision servie, ou retire le cours
-fautif, et l'activité redevient un brouillon à relire. Une tentative garde la version de l'exercice
-à laquelle elle répondait.
+fautif, et l'activité redevient un brouillon à relire si son contenu n'a pas d'erreur. Une tentative
+garde la version de l'exercice à laquelle elle répondait.
 
 Supprimer une source retire de chaque exercice ses passages, le texte des champs qui les citaient,
 rédigés d'après elle, l'image prise dans la source et le lien pour y chercher. Une explication perd
-les phrases qui la citaient, et ses blocs, dont les titres ont pu nommer la source. L'activité
-devient à revoir. Les réponses des élèves restent : elles viennent d'eux, et suivent la purge de
+les phrases qui la citaient, et ses blocs, dont les titres ont pu nommer la source. Ce contenu
+réduit est une nouvelle version, à revoir : une relecture partie de la version précédente ne vaut
+pas pour lui. L'enseignant supprime ou corrige ensuite chaque question vidée, une à la fois, parce
+qu'une modification ne contrôle que les questions qu'elle change. La série reste à revoir tant
+qu'une question est vide, même si l'enseignant retire un cours. Une explication qui a perdu toutes
+ses phrases ne se relit plus. Les réponses des élèves restent : elles viennent d'eux, et suivent la purge de
 `THOT_RETENTION_JOURS`, avec les notes et commentaires de l'enseignant.
 
 Une image déposée avec une activité est rangée dans `activites/` du dossier de données. Son format

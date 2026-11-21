@@ -361,6 +361,92 @@ test("exercice : nouvelle version, lecteurs retirés, rejet et suppression de la
   }
 });
 
+test("source supprimée : une question vidée se supprime ou se corrige seule, et la série vidée ne se relit ni ne se publie", async () => {
+  const { db, dir, coursId, source, prof } = await cadre(false, undefined, [sortie(), sortie()]);
+  try {
+    const r = await envoyer(prof, "/prof/activites", {
+      cours_id: coursId,
+      intitule: OBJECTIF,
+      sources: source,
+      nombre: "2",
+    });
+    assertEquals(r.status, 303, await r.text());
+    const id = r.headers.get("location")!.split("/").at(-1)!;
+    const url = `/prof/activites/${id}`;
+    // Une question écrite par l'enseignant, sans citation : la suppression ne la touche pas.
+    const ecrite = {
+      revision: "1",
+      type: "terme",
+      consigne: "Quel architecte ?",
+      accepte: "Gaudí",
+    };
+    assertEquals(await statut(envoyer(prof, `${url}/questions`, ecrite)), 303);
+    // Un second cours, que l'enseignant pourra retirer.
+    const histoire = cours(db, matiere(db, "Histoire"), "Histoire");
+    db.prepare("INSERT INTO membres_cours VALUES (?, ?)").run(histoire, prof.id);
+    rattacher(db, source, [
+      { cours_id: coursId, theme_id: null },
+      { cours_id: histoire, theme_id: null },
+    ]);
+    assertEquals(await statut(envoyer(prof, `${url}/reglages`, { cours_id: histoire })), 303);
+    await relirePublier(prof, db, id);
+
+    // La suppression vide les deux questions rédigées d'après la source, et crée une version.
+    await supprimerSource(db, source);
+    assertEquals([ligne(db, id).etat, ligne(db, id).revision], ["a_revoir", 3]);
+    assertEquals(actions(db, id).at(-1), "a_revoir 3");
+    const [q1, q2, q3] = serie(db, id).questions;
+    assertEquals(
+      [q1.consigne.texte, q2.consigne.texte, q3.consigne.texte],
+      ["", "", "Quel architecte ?"],
+    );
+
+    // Retirer un cours ne fait pas d'une série vidée un brouillon à relire.
+    assertEquals(await statut(envoyer(prof, `${url}/cours/${histoire}/retirer`)), 303);
+    assertEquals(ligne(db, id).etat, "a_revoir");
+    // Une série vidée déjà redevenue brouillon, puis relue, dans une base existante.
+    const forcer = (etat: string) =>
+      db.prepare("UPDATE activites SET etat = ? WHERE id = ?").run(etat, id);
+    for (const [etat, action] of [
+      ["brouillon", "relire"],
+      ["relue", "publier"],
+    ]) {
+      forcer(etat);
+      const refus = await envoyer(prof, `${url}/${action}`, { revision: "3" });
+      assertEquals(refus.status, 400, action);
+      assertStringIncludes(await refus.text(), "Question 1 : la consigne est vide.");
+      assertEquals(ligne(db, id).etat, etat);
+    }
+    forcer("a_revoir");
+
+    // Supprimer la première question vidée sans toucher à la seconde.
+    const supprimer = envoyer(prof, `${url}/questions/${q1.id}/supprimer`, { revision: "3" });
+    assertEquals(await statut(supprimer), 303);
+    assertEquals([ligne(db, id).etat, ligne(db, id).revision], ["a_revoir", 4]);
+    // Une question vidée ne se duplique pas.
+    const dupliquer = envoyer(prof, `${url}/questions/${q2.id}/dupliquer`, { revision: "4" });
+    assertEquals(await statut(dupliquer), 400);
+    // Corriger la seconde rend un brouillon, qui se relit et se publie.
+    const corrigee = await modifier(
+      prof,
+      db,
+      id,
+      { consigne: "Que refuse Gaudí ?", attendu: "La ligne droite." },
+      q2.id,
+    );
+    assertEquals(corrigee.status, 303, await corrigee.text());
+    assertEquals([ligne(db, id).etat, ligne(db, id).revision], ["brouillon", 5]);
+    assertEquals(
+      serie(db, id).questions.map((q) => q.id),
+      [q2.id, q3.id],
+    );
+    await relirePublier(prof, db, id);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
 test("exercice : retirer le cours de sa source le signale à revoir, sans passer par une route", async () => {
   const { db, dir, coursId, source, prof } = await cadre();
   try {

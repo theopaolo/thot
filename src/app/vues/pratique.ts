@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { html } from "hono/html";
 import {
   type Champ,
@@ -18,16 +19,21 @@ import { enrichi, enrichiLigne, imageQuestion, lettre } from "./questions.ts";
 /**
  * Les options dans l'ordre où l'élève les voit : mélangées pour lui, le même ordre à chaque
  * affichage. Le navigateur envoie la lettre affichée, pas l'identifiant de l'option, qui suit
- * souvent l'ordre où l'enseignant l'a écrite.
+ * souvent l'ordre où l'enseignant l'a écrite. L'élève connaît son compte et la question : la graine
+ * passe par le secret de l'instance, sans lequel il ne retrouve pas l'ordre d'origine.
  */
-export const optionsAffichees = (q: Question & { options: Option[] }, compteId: string) =>
-  melanger(q.options, compteId + q.id);
+export const optionsAffichees = (
+  q: Question & { options: Option[] },
+  compteId: string,
+  secret: string,
+) => melanger(q.options, createHmac("sha256", secret).update(`${compteId}:${q.id}`).digest("hex"));
 
 export type Pratique = {
   a: Activite;
   contenu: Contenu;
-  /** le compte qui lit la page : il fixe l'ordre des options */
+  /** le compte qui lit la page et le secret de l'instance : ils fixent l'ordre des options */
   compteId: string;
+  secret: string;
   tentative?: Tentative;
   relecteur?: string;
   /** l'aperçu de l'enseignant : la page de l'élève avant sa réponse, formulaire inactif */
@@ -97,7 +103,7 @@ const choisies = (q: Question, v?: string) =>
 /** Les champs de saisie d'une question, remplis avec `v`. `requis` : la question se valide seule. */
 function saisie(
   q: Question,
-  compteId: string,
+  p: Pick<Pratique, "compteId" | "secret">,
   v: string | undefined,
   actif: boolean,
   requis = false,
@@ -122,7 +128,7 @@ function saisie(
   const type = q.type === "choix" ? "radio" : "checkbox";
   return html`<fieldset>
     <legend class="aide">${q.type === "choix" ? "Une seule réponse." : "Une ou plusieurs réponses."}</legend>
-    ${optionsAffichees(q, compteId).map(
+    ${optionsAffichees(q, p.compteId, p.secret).map(
       (o, i) =>
         html`<label><input type="${type}" name="${q.id}" value="${lettre(i)}" ${
           coches.has(o.id) ? "checked" : ""
@@ -140,7 +146,13 @@ const code = (texte: string, langage: string) =>
  * permet : c'est la seule fonction de la page qui écrit la réponse attendue, les critères, le
  * retour, les bonnes options, les réponses acceptées et les passages cités.
  */
-function corrige(a: Activite, contenu: Contenu, t: Tentative, q: Question, compteId: string) {
+function corrige(
+  a: Activite,
+  contenu: Contenu,
+  t: Tentative,
+  q: Question,
+  p: Pick<Pratique, "compteId" | "secret">,
+) {
   const r = t.reponses[q.id] ?? { essais: [] };
   const retour = t.retours[q.id];
   const pts = points(q, r.essais, contenu.correction, retour?.note ?? null);
@@ -226,7 +238,7 @@ function corrige(a: Activite, contenu: Contenu, t: Tentative, q: Question, compt
         <p>Réponse attendue : ${enrichiLigne(q.accepte[0] ?? "")}</p>
         ${note}`;
     } else {
-      const opts = optionsAffichees(q, compteId);
+      const opts = optionsAffichees(q, p.compteId, p.secret);
       const lettres = (v: string) =>
         opts.flatMap((o, i) => (choisies(q, v).has(o.id) ? [lettre(i)] : [])).join(", ");
       const finales = choisies(q, derniere);
@@ -275,7 +287,7 @@ function essaiQuestion(p: Pratique, q: Question) {
           } Il te reste ${pluriel(reste, "essai")}.</p>`
         : ""
     }
-    ${saisie(q, p.compteId, p.saisie?.[q.id] ?? r.essais.at(-1), !p.apercu, true)}
+    ${saisie(q, p, p.saisie?.[q.id] ?? r.essais.at(-1), !p.apercu, true)}
     <button class="principal" ${p.apercu ? "disabled" : ""}>${
       q.type === "redigee" ? "Envoyer ma réponse" : "Vérifier"
     }</button>
@@ -359,12 +371,12 @@ export const pratique = (p: Pratique) => {
       }
       ${
         corrigee(contenu, t, q.id)
-          ? corrige(a, contenu, t!, q, p.compteId)
+          ? corrige(a, contenu, t!, q, p)
           : t?.rendue_le
             ? html`<p class="discret">Cette question n'était pas dans la version que tu as remise.</p>`
             : parQuestion
               ? essaiQuestion(p, q)
-              : saisie(q, p.compteId, p.saisie?.[q.id] ?? t?.reponses[q.id]?.essais[0], !p.apercu)
+              : saisie(q, p, p.saisie?.[q.id] ?? t?.reponses[q.id]?.essais[0], !p.apercu)
       }
     </section>`,
   );

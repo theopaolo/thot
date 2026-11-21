@@ -406,6 +406,9 @@ function objectifChoisi(db: Db, coursId: string, objectifId: string, intitule: s
 export function inserer(db: Db, compte: Compte, s: Insertion) {
   const cible = cibleDe(db, compte, s.coursId);
   const intitule = objectifChoisi(db, s.coursId, s.objectifId, s.intitule);
+  // Un quiz importé arrive ici sans autre contrôle de la série.
+  const erreurs = "questions" in s.contenu ? erreursContenu(s.contenu) : [];
+  if (erreurs.length) throw new Error(erreurs.join(" "));
   const id = crypto.randomUUID();
   const t = maintenant();
   const contenu = JSON.stringify(s.contenu);
@@ -570,27 +573,52 @@ export function ancrerPassage(db: Db, a: Cible, sourceId: string, passage: strin
 const lu = (ch: Champ) =>
   JSON.stringify([ch.texte, ch.citations.map((c) => [c.citation, c.titre, c.revision])]);
 
-/** Ce qui rend une série inutilisable, question par question. */
-export function erreursContenu(c: Contenu) {
+/**
+ * Ce qui rend une série inutilisable, question par question. Avec `avant`, la version qu'elle
+ * remplace, seul ce qui change est contrôlé : une question reprise telle quelle n'est pas relue, et
+ * une série trop longue se raccourcit. Une question vidée par la suppression de sa source ne bloque
+ * donc pas la correction des autres.
+ */
+export function erreursContenu(c: Contenu, avant?: Contenu) {
   const erreurs: string[] = [];
-  if (!c.questions.length || c.questions.length > MAX_QUESTIONS) {
+  const n = c.questions.length;
+  if (!n || (n > MAX_QUESTIONS && n > (avant?.questions.length ?? 0))) {
     erreurs.push(`Une série a de 1 à ${MAX_QUESTIONS} questions.`);
   }
-  if (new Set(c.questions.map((q) => q.id)).size !== c.questions.length) {
+  if (new Set(c.questions.map((q) => q.id)).size !== n) {
     erreurs.push("Deux questions ont le même identifiant.");
   }
-  c.questions.forEach((q, i) =>
-    erreurs.push(...erreursQuestion(q).map((e) => `Question ${i + 1} : ${e}`)),
-  );
+  const reprises = new Set(avant?.questions.map((q) => JSON.stringify(q)));
+  c.questions.forEach((q, i) => {
+    if (reprises.has(JSON.stringify(q))) return;
+    erreurs.push(...erreursQuestion(q).map((e) => `Question ${i + 1} : ${e}`));
+  });
   return erreurs;
 }
+
+/**
+ * Ce qui empêche de relire ou de publier une activité telle qu'elle est enregistrée : une série
+ * avec une erreur, ou une explication dont la suppression d'une source a retiré toutes les phrases.
+ */
+function erreursActivite(a: Pick<Activite, "contenu">) {
+  const c = lireContenu(a.contenu);
+  if ("questions" in c) return erreursContenu(c);
+  return c.affirmations.length
+    ? []
+    : ["Cette explication n'a plus aucune phrase. Préparez-en une autre."];
+}
+const exigerContenu = (a: Pick<Activite, "contenu">) => {
+  const erreurs = erreursActivite(a);
+  if (erreurs.length) throw new Error(erreurs.join(" "));
+};
 
 /**
  * Enregistre une nouvelle version d'un exercice, partie de la version `revision`. Le contenu vient
  * de l'enseignant ou du générateur : ses avis de juge ne comptent pas. Un champ dont le texte et
  * les passages n'ont pas changé reprend l'avis de la version précédente, et le juge lit les autres
- * champs cités. La nouvelle version est un brouillon à relire, ou à revoir si une preuve ne tient
- * plus dans un des cours.
+ * champs cités. La nouvelle version est un brouillon à relire. Elle reste à revoir si une preuve ne
+ * tient plus dans un des cours, ou si une question que cette version ne change pas a encore une
+ * erreur.
  */
 export async function enregistrer(
   db: Db,
@@ -604,10 +632,11 @@ export async function enregistrer(
     throw new Error("Une explication ne se modifie pas. Préparez-en une autre.");
   }
   if (revision !== a.revision) return "conflit";
-  const erreurs = erreursContenu(neuf);
+  const avant = JSON.parse(a.contenu) as Contenu;
+  const erreurs = erreursContenu(neuf, avant);
   if (erreurs.length) throw new Error(erreurs.join(" "));
   const avis = new Map(
-    champs(JSON.parse(a.contenu) as Contenu)
+    champs(avant)
       .filter((ch) => "soutien" in ch)
       .map((ch) => [lu(ch), ch.soutien]),
   );
@@ -619,8 +648,9 @@ export async function enregistrer(
     return revalider(db, a, compte.id) ? "modifie" : "inchange";
   await jugerChamps(modeles, champs(neuf));
   const contenu = JSON.stringify(neuf);
+  const valide = !erreursContenu(neuf).length;
   return transaction(db, () => {
-    const etat = preuvesValides(db, { ...a, contenu }) ? "brouillon" : "a_revoir";
+    const etat = valide && preuvesValides(db, { ...a, contenu }) ? "brouillon" : "a_revoir";
     const r = db
       .prepare(
         `UPDATE activites SET contenu = ?, revision = revision + 1, etat = ?, maj_le = ?
@@ -722,10 +752,11 @@ export function retirerCours(db: Db, compte: Compte, a: Activite, coursId: strin
 
 /**
  * Une activité à revoir dont les preuves tiennent de nouveau, parce qu'un cours fautif est retiré
- * ou que ses passages se retrouvent sans changement, redevient un brouillon à relire.
+ * ou que ses passages se retrouvent sans changement, redevient un brouillon à relire. Elle reste à
+ * revoir tant que son contenu a une erreur, une question vidée par exemple.
  */
 function revalider(db: Db, a: Activite, compteId: string) {
-  if (a.etat !== "a_revoir" || !preuvesValides(db, a)) return false;
+  if (a.etat !== "a_revoir" || !preuvesValides(db, a) || erreursActivite(a).length) return false;
   db.prepare("UPDATE activites SET etat = 'brouillon', maj_le = ? WHERE id = ?").run(
     maintenant(),
     a.id,
@@ -758,9 +789,13 @@ export const archiver = (db: Db, a: Activite, oui: boolean) =>
     .prepare("UPDATE activites SET archivee_le = ?, maj_le = ? WHERE id = ?")
     .run(oui ? maintenant() : null, maintenant(), a.id);
 
-/** Relit la version affichée d'un brouillon. Une autre version ne se relit pas à sa place. */
-export const relire = (db: Db, compte: Compte, a: Activite, revision: number) =>
-  transaction(db, () => {
+/**
+ * Relit la version affichée d'un brouillon. Une autre version ne se relit pas à sa place. Un
+ * brouillon dont le contenu a une erreur lève cette erreur.
+ */
+export const relire = (db: Db, compte: Compte, a: Activite, revision: number) => {
+  if (a.etat === "brouillon" && a.revision === revision) exigerContenu(a);
+  return transaction(db, () => {
     const r = db
       .prepare(
         "UPDATE activites SET etat = 'relue', maj_le = ? WHERE id = ? AND revision = ? AND etat = 'brouillon'",
@@ -769,6 +804,7 @@ export const relire = (db: Db, compte: Compte, a: Activite, revision: number) =>
     if (r.changes) historique(db, a.id, revision, "relue", compte.id);
     return r.changes > 0;
   });
+};
 
 const signaler = (db: Db, a: Pick<Activite, "id" | "revision">) => {
   db.prepare("UPDATE activites SET etat = 'a_revoir', maj_le = ? WHERE id = ?").run(
@@ -780,13 +816,14 @@ const signaler = (db: Db, a: Pick<Activite, "id" | "revision">) => {
 
 /**
  * Publie la version relue. Une preuve qui ne tient plus dans un des cours fait signaler l'exercice
- * à revoir.
+ * à revoir. Un contenu avec une erreur lève cette erreur.
  */
 export const publier = (db: Db, compte: Compte, id: string, revision: number) =>
   transaction(db, () => {
     // Relue dans la transaction : une modification arrivée entre-temps n'est pas publiée.
     const a = db.prepare("SELECT * FROM activites WHERE id = ?").get(id) as Activite;
     if (a.etat !== "relue" || a.revision !== revision) return "refus";
+    exigerContenu(a);
     if (!preuvesValides(db, a)) {
       signaler(db, a);
       return "preuves";
@@ -816,8 +853,9 @@ export function revoirActivites(db: Db, sourceId: string) {
  * Retire des activités ce qui vient d'une source supprimée : ses passages, et le texte des champs
  * qui les citaient, rédigé d'après elle. Une question perd aussi une image prise dans la source et
  * le lien pour y chercher. Une explication perd les phrases qui la citaient et ses blocs, dont les
- * titres ont pu la nommer. L'activité est à revoir. Les tentatives des élèves gardent leur réponse
- * et la version à laquelle elles répondaient.
+ * titres ont pu la nommer. Ce contenu est une nouvelle version, à revoir : une relecture partie de
+ * la précédente ne vaut pas pour lui. Les tentatives des élèves gardent leur réponse et la version
+ * à laquelle elles répondaient.
  */
 export function oublierSource(db: Db, sourceId: string) {
   const liste = db
@@ -839,8 +877,11 @@ export function oublierSource(db: Db, sourceId: string) {
       "affirmations" in c
         ? { affirmations: c.affirmations.filter((x) => x.source_id !== sourceId) }
         : { ...c, questions: c.questions.map(sansMontree) };
-    db.prepare("UPDATE activites SET contenu = ? WHERE id = ?").run(JSON.stringify(contenu), a.id);
-    if (a.etat !== "a_revoir") signaler(db, a);
+    db.prepare("UPDATE activites SET contenu = ?, revision = revision + 1 WHERE id = ?").run(
+      JSON.stringify(contenu),
+      a.id,
+    );
+    signaler(db, { id: a.id, revision: a.revision + 1 });
   }
 }
 

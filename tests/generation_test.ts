@@ -1,5 +1,5 @@
 import { test } from "vite-plus/test";
-import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertMatch, assertStringIncludes } from "@std/assert";
 import type { Db } from "../src/app/db.ts";
 import { cours, matiere } from "../src/app/domaines.ts";
 import { CONSIGNE_ACTIVITE, type Contenu, type Question } from "../src/core/activite.ts";
@@ -397,6 +397,42 @@ test("importer le quiz de démonstration de carnet-quiz crée un brouillon de 4 
       .map((o) => o.id),
     ["A", "C", "E"],
   );
+});
+
+test("un quiz de 41 questions est refusé à l'import avec sa raison, et les identifiants du fichier ne sont pas repris", async () => {
+  const c = await cadre([]);
+  const question = (id: string) => ({
+    id,
+    type: "choice",
+    question: "Une question",
+    options: [
+      { id: "a,b", label: "a" },
+      { id: "c/d?", label: "b" },
+    ],
+    correctAnswer: "c/d?",
+  });
+  const quiz = (n: number) => ({
+    title: "Long quiz",
+    questions: Array.from({ length: n }, (_, i) => question(i ? `q/${i}?x` : "remettre")),
+  });
+  const r = await importer(c, quiz(41));
+  assertEquals(r.status, 400);
+  assertStringIncludes(await r.text(), "Une série a de 1 à 40 questions.");
+  assertEquals(c.db.prepare("SELECT count(*) AS n FROM activites").get()!.n, 0);
+
+  const ok = await importer(c, quiz(40));
+  assertEquals(ok.status, 200);
+  const id = /\/prof\/activites\/([0-9a-f-]{36})/.exec(await ok.text())![1];
+  const questions = serie(c.db, id).questions as Extract<Question, { options: unknown }>[];
+  assertEquals(new Set(questions.map((q) => q.id)).size, 40);
+  for (const q of questions) {
+    assertMatch(q.id, /^[a-z0-9]+$/);
+    for (const o of q.options) assertMatch(o.id, /^[A-Z0-9]+$/);
+    assertEquals(
+      q.options.map((o) => o.juste),
+      [false, true],
+    );
+  }
 });
 
 test("un quiz invalide ou illisible réaffiche le formulaire avec ses erreurs, en 400", async () => {
