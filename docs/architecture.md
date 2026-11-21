@@ -65,7 +65,7 @@ la tentative renouvelle son verrou. Un renouvellement refusé interrompt son app
 son `AbortSignal`. Avant de publier, la boucle revérifie les preuves avec les droits actuels de
 l'élève. Une réponse interrompue plusieurs fois échoue avec la cause `INTERRUPTED`.
 
-Un travail d'ingestion suit la même règle (`traiter()` dans `src/app/ingestion.ts`). Chaque
+Un travail d'ingestion suit la même règle (`traiter()` dans `src/app/ingestion/travail.ts`). Chaque
 revendication incrémente `tentatives`, et ce numéro désigne la tentative. Le worker prolonge le
 verrou sur une minuterie et avant chaque écriture : une extraction ou des légendes plus longues
 que le verrou ne sont pas reprises par un autre processus. Une tentative dont le travail a été
