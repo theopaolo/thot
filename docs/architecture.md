@@ -180,8 +180,8 @@ existantes, ou de l'environnement pour une base vide. Une base qui contient plus
 établissements exige une séparation explicite avant son initialisation.
 
 Le nom et le mode d'usage sont enregistrés en base. Un administrateur renomme l'instance depuis
-l'administration, le mode y reste en lecture seule. Chemins, origine, clés, fournisseurs autorisés
-et localisations déclarées restent des réglages d'opérateur. La localisation affichée ne prouve
+l'administration, le mode y reste en lecture seule. Chemins, origine, nombre de proxys, clés,
+fournisseurs autorisés et localisations déclarées restent des réglages d'opérateur. La localisation affichée ne prouve
 pas le lieu d'exécution du fournisseur. Désactiver un fournisseur interdit aussi son emploi en
 repli, même si sa clé est présente.
 

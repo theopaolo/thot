@@ -123,7 +123,7 @@ test("migration 0026 : un exercice devient une série d'une question, sa tentati
     ).run(JSON.stringify(ancien));
     db.exec(`INSERT INTO tentatives (id, activite_id, compte_id, revision, reponse, criteres, cree_le)
       VALUES ('t', 'a', 'e', 1, 'Ma réponse', '[1]', '2026-11-01T10:00:00Z')`);
-    assertEquals(migrer(db), ["0026_series.sql", "0027_lectures.sql"]);
+    assertEquals(migrer(db), ["0026_series.sql", "0027_lectures.sql", "0028_connexions.sql"]);
     const a = db.prepare("SELECT contenu, titre FROM activites").get()!;
     assertEquals(JSON.parse(a.contenu as string), {
       correction: "serie",

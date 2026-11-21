@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
 import { HTTPException } from "hono/http-exception";
+import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Modeles } from "../core/modeles.ts";
 import { MAX_IMAGE } from "./activites.ts";
@@ -24,11 +26,47 @@ import { routesDepot } from "./routes/prof-depot.ts";
 import { routesProfEleves } from "./routes/prof-eleves.ts";
 import { sessions } from "./routes/session.ts";
 import { contexteWeb, type Env, retenirPerimetre } from "./routes/web.ts";
-import { routesRechargement } from "./rechargement.ts";
+import { routesRechargement, SCRIPT_RECHARGEMENT } from "./rechargement.ts";
 import { icone } from "./icones.ts";
+
+/** Le corps d'un formulaire. Le dépôt et les activités reçoivent des fichiers sous leur propre plafond. */
+const MAX_CORPS = 1024 * 1024;
+const AVEC_FICHIERS = /^\/prof\/(depot|activites)(\/|$)/;
 
 export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db, modeles)) {
   const app = new Hono<Env>();
+
+  // Les pages ne chargent que les fichiers de l'instance : scripts de `static/`, images de
+  // `/media/` et des activités. KaTeX et Mermaid écrivent des styles dans la page, d'où
+  // `'unsafe-inline'` pour les styles seuls. Aucun script en ligne, sauf celui de `pnpm dev`,
+  // admis par son empreinte.
+  app.use(
+    "*",
+    secureHeaders({
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          ...(config.dev
+            ? [`'sha256-${createHash("sha256").update(SCRIPT_RECHARGEMENT).digest("base64")}'`]
+            : []),
+        ],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+        // Vite écrit la plus petite police de KaTeX dans sa feuille de style, en `data:`.
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+      xFrameOptions: "DENY",
+      // `no-referrer`, le défaut de Hono, vide l'en-tête Origin d'un formulaire envoyé, et le
+      // contrôle CSRF le refuserait.
+      referrerPolicy: "same-origin",
+      strictTransportSecurity: config.origine.startsWith("https:") && "max-age=15552000",
+    }),
+  );
 
   app.use("*", async (c, next) => {
     if (config.origine && new URL(c.req.url).host !== new URL(config.origine).host) {
@@ -44,6 +82,11 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   });
   app.use("/static/*", serveStatic({ root: "./" }));
   if (config.dev) routesRechargement(app);
+  const limiteCorps = bodyLimit({
+    maxSize: MAX_CORPS,
+    onError: (c) => c.text("Envoi trop volumineux.", 413),
+  });
+  app.use("*", (c, next) => (AVEC_FICHIERS.test(c.req.path) ? next() : limiteCorps(c, next)));
   app.use("*", csrf(config.origine ? { origin: config.origine } : undefined));
 
   const session = sessions(db);

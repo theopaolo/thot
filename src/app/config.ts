@@ -23,6 +23,12 @@ if (origine) {
     throw new Error("THOT_ORIGIN: origine HTTPS requise (HTTP permis sur localhost).");
 }
 
+// Le serveur ne termine pas TLS : une origine HTTPS suppose un proxy devant lui.
+const proxies = Number(env("THOT_PROXIES", origine.startsWith("https:") ? "1" : "0"));
+if (!Number.isInteger(proxies) || proxies < 0) {
+  throw new Error("THOT_PROXIES: nombre de proxys devant le serveur, 0 sans proxy.");
+}
+
 export const fournisseurs = {
   openrouter: {
     autorise: autorise("THOT_OPENROUTER_ENABLED"),
@@ -39,6 +45,8 @@ export const config = {
   dev: process.env["THOT_DEV"] === "1",
   donnees: resolve(env("THOT_DATA_DIR", join(RACINE, "data"))),
   origine,
+  // Les proxys devant le serveur. Chacun ajoute à X-Forwarded-For l'adresse qu'il a vue.
+  proxies,
   port: Number(env("THOT_PORT", "8000")),
   schoolId: env("THOT_SCHOOL_ID", "pilote"),
   retentionJours: Number(env("THOT_RETENTION_JOURS", "90")),

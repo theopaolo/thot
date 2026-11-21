@@ -53,7 +53,8 @@ export const comptes: Record<string, Commande> = {
     },
   },
   reinitialiser: {
-    aide: "  reinitialiser <identifiant>               remet un code provisoire à un enseignant",
+    aide: `  reinitialiser <identifiant>               remet un code provisoire à un enseignant et
+                                            débloque ses connexions`,
     async lancer(db, _, argv) {
       const reste = lire(argv, {}).positionals;
       const identifiant = reste[0]?.trim().toLowerCase();

@@ -9,7 +9,7 @@ import { memePerimetre, resultatActuel } from "./conversations.ts";
 import { type Db, maintenant } from "./db.ts";
 import { lireInstance } from "./instance.ts";
 
-/** Un serveur arrêté pendant une réponse la laisse reprendre une fois ce verrou expiré. */
+/** Un serveur tué pendant une réponse la laisse reprendre une fois ce verrou expiré. */
 export const VERROU_MS = 60_000;
 const MAX_TENTATIVES = 3;
 /** Réponses calculées en même temps. L'extraction tourne dans le worker et ne les retarde pas. */
@@ -83,6 +83,7 @@ export function revendiquerReponse(db: Db, ms = Date.now()): Travail | undefined
 export function boucleReponses(db: Db, modeles: Modeles) {
   const schoolId = lireInstance(db).school_id;
   const actives = new Map<string, AbortController>();
+  const generations = new Map<string, string>();
   const proprietaire = "WHERE id = ? AND generation_id = ? AND etat = 'en_cours'";
 
   async function repondre(t: Travail, controle: AbortController) {
@@ -167,17 +168,22 @@ export function boucleReponses(db: Db, modeles: Modeles) {
     }
   }
 
+  let arretee = false;
   function reveiller(ms = Date.now()) {
     try {
-      while (actives.size < SIMULTANEES) {
+      while (!arretee && actives.size < SIMULTANEES) {
         const t = revendiquerReponse(db, ms);
         if (!t) return;
         const controle = new AbortController();
         actives.set(t.id, controle);
+        generations.set(t.id, t.generation_id);
         repondre(t, controle)
           .catch((e) => console.error(`réponse ${t.id}:`, e))
           .finally(() => {
-            if (actives.get(t.id) === controle) actives.delete(t.id);
+            if (actives.get(t.id) === controle) {
+              actives.delete(t.id);
+              generations.delete(t.id);
+            }
             reveiller();
           });
       }
@@ -192,6 +198,21 @@ export function boucleReponses(db: Db, modeles: Modeles) {
     annuler(id: string) {
       actives.get(id)?.abort(new Error("Réponse arrêtée."));
       changements.emit(id);
+    },
+    /**
+     * À l'arrêt du serveur : les réponses en cours retournent en file sans compter de tentative,
+     * et le prochain serveur les reprend sans attendre que leur verrou expire. La boucle ne
+     * revendique plus rien.
+     */
+    arreter() {
+      arretee = true;
+      for (const [id, controle] of actives) {
+        db.prepare(
+          `UPDATE messages SET etat = 'en_attente', tentatives = tentatives - 1, etape = NULL,
+             verrou_expire_le = NULL, generation_id = NULL, maj_le = ? ${proprietaire}`,
+        ).run(maintenant(), id, generations.get(id)!);
+        controle.abort(new Error("Serveur arrêté."));
+      }
     },
   };
 }

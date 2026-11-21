@@ -139,6 +139,7 @@ test("lecture : propriétaire, collègue, élève et administrateur", async () =
     const vue = await eleve.requete(`/media/${image(db, eleves)}`);
     const etag = vue.headers.get("etag")!;
     assertEquals(vue.headers.get("cache-control"), "private, no-cache");
+    assertEquals(vue.headers.get("x-content-type-options"), "nosniff");
     await vue.body?.cancel();
     assertEquals(
       await statut(
@@ -493,6 +494,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0025_termes.sql",
       "0026_series.sql",
       "0027_lectures.sql",
+      "0028_connexions.sql",
     ]);
     assertEquals(
       db
@@ -746,6 +748,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       "0025_termes.sql",
       "0026_series.sql",
       "0027_lectures.sql",
+      "0028_connexions.sql",
     ]);
     assertEquals(
       db

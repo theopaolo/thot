@@ -9,6 +9,20 @@ import type { Env } from "./web.ts";
 const SESSION_MS = 12 * 3600_000;
 
 /**
+ * L'adresse du client, pour compter ses échecs de connexion. Sans proxy déclaré, c'est celle de la
+ * connexion TCP. Avec `THOT_PROXIES=n`, c'est la n-ième depuis la fin de `X-Forwarded-For` : chaque
+ * proxy y ajoute l'adresse qu'il a vue, et ce qui précède vient du client, qui écrit ce qu'il veut.
+ */
+export function adresseClient(c: Context<Env>) {
+  const directe =
+    (c.env as { incoming?: { socket: { remoteAddress?: string } } } | undefined)?.incoming?.socket
+      .remoteAddress ?? "";
+  if (!config.proxies) return directe;
+  const vues = (c.req.header("x-forwarded-for") ?? "").split(",").map((a) => a.trim());
+  return vues.at(-config.proxies) || directe;
+}
+
+/**
  * La session : un cookie signé qui porte l'identifiant du compte, relu en base à chaque requête.
  * `verifier` garde aussi l'accès aux pages d'administration et d'enseignant.
  */

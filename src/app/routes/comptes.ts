@@ -9,6 +9,7 @@ import {
   IDENTIFIANT_REFUSE,
   inscrireParLien,
   lireCompte,
+  TropDEssais,
 } from "../comptes.ts";
 import { enregistrerReglages, libelles, lireInstance, type Reglages, TERMES } from "../instance.ts";
 import {
@@ -18,7 +19,7 @@ import {
   motDePasse,
 } from "../vues/page.ts";
 import * as Domaines from "../domaines.ts";
-import type { Session } from "./session.ts";
+import { adresseClient, type Session } from "./session.ts";
 import type { Env, Web } from "./web.ts";
 
 export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
@@ -33,24 +34,30 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
   );
   app.post("/connexion", async (c) => {
     const b = await c.req.parseBody();
-    const compte = await authentifier(
-      db,
-      String(b.identifiant ?? ""),
-      String(b.mot_de_passe ?? ""),
-    );
-    if (!compte || (compte.renouveler_mdp && !consommerProvisoire(db, compte))) {
-      return c.html(
+    const refus = (message: string, statut: 401 | 429) =>
+      c.html(
         rendre(
           c,
           "Connexion",
-          formulaireConnexion(
-            "Identifiant ou mot de passe incorrect.",
-            String(b.identifiant ?? ""),
-            retour(b.retour),
-          ),
+          formulaireConnexion(message, String(b.identifiant ?? ""), retour(b.retour)),
         ),
-        401,
+        statut,
       );
+    let compte;
+    try {
+      compte = await authentifier(
+        db,
+        String(b.identifiant ?? ""),
+        String(b.mot_de_passe ?? ""),
+        adresseClient(c),
+      );
+    } catch (e) {
+      if (!(e instanceof TropDEssais)) throw e;
+      c.header("Retry-After", String(e.secondes));
+      return refus(e.message, 429);
+    }
+    if (!compte || (compte.renouveler_mdp && !consommerProvisoire(db, compte))) {
+      return refus("Identifiant ou mot de passe incorrect.", 401);
     }
     await session.ouvrir(c, compte);
     return c.redirect(compte.renouveler_mdp ? "/mot-de-passe" : retour(b.retour) || "/");

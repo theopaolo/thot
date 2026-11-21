@@ -73,6 +73,7 @@ test("migration du pilote : comptes, sources, cache et identité conservés", as
       "0025_termes.sql",
       "0026_series.sql",
       "0027_lectures.sql",
+      "0028_connexions.sql",
     ]);
     const instance = lireInstance(db);
     assertEquals(instance.school_id, "ecole-historique");
