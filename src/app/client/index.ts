@@ -73,8 +73,10 @@ document.addEventListener("keydown", (event) => {
 for (const nom of ["htmx:beforeRequest", "htmx:responseError", "htmx:sendError"]) {
   document.addEventListener(nom, (event) => {
     const erreur = document.getElementById("erreur-reseau");
-    // Le suivi des statuts de la liste tourne en fond : il ne touche pas à l'alerte.
-    if (!erreur || (event.target instanceof Element && event.target.matches(".statut"))) return;
+    // Un rafraîchissement périodique tourne en fond, sans geste de la personne : il ne touche
+    // pas à l'alerte.
+    const fond = event.target instanceof Element && event.target.matches('[hx-trigger^="every"]');
+    if (!erreur || fond) return;
     erreur.dataset.defaut ??= erreur.textContent ?? "";
     const xhr = (event as CustomEvent<{ xhr?: XMLHttpRequest }>).detail.xhr;
     erreur.textContent = xhr?.status === 409 ? xhr.responseText : erreur.dataset.defaut;

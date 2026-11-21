@@ -158,7 +158,9 @@ et le cours, les suivantes les retrouvent par leur nom.
   par `/prof?lot=`. Le serveur refuse le fichier qui ferait dépasser `MAX_LOT` sources au lot, et
   chaque fichier de plus de `MAX_OCTETS`.
 - Une clé de dépôt (`sources.cle_depot`) rend un renvoi inoffensif. Le navigateur en tire une par
-  fichier, le formulaire sans JavaScript la déduit du lot et de la position. La même clé du même
+  fichier. Le formulaire sans JavaScript la déduit du lot, de la position et de la somme de
+  contrôle du fichier : un autre fichier envoyé sous le même lot, depuis un formulaire que le
+  navigateur a gardé, est un autre dépôt. La même clé du même
   compte rend la source déjà créée, sans second travail. Un index unique tranche deux requêtes
   simultanées.
 - Un fichier dont la somme de contrôle est celle d'une source que le compte peut lire est un

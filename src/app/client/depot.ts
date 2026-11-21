@@ -147,7 +147,9 @@ async function deposer(form: HTMLFormElement, l: Ligne) {
   donnees.set("fichier", l.fichier);
   donnees.set("titre", l.titre);
   donnees.set("cle", l.cle);
-  l.etat = "erreur";
+  // La ligne garde « Envoi… » jusqu'à la réponse : le bilan des autres lignes ne la compte pas en
+  // erreur entre-temps.
+  let etat: Etat = "erreur";
   try {
     const r = await fetch(form.action, {
       method: "POST",
@@ -157,7 +159,7 @@ async function deposer(form: HTMLFormElement, l: Ligne) {
     if (r.redirected) l.message = "session expirée, reconnectez-vous.";
     else if (r.headers.get("content-type")?.includes("application/json")) {
       const d = await r.json();
-      l.etat = d.etat;
+      etat = d.etat;
       l.id = d.id;
       l.format = d.format ?? l.format;
       // Un doublon garde le titre de la source existante pour le lien.
@@ -167,6 +169,7 @@ async function deposer(form: HTMLFormElement, l: Ligne) {
   } catch {
     l.message = "réseau indisponible.";
   }
+  l.etat = etat;
   afficher(l);
 }
 

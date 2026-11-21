@@ -58,7 +58,9 @@ export function routesDepot(app: Hono<Env>, w: Web) {
   /**
    * Dépose un fichier seul: l'échec de l'un ne touche pas les autres. La clé identifie la
    * tentative, un renvoi rend la source déjà créée. Un fichier que le compte lit déjà n'est pas
-   * déposé deux fois.
+   * déposé deux fois. `cleNavigateur` manque sans JavaScript : la clé se déduit alors du lot, du
+   * rang et de la somme de contrôle, pour qu'un autre fichier envoyé sous le même lot soit un autre
+   * dépôt.
    */
   const deposerFichier = async (
     c: Context<Env>,
@@ -67,7 +69,8 @@ export function routesDepot(app: Hono<Env>, w: Web) {
     fichier: File | undefined,
     seul: boolean,
     lotId: string,
-    cle: string,
+    cleNavigateur: string | undefined,
+    rang: number,
   ): Promise<Prof.ResultatDepot> => {
     const compte = c.get("compte");
     const nom = fichier?.name ?? "";
@@ -76,6 +79,12 @@ export function routesDepot(app: Hono<Env>, w: Web) {
       nom,
       erreurs,
     });
+    if (fichier && fichier.size > MAX_OCTETS) {
+      return erreur({ fichier: "Fichier trop lourd, 25 Mo au maximum." });
+    }
+    const octets = fichier ? new Uint8Array(await fichier.arrayBuffer()) : new Uint8Array();
+    const somme = await sha256(octets);
+    const cle = cleNavigateur ? `${cleNavigateur}-${rang}` : `${lotId}-${rang}-${somme}`;
     const deja = parCle(compte, cle);
     if (deja) return { etat: "recu", nom, ...deja };
     const dansLot = db
@@ -84,10 +93,6 @@ export function routesDepot(app: Hono<Env>, w: Web) {
     if (dansLot >= MAX_LOT) {
       return erreur({ fichier: `Un lot compte ${MAX_LOT} fichiers au maximum.` });
     }
-    if (fichier && fichier.size > MAX_OCTETS) {
-      return erreur({ fichier: "Fichier trop lourd, 25 Mo au maximum." });
-    }
-    const octets = fichier ? new Uint8Array(await fichier.arrayBuffer()) : new Uint8Array();
     const controle = controlerFichier(octets, nom);
     const format = "format" in controle ? controle.format : null;
     // Le nom saisi ne vaut que pour un fichier seul, sinon chaque fichier garde son titre.
@@ -102,7 +107,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
         ...("erreur" in controle ? { fichier: controle.erreur } : {}),
       });
     }
-    const identique = sourceIdentique(db, compte, instance.school_id, await sha256(octets));
+    const identique = sourceIdentique(db, compte, instance.school_id, somme);
     if (identique) return { etat: "doublon", nom, ...identique };
     try {
       const { source_id } = await deposer(db, {
@@ -173,15 +178,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
       const resultats: Prof.ResultatDepot[] = [];
       for (const [i, f] of (fichiers.length ? fichiers : [undefined]).entries()) {
         resultats.push(
-          await deposerFichier(
-            c,
-            champs,
-            b,
-            f,
-            fichiers.length <= 1,
-            lot,
-            `${jeton(b.cle) ?? lot}-${i}`,
-          ),
+          await deposerFichier(c, champs, b, f, fichiers.length <= 1, lot, jeton(b.cle), i),
         );
       }
       if (json) {
