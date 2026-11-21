@@ -108,6 +108,8 @@ export type Recherche = {
   sansPassage?: string[];
   /** la question traduite, quand le périmètre contient une source anglaise */
   traduction?: string;
+  /** message de la panne de traduction: les sources anglaises n'ont été cherchées qu'en français */
+  panneTraduction?: string;
 };
 
 export function transaction<T>(db: DatabaseSync, f: () => T): T {
@@ -259,7 +261,7 @@ function fusionner(db: DatabaseSync, requetes: string[], p: Perimetre) {
 /**
  * Candidats FTS5 de la question. Si le périmètre contient une source anglaise, un appel de modèle
  * traduit la question, et les candidats de la traduction rejoignent les siens. Une traduction
- * indisponible laisse la question seule.
+ * indisponible laisse la question seule et rend sa cause dans `panneTraduction`.
  */
 export async function candidatsFts(
   db: DatabaseSync,
@@ -269,15 +271,21 @@ export async function candidatsFts(
   signal?: AbortSignal,
 ) {
   let traduction: string | undefined;
+  let panneTraduction: string | undefined;
   if (anglaisCitable(db, p)) {
     try {
       const t = (await modeles.traduire(question, signal)).trim();
-      if (t && t.length <= 1000) traduction = t;
-    } catch {
-      /* Une traduction indisponible ne bloque pas la question. */
+      if (!t || t.length > 1000) throw new Error("Traduction vide ou trop longue.");
+      traduction = t;
+    } catch (e) {
+      panneTraduction = (e as Error).message;
     }
   }
-  return { ...fusionner(db, traduction ? [question, traduction] : [question], p), traduction };
+  return {
+    ...fusionner(db, traduction ? [question, traduction] : [question], p),
+    traduction,
+    panneTraduction,
+  };
 }
 
 /**
@@ -292,8 +300,16 @@ export async function chercher(
   seuil: number,
   signal?: AbortSignal,
 ): Promise<Recherche> {
-  const { candidats, noms, traduction } = await candidatsFts(db, modeles, question, p, signal);
-  if (!candidats.length) return { candidats, retenus: [], score: 0, horsCorpus: true, traduction };
+  const { candidats, noms, traduction, panneTraduction } = await candidatsFts(
+    db,
+    modeles,
+    question,
+    p,
+    signal,
+  );
+  if (!candidats.length) {
+    return { candidats, retenus: [], score: 0, horsCorpus: true, traduction, panneTraduction };
+  }
   let ordre: { index: number; score: number }[];
   let panneReclasseur: string | undefined;
   try {
@@ -331,6 +347,7 @@ export async function chercher(
     horsCorpus: !classes.length || (!panneReclasseur && score < seuil),
     panneReclasseur,
     traduction,
+    panneTraduction,
   };
   if (!noms) return recherche;
   // Seuls les extraits au-dessus du seuil servent. Le meilleur de chaque matière a sa place, les

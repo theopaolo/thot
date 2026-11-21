@@ -177,7 +177,7 @@ export function lire(sortie: string): Brute | null {
 
 /**
  * Contrôles déterministes: chaque citation existe mot pour mot, d'un seul tenant, dans l'extrait
- * qu'elle désigne. Les affirmations au-delà de `MAX_AFFIRMATIONS` ne sont pas lues.
+ * qu'elle désigne. `verifier` ne lit pas les affirmations au-delà de `MAX_AFFIRMATIONS`.
  */
 export function verifier(
   brute: Brute | null,
@@ -349,8 +349,8 @@ export function ranger(brutes: unknown, parRang: (Affirmation | undefined)[]): R
 /**
  * Une réponse conservée perd sa validation dès qu'une de ses preuves est retirée ou modifiée. Une
  * citation d'une révision qui ne sert plus se revérifie dans les chunks que `ancienne` rend pour
- * cette révision. Chaque citation est rendue telle que le document l'écrit : une réponse conservée
- * peut encore porter la copie du modèle.
+ * cette révision. Le résultat rend chaque citation telle que le document l'écrit : une réponse
+ * conservée peut encore porter la copie du modèle.
  */
 export function actualiserResultat(
   db: DatabaseSync,
@@ -536,9 +536,13 @@ export async function demander(
       etape("Mise en contexte de la question");
       try {
         const reformulee = await modeles.reformuler(questionPrecedente, question, signal);
-        if (reformulee && reformulee.length <= 1000) recherche = reformulee;
-      } catch {
-        /* Une reformulation indisponible ne bloque pas la question. */
+        if (!reformulee || reformulee.length > 1000) {
+          throw new Error("Reformulation vide ou trop longue.");
+        }
+        recherche = reformulee;
+      } catch (e) {
+        // La relance part telle quelle. Si la recherche n'aboutit pas, c'est une panne.
+        journal.reformulation_indisponible = (e as Error).message;
       }
       journal.question_recherche = recherche;
     }
@@ -546,6 +550,7 @@ export async function demander(
     const r = await chercher(db, modeles, recherche, p, seuil, signal);
     journal.score = r.score;
     if (r.traduction) journal.traduction = r.traduction;
+    if (r.panneTraduction) journal.traduction_indisponible = r.panneTraduction;
     if (r.panneReclasseur) journal.reclasseur_indisponible = r.panneReclasseur;
     journal.candidats = r.candidats.map((c) => ({
       id: c.id,
@@ -557,6 +562,17 @@ export async function demander(
     sansPassage = r.sansPassage ?? [];
     retenus = r.retenus;
     if (sansPassage.length) journal.sans_passage = sansPassage;
+    // Une question cherchée sans sa reformulation ou sa traduction : ne rien trouver ne prouve
+    // pas une limite du cours.
+    const panneRecherche = (journal.reformulation_indisponible ?? r.panneTraduction) as
+      | string
+      | undefined;
+    if (panneRecherche && (r.horsCorpus || sansPassage.length)) {
+      return {
+        resultat: { etat: "failed", code: "MODEL_UNAVAILABLE", message: panneRecherche },
+        journal,
+      };
+    }
     if (r.horsCorpus) return { resultat: { etat: "out_of_corpus", raison: "seuil" }, journal };
 
     etape("Rédaction à partir des passages trouvés");
@@ -586,10 +602,11 @@ export async function demander(
       if (v.refus) {
         tentatives.push({ sortie: texte, erreurs: v.erreurs });
         if (gardees.affirmations.length) return repondre(gardees, true);
-        // Sans reclasseur, les extraits sont mal triés: leur refus ne prouve pas une limite du cours.
-        if (r.panneReclasseur) {
+        // Des extraits mal triés ou mal cherchés: leur refus ne prouve pas une limite du cours.
+        const panne = r.panneReclasseur ?? panneRecherche;
+        if (panne) {
           return {
-            resultat: { etat: "failed", code: "MODEL_UNAVAILABLE", message: r.panneReclasseur },
+            resultat: { etat: "failed", code: "MODEL_UNAVAILABLE", message: panne },
             journal,
           };
         }

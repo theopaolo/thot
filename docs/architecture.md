@@ -624,10 +624,14 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-  Q[Question] --> F[FTS5 racinisé, top 20<br/>filtré par établissement, périmètre et public]
-  F -- aucun résultat --> HC[out_of_corpus]
+  Q[Question] --> PR[Reformulation d'une relance<br/>traduction si une source est en anglais]
+  PR --> F[FTS5 racinisé, top 20<br/>filtré par établissement, périmètre et public]
+  PR -- "panne : question telle quelle, signalée au journal" --> F
+  F -- aucun résultat --> S{reformulation ou<br/>traduction en panne ?}
   F --> RR[Reclasseur]
-  RR -- score sous le seuil --> HC
+  RR -- score sous le seuil --> S
+  S -- non --> HC[out_of_corpus]
+  S -- oui --> KO
   RR -- "panne : ordre FTS5, signalée au journal" --> G
   RR --> G[Génération sur 5 extraits<br/>JSON d'affirmations citées]
   G --> V{verifier<br/>puis juge}
@@ -636,13 +640,19 @@ flowchart TD
   V -- erreurs au 2e essai, refus ou panne --> P{affirmations<br/>déjà vérifiées ?}
   P -- oui --> PART[answered partielle]
   P -- "non, refus" --> HC
-  P -- "non, refus sans reclasseur" --> KO
+  P -- "non, refus après une panne de reclasseur,<br/>de reformulation ou de traduction" --> KO
   P -- "non, erreur ou panne" --> KO[failed]
 ```
 
 Le seuil d'abstention est une probabilité du reclasseur et ne s'applique pas aux rangs FTS5. En
 panne du reclasseur, le générateur et le juge décident seuls. Leur refus donne `failed`, car des
 extraits mal triés ne prouvent pas que le cours est muet.
+
+Une relance se reformule pour se comprendre seule, et une question se traduit quand son périmètre
+contient une source anglaise. Si l'un de ces appels échoue, Thot cherche la question telle quelle
+et le journal garde la cause sous `reformulation_indisponible` ou `traduction_indisponible`. Une
+recherche sans résultat, ou un refus du générateur, donne alors `failed` : une relance comme
+« Et pourquoi ? » n'a aucun mot à chercher, et son échec ne dit rien du cours.
 
 L'affirmation reste l'unité de preuve. Le profil général peut ranger les affirmations d'une
 réponse en blocs : paragraphe, liste, étapes ou tableau. Un bloc ne désigne que des affirmations
@@ -685,7 +695,8 @@ noms.
 
 Le modèle ne complète pas une matière sans extrait au-dessus du seuil. La réponse affiche
 « Aucun passage trouvé en {matière}. » et le journal note la matière sous `sans_passage`. Sans
-extrait dans aucune matière, la question est `out_of_corpus`.
+extrait dans aucune matière, la question est `out_of_corpus`. Après une panne de reformulation ou
+de traduction, une matière sans extrait donne `failed` au lieu de s'annoncer vide.
 
 Les extraits donnés au générateur nomment leur matière en comparaison seulement, et la consigne du
 profil général y gagne une règle : une colonne de tableau par matière. Les questions d'une seule

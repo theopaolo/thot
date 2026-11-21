@@ -357,12 +357,14 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
             content: `Question précédente : ${questionPrecedente}\nNouvelle question : ${question}`,
           },
         ],
-        // Le raisonnement compte dans le budget. Sans effort réglé, `low` borne la latence.
+        // Le raisonnement compte dans le budget : l'effort du générateur le viderait avant la
+        // question.
         600,
-        config.effort ?? "low",
+        "none",
         false,
         signal,
       );
+      if (!texte.trim()) throw new PanneModele("Reformulation vide.", "MODEL_EMPTY_RESPONSE");
       return texte.trim();
     },
 
@@ -378,10 +380,11 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           { role: "user", content: question },
         ],
         600,
-        config.effort ?? "low",
+        "none",
         false,
         signal,
       );
+      if (!texte.trim()) throw new PanneModele("Traduction vide.", "MODEL_EMPTY_RESPONSE");
       return texte.trim();
     },
 
