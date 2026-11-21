@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import type { Contenu, Question } from "../../core/activite.ts";
 import { approchee, points } from "../../core/questions.ts";
 import { type Activite, NOTES, type TentativeLue } from "../activites.ts";
-import { jour } from "./prof.ts";
+import { jour } from "./commun.ts";
 import { enrichi, enrichiLigne, lettre, NOMS_TYPE } from "./questions.ts";
 
 const NOMBRE = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });

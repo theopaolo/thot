@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { Attente } from "../relecture.ts";
 import { texteDocument } from "./document.ts";
-import { jour } from "./prof.ts";
+import { jour } from "./commun.ts";
 
 /** Un titre de groupe par cours : une ressource de plusieurs cours se range sous le premier. */
 const groupes = (liste: Attente[]) =>

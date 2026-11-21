@@ -11,6 +11,7 @@ import { type Activite, type Avancement, couvre } from "../activites.ts";
 import { champsScope, selectsPerimetre } from "./domaines.ts";
 import { sections, texteDocument } from "./document.ts";
 import { type Etape, dossier, fichier, fil } from "./bureau.ts";
+import { nomPerimetre } from "./commun.ts";
 
 export type ChapitreVue = {
   nom: string;
@@ -525,7 +526,6 @@ export const recherche = (q: string, trouves: Trouve[] = [], p?: Scope) =>
 const lienTheme = (themeId?: string | null, doc?: string) =>
   `${themeId ? `/eleve/themes/${themeId}` : "/eleve/sans-sequence"}${doc ? `?doc=${doc}` : ""}`;
 
-/** Ce que le lecteur montre d'un document choisi dans le mur. */
 /** « 2 sur $ »: compteur de diapositive resté dans deux exports HTML, sans valeur pour un élève. */
 export const COMPTEUR_DIAPO = /^\d+ sur \$\d*$/;
 
@@ -587,6 +587,7 @@ const cartel = (
     </dl>
   `;
 
+/** Ce que le lecteur montre d'un document choisi dans le mur. */
 export type Apercu = {
   id: string;
   titre: string;
@@ -1227,35 +1228,6 @@ export type MessageVue = {
   avis: string | null;
   /** le périmètre de cet échange, quand il diffère de celui de l'échange précédent */
   perimetre?: string;
-};
-
-const LISTE = new Intl.ListFormat("fr");
-/**
- * « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. Une
- * comparaison nomme ses matières : « Histoire de l'art et Physique ».
- */
-export const nomPerimetre = (
-  cat: Catalogue,
-  p: Scope,
-  l: Pick<Libelles, "matiere" | "cours" | "regroupement">,
-) => {
-  if (p.matieres) {
-    return LISTE.format(
-      idsMatieres(p.matieres)
-        .map((id) => cat.matieres.find((m) => m.id === id)?.nom ?? `${l.matiere} indisponible`)
-        .sort((a, b) => a.localeCompare(b, "fr")),
-    );
-  }
-  const t = cat.themes.find((x) => x.id === p.theme_id);
-  const c = cat.cours.find((x) => x.id === (p.cours_id || t?.cours_id));
-  const m = cat.matieres.find((x) => x.id === (p.matiere_id || c?.matiere_id));
-  return [
-    m?.nom ?? (p.matiere_id ? `${l.matiere} indisponible` : ""),
-    c?.nom ?? (p.cours_id ? `${l.cours} indisponible` : ""),
-    t?.nom ?? (p.theme_id ? `${l.regroupement} indisponible` : ""),
-  ]
-    .filter(Boolean)
-    .join(" / ");
 };
 
 export type ConversationVue = {

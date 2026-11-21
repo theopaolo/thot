@@ -10,6 +10,7 @@ import { config } from "../config.ts";
 import { attendreChangement } from "../reponses.ts";
 import { questionsProches } from "../../core/suggestions.ts";
 import { suggestionsDuPerimetre } from "../suggestions.ts";
+import * as Commun from "../vues/commun.ts";
 import * as Eleve from "../vues/eleve.ts";
 import * as Conversations from "../conversations.ts";
 import * as Domaines from "../domaines.ts";
@@ -162,7 +163,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const termes = libelles(db);
     const { lignes, plus } = Conversations.lister(db, c.get("compte"), archivees, toutes, q);
     return {
-      liste: lignes.map((l) => ({ ...l, perimetre: Eleve.nomPerimetre(cat, l, termes) })),
+      liste: lignes.map((l) => ({ ...l, perimetre: Commun.nomPerimetre(cat, l, termes) })),
       plus,
     };
   };
@@ -183,7 +184,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
         theme_id: "",
       };
     const messages = conv
-      ? messagesDe(compte, conv.id, (m) => Eleve.nomPerimetre(cat, m, termes))
+      ? messagesDe(compte, conv.id, (m) => Commun.nomPerimetre(cat, m, termes))
       : [];
     const dernier = messages.findLast((m) => m.resultat);
     const { liste, plus } = conversations(c, false, false);

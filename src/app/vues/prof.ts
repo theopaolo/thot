@@ -9,13 +9,8 @@ import type { Libelles } from "../instance.ts";
 import * as Domaines from "./domaines.ts";
 import { texteDocument } from "./document.ts";
 import { type Dossier, type Etape, dossier, fichier, fil } from "./bureau.ts";
-import { nomPerimetre, panneauSource, question, reponse } from "./eleve.ts";
-
-type Option = { value: string; label: string };
-
-const JOUR = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Europe/Paris" });
-/** « 22 septembre 2026 » à partir d'un horodatage ISO. */
-export const jour = (iso: string) => JOUR.format(new Date(iso));
+import { panneauSource, question, reponse } from "./eleve.ts";
+import { champ, champFichier, jour, lecteurs, nombre, nomPerimetre } from "./commun.ts";
 
 const ETATS_JOB: Record<string, string> = {
   received: "en file",
@@ -1099,108 +1094,12 @@ export const echangeProf = (e: EchangeProf, cat: Catalogue, l: Libelles) => {
   `;
 };
 
-/** Sélecteur de fichier au libellé français, quelle que soit la langue du navigateur. */
-const champFichier = (accept: string, plusieurs = false) =>
-  html`
-    <span class="fichier ${plusieurs ? "zone-depot" : ""}">
-      <input
-        type="file"
-        id="fichier"
-        name="fichier"
-        accept="${accept}"
-        ${plusieurs ? "multiple" : ""}
-        required
-        class="visuellement-cache"
-      >
-      <label for="fichier" class="bouton">${icone("upload-simple")}Choisir ${
-        plusieurs ? "des fichiers" : "un fichier"
-      }</label>
-      <output for="fichier" class="discret">${
-        plusieurs ? "ou glissez-les sur la page" : "Aucun fichier choisi"
-      }</output>
-    </span>
-  `;
-
-const champ = (o: {
-  nom: string;
-  label: string;
-  valeur?: string;
-  erreur?: string;
-  aide?: string;
-  requis?: boolean;
-  options?: Option[];
-  zone?: boolean;
-}) =>
-  html`
-    <div class="champ">
-      <label for="${o.nom}">${o.label}${o.requis ? " *" : ""}</label>
-      ${
-        o.aide
-          ? html`
-          <p class="aide" id="${o.nom}-aide">${o.aide}</p>
-        `
-          : ""
-      } ${
-        o.options
-          ? html`
-          <select id="${o.nom}" name="${o.nom}" ${o.requis ? "required" : ""}>
-            <option value="">Choisir</option>
-            ${o.options.map(
-              (x) =>
-                html`
-                <option value="${x.value}" ${x.value === o.valeur ? "selected" : ""}>${
-                  x.label
-                }</option>
-              `,
-            )}
-          </select>
-        `
-          : o.zone
-            ? html`
-          <textarea id="${o.nom}" name="${o.nom}">${o.valeur ?? ""}</textarea>
-        `
-            : html`
-          <input type="text" id="${o.nom}" name="${o.nom}" value="${o.valeur ?? ""}" ${
-            o.requis ? "required" : ""
-          }>
-        `
-      } ${
-        o.erreur
-          ? html`
-          <p class="erreur" id="${o.nom}-erreur">${o.erreur}</p>
-        `
-          : ""
-      }
-    </div>
-  `;
-
-/** `titre` : faux quand le titre de l'étape du dépôt pose déjà la question. */
-const lecteurs = (audience = "eleves", reponses = true, titre = true) =>
-  html`
-    <fieldset>
-      <legend class="${titre ? "" : "visuellement-cache"}"><strong>Qui peut la lire ?</strong></legend>
-      ${AUDIENCES.map(
-        (a) =>
-          html`
-          <label><input type="radio" name="audience" value="${a.value}" ${
-            audience === a.value ? "checked" : ""
-          }> ${a.label}</label>
-        `,
-      )}
-      <label><input type="checkbox" name="reponses" value="1" ${reponses ? "checked" : ""}> Thot
-        s'en sert pour répondre</label>
-      <p class="aide">Une réponse ne cite que les ressources certifiées que son lecteur peut lire.</p>
-    </fieldset>
-  `;
-
 /** Le sort d'un fichier déposé: reçu, doublon d'une source que le compte lit, ou refusé. */
 export type ResultatDepot = { nom: string } & (
   | { etat: "recu"; id: string; titre: string; format: string }
   | { etat: "doublon"; id: string; titre: string }
   | { etat: "erreur"; erreurs: Record<string, string> }
 );
-
-const nombre = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""}`;
 
 const bilanDepot = (d: { lot: string; resultats: ResultatDepot[] }) => {
   const n = (etat: string) => d.resultats.filter((r) => r.etat === etat).length;
