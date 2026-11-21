@@ -1,7 +1,12 @@
 import { test } from "vite-plus/test";
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { PanneModele } from "../src/core/modeles.ts";
-import { questionsProches, renvoie } from "../src/core/suggestions.ts";
+import {
+  DELAI_PROCHES_MS,
+  MAX_CANDIDATES,
+  questionsProches,
+  renvoie,
+} from "../src/core/suggestions.ts";
 import { fauxModeles } from "./outils.ts";
 
 test("une suggestion qui renvoie à une image absente est écartée, une question qui la nomme passe", () => {
@@ -41,5 +46,28 @@ test("après un refus, seules les questions proches du sens de la question sont 
 
   const { modeles } = fauxModeles();
   modeles.reclasser = () => Promise.reject(new PanneModele("reclasseur 503"));
-  assertEquals(await questionsProches(modeles, "Où a vécu Gaudí ?", candidates, 0.5), []);
+  assertEquals(
+    await questionsProches(modeles, "Où a vécu Gaudí ?", candidates, 0.5),
+    null,
+    "une panne ne vaut pas « rien de proche »",
+  );
+});
+
+test("questions proches : le reclasseur reçoit un nombre borné de candidates et un délai", async () => {
+  const { modeles } = fauxModeles();
+  let recues = 0;
+  modeles.reclasser = (_q, docs) => {
+    recues = docs.length;
+    return Promise.resolve(docs.map((_, index) => ({ index, score: 0.9 })));
+  };
+  const beaucoup = Array.from({ length: MAX_CANDIDATES + 20 }, (_, i) => `Question ${i} ?`);
+  await questionsProches(modeles, "Où a vécu Gaudí ?", beaucoup, 0.5);
+  assertEquals(recues, MAX_CANDIDATES);
+
+  // Un reclasseur qui ne répond pas s'arrête au signal.
+  modeles.reclasser = (_q, _docs, signal) =>
+    new Promise((_, rejeter) => signal?.addEventListener("abort", () => rejeter(signal.reason)));
+  const debut = Date.now();
+  assertEquals(await questionsProches(modeles, "Où a vécu Gaudí ?", beaucoup, 0.5), null);
+  assert(Date.now() - debut < DELAI_PROCHES_MS + 500);
 });

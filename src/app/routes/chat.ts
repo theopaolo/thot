@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { streamSSE } from "hono/streaming";
@@ -63,11 +64,12 @@ export function routesChat(app: Hono<Env>, w: Web) {
       // Un droit retiré depuis retire aussi la question.
       if (connues) return connues.filter((q) => candidates.includes(q));
       const idees = await questionsProches(modeles, question, candidates, config.seuil);
-      if (messageId) {
+      // Une panne ne se garde pas : le prochain affichage rappelle le reclasseur.
+      if (idees && messageId) {
         proches.set(messageId, idees);
         if (proches.size > 1000) proches.delete(proches.keys().next().value!);
       }
-      return idees;
+      return idees ?? [];
     }
     if (cadre) {
       return suggestionsDuPerimetre(
@@ -298,7 +300,8 @@ export function routesChat(app: Hono<Env>, w: Web) {
       .slice(0, 1000);
     if (!texte) return c.text("Question vide.", 400);
     const compte = c.get("compte");
-    const cle = String(b.cle ?? "").slice(0, 100) || null;
+    // La clé enregistrée porte le texte : la même clé avec une autre question est un autre envoi.
+    const cle = b.cle ? createHash("sha256").update(`${b.cle}\n${texte}`).digest("hex") : null;
     // Hors HTMX (accueil, idée proposée, première question), la conversation s'ouvre et le flux
     // démarre là-bas.
     const envoye = (conversationId: string, id: string, question: string) =>

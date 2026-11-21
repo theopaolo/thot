@@ -1,6 +1,6 @@
 ---
 title: CHAT-103 Ne pas bloquer le chat sur les questions proches d'un refus
-status: not_started
+status: in_progress
 scope: [eleve]
 type: [bug]
 ---
@@ -28,15 +28,16 @@ Trois défauts du chat, lus dans le code.
 
 ## Travail
 
-- [ ] les questions proches se calculent avec un délai court, et une panne n'est pas gardée en
+- [x] les questions proches se calculent avec un délai court, et une panne n'est pas gardée en
       mémoire
-- [ ] le nombre de candidates envoyées au reclasseur est borné
-- [ ] relancer une réponse efface son avis
-- [ ] une clé rejouée avec un autre texte crée un nouvel échange, et le formulaire tire une
-      nouvelle clé au retour sur la page (`pageshow`)
+- [x] le nombre de candidates envoyées au reclasseur est borné
+- [x] relancer une réponse efface son avis
+- [x] une clé rejouée avec un autre texte crée un nouvel échange
+- [ ] le formulaire tire une nouvelle clé au retour sur la page (`pageshow`) : le code est écrit
+      dans `src/app/client/eleve.ts`, le retour en arrière reste à vérifier dans un navigateur
 
 ## Terminé quand
 
-- [ ] un test : un reclasseur qui ne répond pas ne retarde pas la page de plus du délai choisi
-- [ ] un test : après « Réessayer », l'échange n'a plus d'avis
-- [ ] un test : la même clé avec un autre texte donne deux échanges
+- [x] un test : un reclasseur qui ne répond pas ne retarde pas la page de plus du délai choisi
+- [x] un test : après « Réessayer », l'échange n'a plus d'avis
+- [x] un test : la même clé avec un autre texte donne deux échanges

@@ -14,9 +14,20 @@ const MOTIF = /\b(le|du|au) motif\b/i;
 export const renvoie = (q: string) =>
   RENVOI.test(q) || (MOTIF.test(q) && !/\p{Lu}/u.test(q.slice(1)));
 
+/** Le temps laissé au reclasseur : la page d'un refus et son flux attendent ce calcul. */
+export const DELAI_PROCHES_MS = 2000;
+/**
+ * Les candidates envoyées au reclasseur, deux fois les passages d'une recherche.
+ * ponytail: au-delà, les premières de la liste, que l'appelant donne dans un ordre tiré au sort.
+ * Un tri lexical avant le reclasseur si un périmètre porte beaucoup plus de questions.
+ */
+export const MAX_CANDIDATES = 40;
+
 /**
  * Les `n` questions que le reclasseur juge proches de `question`, au-dessus du seuil de recherche.
- * Sans reclasseur, aucune: un refus suivi de questions sans rapport induit en erreur.
+ * Sans reclasseur, aucune: un refus suivi de questions sans rapport induit en erreur. `null` dit
+ * que le reclasseur est en panne ou n'a pas répondu dans le délai, une liste vide que rien n'est
+ * proche.
  */
 export async function questionsProches(
   modeles: Modeles,
@@ -24,16 +35,18 @@ export async function questionsProches(
   candidates: string[],
   seuil: number,
   n = 3,
-): Promise<string[]> {
+): Promise<string[] | null> {
   if (!candidates.length) return [];
+  candidates = candidates.slice(0, MAX_CANDIDATES);
+  const signal = AbortSignal.timeout(DELAI_PROCHES_MS);
   try {
-    return (await modeles.reclasser(question, candidates))
+    return (await modeles.reclasser(question, candidates, signal))
       .filter((r) => r.score >= seuil)
       .sort((a, b) => b.score - a.score)
       .slice(0, n)
       .map((r) => candidates[r.index]);
   } catch (e) {
-    if (e instanceof PanneModele) return [];
+    if (e instanceof PanneModele || signal.aborted) return null;
     throw e;
   }
 }

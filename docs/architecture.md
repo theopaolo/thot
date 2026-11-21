@@ -513,14 +513,17 @@ ses échanges gardent la liste des matières comparées.
 Une conversation porte une réponse à la fois, ce qui garde l'ordre de ses tours. L'envoi et la
 relance le vérifient dans la transaction qui met la question en file : deux onglets n'en mettent
 pas deux. Un envoi pendant une réponse, ou dans une conversation archivée, reçoit 409 et l'élève
-garde sa saisie. Un envoi rejoué avec la même clé retrouve son premier échange. Une conversation
+garde sa saisie. Un envoi rejoué avec la même clé et le même texte retrouve son premier échange.
+Sous la même clé, un autre texte est une autre question et ouvre un autre échange : une page que
+le navigateur ressort de son historique garde la clé de son premier affichage. Une conversation
 vidée par la purge disparaît avec son titre, qui reprend souvent une question. Une réponse en
 cours perd alors sa ligne : sa tentative s'interrompt et ne recrée rien.
 
 La réponse continue quand l'élève ferme la page. Le flux SSE lit l'étape enregistrée, puis la
 réponse : le fermer n'arrête ni ne relance le calcul, et une reconnexion repart de l'état
 enregistré. « Arrêter » marque la réponse arrêtée et interrompt son appel de modèle. La question
-reste et se relance avec « Réessayer ». La liste relit le statut d'une réponse en file ou en cours
+reste et se relance avec « Réessayer ». Une relance efface l'avis, qui portait sur la réponse
+remplacée. La liste relit le statut d'une réponse en file ou en cours
 sans déplacer le focus. Elle marque « Nouvelle réponse » une réponse terminée que l'élève n'a pas
 vue, jusqu'à l'ouverture de sa conversation.
 

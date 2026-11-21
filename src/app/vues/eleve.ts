@@ -44,7 +44,10 @@ export type FaitVue = {
   fin: number;
 };
 
-/** Rejoué avec la même clé, un envoi retrouve l'échange déjà créé au lieu d'en ouvrir un autre. */
+/**
+ * Rejoué avec la même clé et le même texte, un envoi retrouve l'échange déjà créé au lieu d'en
+ * ouvrir un autre.
+ */
 export const cleEnvoi = () => html`<input type="hidden" name="cle" value="${crypto.randomUUID()}">`;
 
 /**

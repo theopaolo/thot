@@ -9,6 +9,7 @@ import { config, RACINE } from "../src/app/config.ts";
 import * as Conversations from "../src/app/conversations.ts";
 import { connexion, type Db, migrer, purgerMessages } from "../src/app/db.ts";
 import { cours, desinscrire, inscrire, matiere } from "../src/app/domaines.ts";
+import { DELAI_PROCHES_MS } from "../src/core/suggestions.ts";
 import { quand } from "../src/app/vues/eleve.ts";
 import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
 
@@ -477,4 +478,87 @@ test("dernière activité : l'heure du jour, hier, puis la date", () => {
   assertEquals(quand("2026-10-16T12:02:00Z", maintenant), "14 h 02");
   assertEquals(quand("2026-10-15T09:00:00Z", maintenant), "hier");
   assertEquals(quand("2026-10-12T09:00:00Z", maintenant), "12 oct.");
+});
+
+test("refus : un reclasseur muet ne retient pas la page au-delà du délai, sa panne ne reste pas", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const source = await publier(db, "Casa Batlló");
+    db.prepare("INSERT INTO suggestions VALUES ('sg', ?, 'Qui est Gaudí ?', 'faux', 'test')").run(
+      source,
+    );
+    const f = fauxModeles();
+    let muet = true;
+    // Les passages restent sous le seuil : la question est refusée. Pour les questions proches, le
+    // reclasseur ne répond qu'à l'arrêt demandé par le signal.
+    f.modeles.reclasser = (_q, docs, signal) =>
+      muet && docs.includes("Qui est Gaudí ?")
+        ? new Promise((_, rejeter) =>
+            signal?.addEventListener("abort", () => rejeter(signal.reason)),
+          )
+        : Promise.resolve(
+            docs.map((d, index) => ({ index, score: d.startsWith("Qui") ? 0.9 : 0.001 })),
+          );
+    const eleve = await session(db, f.modeles, "eleve");
+    const id = idDe((await poser(eleve, { texte: "Où Gaudí a-t-il vécu ?" })).texte);
+    while (!db.prepare("SELECT resultat FROM messages WHERE id = ?").get(id)!.resultat) {
+      await new Promise((suite) => setTimeout(suite, 10));
+    }
+    const debut = Date.now();
+    const page = await texteDe(eleve, "/eleve/chat");
+    assert(Date.now() - debut < DELAI_PROCHES_MS + 1000, "la page attend le délai, pas plus");
+    assertStringIncludes(page, "Je ne trouve pas la réponse");
+    assert(!page.includes("Ce que ton cours couvre"));
+    muet = false;
+    assertStringIncludes(await texteDe(eleve, "/eleve/chat"), "Ce que ton cours couvre");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("relance : une réponse marquée fausse repart sans son avis", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const source = await publier(db, "Casa Batlló");
+    const f = fauxModeles({ sorties: [BONNE] });
+    const eleve = await session(db, f.modeles, "eleve");
+    const id = idDe((await poser(eleve, { texte: "Pourquoi pas de ligne droite ?" })).texte);
+    await texteDe(eleve, `/eleve/messages/${id}/flux`);
+    assertEquals(
+      (await envoyer(eleve, `/eleve/messages/${id}/avis`, { avis: "faux" })).status,
+      200,
+    );
+    // La source ne sert plus aux réponses : la réponse perd sa preuve et se relance.
+    db.prepare("UPDATE sources SET reponses = 0 WHERE id = ?").run(source);
+    assertEquals((await envoyer(eleve, `/eleve/messages/${id}/relancer`, {})).status, 200);
+    assertEquals(db.prepare("SELECT avis FROM messages WHERE id = ?").get(id)!.avis, null);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("envoi : la même clé avec un autre texte ouvre un autre échange", async () => {
+  const { db, dir } = await environnement();
+  try {
+    await publier(db, "Casa Batlló");
+    const eleve = await session(db, fauxModeles({ sorties: [BONNE, BONNE] }).modeles, "eleve");
+    const conversation = async (texte: string) =>
+      (await envoyer(eleve, "/eleve/questions", { texte, cle: "k1" })).headers.get("location");
+    const premiere = await conversation("Pourquoi pas de ligne droite ?");
+    const seconde = await conversation("Et la céramique de la façade ?");
+    assert(premiere !== seconde, "la seconde question a sa conversation");
+    assertEquals(await conversation("Et la céramique de la façade ?"), seconde);
+    assertEquals(
+      db
+        .prepare("SELECT question FROM messages ORDER BY rowid")
+        .all()
+        .map((m) => m.question),
+      ["Pourquoi pas de ligne droite ?", "Et la céramique de la façade ?"],
+    );
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
 });

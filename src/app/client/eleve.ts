@@ -172,6 +172,19 @@ export function installerEleve() {
     const cle = memoire("defilement");
     if (cle) ecrire(cle, String(presDeLaFin() ? -1 : Math.round(scrollY)));
   });
+  // Une page que le navigateur ressort de son historique garde les clés de son premier affichage.
+  // Elle en tire de nouvelles : une question envoyée après un retour en arrière est un nouvel
+  // envoi. Un premier affichage garde les siennes, pour qu'un double envoi reste un renvoi.
+  addEventListener("pageshow", (event) => {
+    const [navigation] = performance.getEntriesByType("navigation");
+    const retour = (navigation as PerformanceNavigationTiming | undefined)?.type === "back_forward";
+    if (!event.persisted && !retour) return;
+    for (const cle of document.querySelectorAll<HTMLInputElement>(
+      'form[action="/eleve/questions"] input[name=cle]',
+    )) {
+      cle.value = crypto.randomUUID();
+    }
+  });
   for (const nom of ["htmx:beforeSwap", "htmx:sseBeforeMessage"]) {
     document.addEventListener(nom, () => (auBout = presDeLaFin()));
   }

@@ -259,7 +259,10 @@ export const poser = (
     return { conversation, echange: id };
   });
 
-/** Remet en file un échange en échec, ou dont la réponse a perdu sa preuve. */
+/**
+ * Remet en file un échange en échec, ou dont la réponse a perdu sa preuve. L'avis part avec la
+ * réponse qu'il jugeait.
+ */
 export const relancer = (db: Db, compte: Compte, id: string): Refus | undefined =>
   transaction(db, () => {
     const m = db
@@ -279,7 +282,7 @@ export const relancer = (db: Db, compte: Compte, id: string): Refus | undefined 
     if (reponseEnCours(db, m.conversation_id)) return "en_cours";
     const r = db
       .prepare(
-        `UPDATE messages SET etat = 'en_attente', resultat = NULL, generation_id = NULL,
+        `UPDATE messages SET etat = 'en_attente', resultat = NULL, avis = NULL, generation_id = NULL,
          tentatives = 0, journal = json_object('demande_ms', ?), maj_le = ?
          WHERE id = ? AND compte_id = ? AND etat IN ('failed', 'answered', 'annule')`,
       )
