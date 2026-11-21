@@ -13,7 +13,7 @@ import {
   titreParDefaut,
   valider,
 } from "../depot.ts";
-import * as Prof from "../vues/prof.ts";
+import * as ProfDepot from "../vues/prof-depot.ts";
 import * as Domaines from "../domaines.ts";
 import type { Env, Web } from "./web.ts";
 
@@ -49,7 +49,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
   };
   // `?cours=` coche ce cours, comme le lien « Déposer dans ce cours » de l'administration.
   app.get("/prof/depot", (c) =>
-    c.html(rendre(c, "Déposer", Prof.depot(optionsDepot(c, c.req.query())))),
+    c.html(rendre(c, "Déposer", ProfDepot.depot(optionsDepot(c, c.req.query())))),
   );
   const parCle = (compte: Compte, cle: string) =>
     db
@@ -71,10 +71,10 @@ export function routesDepot(app: Hono<Env>, w: Web) {
     lotId: string,
     cleNavigateur: string | undefined,
     rang: number,
-  ): Promise<Prof.ResultatDepot> => {
+  ): Promise<ProfDepot.ResultatDepot> => {
     const compte = c.get("compte");
     const nom = fichier?.name ?? "";
-    const erreur = (erreurs: Record<string, string>): Prof.ResultatDepot => ({
+    const erreur = (erreurs: Record<string, string>): ProfDepot.ResultatDepot => ({
       etat: "erreur",
       nom,
       erreurs,
@@ -171,11 +171,11 @@ export function routesDepot(app: Hono<Env>, w: Web) {
           return c.json({ etat: "erreur", nom: fichiers[0]?.name ?? "", erreurs }, 400);
         }
         return c.html(
-          rendre(c, "Déposer", Prof.depot({ ...optionsDepot(c, champs), erreurs })),
+          rendre(c, "Déposer", ProfDepot.depot({ ...optionsDepot(c, champs), erreurs })),
           400,
         );
       }
-      const resultats: Prof.ResultatDepot[] = [];
+      const resultats: ProfDepot.ResultatDepot[] = [];
       for (const [i, f] of (fichiers.length ? fichiers : [undefined]).entries()) {
         resultats.push(
           await deposerFichier(c, champs, b, f, fichiers.length <= 1, lot, jeton(b.cle), i),
@@ -189,7 +189,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
           rendre(
             c,
             "Déposer",
-            Prof.depot({ ...optionsDepot(c, champs), erreurs: resultats[0].erreurs }),
+            ProfDepot.depot({ ...optionsDepot(c, champs), erreurs: resultats[0].erreurs }),
           ),
           400,
         );
@@ -198,7 +198,7 @@ export function routesDepot(app: Hono<Env>, w: Web) {
         rendre(
           c,
           "Déposer",
-          Prof.depot({ ...optionsDepot(c, champs), depose: { lot, resultats } }),
+          ProfDepot.depot({ ...optionsDepot(c, champs), depose: { lot, resultats } }),
         ),
       );
     },

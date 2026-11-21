@@ -1,7 +1,8 @@
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { page } from "../src/app/vues/page.ts";
-import { depot, detailSource, pageLegendes } from "../src/app/vues/prof.ts";
+import { detailSource, pageLegendes } from "../src/app/vues/prof.ts";
+import { depot } from "../src/app/vues/prof-depot.ts";
 import { eleves } from "../src/app/vues/prof-eleves.ts";
 import { sources } from "../src/app/vues/prof-bibliotheque.ts";
 import { lignesSources } from "../src/app/vues/prof-lignes.ts";
