@@ -495,6 +495,7 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0026_series.sql",
       "0027_lectures.sql",
       "0028_connexions.sql",
+      "0029_images_revision.sql",
     ]);
     assertEquals(
       db
@@ -749,6 +750,7 @@ test("migration des membres : chaque compte rejoint chaque cours existant", asyn
       "0026_series.sql",
       "0027_lectures.sql",
       "0028_connexions.sql",
+      "0029_images_revision.sql",
     ]);
     assertEquals(
       db

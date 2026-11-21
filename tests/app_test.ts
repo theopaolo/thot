@@ -302,13 +302,14 @@ test("pendant les légendes, la liste des sources compte les images déjà lége
   const { db, dir } = await environnement();
   try {
     const { requete } = await session(db, fauxModeles().modeles, "enseignant");
-    await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+    // Deux PNG réduits à leur en-tête. Le profil arts ne garde que la première image d'une page,
+    // le profil général les importe toutes.
+    const image = (hauteur: number) =>
+      `<img src="data:image/png;base64,${Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 2, 0, 0, 0, hauteur]).toString("base64")}">`;
+    const deux = enc(`<html><h1>Deux images</h1><p>Un texte.</p>${image(1)}${image(2)}</html>`);
+    await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, deux, "casa.html") });
+    db.prepare("UPDATE sources SET profil = 'general'").run();
     const job = revendiquer(db)!;
-    // Une page HTML ne garde que sa première image. La seconde est ajoutée à la main.
-    db.prepare(
-      `INSERT INTO images (id, source_id, position, fichier, mime, checksum)
-       VALUES (?, ?, 1, 'image-0.jpg', 'image/jpeg', '')`,
-    ).run(`${job.source_id}-1`, job.source_id);
     const enAttente = Promise.withResolvers<void>();
     const termine = Promise.withResolvers<{ texte: string; modele: string }>();
     const { modeles } = fauxModeles();
@@ -1597,8 +1598,11 @@ test("une légende relue ne reste pas sur une autre image à la même place", as
     db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
     await traiter(db, revendiquer(db)!, fauxModeles({ legende: "Autre image." }).modeles);
     assertEquals(
-      { ...db.prepare("SELECT legende, legende_statut FROM images WHERE id = ?").get(`${id}-0`) },
-      { legende: "Autre image.", legende_statut: "unreviewed" },
+      db
+        .prepare("SELECT legende, legende_statut FROM images WHERE source_id = ?")
+        .all(id)
+        .map((i) => ({ ...i })),
+      [{ legende: "Autre image.", legende_statut: "unreviewed" }],
     );
   } finally {
     db.close();

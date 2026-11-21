@@ -32,13 +32,15 @@ modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
    recherche. Aucune n'est proposée si rien n'est proche ou si le reclasseur est en panne.
 5. Le corpus reste lisible sans l'application. Chaque source vit dans
    `data/content/{source}/` : original, images, `document.txt` et `blocs.jsonl` de sa révision 1,
-   puis `revisions/{n}/` pour chaque révision suivante. La base dit quelle révision sert.
+   puis `revisions/{n}/` pour chaque révision suivante, avec les images qu'elle a apportées. La
+   base dit quelle révision sert.
    L'index de recherche se reconstruit depuis les révisions servies par `thot rebuild`.
 6. Le `document.txt` d'une révision est le système de coordonnées de ses citations, et son texte
    ne change plus. Une extraction dont le texte diffère de la révision servie devient une
    révision en attente, vérifiée bloc par bloc. Elle ne sert qu'une fois certifiée par un
-   enseignant, et l'index ne contient que la révision servie. Une ancienne révision se lit avec
-   les mêmes droits que la source : retirer l'accès à la source la retire aussi.
+   enseignant, ses images comprises, et l'index ne contient que la révision servie. Une
+   extraction qui redonne le texte servi écarte la révision en attente. Une ancienne révision se
+   lit avec les mêmes droits que la source : retirer l'accès à la source la retire aussi.
    Les offsets comptent des points de code, les chaînes JavaScript des unités UTF-16. Tout
    découpage passe par `src/core/texte.ts`.
 7. Le choix d'un modèle est un réglage d'environnement. Il ne traverse pas le domaine.
@@ -142,6 +144,16 @@ Une image d'un document Word ou d'une présentation garde la section où elle ap
 (`images.section`), et sa légende accompagne le premier passage de cette section. Une image
 répétée sur plusieurs diapositives entre une fois, avec la première. Seuls PNG, JPEG et GIF sont
 importés, sous une borne de pixels. Les autres formats (EMF, WMF, SVG…) donnent un avertissement.
+
+La table `images` ne porte que les images servies, et chaque ligne garde la révision qui l'a
+apportée (`images.revision`). Une extraction qui redonne le texte servi range ses images en
+place. Une extraction qui devient une révision en attente écrit dans le dossier de cette
+révision ses images nouvelles et leur liste (`images.jsonl`), avec la légende proposée pour
+chacune. Certifier la révision sert cette liste, et les images que la révision n'a plus sortent
+avec leurs fichiers. La rejeter efface son dossier. Une image se reconnaît à ses octets : tant
+qu'une extraction la rend, elle garde son identifiant, sa légende et sa relecture, même à une
+autre place. Une image répétée dans un document entre donc une fois. `thot reextraire` ne lit
+pas les images : certifier sa révision laisse celles de la source telles quelles.
 
 Le dépôt web prend plusieurs fichiers. Chacun passe par `deposer()` seul : une source, un travail
 d'ingestion, aucune dépendance entre fichiers. Avec JavaScript, le navigateur envoie un fichier
@@ -636,7 +648,7 @@ stateDiagram-v2
     [*] --> servie: première extraction
     [*] --> en_attente: texte changé
     en_attente --> servie: certifiée
-    en_attente --> [*]: rejetée ou remplacée
+    en_attente --> [*]: rejetée, remplacée ou texte servi revenu
     servie --> conservee: une autre est certifiée
   }
   note right of Revision: certifier une révision certifie aussi sa source

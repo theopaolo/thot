@@ -13,13 +13,14 @@ import { BORNES, detecterOffice, ouvrirArchive } from "../src/core/ooxml.ts";
 import { extrairePptx } from "../src/core/pptx.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { tranche } from "../src/core/texte.ts";
-import { readFileSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { contenu } from "../src/app/config.ts";
 import type { Db } from "../src/app/db.ts";
 import {
   lireDocument,
   MAX_LEGENDES,
   reextraire,
+  relireLegende,
   revendiquer,
   revisionEnAttente,
   statuer,
@@ -771,4 +772,121 @@ test("PPTX : inclure les diapositives masquées relance l'extraction en une vers
   assertStringIncludes(lireDocument(s.id, 2).texte, "Diapositive 3 (masquée) : Brouillon");
   assert(!lireDocument(s.id, 1).texte.includes("Brouillon"), "la version servie ne change pas");
   assertStringIncludes(await (await requete(`/prof/sources/${s.id}`)).text(), "Les exclure");
+});
+
+// Une image par diapositive, la deuxième masquée : l'inclure décale la troisième image.
+const TROIS: Diapo[] = [1, 2, 3].map((n) => ({
+  formes: forme("title", `Partie ${n}`) + photo("rIdI"),
+  masquee: n === 2,
+  rels: [["rIdI", "image", `../media/i${n}.png`]],
+}));
+const IMAGES = { "i1.png": png(2, 2, 1), "i2.png": png(2, 2, 2), "i3.png": png(2, 2, 3) };
+
+/** Une présentation certifiée dont la légende de la dernière image est relue. */
+async function presentationRelue() {
+  const { db } = await environnement();
+  const modeles = {
+    ...fauxModeles().modeles,
+    legender: (o: Uint8Array) => Promise.resolve({ texte: `Croquis ${o[39]}`, modele: "faux-vl" }),
+  };
+  const prof = await session(db, modeles, "enseignant");
+  await deposer(prof.requete, await pptx(TROIS, { medias: IMAGES }), "croquis.pptx");
+  const s = sourceDeposee(db);
+  await traiter(db, revendiquer(db)!, modeles);
+  statuer(db, s.id, "certifiee", "Test");
+  relireLegende(db, `${s.id}-1`, "certified", "Croquis relu", "Test", "Atelier");
+  const eleve = await session(db, modeles, "eleve");
+  const basculer = async (inclure: string) => {
+    await prof.requete(`/prof/sources/${s.id}/diapositives-masquees`, {
+      method: "POST",
+      body: new URLSearchParams({ inclure }),
+    });
+    await traiter(db, revendiquer(db)!, modeles);
+  };
+  const statuerRevision = (n: number, statut: string) =>
+    prof.requete(`/prof/sources/${s.id}/revisions/${n}/${statut}`, { method: "POST" });
+  const images = () =>
+    db
+      .prepare(
+        "SELECT id, position, revision, legende, legende_statut, credit FROM images ORDER BY position",
+      )
+      .all()
+      .map((i) => [i.id, i.revision, i.legende, i.legende_statut, i.credit]);
+  const rappels = () =>
+    db
+      .prepare("SELECT rappel FROM chunks")
+      .all()
+      .map((c) => c.rappel)
+      .join("\n");
+  return { db, s, prof, eleve, basculer, statuerRevision, images, rappels };
+}
+
+test("PPTX : l'image d'une diapositive masquée attend la certification de sa version", async () => {
+  const { db, s, eleve, basculer, statuerRevision, images, rappels } = await presentationRelue();
+  const avant = images();
+  assertEquals(avant, [
+    [`${s.id}-0`, 1, "Croquis 1", "unreviewed", null],
+    [`${s.id}-1`, 1, "Croquis relu", "certified", "Atelier"],
+  ]);
+
+  await basculer("1");
+  assertEquals(revisionEnAttente(db, s.id)?.n, 2);
+  // La version attend sa relecture : rien de la diapositive masquée n'est servi.
+  assertEquals(images(), avant);
+  assert(!rappels().includes("Croquis 2"));
+  const page = await (await eleve.requete(`/eleve/sources/${s.id}`)).text();
+  assertEquals(page.match(/\/media\/[\w-]+/g), [`/media/${s.id}-0`, `/media/${s.id}-1`]);
+  assertEquals((await eleve.requete(`/media/${s.id}-2`)).status, 404);
+
+  // Certifiée, la version sert ses images. La légende relue a suivi son image d'une place.
+  assertEquals((await statuerRevision(2, "certifiee")).status, 303);
+  assertEquals(images(), [
+    [`${s.id}-0`, 1, "Croquis 1", "unreviewed", null],
+    [`${s.id}-2`, 2, "Croquis 2", "unreviewed", null],
+    [`${s.id}-1`, 1, "Croquis relu", "certified", "Atelier"],
+  ]);
+  assertStringIncludes(rappels(), "Croquis 2");
+  const masquee = await eleve.requete(`/media/${s.id}-2`);
+  assertEquals(masquee.status, 200);
+  assertEquals(new Uint8Array(await masquee.arrayBuffer()), IMAGES["i2.png"]);
+
+  // Exclure de nouveau puis certifier retire l'image, sa ligne et son fichier.
+  await basculer("0");
+  assertEquals(images().length, 3, "la version servie garde ses images jusqu'à la relecture");
+  assertEquals((await statuerRevision(3, "certifiee")).status, 303);
+  assertEquals(images(), avant);
+  assert(!rappels().includes("Croquis 2"));
+  assertEquals((await eleve.requete(`/media/${s.id}-2`)).status, 404);
+  assertEquals(readdirSync(contenu(s.id, "revisions", "2", "assets")), []);
+});
+
+test("PPTX : rejeter la version efface les images qu'elle apportait", async () => {
+  const { db, s, basculer, statuerRevision, images } = await presentationRelue();
+  const avant = images();
+  await basculer("1");
+  assertEquals(readdirSync(contenu(s.id, "revisions", "2", "assets")).length, 1);
+  assertEquals((await statuerRevision(2, "rejetee")).status, 303);
+  assert(!existsSync(contenu(s.id, "revisions", "2")));
+  assertEquals(images(), avant);
+  assertEquals(revisionEnAttente(db, s.id), undefined);
+});
+
+test("PPTX : « Les inclure » puis « Les exclure » ne laisse aucune version à relire", async () => {
+  const { db, s, prof, basculer, images } = await presentationRelue();
+  const avant = images();
+  await basculer("1");
+  assertStringIncludes(
+    await (await prof.requete(`/prof/sources/${s.id}`)).text(),
+    "Nouvelle version à relire",
+  );
+  await basculer("0");
+  assertEquals(revisionEnAttente(db, s.id), undefined);
+  assert(!existsSync(contenu(s.id, "revisions", "2")));
+  assert(
+    !(await (await prof.requete(`/prof/sources/${s.id}`)).text()).includes(
+      "Nouvelle version à relire",
+    ),
+  );
+  assertEquals(images(), avant);
+  assert(!lireDocument(s.id, 1).texte.includes("masquée"));
 });

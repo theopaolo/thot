@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
 import {
   assembler,
@@ -148,37 +148,62 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     }
     if (!doc.texte && !ext.images.length) avertissements.push("Aucun texte ni image extrait.");
 
-    const dossier = contenu(s.id);
-    await mkdir(`${dossier}/assets`, { recursive: true });
     await enregistrer(db, s, doc, ext.avertissements, ext.notes);
-    // Une légende relue décrit des octets précis : d'autres octets à la même place repartent sans
-    // légende. La ligne change avant le fichier, une légende ne décrit donc jamais d'autres octets.
-    const ins = db.prepare(
-      `INSERT INTO images (id, source_id, position, fichier, mime, checksum)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT (source_id, position) DO UPDATE SET fichier = excluded.fichier,
-         mime = excluded.mime, checksum = excluded.checksum, legende = NULL,
-         legende_origine = NULL, legende_statut = 'unreviewed', modele = NULL, relu_par = NULL,
-         relu_le = NULL, credit = NULL
-       WHERE checksum != excluded.checksum`,
+    // L'extraction vient de devenir la révision en attente, ou de confirmer la révision servie.
+    const attente = revisionEnAttente(db, s.id);
+    const n = attente?.n ?? s.revision;
+    const dossier = dossierRevision(s.id, n);
+    await mkdir(`${dossier}/assets`, { recursive: true });
+    const servies = new Set(
+      db
+        .prepare("SELECT checksum FROM images WHERE source_id = ?")
+        .all(s.id)
+        .map((i) => i.checksum as string),
     );
-    const section = db.prepare(
-      "UPDATE images SET section = ? WHERE source_id = ? AND position = ?",
-    );
-    for (const [i, img] of ext.images.entries()) {
-      const fichier = `image-${i}.${img.extension}`;
-      ins.run(`${s.id}-${i}`, s.id, i, fichier, img.mime, await sha256(img.octets));
-      section.run(img.section ?? null, s.id, i);
-      await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
+    // Une image répétée dans le document entre une fois, à sa première place. Le fichier porte
+    // le nom de ses octets : un nom ne désigne jamais d'autres octets, et une image que la source
+    // sert déjà garde le sien.
+    const parOctets = new Map<string, ImageRevision>();
+    for (const img of ext.images) {
+      const checksum = await sha256(img.octets);
+      if (parOctets.has(checksum)) continue;
+      const fichier = `${checksum}.${img.extension}`;
+      if (!servies.has(checksum)) await ecrireAtomique(`${dossier}/assets/${fichier}`, img.octets);
+      parOctets.set(checksum, { checksum, fichier, mime: img.mime, section: img.section ?? null });
     }
+    const images = [...parOctets.values()];
+    if (!attente) retirer(transaction(db, () => servirImages(db, s.id, n, images)));
     etat(db, job, "enriching", avertissements);
 
-    const aLegender = db
-      .prepare(
-        `SELECT id, fichier, mime FROM images
-       WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed' ORDER BY position`,
-      )
-      .all(s.id) as { id: string; fichier: string; mime: string }[];
+    const aLegender: { chemin: string; mime: string; garder(l: string, m: string): void }[] =
+      attente
+        ? images
+            .filter((i) => !servies.has(i.checksum))
+            .map((i) => ({
+              chemin: `${dossier}/assets/${i.fichier}`,
+              mime: i.mime,
+              garder: (legende, modele) => void Object.assign(i, { legende, modele }),
+            }))
+        : (
+            db
+              .prepare(
+                `SELECT id, revision, fichier, mime FROM images
+                 WHERE source_id = ? AND legende IS NULL AND legende_statut = 'unreviewed'
+                 ORDER BY position`,
+              )
+              .all(s.id) as { id: string; revision: number; fichier: string; mime: string }[]
+          ).map((i) => ({
+            chemin: cheminImage(s.id, i),
+            mime: i.mime,
+            // Un enseignant a pu relire l'image pendant l'appel : sa légende l'emporte.
+            garder: (legende, modele) =>
+              void db
+                .prepare(
+                  `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
+                   WHERE id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
+                )
+                .run(legende, modele, i.id),
+          }));
     const reste = aLegender.length - MAX_LEGENDES;
     if (reste > 0) {
       avertissements.push(
@@ -188,18 +213,18 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
     for (const img of aLegender.slice(0, MAX_LEGENDES)) {
       try {
         const { texte, modele } = await modeles.legender(
-          await readFile(`${dossier}/assets/${img.fichier}`),
+          await readFile(img.chemin),
           img.mime,
           s.profil,
         );
-        db.prepare(
-          `UPDATE images SET legende = ?, legende_origine = 'generated', modele = ?
-           WHERE id = ? AND legende IS NULL AND legende_statut = 'unreviewed'`,
-        ).run(texte, modele, img.id);
+        img.garder(texte, modele);
       } catch (e) {
         avertissements.push(`Légende non produite: ${(e as Error).message}`);
       }
     }
+    // Les images d'une révision en attente restent dans son dossier, avec leur légende proposée :
+    // `statuer` les sert quand un enseignant la certifie, `ecarterRevision` les efface avec elle.
+    if (attente) await ecrireAtomique(`${dossier}/images.jsonl`, jsonl(images));
     etat(db, job, "awaiting_review", avertissements, true);
     // Une source déjà certifiée qu'on réingère se réindexe avec ses sections et légendes.
     if (s.statut === "certifiee") indexer(db, s.id);
@@ -215,7 +240,92 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
 const dossierRevision = (sourceId: string, n: number) =>
   n === 1 ? contenu(sourceId) : contenu(sourceId, "revisions", String(n));
 
-const jsonl = (blocs: Bloc[]) => blocs.map((b) => JSON.stringify(b)).join("\n");
+const jsonl = (lignes: unknown[]) => lignes.map((l) => JSON.stringify(l)).join("\n");
+
+/**
+ * Une image d'une extraction, à sa place dans le document. `legende` et `modele` : la légende
+ * proposée pour une image que la source ne sert pas encore.
+ */
+type ImageRevision = {
+  checksum: string;
+  fichier: string;
+  mime: string;
+  section: string | null;
+  legende?: string;
+  modele?: string;
+};
+
+/** Le fichier d'une image servie, dans le dossier de la révision qui l'a apportée. */
+export const cheminImage = (sourceId: string, i: { revision: number; fichier: string }) =>
+  `${dossierRevision(sourceId, i.revision)}/assets/${i.fichier}`;
+
+/** Les images d'une révision en attente. `undefined` si elle vient de `reextraire`, sans images. */
+function lireInventaire(sourceId: string, n: number): ImageRevision[] | undefined {
+  try {
+    return readFileSync(`${dossierRevision(sourceId, n)}/images.jsonl`, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as ImageRevision);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Fait des images de la révision `n` celles que la source sert. Une image suit ses octets : celle
+ * que la source servait déjà garde son identifiant, sa légende et sa relecture, et prend sa
+ * nouvelle place. Les autres entrent avec la légende proposée. Celles que la révision n'a plus
+ * sortent, et leurs fichiers sont rendus pour être effacés une fois la transaction validée.
+ * Sans transaction.
+ */
+function servirImages(db: Db, sourceId: string, n: number, images: ImageRevision[]) {
+  // ponytail: le numéro repart du plus grand encore servi. Celui d'une image retirée peut donc
+  // revenir à une autre, et une activité qui montrait la première montrerait la seconde. Un
+  // compteur par source l'éviterait.
+  let numero = db
+    .prepare(
+      "SELECT coalesce(max(CAST(substr(id, ?) AS INTEGER)), -1) + 1 AS n FROM images WHERE source_id = ?",
+    )
+    .get(sourceId.length + 2, sourceId)!.n as number;
+  // Les places passent sous zéro le temps du rangement : `(source_id, position)` est unique, et
+  // ce qui reste sous zéro à la fin n'est plus dans la révision.
+  db.prepare("UPDATE images SET position = -1 - position WHERE source_id = ?").run(sourceId);
+  const garder = db.prepare(
+    `UPDATE images SET position = ?, section = ? WHERE id = (
+       SELECT id FROM images WHERE source_id = ? AND checksum = ? AND position < 0
+       ORDER BY position DESC LIMIT 1)`,
+  );
+  const ajouter = db.prepare(
+    `INSERT INTO images (id, source_id, revision, position, fichier, mime, checksum, section,
+       legende, legende_origine, modele)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (const [position, i] of images.entries()) {
+    if (garder.run(position, i.section, sourceId, i.checksum).changes) continue;
+    ajouter.run(
+      `${sourceId}-${numero++}`,
+      sourceId,
+      n,
+      position,
+      i.fichier,
+      i.mime,
+      i.checksum,
+      i.section,
+      i.legende ?? null,
+      i.legende ? "generated" : null,
+      i.modele ?? null,
+    );
+  }
+  return (
+    db
+      .prepare(
+        "DELETE FROM images WHERE source_id = ? AND position < 0 RETURNING revision, fichier",
+      )
+      .all(sourceId) as { revision: number; fichier: string }[]
+  ).map((i) => cheminImage(sourceId, i));
+}
+
+const retirer = (chemins: string[]) => chemins.forEach((c) => rmSync(c, { force: true }));
 
 const lireFichiers = async (dossier: string) => ({
   texte: await readFile(`${dossier}/document.txt`, "utf8").catch(() => undefined),
@@ -259,9 +369,9 @@ export const revisionEnAttente = (db: Db, sourceId: string) =>
 
 /**
  * Range une extraction. Une première extraction, ou un texte identique à celui de la révision
- * servie, s'écrit en place : les offsets des citations ne bougent pas. Un autre texte devient une
- * révision en attente, vérifiée avant d'être enregistrée. La révision servie reste citée jusqu'à
- * ce qu'un enseignant certifie la nouvelle.
+ * servie, s'écrit en place : les offsets des citations ne bougent pas, et une révision en attente
+ * est écartée. Un autre texte devient une révision en attente, vérifiée avant d'être enregistrée.
+ * La révision servie reste citée jusqu'à ce qu'un enseignant certifie la nouvelle.
  */
 async function enregistrer(
   db: Db,
@@ -273,6 +383,9 @@ async function enregistrer(
   const blocs = jsonl(doc.blocs);
   const servie = await lireFichiers(dossierRevision(s.id, s.revision));
   if (servie.texte === undefined || servie.texte === doc.texte) {
+    // Le texte servi est revenu : la révision en attente n'a plus rien à faire relire.
+    const perimee = revisionEnAttente(db, s.id);
+    if (perimee) await ecarterRevision(db, s.id, perimee.n);
     db.prepare(
       `INSERT INTO revisions (source_id, n, avertissements, cree_le) VALUES (?, ?, ?, ?)
        ON CONFLICT (source_id, n) DO UPDATE SET avertissements = excluded.avertissements`,
@@ -306,7 +419,7 @@ async function enregistrer(
   return "revision";
 }
 
-/** Écarte la révision en attente. Elle n'a jamais servi, personne ne la cite. */
+/** Écarte la révision en attente, avec ses images. Elle n'a jamais servi, personne ne la cite. */
 export async function ecarterRevision(db: Db, sourceId: string, n: number) {
   const { changes } = db
     .prepare(
@@ -529,8 +642,8 @@ export const indexer = (db: Db, sourceId: string) => transaction(db, () => reind
 
 /**
  * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
- * celle-ci dans la transaction de l'index : un échec laisse servir l'ancienne. Un exercice qui
- * citait une autre révision, ou une source rejetée, devient à revoir.
+ * celle-ci et ses images dans la transaction de l'index : un échec laisse servir l'ancienne. Un
+ * exercice qui citait une autre révision, ou une source rejetée, devient à revoir.
  */
 export function statuer(
   db: Db,
@@ -539,6 +652,7 @@ export function statuer(
   par: string,
   revision?: number,
 ) {
+  let retirees: string[] = [];
   transaction(db, () => {
     if (
       statut === "certifiee" &&
@@ -556,6 +670,8 @@ export function statuer(
         revision,
         sourceId,
       );
+      const images = lireInventaire(sourceId, revision);
+      if (images) retirees = servirImages(db, sourceId, revision, images);
     }
     db.prepare("UPDATE sources SET statut = ?, statut_par = ?, statut_le = ? WHERE id = ?").run(
       statut,
@@ -566,6 +682,7 @@ export function statuer(
     reindexer(db, sourceId);
     revoirActivites(db, sourceId);
   });
+  retirer(retirees);
 }
 
 // Chaque changement d'une source écrit, réindexe et signale les activités à revoir dans une seule
@@ -657,13 +774,14 @@ export async function supprimerSource(db: Db, sourceId: string) {
   const s = lireSource(db, sourceId);
   if (!s) throw new Error("Source introuvable.");
   const images = db
-    .prepare("SELECT fichier, mime FROM images WHERE source_id = ?")
-    .all(sourceId) as { fichier: string; mime: string }[];
+    .prepare("SELECT revision, fichier, mime FROM images WHERE source_id = ?")
+    .all(sourceId) as { revision: number; fichier: string; mime: string }[];
   // ponytail: la clé suit le modèle de légende actuel. Une légende mise en cache sous un autre
-  // modèle, ou pour une image remplacée par une réextraction, reste dans le cache.
+  // modèle, pour une image qu'une extraction a retirée ou pour celle d'une révision en attente,
+  // reste dans le cache.
   const cles: string[] = [];
   for (const i of images) {
-    const octets = await readFile(contenu(sourceId, "assets", i.fichier)).catch(() => undefined);
+    const octets = await readFile(cheminImage(sourceId, i)).catch(() => undefined);
     if (octets) cles.push(await cleLegende(config.modeles.legende, octets, i.mime, s.profil));
   }
   transaction(db, () => {
@@ -751,7 +869,7 @@ export function relireLegende(
   });
 }
 
-/** Les images d'une source. Une légende ne se montre qu'une fois relue. */
+/** Les images que la source sert. Une légende ne se montre qu'une fois relue. */
 export const imagesLues = (db: Db, sourceId: string) =>
   db
     .prepare(
