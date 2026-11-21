@@ -13,10 +13,11 @@ import { libelles, lireInstance } from "../instance.ts";
 import { config } from "../config.ts";
 import { imagesLues, lireDocument } from "../ingestion.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../suggestions.ts";
-import * as Eleve from "../vues/eleve.ts";
-import * as EleveRessources from "../vues/eleve-ressources.ts";
 import * as EleveAccueil from "../vues/eleve-accueil.ts";
+import * as EleveChapitre from "../vues/eleve-chapitre.ts";
 import * as EleveCommun from "../vues/eleve-commun.ts";
+import * as EleveLecture from "../vues/eleve-lecture.ts";
+import * as EleveRessources from "../vues/eleve-ressources.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import * as Activites from "../activites.ts";
@@ -31,6 +32,9 @@ const QUIZ = `CASE WHEN s.profil = 'arts-appliques' THEN trim(coalesce(json_extr
 /** Après la séance : l'ordre de lecture que l'enseignant donne, puis le titre. */
 const ORDRE_LECTURE = `json_extract(s.metadonnees, '$.ordre') IS NULL,
   json_extract(s.metadonnees, '$.ordre'), s.titre`;
+
+/** « 2 sur $ »: compteur de diapositive resté dans deux exports HTML, sans valeur pour un élève. */
+const COMPTEUR_DIAPO = /^\d+ sur \$\d*$/;
 
 export function routesEleve(app: Hono<Env>, w: Web) {
   const {
@@ -289,7 +293,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       rendre(
         c,
         nom || "Autres documents",
-        Eleve.pageChapitre(
+        EleveChapitre.pageChapitre(
           nom,
           sources,
           suggestionsDuPerimetre(db, lu(c), new Set(sources.map((s) => s.id))),
@@ -303,7 +307,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     );
   });
 
-  const apercu = (id: string, l: Lecteur): Eleve.Apercu | undefined => {
+  const apercu = (id: string, l: Lecteur): EleveChapitre.Apercu | undefined => {
     const s = sourceCertifiee(id, l);
     if (!s) return undefined;
     const images = imagesLues(db, id);
@@ -311,8 +315,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     try {
       const texte = lireDocument(id, s.revision)
         .blocs.filter(
-          (b) =>
-            b.texte !== s.titre && b.texte !== b.section && !Eleve.COMPTEUR_DIAPO.test(b.texte),
+          (b) => b.texte !== s.titre && b.texte !== b.section && !COMPTEUR_DIAPO.test(b.texte),
         )
         .map((b) => b.texte)
         .join(" ");
@@ -331,7 +334,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
   };
   app.get("/eleve/documents/:id/apercu", (c) => {
     const a = apercu(c.req.param("id"), lu(c));
-    return a ? c.html(Eleve.lecteur(a, libelles(db))) : c.notFound();
+    return a ? c.html(EleveChapitre.lecteur(a, libelles(db))) : c.notFound();
   });
 
   // Le lecteur l'envoie quand la fin du texte paraît à l'écran.
@@ -369,10 +372,10 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       rendre(
         c,
         s.titre,
-        Eleve.lectureSource(
+        EleveLecture.lectureSource(
           s,
           images,
-          lireDocument(s.id, revision).blocs.filter((b) => !Eleve.COMPTEUR_DIAPO.test(b.texte)),
+          lireDocument(s.id, revision).blocs.filter((b) => !COMPTEUR_DIAPO.test(b.texte)),
           Domaines.champsMatiere(db, s.matiere_id, s.profil ?? "general"),
           libelles(db),
           marque,

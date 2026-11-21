@@ -10,7 +10,7 @@ import { lireDocument, nombreLegendes } from "../ingestion.ts";
 import { boucleReponses } from "../reponses.ts";
 import { page } from "../vues/page.ts";
 import * as Echange from "../vues/echange.ts";
-import * as Eleve from "../vues/eleve.ts";
+import * as EleveLecture from "../vues/eleve-lecture.ts";
 import * as Domaines from "../domaines.ts";
 
 export type Env = { Variables: { compte: Compte } };
@@ -101,7 +101,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
           ...Domaines.mesCours(l),
         },
         id,
-      ) as Eleve.SourceLue | undefined;
+      ) as EleveLecture.SourceLue | undefined;
   /** La feuille du passage `:n` d'une réponse ou d'une explication `id`, s'il est lisible. */
   const feuilleCitation = (
     c: Context<Env>,
