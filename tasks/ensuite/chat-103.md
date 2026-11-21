@@ -1,6 +1,6 @@
 ---
 title: CHAT-103 Ne pas bloquer le chat sur les questions proches d'un refus
-status: in_progress
+status: done
 scope: [eleve]
 type: [bug]
 ---
@@ -33,8 +33,9 @@ Trois défauts du chat, lus dans le code.
 - [x] le nombre de candidates envoyées au reclasseur est borné
 - [x] relancer une réponse efface son avis
 - [x] une clé rejouée avec un autre texte crée un nouvel échange
-- [ ] le formulaire tire une nouvelle clé au retour sur la page (`pageshow`) : le code est écrit
-      dans `src/app/client/eleve.ts`, le retour en arrière reste à vérifier dans un navigateur
+- [x] le formulaire tire une nouvelle clé au retour sur la page (`pageshow`), vérifié dans
+      Helium : une question envoyée d'une page de thème, un retour en arrière, puis une autre
+      question ouvrent deux conversations
 
 ## Terminé quand
 
