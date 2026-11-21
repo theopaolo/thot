@@ -75,10 +75,40 @@ const decoderHtml = decoderAvec(
 /** Un chemin relatif, sans schéma (`https:`, `data:`) ni `//`. */
 export const RELATIF = /^(?![a-z][a-z\d+.-]*:|\/\/)/i;
 
-const sansBalises = (s: string) =>
-  decoder(s.replace(/<[^>]+>/g, ""))
-    .replace(/\s+/g, " ")
-    .trim();
+// Les motifs qui lisent une page déposée lisent chaque caractère une fois. Une ouverture sans
+// fermeture prend le reste du texte et y reste telle quelle : les ouvertures suivantes n'auraient
+// pas trouvé de fermeture non plus, et les essayer une à une relirait le texte depuis chacune. Un
+// motif cherché une seule fois s'écrit `ouverture(?:suite|[^]*$)` : si la suite échoue, il prend
+// tout le reste sans rien capturer.
+const RE_BALISE = /<[^>]+(>|$)/g;
+
+/** Retire les occurrences fermées de `re`, dont le seul groupe est la fermeture ou la fin. */
+const retirer = (s: string, re: RegExp) =>
+  s.replace(re, (tout: string, fin: string) => (fin ? "" : tout));
+
+/**
+ * Retire les éléments `noms`, contenu compris. `motif` donne l'expression pour ces noms, le nom
+ * puis la fermeture en groupes. Un élément sans fermeture reste, et la suite se lit sans son nom :
+ * aucun autre ne s'y fermerait.
+ */
+function sansElements(
+  s: string,
+  noms: string[],
+  motif: (noms: string) => string,
+  retire?: (nom: string) => void,
+): string {
+  return s.replace(new RegExp(motif(noms.join("|")), "gi"), (tout, nom: string, ferme: string) => {
+    if (ferme) {
+      retire?.(nom.toLowerCase());
+      return "";
+    }
+    const autres = noms.filter((n) => n !== nom.toLowerCase());
+    const suite = tout.slice(1);
+    return tout[0] + (autres.length ? sansElements(suite, autres, motif, retire) : suite);
+  });
+}
+
+const sansBalises = (s: string) => decoder(retirer(s, RE_BALISE)).replace(/\s+/g, " ").trim();
 
 /**
  * Les synthèses Pearltrees marquent leurs parties en gras, sans balise de titre: un paragraphe
@@ -96,54 +126,84 @@ function intertitreGras(morceau: string) {
   return gras && (seul || /^[—–] /.test(reste)) ? gras : undefined;
 }
 
-const RE_IMG = /src="data:image\/(jpeg|jpg|png|gif|webp)[^,"]*base64,\s*([A-Za-z0-9+/=\s]+)"/i;
+const RE_IMG = /src="data:image\/(?:jpeg|jpg|png|gif|webp)[^,"]*base64,([A-Za-z0-9+/=\s]+)"/i;
+const FIN_MEDAILLES = /Voir dans Pearltrees<\/a>\s*<\/div>\s*<\/div>/gi;
+
+/** Retire le bandeau des médailles, de son `<div class="medals">` au lien « Voir dans Pearltrees ». */
+function sansMedailles(html: string) {
+  // Chaque `<div` est lu une fois, jusqu'à son `>`.
+  for (const m of html.matchAll(/<div[^>]*/gi)) {
+    const classe = m[0].search(/class="medals"/i);
+    if (classe < 0) continue;
+    FIN_MEDAILLES.lastIndex = m.index + classe;
+    // Sans lien après ce bandeau, aucun `<div` suivant n'en trouverait.
+    if (!FIN_MEDAILLES.exec(html)) break;
+    return html.slice(0, m.index) + html.slice(FIN_MEDAILLES.lastIndex);
+  }
+  return html;
+}
 
 /**
  * Page d'un export Pearltrees: un titre, du texte, des images en base64. Seule la première image
- * est gardée. Le profil arts appliqués lit ainsi toute page HTML, les autres profils passent par
- * `extraireHtml()`.
+ * est gardée, si `imageOffice()` l'accepte. Le profil arts appliqués lit ainsi toute page HTML,
+ * les autres profils passent par `extraireHtml()`.
  */
 // ponytail: les images suivantes d'un article long sont ignorées. Les garder demande une
 // légende et une relecture de plus par image, sans mesure qui le justifie sur le pilote.
 export function extrairePearltrees(html: string, titreParDefaut: string): Extraction {
   const titre = sansBalises(
-    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1] ??
-      html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ??
+    html.match(/<h1(?:[^>]*>([\s\S]*?)<\/h1>|[^]*$)/i)?.[1] ??
+      html.match(/<title>(?:([\s\S]*?)<\/title>|[^]*$)/i)?.[1] ??
       titreParDefaut,
   );
-  const images: Image[] = [];
+  // Le type vient des octets, comme pour l'image d'un document Word. Celui de l'adresse est ignoré.
   const img = html.match(RE_IMG);
-  if (img) {
-    const type = img[1].toLowerCase() === "jpg" ? "jpeg" : img[1].toLowerCase();
-    images.push({
-      octets: Uint8Array.from(atob(img[2].replace(/\s/g, "")), (c) => c.charCodeAt(0)),
-      mime: `image/${type}`,
-      extension: type === "jpeg" ? "jpg" : type,
-    });
-  }
+  const image = img ? imageOffice(Buffer.from(img[1], "base64")) : undefined;
 
-  const corps = html
-    .replace(/<head[\s\S]*?<\/head>/i, "")
-    .replace(/<(script|style|iframe)[\s\S]*?<\/\1>/gi, "")
-    .replace(/<h1[\s\S]*?<\/h1>/i, "")
-    .replace(/<div[^>]*class="medals"[\s\S]*?Voir dans Pearltrees<\/a>\s*<\/div>\s*<\/div>/i, "")
-    .replace(/<img[^>]*>/gi, "");
+  const sansTete = retirer(html, /<head[\s\S]*?(<\/head>|$)/i);
+  const sansCode = sansElements(
+    sansTete,
+    ["script", "style", "iframe"],
+    (noms) => `<(${noms})[\\s\\S]*?(<\\/\\1>|$)`,
+  );
+  const corps = retirer(
+    sansMedailles(retirer(sansCode, /<h1[\s\S]*?(<\/h1>|$)/i)),
+    /<img[^>]*(>|$)/gi,
+  );
   const parties: Partie[] = [{ texte: titre, section: titre }];
   let section = titre;
   for (const morceau of corps.split(/<\/(?:p|div|h[2-6]|li|blockquote)>|<br\s*\/?>/i)) {
-    const intertitre = morceau.match(/<h([2-6])[^>]*>([\s\S]*)$/i);
+    // Le morceau porte un intertitre si son premier `<h2>` à `<h6>` a un `>` après lui. Sinon les
+    // suivants n'en ont pas non plus.
+    const h = morceau.search(/<h[2-6]/i);
+    const intertitre = h >= 0 && morceau.includes(">", h);
     const texte = sansBalises(morceau);
     if (!texte || texte === "–") continue;
     if (intertitre) section = texte;
     else section = intertitreGras(morceau) ?? section;
     parties.push({ texte, section });
   }
-  return { parties, images, avertissements: [] };
+  return {
+    parties,
+    images: typeof image === "object" ? [image] : [],
+    avertissements: typeof image === "string" ? imagesEcartees([image]) : [],
+  };
 }
 
 /** Éléments sans texte de lecture: titre de l'onglet, code, menus, commandes et figures SVG. */
-const ECARTES =
-  /<(title|script|style|template|noscript|svg|iframe|nav|button|select|textarea)\b[\s\S]*?<\/\1\s*>/gi;
+const ECARTES = [
+  "title",
+  "script",
+  "style",
+  "template",
+  "noscript",
+  "svg",
+  "iframe",
+  "nav",
+  "button",
+  "select",
+  "textarea",
+];
 const BLOCS = new Set(
   "address article aside blockquote body br caption center dd details dialog div dl dt fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr html li main menu ol p pre section summary table tbody td tfoot th thead tr ul".split(
     " ",
@@ -161,22 +221,20 @@ const ENTREES = new Set(["li", "dt", "dd"]);
 // ponytail: lecture par balises, sans arbre. Un `</li>` ou un `</p>` oublié ne gêne pas, mais un
 // `>` dans un attribut coupe la balise. Prendre parse5 si des pages réelles le demandent.
 export function extraireHtml(html: string, titreParDefaut: string): Extraction {
-  const source = html.replace(/<!--[\s\S]*?-->/g, "");
-  const onglet = source.match(/<title\b[^>]*>([\s\S]*?)<\/title\s*>/i)?.[1] ?? "";
+  const source = retirer(html, /<!--[\s\S]*?(-->|$)/g);
+  const onglet = source.match(/<title\b(?:[^>]*>([\s\S]*?)<\/title\s*>|[^]*$)/i)?.[1] ?? "";
   let figures = 0;
-  const corps = (source.match(/<main\b[^>]*>([\s\S]*)<\/main\s*>/i)?.[1] ?? source).replace(
+  const corps = sansElements(
+    source.match(/<main\b(?:[^>]*>([\s\S]*)<\/main\s*>|[^]*$)/i)?.[1] ?? source,
     ECARTES,
-    (_, nom: string) => {
-      if (nom.toLowerCase() === "svg") figures++;
-      return "";
+    (noms) => `<(${noms})\\b[\\s\\S]*?(<\\/\\1\\s*>|$)`,
+    (nom) => {
+      if (nom === "svg") figures++;
     },
   );
-  const enClair = (s: string) =>
-    decoderHtml(s.replace(/<[^>]+>/g, ""))
-      .replace(/\s+/g, " ")
-      .trim();
+  const enClair = (s: string) => decoderHtml(retirer(s, RE_BALISE)).replace(/\s+/g, " ").trim();
   const titre =
-    enClair(corps.match(/<h1\b[^>]*>([\s\S]*?)<\/h1\s*>/i)?.[1] ?? "") ||
+    enClair(corps.match(/<h1\b(?:[^>]*>([\s\S]*?)<\/h1\s*>|[^]*$)/i)?.[1] ?? "") ||
     enClair(onglet) ||
     titreParDefaut;
 
@@ -306,8 +364,14 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
 
   const jetons = /<[!?][^>]*>|<(\/?)([a-z][a-z0-9]*)\b([^>]*)>|[^<]+|</gi;
   const finPre = /<\/pre\s*>/gi;
+  const dernierChevron = corps.lastIndexOf(">");
   for (let m; (m = jetons.exec(corps));) {
     const [jeton, ferme, nomBrut, attributs] = m;
+    // Après le dernier `>`, plus aucune balise ne se ferme : le reste est du texte.
+    if (jeton === "<" && m.index > dernierChevron) {
+      mots(corps.slice(m.index));
+      break;
+    }
     if (nomBrut === undefined) {
       if (!/^<[!?]/.test(jeton)) mots(jeton);
       continue;
@@ -322,7 +386,7 @@ export function extraireHtml(html: string, titreParDefaut: string): Extraction {
       jetons.lastIndex = fin ? finPre.lastIndex : corps.length;
       const classes = `${attributs} ${brut.match(/^\s*<code\b([^>]*)>/i)?.[1] ?? ""}`;
       const langage = classes.match(/\blang(?:uage)?-([\w+#-]+)/i)?.[1].toLowerCase();
-      const lignes = decoderHtml(brut.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, ""))
+      const lignes = decoderHtml(retirer(brut.replace(/<br\s*\/?>/gi, "\n"), RE_BALISE))
         .replace(/\r\n?/g, "\n")
         .replace(/^\n/, "");
       if (lignes.trim()) {

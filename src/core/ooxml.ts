@@ -278,10 +278,13 @@ export function detecterOffice(
     if (a.noms.some((n) => /(^|\/)vbaProject\.bin$/i.test(n))) return { erreur: MACROS };
     // Le serveur lit cette liste à chaque dépôt : une expression régulière, sans arbre XML.
     const types = new TextDecoder().decode(a.lire("[Content_Types].xml"));
+    // `>?` laisse une balise sans fin prendre le reste du texte : chaque `<Override` est lu une
+    // fois, au lieu de relire la liste depuis chacun.
+    const surcharges = types.match(/<Override[^>]*>?/g) ?? [];
     for (const [format, [partie, type]] of Object.entries(PRINCIPAL)) {
-      const declare = types
-        .match(new RegExp(`<Override[^>]*PartName="/${partie.replace(".", "\\.")}"[^>]*>`))?.[0]
-        .match(/ContentType="([^"]*)"/)?.[1];
+      const declare = surcharges
+        .find((s) => s.endsWith(">") && s.includes(`PartName="/${partie}"`))
+        ?.match(/ContentType="([^"]*)"/)?.[1];
       if (/macroEnabled/i.test(declare ?? "")) return { erreur: MACROS };
       if (declare === type && a.noms.includes(partie)) {
         return { format: format as "docx" | "pptx" };

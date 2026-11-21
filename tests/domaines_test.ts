@@ -65,7 +65,7 @@ async function ressource(
     audience: "eleves",
     reponses: true,
     octets: new TextEncoder().encode(
-      `<html><h1>Lumière</h1><img src="data:image/jpeg;base64,/9j/4AAQ"><p>${texte}</p></html>`,
+      `<html><h1>Lumière</h1><img src="data:image/jpeg;base64,/9j/wAARCAACAAIDAREAAhEAAxEA/9kA"><p>${texte}</p></html>`,
     ),
   });
   await traiter(db, revendiquer(db)!, fauxModeles().modeles);

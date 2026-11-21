@@ -90,7 +90,7 @@ const ELEVE = { id: "", enseignant: false, administrateur: true };
 
 // Une page HTML suffit à exercer extraction, légende, certification et recherche sans pdftotext.
 const PAGE = enc(`<html><head><title>t</title></head><body><h1>Casa Batlló, Antoni Gaudí</h1>
-<img src="data:image/jpeg;base64,/9j/4AAQ" />
+<img src="data:image/jpeg;base64,/9j/wAARCAACAAIDAREAAhEAAxEA/9kA" />
 <p>La façade de la Casa Batlló est couverte de céramique irisée et ses balcons évoquent des masques.</p>
 <p>Gaudí refuse la ligne droite dans toute la façade.</p>
 <p>Le toit en écailles de céramique rappelle le dos d'un dragon, et les cheminées torsadées prolongent le mouvement de la façade jusqu'au ciel de Barcelone.</p></body></html>`);
@@ -1594,7 +1594,7 @@ test("une légende relue ne reste pas sur une autre image à la même place", as
   try {
     const id = await sourceTraitee(db, "Façade aux balcons en masques.");
     relireLegende(db, `${id}-0`, "certified", "", "Prof");
-    await changerOriginal(id, "/9j/4AAQ", "/9j/4AAR");
+    await changerOriginal(id, "/9kA", "/9kB");
     db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
     await traiter(db, revendiquer(db)!, fauxModeles({ legende: "Autre image." }).modeles);
     assertEquals(

@@ -110,7 +110,7 @@ const PAGE = `<html><head><title>Titre de repli</title><style>p{}</style></head>
 <div class="central-column"><div class="card"><h1 class="pearl-title">Antoni Gaudi, Casa Batll&oacute; (1906)</h1>
 <div class="medals"><div class="author-medal"><a href="x">Sdetienne</a></div><div> – </div>
 <div class="see-medal"><a href="y">Voir dans Pearltrees</a></div></div>
-<img src="data:image/jpeg;charset:utf-8;base64, /9j/4AAQ" />
+<img src="data:image/jpeg;charset:utf-8;base64, /9j/wAARCAACAAIDAREAAhEAAxEA/9kA" />
 <p>Le patio est rev&ecirc;tu de c&eacute;ramique bleue.</p><p><i>L&rsquo;intensit&eacute;</i> augmente.</p>
 <h2>D&eacute;tails</h2><p>Main courante en bois.</p>
 <img src="data:image/png;base64,iVBORw0KGgo=" /></div></div></body></html>`;
@@ -391,4 +391,144 @@ test("Markdown: l'indicateur de code passe dans les blocs sans bouger les offset
     ["# Image de base", "graph TD"],
   );
   assert(doc.blocs.every((b) => b.code === undefined || b.code === true));
+});
+
+test("HTML Pearltrees: l'image garde le type de ses octets, une image hors borne est écartée", () => {
+  const page = (largeur: number, hauteur: number) => {
+    const o = new Uint8Array(24);
+    o.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
+    const v = new DataView(o.buffer);
+    v.setUint32(16, largeur);
+    v.setUint32(20, hauteur);
+    const png = Buffer.from(o).toString("base64");
+    return `<h1>Affiche</h1><img src="data:image/jpeg;base64,${png}"><p>Texte.</p>`;
+  };
+  const lue = extrairePearltrees(page(2, 2), "repli");
+  assertEquals(
+    lue.images.map((i) => [i.mime, i.extension]),
+    [["image/png", "png"]],
+  );
+  assertEquals(lue.avertissements, []);
+  const geante = extrairePearltrees(page(10_000, 10_000), "repli");
+  assertEquals(geante.images, []);
+  assertEquals(geante.avertissements, [
+    "Images non importées (1) : 10000 × 10000 pixels, 50 millions au maximum.",
+  ]);
+  const illisible = extrairePearltrees('<img src="data:image/png;base64,AAAA"><p>Texte.</p>', "x");
+  assertEquals(illisible.images, []);
+  assertEquals(illisible.avertissements.length, 1);
+});
+
+test("HTML Pearltrees: un script, un bandeau ou une image sans fermeture laissent le même texte", () => {
+  const ext = extrairePearltrees(
+    `<html><head><title>Repli</title></head><body><h1 class="pearl-title">Le <i>Bauhaus</i></h1>
+<div class="medals"><div><a href="x">Auteur</a></div></div>
+<style>p{}</style><p>Une école fondée en 1919.</p><h3 class="x">Weimar</h3><p>Puis Dessau < Berlin.</p>
+<script>var a = 1;<p>Texte après un script jamais fermé.</p><iframe src="x"></iframe><p>Suite</p><img src="x.png"`,
+    "repli",
+  );
+  assertEquals(
+    ext.parties.map((p) => [p.section, p.texte]),
+    [
+      ["Le Bauhaus", "Le Bauhaus"],
+      ["Le Bauhaus", "Auteur"],
+      ["Le Bauhaus", "Une école fondée en 1919."],
+      ["Weimar", "Weimar"],
+      ["Weimar", "Puis Dessau < Berlin."],
+      ["Weimar", "var a = 1;Texte après un script jamais fermé."],
+      ["Weimar", "Suite"],
+      ["Weimar", '<img src="x.png"'],
+    ],
+  );
+});
+
+test("HTML: un élément écarté, un commentaire ou un `<` sans fermeture laissent le même texte", () => {
+  const ext = extraireHtml(
+    `<!doctype html><html><head><title>Cours — onglet</title><style>p{}</style></head><body>
+<!-- bandeau --><nav><a href="/">Accueil</a></nav>
+<h1 class="t">Les <em>tableaux</em> en C</h1>
+<p>Si a < b et b > c, alors <code>a &lt; c</code>.</p>
+<noscript>Activez JavaScript</noscript><svg><title>x</title></svg>
+<p>Une zone de saisie oubliée : <textarea>jamais fermée</p>
+<button>Envoyer</button><p>Fin <!-- commentaire ouvert</p><p>et 1 < 2`,
+    "repli",
+  );
+  assertEquals(
+    ext.parties.map((p) => p.texte),
+    [
+      "Les tableaux en C",
+      "Si a < b et b > c, alors a < c.",
+      "Une zone de saisie oubliée : jamais fermée",
+      "Fin",
+      "et 1 < 2",
+    ],
+  );
+  assertEquals(ext.parties[1].codes, [[25, 30]]);
+  assertEquals(ext.avertissements, ["Figures SVG non extraites : 1."]);
+});
+
+test("Markdown: références, emphases et titres réduits, une marque sans fermeture reste du texte", () => {
+  const md = `---
+title:   "Git : les branches"  
+order: 3
+---
+
+# Git : les branches
+
+## Créer une branche ##
+
+Une branche est un __pointeur__ vers un commit, _pas_ une copie ~~du dépôt~~.
+Voir [la doc][git] ou [le livre](https://git-scm.com/book "Pro Git").
+
+1. \`git switch -c essai\` crée la branche
+2) elle part de *HEAD*
+
+Un crochet [seul, une image ![sans fin](img/a.png, un gras **jamais fermé et un _mot isolé.
+
+<!-- note pour l'auteur --> Le texte <span class="cle">visible</span> suit. Un <!-- commentaire ouvert <b>reste</b>.
+
+snake_case et 2 * 3 * 4 ne sont pas des emphases, ni a < b. Un **gras ouvert puis __un vrai__.
+
+![schéma](<img/branches bis.png> "titre") ![](https://exemple.fr/x.png) ![logo]( img/logo.svg )
+
+### Fusion #1
+
+[git]: https://git-scm.com
+`;
+  const { titre, ordre } = lireFrontMatter(md);
+  assertEquals([titre, ordre], ["Git : les branches", 3]);
+  const ext = extraireMarkdown(md, "repli");
+  assertEquals(
+    ext.parties.map((p) => [p.section, p.texte]),
+    [
+      ["Git : les branches", "Git : les branches"],
+      ["Créer une branche", "Créer une branche"],
+      [
+        "Créer une branche",
+        "Une branche est un pointeur vers un commit, pas une copie du dépôt. Voir la doc ou le livre.",
+      ],
+      ["Créer une branche", "git switch -c essai crée la branche\nelle part de HEAD"],
+      [
+        "Créer une branche",
+        "Un crochet [seul, une image ![sans fin](img/a.png, un gras **jamais fermé et un _mot isolé.",
+      ],
+      ["Créer une branche", "Le texte visible suit. Un <!-- commentaire ouvert reste ."],
+      [
+        "Créer une branche",
+        "snake_case et 2 * 3 * 4 ne sont pas des emphases, ni a < b. Un **gras ouvert puis un vrai.",
+      ],
+      ["Fusion #1", "Fusion #1"],
+    ],
+  );
+  assertEquals(ext.parties[3].codes, [[0, 19]]);
+  assertEquals(ext.avertissements, [
+    "Images liées, non jointes à la source : img/branches, img/logo.svg.",
+  ]);
+});
+
+test("Markdown: un front matter qui ne se ferme pas dans le début du fichier n'en est pas un", () => {
+  const long = `---\ntitle: Loin\n${"cle: valeur\n".repeat(2000)}---\ncorps`;
+  assertEquals(lireFrontMatter(long), { corps: long });
+  const court = `---\ntitle: Près\n${"cle: valeur\n".repeat(1000)}---\ncorps`;
+  assertEquals(lireFrontMatter(court), { titre: "Près", ordre: undefined, corps: "corps" });
 });
