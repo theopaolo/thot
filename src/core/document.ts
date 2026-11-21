@@ -34,7 +34,9 @@ export function assembler(parties: Partie[]): Document {
   let texte = "";
   let curseur = 0;
   for (const { codes, ...p } of parties) {
-    const t = p.texte.trim();
+    // Un bloc de code ne perd en tête que ses lignes vides : sa première ligne garde son retrait.
+    const tete = p.code ? p.texte.replace(/^(?:[^\S\n]*\n)+/, "") : p.texte.trimStart();
+    const t = tete.trimEnd();
     if (!t) continue;
     if (texte) {
       texte += SEPARATEUR;
@@ -42,7 +44,7 @@ export function assembler(parties: Partie[]): Document {
     }
     const n = longueur(t);
     // Les plages suivent le texte rogné.
-    const retrait = longueur(p.texte) - longueur(p.texte.trimStart());
+    const retrait = longueur(p.texte) - longueur(tete);
     const plages = codes
       ?.map(([a, z]): [number, number] => [a - retrait, z - retrait])
       .filter(([a, z]) => a >= 0 && a < z && z <= n);

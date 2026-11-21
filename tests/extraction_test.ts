@@ -532,3 +532,25 @@ test("Markdown: un front matter qui ne se ferme pas dans le début du fichier n'
   const court = `---\ntitle: Près\n${"cle: valeur\n".repeat(1000)}---\ncorps`;
   assertEquals(lireFrontMatter(court), { titre: "Près", ordre: undefined, corps: "corps" });
 });
+
+const CODE_INDENTE = "    if x:\n        return 1\n    return 2";
+
+test("Markdown: un bloc de code garde l'indentation de sa première ligne", () => {
+  const md = `# T\n\n\`\`\`python\n\n${CODE_INDENTE}\n\n\`\`\`\n`;
+  const doc = assembler(extraireMarkdown(md, "T").parties);
+  const bloc = doc.blocs.find((b) => b.code)!;
+  assertEquals(bloc.texte, CODE_INDENTE);
+  assertEquals(tranche(doc.texte, bloc.debut, bloc.fin), CODE_INDENTE);
+  // Un paragraphe perd toujours ses blancs, et ses plages de code en ligne suivent.
+  const [p] = assembler([{ texte: "  \n  Lancer make.  ", section: "T", codes: [[12, 16]] }]).blocs;
+  assertEquals([p.texte, p.codes], ["Lancer make.", [[7, 11]]]);
+});
+
+test("HTML: un <pre> garde l'indentation de sa première ligne, sans ses lignes vides", () => {
+  const html = `<h1>T</h1><pre>\n\n${CODE_INDENTE}\n  \n</pre>`;
+  const doc = assembler(extraireHtml(html, "T").parties);
+  const bloc = doc.blocs.find((b) => b.code)!;
+  assertEquals(bloc.texte, CODE_INDENTE);
+  assertEquals(tranche(doc.texte, bloc.debut, bloc.fin), CODE_INDENTE);
+  assert(coherent(doc));
+});
