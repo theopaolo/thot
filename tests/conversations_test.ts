@@ -10,7 +10,7 @@ import * as Conversations from "../src/app/conversations.ts";
 import { connexion, type Db, migrer, purgerMessages } from "../src/app/db.ts";
 import { cours, desinscrire, inscrire, matiere } from "../src/app/domaines.ts";
 import { DELAI_PROCHES_MS } from "../src/core/suggestions.ts";
-import { quand } from "../src/app/vues/eleve.ts";
+import { quand } from "../src/app/vues/eleve-conversations.ts";
 import { BONNE, environnement, fauxModeles, publier, session } from "./outils.ts";
 
 type Session = Awaited<ReturnType<typeof session>>;

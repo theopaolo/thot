@@ -12,7 +12,8 @@ import { questionsProches } from "../../core/suggestions.ts";
 import { suggestionsDuPerimetre } from "../suggestions.ts";
 import * as Commun from "../vues/commun.ts";
 import * as Echange from "../vues/echange.ts";
-import * as Eleve from "../vues/eleve.ts";
+import * as EleveChat from "../vues/eleve-chat.ts";
+import * as EleveConversations from "../vues/eleve-conversations.ts";
 import * as Conversations from "../conversations.ts";
 import * as Domaines from "../domaines.ts";
 import type { Env, Web } from "./web.ts";
@@ -36,7 +37,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
   // Un échange nomme son périmètre quand il diffère de celui de l'échange précédent.
   const messagesDe = (compte: Compte, conversationId: string, nomme: (p: Perimetre) => string) => {
     const lignes = Conversations.echanges(db, compte, conversationId);
-    return lignes.map((m, i): Eleve.MessageVue => ({
+    return lignes.map((m, i): EleveChat.MessageVue => ({
       ...m,
       resultat: m.resultat && JSON.stringify(m.resultat),
       perimetre: i && !Conversations.memePerimetre(lignes[i - 1], m) ? nomme(m) : undefined,
@@ -193,7 +194,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
       rendre(
         c,
         conv?.titre ?? "Nouvelle conversation",
-        Eleve.chat({
+        EleveChat.chat({
           compte: compte.id,
           conversation: conv && { id: conv.id, titre: conv.titre, archivee: !!conv.archivee_le },
           messages,
@@ -244,13 +245,15 @@ export function routesChat(app: Hono<Env>, w: Web) {
     // La recherche HTMX ne remplace que les résultats : la page sans JavaScript se recharge.
     if (c.req.header("HX-Request") && !c.req.header("HX-Boosted")) {
       const courante = c.req.query("courante") ?? "";
-      return c.html(Eleve.resultatsConversations(liste, courante, archivees, suite, q));
+      return c.html(
+        EleveConversations.resultatsConversations(liste, courante, archivees, suite, q),
+      );
     }
     return c.html(
       rendre(
         c,
         archive ? "Conversations archivées" : "Conversations",
-        Eleve.pageConversations(archive, liste, archivees, suite, q),
+        EleveConversations.pageConversations(archive, liste, archivees, suite, q),
       ),
     );
   });
@@ -258,7 +261,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
   app.get("/eleve/conversations/:id/etat", (c) => {
     const conv = Conversations.etatDe(db, c.get("compte"), c.req.param("id"));
     return conv
-      ? c.html(Eleve.statutConversation(conv, c.req.query("ouverte") === "1"))
+      ? c.html(EleveConversations.statutConversation(conv, c.req.query("ouverte") === "1"))
       : c.notFound();
   });
   app.post("/eleve/chat/:id/renommer", async (c) => {

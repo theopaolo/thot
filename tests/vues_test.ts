@@ -8,8 +8,8 @@ import { pageLegendes } from "../src/app/vues/prof-legendes.ts";
 import { lignesSources } from "../src/app/vues/prof-lignes.ts";
 import { detailSource } from "../src/app/vues/prof-source.ts";
 import { panneauSource, reponse } from "../src/app/vues/echange.ts";
-import { chat } from "../src/app/vues/eleve.ts";
 import { pageChapitre } from "../src/app/vues/eleve-chapitre.ts";
+import { chat } from "../src/app/vues/eleve-chat.ts";
 import {
   legendeSchema,
   sansDirectives,
