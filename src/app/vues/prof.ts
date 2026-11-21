@@ -407,6 +407,8 @@ export const sources = (
   supprimee = false,
   debut?: Debut,
   rangement?: Rangement,
+  /** les sources que l'action groupée n'a pas certifiées, chacune avec sa raison */
+  refus: { id: string; titre: string; raison: string }[] = [],
 ) => {
   // Le compte de chaque filtre tient compte de l'autre.
   const somme = (garde: (r: (typeof repartition)[number]) => boolean) =>
@@ -434,6 +436,16 @@ export const sources = (
     ${
       supprimee
         ? html`<p role="status" tabindex="-1" autofocus>Source supprimée définitivement.</p>`
+        : ""
+    }
+    ${
+      refus.length
+        ? html`<div role="alert" tabindex="-1" autofocus>
+            ${refus.length > 1 ? `${refus.length} sources n'ont pas été certifiées` : "Une source n'a pas été certifiée"} :
+            <ul>
+              ${refus.map((r) => html`<li><a href="/prof/sources/${r.id}">${r.titre}</a> : ${r.raison}.</li>`)}
+            </ul>
+          </div>`
         : ""
     }
     ${

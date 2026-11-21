@@ -725,6 +725,19 @@ function reindexer(db: Db, sourceId: string) {
 export const indexer = (db: Db, sourceId: string) => transaction(db, () => reindexer(db, sourceId));
 
 /**
+ * Ce qui empêche de certifier la source, ou `undefined` : seule une extraction qui attend sa
+ * relecture se certifie. Une source a toujours un travail, créé avec elle par `deposer()`.
+ */
+export function refusCertification(db: Db, sourceId: string) {
+  const etat = db
+    .prepare("SELECT etat FROM ingestion_jobs WHERE source_id = ?")
+    .get(sourceId)?.etat;
+  if (etat === "awaiting_review") return undefined;
+  if (etat === "failed") return "son traitement a échoué";
+  return etat ? "son extraction n'est pas terminée" : "elle est introuvable";
+}
+
+/**
  * Certifie ou rejette une source. Certifier avec `revision`, sa révision en attente, fait servir
  * celle-ci et ses images dans la transaction de l'index : un échec laisse servir l'ancienne. Un
  * exercice qui citait une autre révision, ou une source rejetée, devient à revoir.
@@ -738,13 +751,8 @@ export function statuer(
 ) {
   let retirees: string[] = [];
   transaction(db, () => {
-    if (
-      statut === "certifiee" &&
-      db.prepare("SELECT etat FROM ingestion_jobs WHERE source_id = ?").get(sourceId)?.etat !==
-        "awaiting_review"
-    ) {
-      throw new Error("La source n'est pas prête à être certifiée.");
-    }
+    const refus = statut === "certifiee" && refusCertification(db, sourceId);
+    if (refus) throw new Error(`La source n'est pas prête à être certifiée : ${refus}.`);
     if (revision !== undefined) {
       if (revisionEnAttente(db, sourceId)?.n !== revision) {
         throw new Error("Cette version n'attend plus de relecture.");

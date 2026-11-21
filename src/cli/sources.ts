@@ -287,6 +287,21 @@ function orphelins(db: Db, supprimer: boolean) {
   console.log(`${n} reste(s) effacé(s).`);
 }
 
+/**
+ * Nomme les sources qu'une commande n'a pas pu traiter, une fois les autres traitées, et la fait
+ * sortir en 1 : une tâche planifiée voit l'échec.
+ */
+function signalerEchecs(db: Db, echecs: { id: string; erreur: unknown }[]) {
+  if (!echecs.length) return;
+  const titre = db.prepare("SELECT titre FROM sources WHERE id = ?");
+  console.error(`${echecs.length} source(s) en échec :`);
+  for (const { id, erreur } of echecs) {
+    const t = titre.get(id)?.titre;
+    console.error(`  ${t ? `${t} (${id})` : id} : ${(erreur as Error).message}`);
+  }
+  process.exitCode = 1;
+}
+
 /** Les sources désignées, ou avec `--tout` toutes celles de l'établissement dans `statut`. */
 const designees = (db: Db, statut: string, tout: boolean | undefined, ids: string[]) =>
   tout
@@ -328,8 +343,16 @@ export const sources: Record<string, Commande> = {
     lancer(db, _, argv) {
       const { values, positionals } = lire(argv, { tout: oui, par: texte });
       const ids = designees(db, "a_relire", values.tout, positionals);
-      for (const id of ids) statuer(db, id, "certifiee", values.par ?? "cli");
-      console.log(`${ids.length} source(s) certifiée(s).`);
+      const echecs = [];
+      for (const id of ids) {
+        try {
+          statuer(db, id, "certifiee", values.par ?? "cli");
+        } catch (erreur) {
+          echecs.push({ id, erreur });
+        }
+      }
+      console.log(`${ids.length - echecs.length} source(s) certifiée(s).`);
+      signalerEchecs(db, echecs);
     },
   },
   suggestions: {
@@ -372,14 +395,19 @@ export const sources: Record<string, Commande> = {
     async lancer(db, _, argv) {
       lire(argv, {});
       const bilan: Record<string, string[]> = {};
+      const echecs = [];
       for (const { id, fichier } of db.prepare("SELECT id, fichier FROM sources").all()) {
-        const r = await reextraire(db, id as string);
-        (bilan[r] ??= []).push(fichier as string);
+        try {
+          (bilan[await reextraire(db, id as string)] ??= []).push(fichier as string);
+        } catch (erreur) {
+          echecs.push({ id: id as string, erreur });
+        }
       }
       for (const [etat, fichiers] of Object.entries(bilan)) {
         console.log(`${etat}: ${fichiers.length}`);
         if (etat === "revision") fichiers.forEach((f) => console.log(`  ${f}`));
       }
+      signalerEchecs(db, echecs);
     },
   },
   orphelins: {

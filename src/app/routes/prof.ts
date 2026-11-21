@@ -24,6 +24,7 @@ import {
   modifierSource,
   relireLegende,
   revisionEnAttente,
+  refusCertification,
   statuer,
   supprimerSource,
 } from "../ingestion.ts";
@@ -236,6 +237,21 @@ export function routesProf(app: Hono<Env>, w: Web) {
             questions: personnel ? [] : questionsDesEleves(db, lu(c)),
           },
           bureau?.rangement,
+          // Les sources que l'action groupée n'a pas certifiées. Seules celles que le compte lit
+          // sont nommées, et la raison se relit en base : rien ne vient de l'adresse que des
+          // identifiants.
+          (c.req.queries("refus") ?? []).flatMap((id) => {
+            const s = toutes.find((l) => l.id === id);
+            return s
+              ? [
+                  {
+                    id,
+                    titre: s.titre,
+                    raison: refusCertification(db, id) ?? "réessayez depuis sa page",
+                  },
+                ]
+              : [];
+          }),
         )}`,
       ),
     );
@@ -289,11 +305,20 @@ export function routesProf(app: Hono<Env>, w: Web) {
         return c.text((e as Error).message, 400);
       }
       for (const id of ids) changerLecteurs(db, id, lecteurs);
-    } else {
-      const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
-      for (const id of ids) statuer(db, id, statut, c.get("compte").nom);
+      return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
     }
-    return c.redirect(`/prof?${new URLSearchParams(filtres(c))}`, 303);
+    const statut = b.statut === "certifiee" ? "certifiee" : "rejetee";
+    // Une source qui n'est pas prête ne retient pas les autres : la bibliothèque la nomme ensuite.
+    const retour = new URLSearchParams(filtres(c));
+    for (const id of ids) {
+      try {
+        statuer(db, id, statut, c.get("compte").nom);
+      } catch (e) {
+        if (statut !== "certifiee" || (e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+        retour.append("refus", id);
+      }
+    }
+    return c.redirect(`/prof?${retour}`, 303);
   });
   const detail = (id: string, compte: Compte): Prof.Detail | undefined => {
     const source = db
@@ -453,7 +478,12 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const d = detail(id, c.get("compte"));
     if (!d) return c.notFound();
     if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
-    statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
+    try {
+      statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
+    } catch (e) {
+      if ((e as { code?: string }).code === "ERR_SQLITE_ERROR") throw e;
+      return c.text((e as Error).message, 409);
+    }
     return c.html(Prof.statutSource(detail(id, c.get("compte"))!.source));
   });
   app.post("/prof/sources/:id/supprimer", async (c) => {
