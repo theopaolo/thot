@@ -284,6 +284,34 @@ test("note sur une réponse fermée : la note de l'enseignant remplace les point
   db.close();
 });
 
+test("réponse à taper acceptée avec une différence : l'enseignant la lit et peut la refuser", async () => {
+  const { db, c1, prof, e1, e1b } = await cadre();
+  const a = serie(db, prof, c1, [terme]);
+  enregistrerReponses(db, e1, a, { q2: "Gaudy" }, true);
+  enregistrerReponses(db, e1b, a, { q2: "gaudí" }, true);
+  const lues = tentativesLues(db, prof, a)!;
+  const t = lues.find((x) => x.compte_id === e1.id)!;
+  const exacte = lues.find((x) => x.compte_id === e1b.id)!;
+  const s = await connecter(db, prof);
+  const page = async () => (await s.lire(`/prof/activites/${a.id}/reponses`)).text();
+
+  const avant = await page();
+  assertStringIncludes(avant, `<td class="case s-ok"><a href="#r-${t.id}-q2">1</a></td>`);
+  assertStringIncludes(avant, `<li id="r-${t.id}-q2">`);
+  assertStringIncludes(avant, "Acceptée avec une différence");
+  assertStringIncludes(avant, "Gaudy");
+  // Une réponse qui ne diffère que par la casse n'a rien à relire.
+  assert(!avant.includes(`r-${exacte.id}-q2`));
+
+  const r = await s.envoyer(`/prof/activites/${a.id}/reponses/${t.id}/q2`, {
+    note: "0",
+    commentaire: "",
+  });
+  assertEquals(r.status, 303);
+  assertStringIncludes(await page(), `<td class="case s-ko"><a href="#r-${t.id}-q2">0</a></td>`);
+  db.close();
+});
+
 test("à reprendre : l'enseignant marque une tentative remise, puis retire la marque", async () => {
   const { db, c1, prof, e1, e1b } = await cadre();
   const a = serie(db, prof, c1, [choix]);

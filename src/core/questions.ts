@@ -11,12 +11,16 @@ import { sansAccents } from "./texte.ts";
 
 // Correction d'une réponse. Le barème et le format des quiz viennent de carnet-quiz.
 
-/** Minuscules, sans accents ni ponctuation : « Loi de Jakob ! » devient « loi de jakob ». */
-const simple = (s: string) =>
+/**
+ * Les mots d'une réponse, en minuscules, sans accents ni ponctuation : « Loi de Jakob ! » devient
+ * loi, de, jakob. Le signe moins collé devant un chiffre fait partie du nombre : « -1 » ne vaut
+ * pas « 1 », alors que « Jean-Paul » se lit comme deux mots.
+ */
+const mots = (s: string) =>
   sansAccents(s)
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+    .replace(/\u2212/g, "-")
+    .match(/(?:(?<![a-z0-9])-(?=\d))?[a-z0-9]+/g) ?? [];
 
 /** Mots qui entourent la réponse sans la changer : « c'est la loi de Jakob » se compare comme « jakob ». */
 const FILLERS = new Set(
@@ -24,11 +28,14 @@ const FILLERS = new Set(
     " ",
   ),
 );
-const noyau = (s: string) =>
-  simple(s)
-    .split(" ")
-    .filter((m) => !FILLERS.has(m))
-    .join(" ");
+/**
+ * Un mot de liaison ne s'efface que devant un autre mot. Le dernier mot reste : dans « balise a »
+ * ou « la loi », il est la réponse.
+ */
+const noyau = (s: string) => {
+  const liste = mots(s);
+  return liste.filter((m, i) => i === liste.length - 1 || !FILLERS.has(m));
+};
 
 function distance(a: string, b: string): number {
   let prec = Array.from({ length: b.length + 1 }, (_, j) => j);
@@ -46,17 +53,31 @@ function distance(a: string, b: string): number {
   return prec[b.length];
 }
 
+/** Les fautes de frappe tolérées dans un mot. Aucune dès qu'il porte un chiffre : « 1798 » est une autre date que « 1789 ». */
+const tolerance = (attendu: string, saisi: string) =>
+  /\d/.test(attendu + saisi) ? 0 : attendu.length >= 10 ? 2 : attendu.length >= 5 ? 1 : 0;
+
 /**
- * Une saisie est juste si, mots de liaison retirés, elle vaut une variante acceptée à une faute de
- * frappe près dès 5 lettres, deux dès 10. Toute la réponse compte : « Jakob Hick » ne vaut pas « Jakob ».
+ * Une saisie est juste si, mots de liaison retirés, chacun de ses mots vaut le mot de même rang
+ * d'une variante acceptée, à la tolérance de ce mot près. Toute la réponse compte : « Jakob Hick »
+ * ne vaut pas « Jakob ».
  */
 export function correspond(saisie: string, acceptes: string[]): boolean {
   const x = noyau(saisie);
-  if (!x) return false;
+  if (!x.length) return false;
   return acceptes.some((variante) => {
     const y = noyau(variante);
-    return y !== "" && distance(x, y) <= (y.length >= 10 ? 2 : y.length >= 5 ? 1 : 0);
+    return y.length === x.length && y.every((m, i) => distance(x[i], m) <= tolerance(m, x[i]));
   });
+}
+
+/**
+ * Vrai si la saisie est acceptée sans être une des variantes, casse et espaces mis à part. Accent,
+ * ponctuation, mot de liaison ou faute de frappe : l'enseignant relit ce que Thot a laissé passer.
+ */
+export function approchee(saisie: string, acceptes: string[]): boolean {
+  const brut = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+  return correspond(saisie, acceptes) && !acceptes.some((a) => brut(a) === brut(saisie));
 }
 
 const ordre = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
@@ -164,8 +185,7 @@ export function erreursQuestion(q: Question): string[] {
   if (q.type === "terme") {
     if (!q.accepte.length) erreurs.push("il faut au moins une réponse acceptée.");
     for (const a of q.accepte) {
-      if (!noyau(a))
-        erreurs.push(`la réponse acceptée « ${a} » est vide une fois les mots de liaison retirés.`);
+      if (!noyau(a).length) erreurs.push(`la réponse acceptée « ${a} » n'a ni lettre ni chiffre.`);
     }
   }
   if (q.image) {

@@ -452,15 +452,26 @@ erreur et le deuxième essai vaut 0,5 point. Quand il suit la série, l'élève 
 réponses, revient, puis remet, avec un essai par question.
 
 Thot corrige les questions fermées d'après les réponses de l'enseignant. Une réponse à taper se
-compare sans casse, sans accents ni mots de liaison, avec une faute de frappe tolérée dès 5 lettres
-et deux dès 10 (`src/core/questions.ts`). Une réponse rédigée n'a pas de note automatique : l'élève
-coche les critères qu'il pense remplir. Un modèle ne note rien.
+compare mot à mot avec chaque réponse acceptée, sans casse, sans accents ni ponctuation
+(`correspond()` dans `src/core/questions.ts`). Un mot de liaison, « la » ou « de » par exemple,
+s'efface devant un autre mot. Le dernier mot d'une réponse reste toujours, parce qu'il peut être la
+réponse : « balise » ne vaut pas « balise a ». Le signe moins collé devant un chiffre fait partie du
+nombre, donc « 1 » ne vaut pas « -1 ». Les deux réponses doivent ensuite avoir autant de mots, et
+chaque mot se compare à celui de même rang. Un mot de 5 lettres tolère une faute de frappe, un mot
+de 10 lettres en tolère deux, et un mot plus court ou qui contient un chiffre se compare exactement.
+« Wiliam Morris » vaut donc « William Morris », alors que « hépatite C » ne vaut pas « Hépatite A »
+ni « H2SO3 » « H2SO4 ». Une réponse rédigée n'a pas de note automatique : l'élève coche les
+critères qu'il pense remplir. Un modèle ne note rien.
 
 Un enseignant lit les tentatives des élèves de ses propres cours parmi ceux de l'activité, toutes
 versions confondues. L'auteur d'une activité privée lit les siennes. Être administrateur ne suffit
 pas. La page « Réponses » montre une ligne par élève suivi, sa dernière tentative et une case par
 question. L'enseignant note une réponse 0, 0,5 ou 1, ce qui remplace la note automatique, la
-commente, et peut marquer la tentative à reprendre : l'élève en commence alors une autre. Ces
+commente, et peut marquer la tentative à reprendre : l'élève en commence alors une autre. Sous la
+grille, la page liste les réponses fermées que Thot a refusées, pour que l'enseignant puisse leur
+donner des points. Elle liste aussi les réponses à taper que Thot a acceptées alors qu'elles
+diffèrent de chaque réponse acceptée autrement que par la casse ou les espaces : un accent, un mot
+de liaison ou une faute de frappe. L'enseignant refuse celles qui sont fausses en les notant 0. Ces
 points comptent ce qui a été pratiqué : ils ne mesurent pas un niveau.
 
 Une citation tient tant qu'elle vise la révision servie d'une source certifiée, rattachée au cours,

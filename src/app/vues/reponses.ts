@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { Contenu, Question } from "../../core/activite.ts";
-import { points } from "../../core/questions.ts";
+import { approchee, points } from "../../core/questions.ts";
 import { type Activite, NOTES, type TentativeLue } from "../activites.ts";
 import { jour } from "./prof.ts";
 import { enrichi, enrichiLigne, lettre, NOMS_TYPE } from "./questions.ts";
@@ -76,12 +76,19 @@ function affiche(q: Question, v: string) {
 
 const ancre = (t: { id: string }, q: Question) => `r-${t.id}-${q.id}`;
 
-/** Une réponse rédigée se note, une réponse fermée aussi quand Thot l'a refusée ou que l'enseignant l'a notée. */
+/** Une réponse à taper que Thot a acceptée alors qu'elle diffère de chaque réponse attendue. */
+const differente = (q: Question, c: Case) =>
+  q.type === "terme" && c.essais.some((v) => approchee(v, q.accepte));
+
+/**
+ * Une réponse rédigée se note. Une réponse fermée aussi quand Thot l'a refusée, que l'enseignant
+ * l'a notée, ou que Thot l'a acceptée avec une différence.
+ */
 const anoter = (q: Question, c: Case | undefined): c is Case =>
   !!c &&
   (q.type === "redigee"
     ? !!c.essais[0]
-    : c.essais.length > 0 && (c.note !== undefined || (c.points ?? 1) < 1));
+    : c.essais.length > 0 && (c.note !== undefined || (c.points ?? 1) < 1 || differente(q, c)));
 
 const classe = (p: number) => (p >= 1 ? "s-ok" : p > 0 ? "s-half" : "s-ko");
 
@@ -193,6 +200,10 @@ const sectionFermees = (a: Activite, contenu: Contenu, liste: Ligne[]) => {
               l.t!.revision === a.revision
                 ? ""
                 : html` <span class="discret">version ${l.t!.revision}</span>`
+            }${
+              differente(q, c)
+                ? html` <span class="statut a_relire">Acceptée avec une différence</span>`
+                : ""
             }</p>
             <p class="reponse-texte">${c.essais.map((v) => affiche(q, v)).join(" puis ")}</p>
             ${formNote(a, l, q, c)}
@@ -202,8 +213,8 @@ const sectionFermees = (a: Activite, contenu: Contenu, liste: Ligne[]) => {
     ];
   });
   return blocs.length
-    ? html`<h2>Réponses fermées refusées</h2>
-        <p class="discret">Une réponse juste que Thot a refusée, une faute de frappe trop grande par exemple, peut recevoir des points.</p>${blocs}`
+    ? html`<h2>Réponses fermées à vérifier</h2>
+        <p class="discret">Une réponse juste que Thot a refusée, une faute de frappe trop grande par exemple, peut recevoir des points. Une réponse à taper que Thot a acceptée avec un accent, un mot ou une lettre de différence peut les perdre : notez-la 0.</p>${blocs}`
     : "";
 };
 

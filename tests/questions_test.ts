@@ -4,6 +4,7 @@ import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
 import type { Champ, Question } from "../src/core/activite.ts";
 import {
+  approchee,
   correspond,
   depuisCarnet,
   erreursQuestion,
@@ -41,7 +42,36 @@ test("réponses tapées : variantes, mots de liaison et fautes de frappe", () =>
   assert(!correspond("Jakob Hick Fitts", ["Jakob"]));
   assert(!correspond("Hick", ["Jakob"]));
   assert(!correspond("fit", ["Fitts"]));
-  assert(!correspond("la loi", ["la loi", "Jakob"]));
+});
+
+test("réponses tapées : une réponse fausse à une lettre, un chiffre ou un signe près est refusée", () => {
+  assert(!correspond("hépatite C", ["Hépatite A"]));
+  assert(!correspond("1", ["-1"]));
+  assert(!correspond("H2SO3", ["H2SO4"]));
+  assert(!correspond("14 juillet 1798", ["14 juillet 1789"]));
+  assert(!correspond("balise", ["balise a"]));
+  assert(correspond("Wiliam Morris", ["William Morris"]));
+  // Le dernier mot reste, même s'il est de liaison.
+  assert(correspond("la balise A", ["balise a"]));
+  assert(correspond("la loi", ["la loi", "Jakob"]));
+  assert(!correspond("la loi", ["Jakob"]));
+  // Le signe moins se garde devant un chiffre, le trait d'union sépare des mots.
+  assert(correspond("−1", ["-1"]));
+  assert(!correspond("-1", ["1"]));
+  assert(correspond("Jean Paul", ["Jean-Paul"]));
+  assert(correspond("1789 1799", ["1789-1799"]));
+  // La faute de frappe se compte dans chaque mot : un mot court ne se devine pas.
+  assert(!correspond("du bit", ["du but"]));
+  assert(!correspond("jak0b", ["Jakob"]));
+  assert(correspond("architectre", ["architecture"]));
+});
+
+test("réponse tapée acceptée avec une différence : tout sauf la casse et les espaces", () => {
+  assert(!approchee("  william   MORRIS ", ["William Morris"]));
+  assert(approchee("Wiliam Morris", ["William Morris"]));
+  assert(approchee("proximite", ["proximité"]));
+  assert(approchee("la loi de Jakob", ["Jakob"]));
+  assert(!approchee("Hick", ["Jakob"]), "refusée, donc pas acceptée avec une différence");
 });
 
 test("valeurs envoyées", () => {
@@ -144,7 +174,8 @@ test("erreursQuestion attrape chaque règle", () => {
     1,
   );
   assertEquals(n({ ...terme, accepte: [] } as Question), 1);
-  assertEquals(n({ ...terme, accepte: ["la loi"] } as Question), 1);
+  assertEquals(n({ ...terme, accepte: ["la loi"] } as Question), 0);
+  assertEquals(n({ ...terme, accepte: ["?!"] } as Question), 1);
   assertEquals(n({ ...terme, accepte: ["Jakob", " "] } as Question), 1);
   assertEquals(n({ ...terme, image: { alt: "", fichier: "a.png" } }), 1);
   assertEquals(n({ ...terme, image: { alt: "A" } }), 1);
@@ -269,7 +300,7 @@ test("un quiz carnet inutilisable renvoie ses erreurs numérotées", () => {
         { ...q, correctAnswer: "A" },
         { ...q, correctAnswer: "Z" },
         { ...q, type: "multiple", correctAnswers: ["A", "Z"] },
-        { id: "q4", type: "text", question: "Q", accept: ["la loi"] },
+        { id: "q4", type: "text", question: "Q", accept: ["?!"] },
         { ...q, type: "essai" },
       ],
     }),
@@ -277,7 +308,7 @@ test("un quiz carnet inutilisable renvoie ses erreurs numérotées", () => {
       erreurs: [
         "Question 2 : il faut exactement une bonne option.",
         "Question 3 : correctAnswers cite une option qui n'existe pas.",
-        "Question 4 : la réponse acceptée « la loi » est vide une fois les mots de liaison retirés.",
+        "Question 4 : la réponse acceptée « ?! » n'a ni lettre ni chiffre.",
         "Question 5 : type inconnu « essai ».",
       ],
     },
