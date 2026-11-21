@@ -13,6 +13,7 @@ import { catalogueDe } from "../domaines.ts";
 import { lireQuestion, nouvelId, reancrer, saisie, saisieDe } from "../edition.ts";
 import { libelles } from "../instance.ts";
 import * as Vue from "../vues/activites.ts";
+import * as VueDetail from "../vues/activites-detail.ts";
 import type { Env, Web } from "./web.ts";
 
 const CONFLIT = "Cette activité a changé pendant votre saisie. Relisez sa version actuelle.";
@@ -82,7 +83,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
   const detail = (
     c: Context<Env>,
     a: Activites.Activite,
-    extra: { erreur?: string; edition?: Vue.Edition } = {},
+    extra: { erreur?: string; edition?: VueDetail.Edition } = {},
   ) => {
     const compte = c.get("compte");
     const contenu = JSON.parse(a.contenu) as Contenu | Explication;
@@ -101,7 +102,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
     return rendre(
       c,
       a.titre,
-      Vue.detailProf({
+      VueDetail.detailProf({
         a,
         contenu,
         relectures,
@@ -131,7 +132,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
     if (!a) return c.notFound();
     const contenu = JSON.parse(a.contenu) as Contenu | Explication;
     const modifier = c.req.query("modifier");
-    let edition: Vue.Edition | undefined;
+    let edition: VueDetail.Edition | undefined;
     if (modifier && "questions" in contenu) {
       const q = contenu.questions.find((x) => x.id === modifier);
       if (q) edition = { id: q.id, type: q.type, saisie: saisieDe(q) };
@@ -150,7 +151,7 @@ export function routesActivites(app: Hono<Env>, w: Web) {
     revision: number,
     neuf: () => Contenu | Promise<Contenu>,
     ancre = "",
-    edition?: Vue.Edition,
+    edition?: VueDetail.Edition,
   ) => {
     if (revision !== a.revision) return c.html(detail(c, a, { erreur: CONFLIT, edition }), 409);
     try {
