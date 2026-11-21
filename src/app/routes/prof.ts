@@ -30,6 +30,7 @@ import {
 } from "../ingestion.ts";
 import { validerInformations } from "../../core/profils.ts";
 import * as Prof from "../vues/prof.ts";
+import * as ProfLignes from "../vues/prof-lignes.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
 import type { Env, Web } from "./web.ts";
@@ -68,7 +69,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
         theme,
         lot,
         lot,
-      ) as unknown as Prof.LigneSource[];
+      ) as unknown as ProfLignes.LigneSource[];
   /** Sans accents ni casse : « algebre » trouve « Algèbre ». */
   const plier = (t: string) =>
     t
@@ -79,7 +80,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
    * Les ressources du périmètre qui contiennent la recherche dans leur titre. Sans cours choisi,
    * chaque ligne nomme ses cours, parmi ceux du compte.
    */
-  const lignesVisibles = (c: Context<Env>, liste: Prof.LigneSource[]) => {
+  const lignesVisibles = (c: Context<Env>, liste: ProfLignes.LigneSource[]) => {
     const selection = idsScope(c);
     const q = plier(c.req.query("q") ?? "");
     const garde = liste.filter((s) => selection.has(s.id) && plier(s.titre).includes(q));
@@ -106,9 +107,9 @@ export function routesProf(app: Hono<Env>, w: Web) {
   const ranger = (
     c: Context<Env>,
     f: ReturnType<typeof filtres>,
-    ressources: Prof.LigneSource[],
+    ressources: ProfLignes.LigneSource[],
     cat: Domaines.Catalogue,
-  ): { rangement: Prof.Rangement; fichiers: Prof.LigneSource[] } => {
+  ): { rangement: Prof.Rangement; fichiers: ProfLignes.LigneSource[] } => {
     const p = scope(c);
     const racine = { nom: "Bibliothèque", portee: { matiere_id: "", cours_id: "", theme_id: "" } };
     const cours = cat.cours.find((x) => x.id === p.cours_id);
@@ -136,10 +137,10 @@ export function routesProf(app: Hono<Env>, w: Web) {
       [
         ...new Set(liens.filter((l) => parId.has(l.source_id) && garde(l)).map((l) => l.source_id)),
       ].map((id) => parId.get(id)!);
-    const aRelire = (liste: Prof.LigneSource[]) =>
+    const aRelire = (liste: ProfLignes.LigneSource[]) =>
       liste.filter((s) => s.statut === "a_relire" || s.revision_en_attente).length;
     const dossiers = (
-      groupes: { nom: string; portee: Partial<typeof f>; liste: Prof.LigneSource[] }[],
+      groupes: { nom: string; portee: Partial<typeof f>; liste: ProfLignes.LigneSource[] }[],
     ) =>
       groupes
         .filter((g) => g.liste.length)
@@ -201,7 +202,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const cat = Domaines.catalogueDe(db, c.get("compte"));
     const personnel = lireInstance(db).mode === "personal";
     // Une nouvelle version à relire compte avec les sources à relire.
-    const statut = (s: Prof.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
+    const statut = (s: ProfLignes.LigneSource) => (s.revision_en_attente ? "a_relire" : s.statut);
     const repartition = [
       ...Map.groupBy(ressources, (s) => `${s.theme ?? ""}\0${statut(s)}`).values(),
     ].map((liste) => ({
@@ -282,7 +283,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
         ? ranger(c, f, liste, Domaines.catalogueDe(db, c.get("compte")))
         : undefined;
     return c.html(
-      Prof.lignesSources(
+      ProfLignes.lignesSources(
         bureau?.fichiers ?? liste,
         new URLSearchParams(f).toString(),
         f.vue === "grille",
