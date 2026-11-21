@@ -1,0 +1,21 @@
+@media print {
+  header.site,
+  .rail,
+  .evitement,
+  .sans-impression {
+    display: none !important;
+  }
+  body,
+  body.prof {
+    display: block;
+    background: white;
+  }
+  main,
+  body.prof main {
+    max-width: none;
+    padding: 0;
+  }
+  .feuilles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

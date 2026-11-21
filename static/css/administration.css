@@ -200,3 +200,16 @@ form:not(.pas-a-pas) :is([data-suivant], [data-precedent]) {
 [data-lot-liste] h2 {
   font-size: 1.125rem;
 }
+
+/* ------------------------------------------------- questions des élèves (bibliothèque) */
+.activite-eleves {
+  max-width: var(--measure);
+  margin-bottom: var(--s5);
+}
+.activite-eleves h2 {
+  font-size: 1.125rem;
+}
+.activite-eleves ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}

@@ -217,11 +217,12 @@ de `:root`, les polices et la typographie sont dans `base.css`. Chaque autre feu
 écrans que nomme son premier commentaire : `navigation.css` l'en-tête de l'élève et le rail de
 l'enseignant, `page.css` les composants communs, `documents.css` le texte d'une source,
 `lecture.css` l'accueil de l'élève, le chapitre et les feuilles de lecture, `chat.css` le chat et
-les conversations, `enseignant.css` les pages de l'enseignant et l'impression,
-`bibliotheque.css` la bibliothèque, `reponses.css` les réponses d'une série, `activites.css` la
-pratique et l'éditeur d'activité, `administration.css` les matières, la prise en main et le dépôt,
-`questions.css` les questions des élèves et la vue en dossiers, `eleves.css` les élèves, la
-relecture en colonnes et le sommaire d'un cours.
+les conversations, `enseignant.css` les pages de l'enseignant, `impression.css` la feuille
+imprimée, `bibliotheque.css` la bibliothèque, `reponses.css` les réponses d'une série,
+`activites.css` la pratique et l'éditeur d'activité, `administration.css` les matières, la prise
+en main, le dépôt et l'activité des élèves, `dossiers.css` la vue en dossiers et la zone de dépôt,
+`eleves.css` les élèves, `relecture.css` la relecture en colonnes, `sommaire.css` le sommaire d'un
+cours.
 
 ## Overview
 

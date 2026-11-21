@@ -25,12 +25,15 @@ const FEUILLES = [
   "lecture",
   "chat",
   "enseignant",
+  "impression",
   "bibliotheque",
   "reponses",
   "activites",
   "administration",
-  "questions",
+  "dossiers",
   "eleves",
+  "relecture",
+  "sommaire",
 ];
 
 export const page = (
