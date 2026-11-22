@@ -23,6 +23,7 @@ import { routesEleve } from "./routes/eleve.ts";
 import { routesMedia } from "./routes/media.ts";
 import { routesProf } from "./routes/prof.ts";
 import { routesProfCours } from "./routes/prof-cours.ts";
+import { routesProfSource } from "./routes/prof-source.ts";
 import { routesDepot } from "./routes/prof-depot.ts";
 import { routesProfEleves } from "./routes/prof-eleves.ts";
 import { sessions } from "./routes/session.ts";
@@ -109,6 +110,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
   routesDomaines(app, w);
   routesMedia(app, w);
   routesProf(app, w);
+  routesProfSource(app, w);
   routesProfCours(app, w);
   routesProfEleves(app, w);
   routesDepot(app, w);
