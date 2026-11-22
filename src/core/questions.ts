@@ -6,7 +6,7 @@ import {
   OPTIONS,
   type Option,
   type Question,
-} from "./activite.ts";
+} from "./contenu.ts";
 import { sansAccents } from "./texte.ts";
 
 // Correction d'une réponse. Le barème et le format des quiz viennent de carnet-quiz.
