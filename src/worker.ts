@@ -3,6 +3,7 @@ import { config, preparerDonnees } from "./app/config.ts";
 import { cacheModeles, connexion, purgerMessages } from "./app/db.ts";
 import {
   proposerInformations,
+  relacher,
   revendiquer,
   sourceSansInformations,
   traiter,
@@ -16,20 +17,29 @@ import {
 preparerDonnees();
 const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
-let arret = false;
 let prochainePurge = 0;
-process.on("SIGTERM", () => (arret = true));
+let enCours: ReturnType<typeof revendiquer>;
+// Un arrêt demandé, par un déploiement ou `docker stop` : le travail en cours retourne en file
+// pour le prochain worker, puis la base se ferme. Attendre la fin d'une extraction dépasserait
+// le délai de `docker stop`, et le travail tué resterait derrière son verrou.
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    if (enCours) relacher(db, enCours);
+    db.close();
+    process.exit(0);
+  });
+}
 
 console.log("worker: en attente de travaux");
 
-while (!arret) {
+while (true) {
   if (Date.now() >= prochainePurge) {
     purgerMessages(db, config.retentionJours);
     prochainePurge = Date.now() + 3_600_000;
   }
-  const job = revendiquer(db);
-  if (job) {
-    await traiter(db, job, modeles);
+  enCours = revendiquer(db);
+  if (enCours) {
+    await traiter(db, enCours, modeles);
     continue;
   }
   // File vide : propositions du profil arts, puis questions suggérées, une source à la fois.
@@ -52,4 +62,3 @@ while (!arret) {
   }
   await new Promise((r) => setTimeout(r, 1000));
 }
-db.close();

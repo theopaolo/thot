@@ -1,4 +1,4 @@
-export { MAX_LEGENDES, reextraire, revendiquer, traiter } from "./ingestion/travail.ts";
+export { MAX_LEGENDES, reextraire, relacher, revendiquer, traiter } from "./ingestion/travail.ts";
 export {
   ecarterRevision,
   lireDocument,

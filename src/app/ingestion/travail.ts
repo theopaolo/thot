@@ -70,6 +70,18 @@ const prolonger = (db: Db, job: Job) =>
     .prepare(`UPDATE ingestion_jobs SET verrou_expire_le = ? WHERE ${TENU}`)
     .run(horodatage(Date.now() + VERROU_MS), job.id, job.tentatives).changes > 0;
 
+/**
+ * À l'arrêt du worker : le travail retourne en file sans compter de tentative, et le prochain
+ * worker le reprend sans attendre que son verrou expire.
+ */
+export const relacher = (db: Db, job: Job) =>
+  db
+    .prepare(
+      `UPDATE ingestion_jobs SET etat = 'received', tentatives = tentatives - 1, etape = NULL,
+         progression = 0, verrou_expire_le = NULL, maj_le = ? WHERE ${TENU}`,
+    )
+    .run(maintenant(), job.id, job.tentatives);
+
 const REMPLACEE = "Tentative remplacée.";
 
 async function extraire(s: Source): Promise<Extraction & { notes?: Note[] }> {

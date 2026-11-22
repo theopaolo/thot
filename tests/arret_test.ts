@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
+import { createServer as serveurHttp } from "node:http";
 import { createServer } from "node:net";
 import { test } from "vite-plus/test";
 import { assert, assertEquals } from "@std/assert";
@@ -10,7 +11,8 @@ import { creerCompte } from "../src/app/comptes.ts";
 import { RACINE } from "../src/app/config.ts";
 import { boucleReponses, revendiquerReponse } from "../src/app/reponses.ts";
 import { creerApp } from "../src/app/routes.ts";
-import { BONNE, environnement, fauxModeles, ORIGINE, publier } from "./outils.ts";
+import { BONNE, environnement, fauxModeles, ORIGINE, publier, session } from "./outils.ts";
+import { CHAMPS, formulaire, PAGE } from "./source_outils.ts";
 
 test("arrêt du serveur : une réponse en cours retourne en file sans attendre son verrou", async () => {
   const { db, dir } = await environnement();
@@ -105,6 +107,47 @@ test("arrêt du serveur : SIGTERM ferme la base et sort en 0", async () => {
     assert(!existsSync(join(dir, "state.sqlite3-wal")), "la base est restée ouverte");
   } finally {
     serveur.kill("SIGKILL");
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("arrêt du worker : SIGTERM remet en file le travail en cours et sort en 0", async () => {
+  const { db, dir } = await environnement();
+  // Le fournisseur ne répond jamais : le worker reste dans sa première légende.
+  const muet = serveurHttp(() => {}).listen(0, "127.0.0.1");
+  await once(muet, "listening");
+  const { requete } = await session(db, fauxModeles().modeles, "enseignant");
+  await requete("/prof/depot", { method: "POST", body: formulaire(CHAMPS, PAGE, "casa.html") });
+  const worker = spawn(process.execPath, ["src/worker.ts"], {
+    cwd: RACINE,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      THOT_DATA_DIR: dir,
+      THOT_ORIGIN: "",
+      THOT_DEV: "0",
+      THOT_OPENROUTER_ENABLED: "1",
+      THOT_OPENROUTER_URL: `http://127.0.0.1:${(muet.address() as { port: number }).port}`,
+      OPENROUTER_API_KEY: "test",
+      THOT_MISTRAL_ENABLED: "0",
+    },
+  });
+  try {
+    const ligne = () =>
+      db.prepare("SELECT etat, tentatives, verrou_expire_le FROM ingestion_jobs").get()!;
+    for (let i = 0; i < 200 && ligne().etat !== "enriching"; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assertEquals(ligne().etat, "enriching", "le worker n'a pas atteint les légendes");
+    const fin = once(worker, "exit");
+    worker.kill("SIGTERM");
+    assertEquals(await fin, [0, null]);
+    assertEquals({ ...ligne() }, { etat: "received", tentatives: 0, verrou_expire_le: null });
+  } finally {
+    worker.kill("SIGKILL");
+    muet.closeAllConnections();
+    muet.close();
+    db.close();
     await rm(dir, { recursive: true });
   }
 });
