@@ -1,6 +1,6 @@
 ---
 title: CHAT-102 Ne pas répéter le nom du cours dans le périmètre
-status: not_started
+status: done
 scope: [eleve]
 type: [bug]
 ---
@@ -12,4 +12,4 @@ comprendre et améliorer une codebase ». `nomPerimetre()` dans `src/app/vues/co
 matière, cours et thème, et l'import du jeu développement a créé dans chaque cours un thème du
 même nom que le cours.
 
-- [ ] un thème homonyme de son cours n'est pas répété dans le libellé
+- [x] un thème homonyme de son cours n'est pas répété dans le libellé

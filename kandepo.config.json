@@ -1,4 +1,4 @@
 {
   "title": "Thot MVP",
-  "dirs": ["./tasks/semaine", "./tasks/ensuite"]
+  "dirs": ["./tasks/semaine", "./tasks/ensuite", "./tasks/pilote"]
 }
