@@ -8,12 +8,13 @@ modèles et leurs réglages se lisent dans `src/app/routes/`, `migrations/` et
 
 1. Une affirmation cite un passage retrouvé mot pour mot dans une source certifiée, que son
    lecteur peut lire et que Thot peut citer. Le passage est d'un seul tenant, sans points de
-   suspension, et commence et finit sur un mot entier. `verifier()` dans `src/core/reponse.ts` le
-   contrôle et garde le texte du document à la place de la copie du modèle. Un juge (`juger()`,
-   même fichier) contrôle ensuite que ce passage, lu sous le titre de son extrait, prouve toute la
-   phrase. Un juge injoignable ou plus lent que 4 s laisse passer
-   l'affirmation et le note au journal. La réponse affiche alors « Vérification partielle » au
-   lieu de « Réponse vérifiée ». Le dépassement du délai annule la requête du juge.
+   suspension, et commence et finit sur un mot entier. `verifier()` dans
+   `src/core/reponse/verification.ts` le contrôle et garde le texte du document à la place de la
+   copie du modèle. Un juge (`juger()` dans `src/core/reponse.ts`) contrôle ensuite que ce
+   passage, lu sous le titre de son extrait, prouve toute la phrase. Un juge injoignable ou plus
+   lent que 4 s laisse passer l'affirmation et le note au journal. La réponse affiche alors
+   « Vérification partielle » au lieu de « Réponse vérifiée ». Le dépassement du délai annule la
+   requête du juge.
    Avant publication et à chaque relecture d'un échange, les preuves sont contrôlées à nouveau,
    dans la révision que cite la réponse. Si une preuve ou son titre a changé, ou si le lecteur
    n'y a plus accès, la réponse est signalée comme indisponible et peut être recalculée. Une
@@ -415,7 +416,7 @@ l'objectif du cours de même intitulé, sans compter la casse ni les accents, au
 second.
 
 Un exercice est une série de questions de quatre types : choix unique, choix multiple, réponse à
-taper et réponse rédigée (`src/core/activite.ts`). Une réponse rédigée peut porter un langage :
+taper et réponse rédigée (`src/core/contenu.ts`). Une réponse rédigée peut porter un langage :
 l'élève répond en code, que rien n'exécute. Toute question peut montrer une image et nommer une
 source du cours où chercher. Une version, une relecture et une publication valent pour toute la
 série.
@@ -748,10 +749,10 @@ réponse en blocs : paragraphe, liste, étapes ou tableau. Un bloc ne désigne q
 vérifiées, donc chaque étape, élément ou case de tableau garde sa citation. Les titres de blocs,
 de colonnes et de lignes viennent du modèle sans preuve et restent courts. Un tableau juxtapose
 des cases vérifiées une à une et n'affirme aucune relation entre elles : une relation est une
-affirmation avec sa propre citation. `ranger()` dans `src/core/reponse.ts` borne la structure.
-Une structure invalide donne un seul paragraphe, une affirmation refusée quitte son bloc. Une
-réponse sans blocs, comme toutes celles d'avant, se lit en un paragraphe. Les réponses d'arts
-appliqués restent plates : leur consigne mesurée ne demande pas de blocs.
+affirmation avec sa propre citation. `ranger()` dans `src/core/reponse/verification.ts` borne la
+structure. Une structure invalide donne un seul paragraphe, une affirmation refusée quitte son
+bloc. Une réponse sans blocs, comme toutes celles d'avant, se lit en un paragraphe. Les réponses
+d'arts appliqués restent plates : leur consigne mesurée ne demande pas de blocs.
 
 Un schéma relie des nœuds nommés par le modèle. Chaque relation, de cause, de suite ou de thème,
 cite une affirmation vérifiée. Un nœud peut citer une autre affirmation, qui le décrit. Les noms
