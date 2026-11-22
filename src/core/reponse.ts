@@ -27,6 +27,7 @@ const DELAI_JUGE_MS = 4000;
  * Le juge vérifie que chaque citation, lue sous le titre de son extrait, prouve sa phrase.
  * Un juge injoignable ou trop lent laisse passer l'affirmation: les citations restent vérifiées
  * mot pour mot, la panne est notée au journal et la réponse porte `juge_indisponible`.
+ * Un appel interrompu par `signal` lève : aucune affirmation ne passe sans verdict.
  */
 export async function juger(
   modeles: Modeles,
@@ -57,6 +58,7 @@ export async function juger(
       ]).finally(() => clearTimeout(minuteur));
     }),
   );
+  signal?.throwIfAborted();
   const soutenues: Affirmation[] = [];
   const erreurs: string[] = [];
   const probabilites: (number | null)[] = [];

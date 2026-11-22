@@ -421,3 +421,31 @@ test("le délai du juge annule son signal avant de laisser passer la citation", 
     db.close();
   }
 });
+
+test("une réponse interrompue pendant le juge ne passe pas pour vérifiée", async () => {
+  const { db } = await environnement();
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    const controle = new AbortController();
+    const fake = fauxModeles({ sorties: [REPONSE_CITEE] });
+    fake.modeles.soutenir = () => {
+      controle.abort(new Error("Réponse arrêtée."));
+      return Promise.reject(controle.signal.reason);
+    };
+    const r = await demander(
+      db,
+      fake.modeles,
+      "ligne droite",
+      { lecteur: null, schoolId: "pilote" },
+      0.023,
+      undefined,
+      undefined,
+      controle.signal,
+    );
+    assertEquals(r.resultat.etat, "failed");
+    assertEquals(r.journal.juge_indisponible, undefined);
+  } finally {
+    db.close();
+  }
+});
