@@ -1,6 +1,66 @@
-export * from "./activites/acces.ts";
-export * from "./activites/objectifs.ts";
-export * from "./activites/versions.ts";
-export * from "./activites/redaction.ts";
-export * from "./activites/tentatives.ts";
-export * from "./activites/images.ts";
+export {
+  type Activite,
+  activiteEleve,
+  type ActiviteListee,
+  activiteProf,
+  activitesEleve,
+  activitesProf,
+  bloquantes,
+  cibleDe,
+  coursDe,
+  couvre,
+  type FiltreActivites,
+  preuvesValides,
+  servies,
+} from "./activites/acces.ts";
+export {
+  changerObjectif,
+  fusionnerObjectifs,
+  objectifs,
+  renommerObjectif,
+  suiviObjectifs,
+} from "./activites/objectifs.ts";
+export {
+  ajouterCours,
+  archiver,
+  enregistrer,
+  inserer,
+  oublierSource,
+  publier,
+  regler,
+  relecteur,
+  relectures,
+  relire,
+  retirerCours,
+  revoirActivites,
+  supprimerBrouillon,
+} from "./activites/versions.ts";
+export {
+  ancrerPassage,
+  imagesCitables,
+  MAX_SERIE,
+  MAX_SOURCES,
+  ordreLecture,
+  preparer,
+  regenerer,
+  type SourceCitable,
+  sourcesCitables,
+} from "./activites/redaction.ts";
+export {
+  aReprendre,
+  type Avancement,
+  avecAvancement,
+  cocher,
+  corrigee,
+  elevesSuivis,
+  enregistrerReponses,
+  essayer,
+  noter,
+  NOTES,
+  recommencer,
+  type Tentative,
+  tentative,
+  type TentativeLue,
+  tentativesLues,
+} from "./activites/tentatives.ts";
+export { deposerImage, lireImage, MAX_IMAGE } from "./activites/images.ts";
