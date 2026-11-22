@@ -22,7 +22,22 @@ import {
   sourcesCitables,
 } from "./activites.ts";
 import type { Db } from "./db.ts";
-import { LANGAGES } from "./vues/questions.ts";
+
+/** Les langages proposés pour une réponse en code, que Shiki colore. */
+export const LANGAGES = [
+  "html",
+  "css",
+  "javascript",
+  "typescript",
+  "json",
+  "python",
+  "php",
+  "sql",
+  "bash",
+  "java",
+  "csharp",
+  "yaml",
+] as const;
 
 // Le formulaire d'une question, dans les deux sens. Chaque champ `cle` (consigne, attendu, retour,
 // critere_0…, option_0…) a son texte sous `cle` et ses passages sous `cle_p0`, `cle_s0`… : le

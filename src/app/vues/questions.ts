@@ -9,22 +9,6 @@ export const NOMS_TYPE: Record<TypeQuestion, string> = {
   terme: "Réponse à taper",
 };
 
-/** Les langages proposés pour une réponse en code, que Shiki colore. */
-export const LANGAGES = [
-  "html",
-  "css",
-  "javascript",
-  "typescript",
-  "json",
-  "python",
-  "php",
-  "sql",
-  "bash",
-  "java",
-  "csharp",
-  "yaml",
-] as const;
-
 /** A, B, C… dans l'ordre affiché. */
 export const lettre = (i: number) => String.fromCharCode(65 + i);
 

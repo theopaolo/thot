@@ -90,6 +90,11 @@ derrière la session et la protection CSRF. Une route lit la requête, appelle l
 compte dans son SQL. Elle lit par `LISIBLE` ou `CITABLE` de `src/core/recherche.ts`, ou appelle
 le module qui porte la règle. `pnpm frontiere` le vérifie.
 
+Les imports de `src/app/` vont dans un seul sens : une route importe des vues et des modules, une
+vue importe des modules, et un module n'importe ni vue ni route. Une vue ne prépare aucune
+requête SQL : elle rend ce qu'elle reçoit. Un module se teste ainsi sans HTTP et une vue sans
+base. `pnpm frontiere` vérifie ces deux règles, et le lint refuse un cycle d'imports.
+
 Le dépôt accepte PDF, Word (`.docx`), PowerPoint (`.pptx`), HTML, PNG, JPEG et Markdown. Le type
 vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'extension `.md` ou
 `.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur

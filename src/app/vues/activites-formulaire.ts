@@ -9,9 +9,9 @@ import {
   type TypeQuestion,
 } from "../../core/activite.ts";
 import type { Activite, imagesCitables } from "../activites.ts";
-import { MAX_PASSAGES, type Saisie, un } from "../edition.ts";
+import { LANGAGES, MAX_PASSAGES, type Saisie, un } from "../edition.ts";
 import type { Libelles } from "../instance.ts";
-import { imageQuestion, LANGAGES, lettre, NOMS_TYPE } from "./questions.ts";
+import { imageQuestion, lettre, NOMS_TYPE } from "./questions.ts";
 import { option } from "./activites.ts";
 
 /** La question ouverte en formulaire : `nouvelle` pour une question à ajouter. */

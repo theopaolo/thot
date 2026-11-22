@@ -24,8 +24,9 @@ pnpm dev                                     # serveur et worker, http://127.0.0
 
 - `pnpm dev` connecte tout compte sans vérifier son mot de passe, administrateur compris. Le
   serveur refuse alors un `THOT_HOST` autre que la machine locale.
-- `pnpm check` : format, lint et types (`vp check`), build, frontière `core/`/`app/`, taille des
-  fichiers (600 lignes au plus dans `src/`, 800 dans `tests/`), tests
+- `pnpm check` : format, lint et types (`vp check`, qui refuse aussi un cycle d'imports), build,
+  frontières entre `core/` et `app/` puis entre routes, vues et modules, taille des fichiers
+  (600 lignes au plus dans `src/`, 800 dans `tests/`), tests
 - `pnpm thot` : liste les commandes en ligne (comptes, import, certification, évaluation)
 - `pnpm board` : ouvre le suivi des tâches de `tasks/` sur http://localhost:7878
 

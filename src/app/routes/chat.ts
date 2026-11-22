@@ -146,11 +146,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
       const matieres = comparees.map((m) => ({ matiere_id: m, cours_id: "", theme_id: "" }));
       if (![p, ...matieres].every(visible)) return "Périmètre indisponible.";
       // Un élève ne pose une question dans un cours que s'il en est membre.
-      const coursId =
-        p.cours_id ||
-        String(
-          db.prepare("SELECT cours_id FROM themes WHERE id = ?").get(p.theme_id)?.cours_id ?? "",
-        );
+      const coursId = p.cours_id || (Domaines.coursDuTheme(db, p.theme_id) ?? "");
       if (
         (p.cours_id || p.theme_id) &&
         !lu(c).administrateur &&
