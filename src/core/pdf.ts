@@ -11,7 +11,12 @@ const execFileP = promisify(execFile);
 
 const bruit = (l: string) => l.length < 2 || /^\d+\s*(sur|\/)\s*[\d!]+$/i.test(l);
 
-export async function extrairePdf(chemin: string, profil: Profil = "general"): Promise<Extraction> {
+export async function extrairePdf(
+  chemin: string,
+  profil: Profil = "general",
+  signal?: AbortSignal,
+): Promise<Extraction> {
+  signal?.throwIfAborted();
   const linux = process.platform === "linux";
   const processus = spawn(
     linux ? "/usr/bin/prlimit" : "pdftotext",
@@ -43,6 +48,8 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
     erreur ??= new Error(raison);
     processus.kill("SIGKILL");
   };
+  const surArret = () => arreter("PDF : extraction interrompue.");
+  signal?.addEventListener("abort", surArret, { once: true });
   const minuteur = setTimeout(() => arreter("PDF : extraction au-delà de 30 secondes."), 30_000);
   let controleEnCours: Promise<void> | undefined;
   // shortcut: macOS borne le RSS par sondage, utiliser Linux pour une limite mémoire stricte.
@@ -93,6 +100,7 @@ export async function extrairePdf(chemin: string, profil: Profil = "general"): P
     }
     return decouperPdf(texte + decoder.decode(), profil);
   } finally {
+    signal?.removeEventListener("abort", surArret);
     clearTimeout(minuteur);
     clearInterval(memoire);
     processus.kill("SIGKILL");

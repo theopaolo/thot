@@ -445,6 +445,28 @@ test("une réponse interrompue pendant le juge ne passe pas pour vérifiée", as
     );
     assertEquals(r.resultat.etat, "failed");
     assertEquals(r.journal.juge_indisponible, undefined);
+
+    // Un signal déjà interrompu avant juger() lève sans lancer d'appel au juge.
+    let appels = 0;
+    fake.modeles.soutenir = () => {
+      appels++;
+      return Promise.resolve({ probabilite: 1, modele: "juge" });
+    };
+    const { juger } = await import("../src/core/reponse.ts");
+    let leve = false;
+    try {
+      await juger(
+        fake.modeles,
+        [{ texte: "t", citation: "c", titre: "s", source_id: id, chunk_id: "c" }],
+        {},
+        "general",
+        controle.signal,
+      );
+    } catch {
+      leve = true;
+    }
+    assert(leve);
+    assertEquals(appels, 0);
   } finally {
     db.close();
   }

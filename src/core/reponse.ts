@@ -36,6 +36,7 @@ export async function juger(
   profil: Profil,
   signal?: AbortSignal,
 ) {
+  signal?.throwIfAborted();
   const verdicts = await Promise.allSettled(
     affirmations.map((a) => {
       const controle = new AbortController();

@@ -110,3 +110,33 @@ test("l'échec de pdftotext porte sa sortie d'erreur et son signal", async () =>
     await assertRejects(() => extrairePdf("document.pdf"), Error, attendu);
   }
 });
+
+test("un signal interrompu tue pdftotext sur-le-champ et évite de le lancer s'il l'est déjà", async () => {
+  const deja = new AbortController();
+  deja.abort(new Error("arrêt"));
+  enfants.args = [];
+  await assertRejects(() => extrairePdf("document.pdf", "general", deja.signal), Error, "arrêt");
+  assertEquals(enfants.args.length, 0);
+
+  const controle = new AbortController();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  let tue = "";
+  const enfant = Object.assign(new EventEmitter(), {
+    pid: 123,
+    stdout,
+    stderr,
+    kill(s: string) {
+      if (tue) return;
+      tue = s;
+      stdout.end();
+      stderr.end();
+      setImmediate(() => enfant.emit("close", null, s));
+    },
+  });
+  enfants.courant = enfant;
+  const p = extrairePdf("document.pdf", "general", controle.signal);
+  controle.abort();
+  assertEquals(tue, "SIGKILL", "pdftotext doit être tué de façon synchrone avant process.exit");
+  await assertRejects(() => p, Error, "interrompue");
+});

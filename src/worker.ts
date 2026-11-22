@@ -19,11 +19,14 @@ const db = connexion();
 const modeles = openrouter(config.modeles, cacheModeles(db));
 let prochainePurge = 0;
 let enCours: ReturnType<typeof revendiquer>;
-// Un arrêt demandé, par un déploiement ou `docker stop` : le travail en cours retourne en file
-// pour le prochain worker, puis la base se ferme. Attendre la fin d'une extraction dépasserait
-// le délai de `docker stop`, et le travail tué resterait derrière son verrou.
+const arret = new AbortController();
+// Un arrêt demandé, par un déploiement ou `docker stop` : coupe le convertisseur enfant éventuel
+// (`pdftotext`), remet le travail en cours en file pour le prochain worker, puis ferme la base.
+// Attendre la fin d'une extraction dépasserait le délai de `docker stop`, et le travail tué
+// resterait derrière son verrou.
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.once(signal, () => {
+    arret.abort();
     if (enCours) relacher(db, enCours);
     db.close();
     process.exit(0);
@@ -39,7 +42,11 @@ while (true) {
   }
   enCours = revendiquer(db);
   if (enCours) {
-    await traiter(db, enCours, modeles);
+    try {
+      await traiter(db, enCours, modeles, arret.signal);
+    } finally {
+      enCours = undefined;
+    }
     continue;
   }
   // File vide : propositions du profil arts, puis questions suggérées, une source à la fois.

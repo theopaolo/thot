@@ -84,9 +84,9 @@ export const relacher = (db: Db, job: Job) =>
 
 const REMPLACEE = "Tentative remplacée.";
 
-async function extraire(s: Source): Promise<Extraction & { notes?: Note[] }> {
+async function extraire(s: Source, signal?: AbortSignal): Promise<Extraction & { notes?: Note[] }> {
   const chemin = contenu(s.id, "original", s.fichier);
-  if (s.format === "pdf") return await extrairePdf(chemin, s.profil);
+  if (s.format === "pdf") return await extrairePdf(chemin, s.profil, signal);
   if (s.format === "html") {
     // Le pilote arts appliqués dépose des exports Pearltrees. Une autre lecture changerait le
     // texte de ses sources à la réextraction.
@@ -140,7 +140,7 @@ function etat(db: Db, job: Job, etat: string, avertissements: string[], fin = fa
  * travail, et `supprimerSource` refuse la source. Une tentative qui a perdu le travail n'écrit
  * plus rien, ni fichier, ni ligne, ni échec.
  */
-export async function traiter(db: Db, job: Job, modeles: Modeles) {
+export async function traiter(db: Db, job: Job, modeles: Modeles, signal?: AbortSignal) {
   const s = lireSource(db, job.source_id);
   // Appelé avant chaque écriture : elle se fait alors sous un verrou qui vient d'être prolongé.
   const tenir = () => {
@@ -156,7 +156,7 @@ export async function traiter(db: Db, job: Job, modeles: Modeles) {
   }, VERROU_MS / 4);
   try {
     tenir();
-    const ext = await extraire(s);
+    const ext = await extraire(s, signal);
     const doc = assembler(ext.parties);
     const avertissements = [...ext.avertissements];
     if (s.langue !== "fr" && !estAnglais(s.langue)) {
