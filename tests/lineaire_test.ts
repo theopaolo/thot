@@ -57,9 +57,6 @@ const CAS: [string, (s: string) => unknown, string][] = [
     markdown,
     `- ${repete(" ", MO / 2)}${repete("a", MO / 2)} b`,
   ],
-  ["Markdown : paragraphe de lignes courtes", markdown, repete("a\n")],
-  ["Markdown : liste d'entrées courtes", markdown, repete("- a\n")],
-  ["Markdown : rangée de tableau aux nombreuses cellules", markdown, `|${repete("a|")}`],
   ["HTML : `<!--` sans `-->`", html, repete("<!--")],
   ["HTML : rangées de tableau", html, `<table>${repete("<tr><td>a</td></tr>")}</table>`],
   [
@@ -117,6 +114,21 @@ const CAS: [string, (s: string) => unknown, string][] = [
 
 for (const [nom, lire, entree] of CAS) {
   test(`${nom} : 1 Mo en moins d'une seconde`, () => enMoinsDuneSeconde(() => lire(entree)));
+}
+
+// Chaque ligne ou cellule passe par tous les motifs du Markdown : 1 Mo de lignes de deux
+// caractères prend déjà plus d'une seconde sur une machine d'intégration, en temps linéaire.
+// À 128 Ko, la lecture linéaire tient en un quart de seconde et un assemblage qui relit son bloc
+// à chaque ligne en prendrait dix.
+const KO_128 = MO / 8;
+const CAS_PAR_LIGNE: [string, string][] = [
+  ["paragraphe de lignes courtes", repete("a\n", KO_128)],
+  ["liste d'entrées courtes", repete("- a\n", KO_128)],
+  ["rangée de tableau aux nombreuses cellules", `|${repete("a|", KO_128)}`],
+];
+for (const [nom, entree] of CAS_PAR_LIGNE) {
+  test(`Markdown : ${nom} : 128 Ko en moins d'une seconde`, () =>
+    enMoinsDuneSeconde(() => markdown(entree)));
 }
 
 test("Office : `<Override ` sans `>` dans la liste des types, 1 Mo en moins d'une seconde", async () => {
