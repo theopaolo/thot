@@ -3,14 +3,16 @@ import { readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "vite-plus/test";
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import {
   activiteEleve,
   activitesEleve,
   activiteProf,
   ajouterCours,
   aReprendre,
+  cocher,
   corrigee,
+  enregistrer,
   enregistrerReponses,
   essayer,
   inserer,
@@ -18,6 +20,7 @@ import {
   preuvesValides,
   publier,
   recommencer,
+  regenerer,
   retirerCours,
   relire,
   tentative,
@@ -29,7 +32,7 @@ import { connexion, type Db, migrer } from "../src/app/db.ts";
 import { cours, matiere } from "../src/app/domaines.ts";
 import { rattacher } from "../src/app/ingestion.ts";
 import type { Champ, Contenu, Question } from "../src/core/activite.ts";
-import { environnement, publier as publierSource } from "./outils.ts";
+import { environnement, fauxModeles, publier as publierSource } from "./outils.ts";
 
 const libre = (texte: string): Champ => ({ texte, citations: [] });
 
@@ -241,4 +244,36 @@ test("tentatives : une série s'enregistre puis se remet, une question se corrig
   assert(!tentative(db, e1, b)!.rendue_le, "une question reste");
   assertEquals(essayer(db, e1, b, "q2", "Céramique irisée"), { juste: false, finie: true });
   assert(tentative(db, e1, b)!.rendue_le, "toutes les questions finies");
+});
+
+test("explication : l'édition lève une erreur, les tentatives renvoient leur refus sans lever", async () => {
+  const { db, c1, prof, e1 } = await cadre();
+  const id = inserer(db, prof, {
+    type: "explication",
+    coursId: c1,
+    objectifId: "",
+    intitule: "Expliquer la façade",
+    reference: "",
+    contenu: { affirmations: [] },
+  });
+  const explication = activiteProf(db, prof, id)!;
+  const { modeles } = fauxModeles();
+
+  await assertRejects(
+    () =>
+      enregistrer(db, modeles, prof, explication, explication.revision, {
+        correction: "serie",
+        questions: [choix],
+      }),
+    Error,
+    "explication",
+  );
+  await assertRejects(
+    () => regenerer(db, modeles, prof, explication, explication.revision, { type: "choix" }),
+    Error,
+    "explication",
+  );
+  assertEquals(enregistrerReponses(db, e1, explication, { q1: "A" }, true), "refus");
+  assertEquals(essayer(db, e1, explication, "q1", "A"), "refus");
+  assertEquals(cocher(db, e1, explication, "t1", "q1", [0]), false);
 });

@@ -4,7 +4,7 @@ import { transaction } from "../../core/recherche.ts";
 import { texte } from "../../core/texte.ts";
 import type { Compte } from "../comptes.ts";
 import { type Db, maintenant } from "../db.ts";
-import { type Activite, LUE } from "./acces.ts";
+import { type Activite, lireContenu, LUE } from "./acces.ts";
 
 // Tentatives : une par passage de l'élève sur une version de l'exercice.
 
@@ -96,8 +96,8 @@ export function enregistrerReponses(
   brutes: Record<string, unknown>,
   remettre: boolean,
 ): "enregistree" | "rendue" | "refus" | "refusee" {
-  const contenu = JSON.parse(a.contenu) as Contenu;
-  if (contenu.correction !== "serie") return "refus";
+  const contenu = lireContenu(a.contenu);
+  if (!("questions" in contenu) || contenu.correction !== "serie") return "refus";
   const refus = contenu.questions.some((q) => refusee(q, brutes[q.id]));
   const rendre = remettre && !refus;
   return transaction(db, () => {
@@ -124,9 +124,10 @@ export function enregistrerReponses(
  * questions finies, la tentative est rendue.
  */
 export function essayer(db: Db, c: Compte, a: Activite, questionId: string, brute: unknown) {
-  const contenu = JSON.parse(a.contenu) as Contenu;
+  const contenu = lireContenu(a.contenu);
+  if (!("questions" in contenu) || contenu.correction !== "question") return "refus" as const;
   const q = contenu.questions.find((x) => x.id === questionId);
-  if (contenu.correction !== "question" || !q) return "refus" as const;
+  if (!q) return "refus" as const;
   const v = valeur(q, brute);
   if (v === null) return "invalide" as const;
   return transaction(db, () => {
@@ -151,7 +152,8 @@ export function cocher(
   questionId: string,
   coches: number[],
 ) {
-  const contenu = JSON.parse(a.contenu) as Contenu;
+  const contenu = lireContenu(a.contenu);
+  if (!("questions" in contenu)) return false;
   const q = contenu.questions.find((x) => x.id === questionId);
   const t = tentative(db, c, a);
   if (q?.type !== "redigee" || t?.id !== tentativeId || !corrigee(contenu, t, q.id)) return false;

@@ -23,7 +23,7 @@ import { texte } from "../../core/texte.ts";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
 import type { Db } from "../db.ts";
-import { type Activite, type Cible, cibleDe, perimetre } from "./acces.ts";
+import { type Activite, type Cible, cibleDe, lireContenu, perimetre } from "./acces.ts";
 import { objectifChoisi } from "./objectifs.ts";
 import { enregistrer, inserer } from "./versions.ts";
 
@@ -234,10 +234,10 @@ export async function regenerer(
   revision: number,
   cible: { question: string } | { type: string },
 ) {
-  if (a.type === "explication") {
+  const contenu = lireContenu(a.contenu);
+  if (a.type === "explication" || !("questions" in contenu)) {
     throw new Error("Une explication ne se modifie pas. Préparez-en une autre.");
   }
-  const contenu = JSON.parse(a.contenu) as Contenu;
   const rang =
     "question" in cible ? contenu.questions.findIndex((q) => q.id === cible.question) : -1;
   if ("question" in cible && rang < 0) throw new Error("Question inconnue dans cette activité.");

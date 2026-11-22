@@ -171,11 +171,11 @@ export async function enregistrer(
   revision: number,
   neuf: Contenu,
 ): Promise<"conflit" | "inchange" | "modifie"> {
-  if (a.type === "explication") {
+  const avant = lireContenu(a.contenu);
+  if (a.type === "explication" || !("questions" in avant)) {
     throw new Error("Une explication ne se modifie pas. Préparez-en une autre.");
   }
   if (revision !== a.revision) return "conflit";
-  const avant = JSON.parse(a.contenu) as Contenu;
   const erreurs = erreursContenu(neuf, avant);
   if (erreurs.length) throw new Error(erreurs.join(" "));
   const avis = new Map(
