@@ -1,13 +1,17 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { html, raw } from "hono/html";
 import type { Compte } from "../comptes.ts";
-import { config } from "../config.ts";
+import { config, RACINE } from "../config.ts";
 import { SCRIPT_RECHARGEMENT } from "../rechargement.ts";
 import type { Instance } from "../instance.ts";
+import { type Formes, formes } from "../../core/accords.ts";
 import { type Icone, icone } from "../icones.ts";
 
 /**
  * Les feuilles de `static/css/`, dans l'ordre de la cascade : à sélecteur égal, la règle d'une
- * feuille l'emporte sur celle d'une feuille placée avant elle.
+ * feuille l'emporte sur celle d'une feuille placée avant elle. Hors `pnpm dev`, Vite les réunit
+ * en une seule feuille hachée (`src/app/client/styles.css`).
  */
 const FEUILLES = [
   "base",
@@ -28,6 +32,24 @@ const FEUILLES = [
   "sommaire",
 ];
 
+/** La feuille réunie par Vite (`static/dist/assets/styles-*.css`), ou rien avant construction. */
+const feuilleReunie = (() => {
+  try {
+    const manifeste = JSON.parse(
+      readFileSync(join(RACINE, "static/dist/.vite/manifest.json"), "utf8"),
+    ) as Record<string, { file?: string }>;
+    const fichier = manifeste["src/app/client/styles.css"]?.file;
+    return fichier ? `/static/dist/${fichier}` : undefined;
+  } catch {
+    return undefined;
+  }
+})();
+
+const liensStyles = () =>
+  !config.dev && feuilleReunie
+    ? html`<link rel="stylesheet" href="${feuilleReunie}">`
+    : FEUILLES.map((f) => html`<link rel="stylesheet" href="/static/css/${f}.css">`);
+
 export const page = (
   titre: string,
   compte: Compte | null,
@@ -37,6 +59,8 @@ export const page = (
   railReplie = false,
   instance: Pick<Instance, "nom" | "mode"> = { nom: "Thot", mode: "shared" },
   legendes = 0,
+  /** le terme de cours de l'instance, celui du profil par défaut */
+  fc: Formes = formes("Cours", "Cours", "m"),
 ) => {
   // L'administration garde le menu de l'enseignant : on y passe sans changer d'espace.
   const prof =
@@ -50,7 +74,7 @@ export const page = (
         <meta name="htmx-config" content='{"globalViewTransitions":true}'>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>${titre} · ${instance.nom}</title>
-        ${FEUILLES.map((f) => html`<link rel="stylesheet" href="/static/css/${f}.css">`)}
+        ${liensStyles()}
         <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
         <script src="/static/vendor/htmx.min.js" defer></script>
         <script src="/static/vendor/htmx-ext-sse.js" defer></script>
@@ -63,13 +87,13 @@ export const page = (
         <a class="evitement" href="#contenu">Aller au contenu</a>
         ${
           compte && prof
-            ? rail(compte, chemin, railReplie, instance, legendes)
+            ? rail(compte, chemin, railReplie, instance, legendes, fc)
             : html`
           <header class="site">
             <a class="marque" href="/">${instance.nom}</a>
             ${
               compte && !compte.renouveler_mdp && chemin !== "/eleve/recherche"
-                ? rechercheEntete
+                ? rechercheEntete(fc)
                 : ""
             }
             ${
@@ -116,9 +140,9 @@ const compteMenu = (c: Compte) =>
     </details>
   `;
 
-const rechercheEntete = html`
+const rechercheEntete = (fc: Formes) => html`
   <form method="get" action="/eleve/recherche" role="search" class="recherche-entete">
-    <input type="search" name="q" required maxlength="300" aria-label="Chercher dans le cours"
+    <input type="search" name="q" required maxlength="300" aria-label="Chercher dans ${fc.le}"
       placeholder="Chercher une ressource">
     <button aria-label="Chercher">${icone("magnifying-glass")}</button>
   </form>
@@ -177,6 +201,7 @@ const rail = (
   replie: boolean,
   instance: Pick<Instance, "nom" | "mode">,
   legendes: number,
+  fc: Formes,
 ) =>
   html`
     <header class="rail">
@@ -211,7 +236,7 @@ const rail = (
         ${
           instance.mode === "shared"
             ? html`
-            ${lienNav("/prof/cours", "Mes cours", "squares-four", chemin.startsWith("/prof/cours"))}
+            ${lienNav("/prof/cours", `Mes ${fc.noms}`, "squares-four", chemin.startsWith("/prof/cours"))}
             ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
             ${lienNav(
               "/prof/questions",

@@ -54,9 +54,19 @@
   margin-top: var(--s5);
   font-size: 1.125rem;
 }
+/* Un titre Markdown au-delà du troisième niveau garde la taille du texte, en gras. */
+.document :is(h4, h5, h6) {
+  margin: var(--s5) 0 var(--s3);
+  font-size: 1rem;
+  line-height: 1.3;
+}
 .document .intertitre {
   margin-top: var(--s6);
   scroll-margin-top: var(--s5);
+}
+/* Un sous-titre se tient plus près de son titre que deux sections entre elles. */
+.document :is(h3, h4, h5, h6).intertitre {
+  margin-top: var(--s5);
 }
 .document .cadre-tableau {
   margin: var(--s4) 0 var(--s5);
@@ -187,6 +197,13 @@
   border-left: 1px solid var(--line);
   list-style: none;
 }
+/* Le sommaire range un sous-titre sous son titre. */
+.sommaire li[data-niveau="3"] {
+  padding-left: var(--s3);
+}
+.sommaire li[data-niveau="4"] {
+  padding-left: var(--s5);
+}
 :is(.sommaire, .ressources-theme) a {
   display: block;
   padding: var(--s1) 0;
@@ -201,7 +218,7 @@
 }
 .ressources-theme a[aria-current="page"] {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
 }
 .suite-lecture {
   display: flex;
@@ -215,7 +232,7 @@
 .suite-lecture a {
   max-width: 24rem;
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
 }
 .suite-lecture a:hover {

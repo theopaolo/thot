@@ -7,6 +7,7 @@ import {
 import { type Perimetre, revisionCitable } from "../../core/recherche.ts";
 import { type Compte, lecteur, lireCompte } from "../comptes.ts";
 import type { Db } from "../db.ts";
+import { libelles } from "../termes.ts";
 import { catalogueDe } from "../domaines.ts";
 import { lireInstance } from "../instance.ts";
 
@@ -239,7 +240,9 @@ export const activiteEleve = (db: Db, c: Compte, id: string) => {
 /** Le cours d'une nouvelle activité, s'il fait partie de ceux du compte. */
 export const cibleDe = (db: Db, compte: Compte, coursId: string): Cible => {
   if (!catalogueDe(db, compte).cours.some((c) => c.id === coursId)) {
-    throw new Error("Choisissez un de vos cours.");
+    throw new Error(
+      `Choisissez ${libelles(db).formes.cours.selon("un", "une")} de vos ${libelles(db).formes.cours.noms}.`,
+    );
   }
   return {
     cours_id: coursId,

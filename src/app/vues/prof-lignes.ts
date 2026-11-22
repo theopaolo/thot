@@ -179,8 +179,9 @@ const ecartLigne = (l: LigneSource) =>
 const plis = (
   lignes: LigneSource[],
   requete: string,
-  noms: Pick<Libelles, "cours" | "regroupement">,
+  noms: Pick<Libelles, "cours" | "regroupement"> & Partial<Pick<Libelles, "formes">>,
 ) => {
+  const ce = noms.formes?.cours.ce ?? "ce cours";
   const groupes = grouper(lignes, noms);
   const p = new URLSearchParams(requete);
   const filtre = ["q", "statut", "theme", "lot"].some((k) => p.get(k));
@@ -209,8 +210,8 @@ const plis = (
       )}</span>${etat.html}</summary>
       <div class="pli-corps">${liste(g, i)}${
         g.coursId
-          ? html`<p class="pli-pied"><a href="/prof?cours_id=${g.coursId}">Ne montrer que ce cours</a><a
-              href="/prof/depot?cours=${g.coursId}">Déposer dans ce cours</a></p>`
+          ? html`<p class="pli-pied"><a href="/prof?cours_id=${g.coursId}">Ne montrer que ${ce}</a><a
+              href="/prof/depot?cours=${g.coursId}">Déposer dans ${ce}</a></p>`
           : ""
       }</div>
     </details>`;
@@ -223,7 +224,10 @@ export const lignesSources = (
   requete: string,
   grille = false,
   coursId = "",
-  noms: Pick<Libelles, "cours" | "regroupement"> = { cours: "cours", regroupement: "thème" },
+  noms: Pick<Libelles, "cours" | "regroupement"> & Partial<Pick<Libelles, "formes">> = {
+    cours: "cours",
+    regroupement: "thème",
+  },
 ) => {
   const actifs = lignes.some((l) => JOBS_ACTIFS.includes(l.etat));
   const rafraichir = actifs

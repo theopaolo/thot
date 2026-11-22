@@ -3,8 +3,9 @@ import { longueur } from "./texte.ts";
 /**
  * Un passage extrait, avant assemblage. `page` situe le passage dans l'original : page d'un PDF,
  * diapositive d'une présentation. `code` marque un bloc de code, rendu dans un `<pre>`, et
- * `langage` le langage que nomme sa clôture Markdown. `codes` donne les plages de code en ligne,
- * en points de code du texte. Les extractions antérieures n'en ont pas.
+ * `langage` le langage que nomme sa clôture Markdown. `codes` et `gras` donnent les plages de
+ * code en ligne et de gras, en points de code du texte. `niveau` est celui d'un titre Markdown,
+ * de 1 à 6. Les extractions antérieures n'en ont pas.
  */
 export type Partie = {
   texte: string;
@@ -13,6 +14,8 @@ export type Partie = {
   code?: true;
   langage?: string;
   codes?: [number, number][];
+  gras?: [number, number][];
+  niveau?: number;
 };
 
 export type Bloc = Partie & { id: string; debut: number; fin: number };
@@ -33,7 +36,7 @@ export function assembler(parties: Partie[]): Document {
   const blocs: Bloc[] = [];
   let texte = "";
   let curseur = 0;
-  for (const { codes, ...p } of parties) {
+  for (const { codes, gras, ...p } of parties) {
     // Un bloc de code ne perd en tête que ses lignes vides : sa première ligne garde son retrait.
     const tete = p.code ? p.texte.replace(/^(?:[^\S\n]*\n)+/, "") : p.texte.trimStart();
     const t = tete.trimEnd();
@@ -45,12 +48,15 @@ export function assembler(parties: Partie[]): Document {
     const n = longueur(t);
     // Les plages suivent le texte rogné.
     const retrait = longueur(p.texte) - longueur(tete);
-    const plages = codes
-      ?.map(([a, z]): [number, number] => [a - retrait, z - retrait])
-      .filter(([a, z]) => a >= 0 && a < z && z <= n);
+    const rognees = (plages?: [number, number][]) =>
+      plages
+        ?.map(([a, z]): [number, number] => [a - retrait, z - retrait])
+        .filter(([a, z]) => a >= 0 && a < z && z <= n);
+    const [lesCodes, lesGras] = [rognees(codes), rognees(gras)];
     blocs.push({
       ...p,
-      ...(plages?.length && { codes: plages }),
+      ...(lesCodes?.length && { codes: lesCodes }),
+      ...(lesGras?.length && { gras: lesGras }),
       texte: t,
       id: `blk_${blocs.length}`,
       debut: curseur,

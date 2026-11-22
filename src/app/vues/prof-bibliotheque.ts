@@ -5,7 +5,14 @@ import type { Libelles } from "../instance.ts";
 import { type Dossier, type Etape, dossier, fil } from "./bureau.ts";
 import { nombre } from "./commun.ts";
 import { type LigneSource, lignesSources } from "./prof-lignes.ts";
-import type { QuestionProf } from "./prof-questions.ts";
+
+/** Synthèse des questions d'élèves affichée en tête de la bibliothèque. */
+export type ActiviteEleves = {
+  total: number;
+  semaine: number;
+  sansReponse: number;
+  dernieres: { id: string; question: string; etat: string; nom: string }[];
+};
 
 type Filtres = {
   q: string;
@@ -65,8 +72,8 @@ export type Debut = {
   certifiee: boolean;
   administrateur: boolean;
   personnel: boolean;
-  /** les questions des élèves des cours du compte, vides en mode personnel */
-  questions?: QuestionProf[];
+  /** synthèse des questions des élèves des cours du compte, absente en mode personnel */
+  activite?: ActiviteEleves;
 };
 /** Les étapes de prise en main sont faites : Thot peut répondre. */
 const pret = (d: Debut) => d.cours && d.ressource && d.certifiee;
@@ -75,7 +82,7 @@ const pret = (d: Debut) => d.cours && d.ressource && d.certifiee;
  * vide qui répéterait que les réponses citent les ressources certifiées.
  */
 const invitation = (d: Debut) =>
-  pret(d) && !d.questions?.length
+  pret(d) && !d.activite?.total
     ? html` ${d.personnel ? "" : "Aucune question d'élève pour l'instant. "}<a href="/eleve/chat">${
         d.personnel ? "Poser une question" : "Essayer avec une question"
       }</a>`
@@ -84,24 +91,21 @@ const invitation = (d: Debut) =>
  * Ce que Thot fait des ressources, une fois l'une d'elles certifiée : les questions des élèves de
  * la semaine, dont celles qu'aucun passage du cours n'a pu prouver.
  */
-const activiteEleves = (d: Debut) => {
-  if (!d.questions?.length) return "";
-  const semaine = Date.now() - 7 * 24 * 3600 * 1000;
-  const recentes = d.questions.filter((q) => Date.parse(q.cree_le) >= semaine);
-  const sansReponse = recentes.filter((q) => q.etat === "out_of_corpus").length;
-  const dernieres = [...d.questions].sort((a, b) => b.cree_le.localeCompare(a.cree_le)).slice(0, 3);
+const activiteEleves = (d: Debut, l: Libelles) => {
+  if (!d.activite?.total) return "";
+  const { semaine, sansReponse, dernieres } = d.activite;
   return html`
     <section class="activite-eleves" aria-labelledby="activite-eleves">
       <h2 id="activite-eleves">${d.personnel ? "Vos questions" : "Questions des élèves"}</h2>
-      <p>${recentes.length} cette semaine${
+      <p>${semaine} cette semaine${
         sansReponse
-          ? html`, dont ${sansReponse} sans passage dans le cours : un document manque peut-être`
+          ? html`, dont ${sansReponse} sans passage dans ${l.formes.cours.le} : un document manque peut-être`
           : ""
       }. <a href="/prof/questions">Voir les questions</a></p>
       <ul>${dernieres.map(
         (q) =>
           html`<li>« <a href="/prof/questions/${q.id}">${q.question}</a> » <span class="discret">${q.nom}${
-            q.etat === "out_of_corpus" ? ", sans passage dans le cours" : ""
+            q.etat === "out_of_corpus" ? `, sans passage dans ${l.formes.cours.le}` : ""
           }</span></li>`,
       )}</ul>
     </section>
@@ -111,8 +115,9 @@ const activiteEleves = (d: Debut) => {
  * Les étapes qui mènent à une première réponse, tant qu'il manque un cours, une ressource ou une
  * ressource certifiée. Une étape faite reste listée, cochée.
  */
-const premiersPas = (d: Debut) => {
+const premiersPas = (d: Debut, l: Libelles) => {
   if (pret(d)) return "";
+  const { cours: fc, matiere: fm } = l.formes;
   const etape = (fait: boolean, titre: unknown, aide: string) =>
     html`<li class="${fait ? "fait" : ""}">${fait ? html`${icone("check")}<span class="visuellement-cache">Fait : </span>` : ""}<strong>${titre}</strong>
       <span class="discret">${aide}</span></li>`;
@@ -123,11 +128,11 @@ const premiersPas = (d: Debut) => {
         ${etape(
           d.cours,
           d.administrateur
-            ? html`<a href="/administration/domaines">Créer une matière et un cours</a>`
-            : "Rejoindre un cours",
+            ? html`<a href="/administration/domaines">Créer ${fm.un} et ${fc.un}</a>`
+            : `Rejoindre ${fc.un}`,
           d.administrateur
-            ? "Ils rangent les ressources."
-            : "Un administrateur crée les cours et vous y inscrit.",
+            ? `${fm.selon("Ils", fc.selon("Ils", "Elles"))} rangent les ressources.`
+            : `Un administrateur crée les ${fc.noms} et vous y inscrit.`,
         )}
         ${etape(
           d.ressource,
@@ -144,7 +149,7 @@ const premiersPas = (d: Debut) => {
           html`<a href="/eleve">${d.personnel ? "Étudier" : "Ouvrir la vue élève"}</a>`,
           d.personnel
             ? "Posez vos questions. Chaque réponse cite les passages de vos ressources."
-            : "Les élèves membres du cours y posent leurs questions. Chaque réponse cite les passages des ressources certifiées.",
+            : `Les élèves membres ${fc.du} y posent leurs questions. Chaque réponse cite les passages des ressources certifiées.`,
         )}
       </ol>
     </section>
@@ -184,7 +189,7 @@ export const sources = (
           }${invitation(debut)}</p>`
         : ""
     }
-    ${!debut ? "" : pret(debut) ? activiteEleves(debut) : premiersPas(debut)}
+    ${!debut ? "" : pret(debut) ? activiteEleves(debut, l) : premiersPas(debut, l)}
     ${ongletsBibliotheque("/prof")}
     ${
       supprimee
@@ -276,7 +281,7 @@ export const sources = (
             <button type="button" class="lien" data-selection="tout">Tout sélectionner</button>
             <button type="button" class="lien" data-selection="aucun">Annuler</button>
             <button class="principal certifier espace" name="statut" value="certifiee" formnovalidate
-              data-certifier-selection>
+              data-certifier-selection="${l.formes.cours.noms}">
               ${icone("check")} Certifier
             </button>
             <button name="statut" value="rejetee" formnovalidate data-rejeter-selection>

@@ -2,6 +2,7 @@ import { transaction } from "../../core/recherche.ts";
 import { sansAccents, texte } from "../../core/texte.ts";
 import type { Compte } from "../comptes.ts";
 import { type Db, maintenant } from "../db.ts";
+import { libelles } from "../termes.ts";
 import { catalogueDe } from "../domaines.ts";
 import { type Activite, LUE } from "./acces.ts";
 
@@ -22,7 +23,7 @@ export function objectifChoisi(db: Db, coursId: string, objectifId: string, inti
   const o = db
     .prepare("SELECT intitule FROM objectifs WHERE id = ? AND cours_id = ?")
     .get(objectifId, coursId) as { intitule: string } | undefined;
-  if (!o) throw new Error("Objectif inconnu dans ce cours.");
+  if (!o) throw new Error(`Objectif inconnu dans ${libelles(db).formes.cours.ce}.`);
   return o.intitule;
 }
 
@@ -34,7 +35,7 @@ export function changerObjectif(db: Db, a: Activite, objectifId: string) {
        AND EXISTS (SELECT 1 FROM objectifs WHERE id = ? AND cours_id = ?)`,
     )
     .run(objectifId, maintenant(), a.id, objectifId, a.cours_id);
-  if (!r.changes) throw new Error("Objectif inconnu dans ce cours.");
+  if (!r.changes) throw new Error(`Objectif inconnu dans ${libelles(db).formes.cours.ce}.`);
 }
 
 /** Un objectif d'un cours du compte, ou une erreur. */
@@ -43,7 +44,7 @@ const objectifDu = (db: Db, compte: Compte, id: string) => {
     | { id: string; cours_id: string; intitule: string }
     | undefined;
   if (!o || !catalogueDe(db, compte).cours.some((c) => c.id === o.cours_id)) {
-    throw new Error("Objectif inconnu dans vos cours.");
+    throw new Error(`Objectif inconnu dans vos ${libelles(db).formes.cours.noms}.`);
   }
   return o;
 };
@@ -54,7 +55,7 @@ export function renommerObjectif(db: Db, compte: Compte, id: string, intitule: s
   const autre = objectifNomme(db, o.cours_id, t);
   if (autre && autre.id !== id) {
     throw new Error(
-      `« ${autre.intitule} » existe déjà dans ce cours : fusionnez les deux objectifs.`,
+      `« ${autre.intitule} » existe déjà dans ${libelles(db).formes.cours.ce} : fusionnez les deux objectifs.`,
     );
   }
   db.prepare("UPDATE objectifs SET intitule = ? WHERE id = ?").run(t, id);
@@ -65,7 +66,9 @@ export function fusionnerObjectifs(db: Db, compte: Compte, de: string, vers: str
   const a = objectifDu(db, compte, de);
   const b = objectifDu(db, compte, vers);
   if (a.id === b.id || a.cours_id !== b.cours_id) {
-    throw new Error("Choisissez un autre objectif du même cours.");
+    throw new Error(
+      `Choisissez un autre objectif ${libelles(db).formes.cours.selon("du même", "de la même")} ${libelles(db).formes.cours.nom}.`,
+    );
   }
   transaction(db, () => {
     db.prepare("UPDATE activites SET objectif_id = ? WHERE objectif_id = ?").run(b.id, a.id);

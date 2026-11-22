@@ -1,5 +1,7 @@
 import { FILTRE_ACCES, type Lecteur, parametresAcces } from "../../core/recherche.ts";
 import type { Db } from "../db.ts";
+import { minuscule } from "../../core/accords.ts";
+import { libelles } from "../termes.ts";
 import { cours, theme } from "./catalogue.ts";
 import { coursDuCompte, type Membre, MES_COURS, mesCours } from "./membres.ts";
 
@@ -24,7 +26,9 @@ export function liensAutorises(
 ): Affiliation[] {
   const siens = c.administrateur === 1 ? null : coursDuCompte(db, c.id);
   if (siens && liens.some((l) => !siens.has(l.cours_id))) {
-    throw new Error("Rattachement refusé : ce cours n'est pas le vôtre.");
+    throw new Error(
+      `Rattachement refusé : ${libelles(db).formes.cours.ce} n'est pas ${libelles(db).formes.cours.selon("le vôtre", "la vôtre")}.`,
+    );
   }
   const actuels = sourceId
     ? (db
@@ -34,7 +38,7 @@ export function liensAutorises(
   const autres = siens ? actuels.filter((l) => !siens.has(l.cours_id)) : [];
   // Sans cours, une source partagée se lirait dans toute l'instance.
   if (actuels.length && !liens.length && !autres.length) {
-    throw new Error("Une ressource rattachée garde au moins un cours.");
+    throw new Error(`Une ressource rattachée garde au moins ${libelles(db).formes.cours.un}.`);
   }
   return [...liens, ...autres];
 }
@@ -47,7 +51,7 @@ export function affiliations(db: Db, sourceId: string, liens: Affiliation[]) {
           .prepare("SELECT id FROM themes WHERE id = ? AND cours_id = ?")
           .get(l.theme_id, l.cours_id))
     )
-      throw new Error("Cours ou thème inconnu.");
+      throw new Error(`${libelles(db).cours} ou ${minuscule(libelles(db).regroupement)} inconnu.`);
   }
   db.prepare("DELETE FROM source_cours WHERE source_id = ?").run(sourceId);
   for (const l of liens) {

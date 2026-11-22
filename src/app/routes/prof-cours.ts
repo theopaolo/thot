@@ -7,16 +7,16 @@ import { libelles } from "../instance.ts";
 import * as ProfCours from "../vues/prof-cours.ts";
 import type { Env, Web } from "./web.ts";
 
-const REFUS_COURS = "Inscription refusée : cochez un ou plusieurs de vos cours.";
-
 export function routesProfCours(app: Hono<Env>, w: Web) {
   const { db, rendre } = w;
+  const refusCours = () =>
+    `Inscription refusée : cochez un ou plusieurs de vos ${libelles(db).formes.cours.noms}.`;
   const pageCours = (c: Context<Env>, erreur?: string) => {
     const moi = c.get("compte");
     const cat = Domaines.catalogueDe(db, moi);
     return rendre(
       c,
-      "Mes cours",
+      `Mes ${libelles(db).formes.cours.noms}`,
       ProfCours.mesCours(
         cat,
         new Map(
@@ -83,11 +83,11 @@ export function routesProfCours(app: Hono<Env>, w: Web) {
         }
         case "collegue": {
           const cours = coursCoches(c, b);
-          if (!cours) return c.html(pageCours(c, REFUS_COURS), 400);
+          if (!cours) return c.html(pageCours(c, refusCours()), 400);
           const collegue = champ("compte_id");
           if (!estEnseignant(db, collegue)) {
             throw new Error(
-              "Seul un compte enseignant s'ajoute comme collègue. Un élève rejoint vos cours par un lien d'inscription.",
+              `Seul un compte enseignant s'ajoute comme collègue. Un élève rejoint vos ${libelles(db).formes.cours.noms} par un lien d'inscription.`,
             );
           }
           transaction(db, () => {

@@ -100,8 +100,10 @@ vient du contenu, sauf le Markdown qui n'a pas de signature : il demande l'exten
 `.markdown`, des octets UTF-8 valides et aucun NUL. Son texte de preuve est celui que le lecteur
 voit une fois la page rendue : les titres ATX (`#`) ouvrent les sections, les marques de lien et
 d'emphase disparaissent, même autour d'un code en ligne, et les blocs de code et `mermaid` restent
-mot pour mot. Le code en ligne garde son texte, et sa plage est notée hors du texte pour que le
-lecteur l'affiche en code. Le langage nommé par la clôture d'un bloc est noté hors du texte : le
+mot pour mot. Le code en ligne et le gras gardent leur texte, et leur plage est notée hors du texte
+pour que le lecteur les affiche. Le texte de preuve ne dépend pas du gras : une marque de gras qui
+changerait le texte lu, après un `\` par exemple, n'est pas notée. Un titre note aussi son niveau,
+que le lecteur rend en intertitre et en retrait dans le sommaire. Le langage nommé par la clôture d'un bloc est noté hors du texte : le
 lecteur dessine un bloc `mermaid` en figure, avec le moteur des réponses, sans le front matter ni
 les directives de l'auteur. Un bloc `animated` de carnet qui commence par `sequenceDiagram` se
 dessine de même, dans son état final, et ses lignes `%% note:` passent en liste numérotée sous le
@@ -292,10 +294,18 @@ en code, avec sa propre évaluation.
 
 Les termes de matière, de cours, de niveau et de regroupement appartiennent à l'instance, pas à
 la matière : l'accueil de l'élève et la bibliothèque montrent plusieurs matières sur une page. Un
-terme se règle au singulier et au pluriel, sans genre. L'interface ne l'accorde donc avec aucun
-article ni adjectif. Le terme de regroupement nomme les thèmes partout, administration comprise.
-Les termes de matière et de cours nomment les titres, les champs, les colonnes et le choix du
-cours. Les phrases de l'interface disent encore « matière » et « cours ».
+terme se règle au singulier et au pluriel. Le terme de regroupement nomme les thèmes partout,
+administration comprise.
+
+« Matière » et « cours » sont les mots de base, que chacun comprend. Une instance les remplace par
+les siens, « Formation » et « Unité » par exemple, et règle leur genre avec eux. Les titres, les
+champs, les phrases de l'interface et les messages d'erreur prennent alors ce terme, avec son
+article et ses accords : « un cours » devient « une unité », « ce cours » devient « cette unité »
+(`formes()` dans `src/core/accords.ts`). Un terme vide garde le mot et le genre du profil. Une
+phrase lit ses termes dans `libelles(db).formes`, y compris quand « cours » désigne le contenu :
+« Dans ton cours », « Que dit le cours sur… ». Les réglages nomment les deux mots de base dans
+leurs libellés, pour dire ce que l'on renomme. Les mots « élève » et « enseignant » ne se règlent
+pas, et le niveau et le regroupement ne s'accordent pas dans une phrase.
 
 Les champs du dépôt appartiennent à chaque matière. Une matière coche des champs prédéfinis et
 des champs personnalisés de l'instance, de type texte, date ou mots-clés. La valeur d'un champ
@@ -784,7 +794,8 @@ mode strict puis DOMPurify sur le SVG. Un échec laisse la liste.
 
 Une formule est un fait. Une phrase ne rend une formule `$…$` ou `$$…$$` avec KaTeX que si le
 passage cité l'écrit dans le document, casse comprise et espaces mis à part. Sinon la formule
-reste du texte. KaTeX
+reste du texte. Le texte d'une source est sa propre preuve : le lecteur et le panneau de citation
+rendent ses formules, sauf dans un bloc de code ou un code en ligne, qui gardent leurs `$`. KaTeX
 tourne sans confiance, avec des macros neuves à chaque formule et une expansion bornée
 (`optionsKatex()`). Rendre une formule ne vérifie ni son raisonnement, ni ses unités, ni son
 résultat.

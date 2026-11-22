@@ -122,9 +122,11 @@ main.page-chat #erreur-reseau {
   position: absolute;
   inset: -11px -4px;
 }
+/* Le trait d'encre dit la citation ouverte sans la couleur. */
 .citation[aria-pressed="true"] {
   border-color: var(--yellow);
   background: var(--yellow-surface);
+  box-shadow: inset 0 -2px 0 var(--ink);
 }
 .image-reponse {
   display: block;

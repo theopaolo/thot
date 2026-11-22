@@ -1,0 +1,17 @@
+/* Feuilles de `static/css/` dans l'ordre de la cascade de `src/app/vues/page.ts`. */
+@import "../../../static/css/base.css";
+@import "../../../static/css/navigation.css";
+@import "../../../static/css/page.css";
+@import "../../../static/css/documents.css";
+@import "../../../static/css/lecture.css";
+@import "../../../static/css/chat.css";
+@import "../../../static/css/enseignant.css";
+@import "../../../static/css/impression.css";
+@import "../../../static/css/bibliotheque.css";
+@import "../../../static/css/reponses.css";
+@import "../../../static/css/activites.css";
+@import "../../../static/css/administration.css";
+@import "../../../static/css/dossiers.css";
+@import "../../../static/css/eleves.css";
+@import "../../../static/css/relecture.css";
+@import "../../../static/css/sommaire.css";

@@ -260,7 +260,7 @@ function recapituler(form: HTMLFormElement) {
   const lecteurs = form.querySelector<HTMLInputElement>("input[name=audience]:checked");
   recap.textContent = `${
     choix.value === "nouveau"
-      ? `Dans : ${nomMatiere} / ${valeur("nouveau_cours")?.value.trim()}, créé avec le dépôt.`
+      ? `Dans : ${nomMatiere} / ${valeur("nouveau_cours")?.value.trim()}, créé${recap.dataset.accord ?? ""} avec le dépôt.`
       : `Dans : ${choix.dataset.chemin}.`
   }${lecteurs ? ` Lecteurs : ${lecteurs.closest("label")?.textContent?.trim().toLowerCase()}.` : ""}`;
   recap.hidden = false;

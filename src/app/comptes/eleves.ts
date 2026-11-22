@@ -1,5 +1,6 @@
 import { transaction } from "../../core/recherche.ts";
 import { type Db, maintenant } from "../db.ts";
+import { libelles } from "../termes.ts";
 import { inscrire } from "../domaines.ts";
 import { type Compte, deriver, hex } from "./compte.ts";
 
@@ -91,7 +92,7 @@ export async function creerEleves(
   for (const c of comptes) {
     if (existants.get(c.identifiant)) {
       throw new Error(
-        `Identifiant déjà utilisé : ${c.identifiant}. Un élève qui a déjà un compte rejoint vos cours par un lien d'inscription.`,
+        `Identifiant déjà utilisé : ${c.identifiant}. Un élève qui a déjà un compte rejoint vos ${libelles(db).formes.cours.noms} par un lien d'inscription.`,
       );
     }
   }

@@ -8,6 +8,8 @@ import { connexion, migrer } from "../src/app/db.ts";
 import { config, RACINE } from "../src/app/config.ts";
 import { deposer, valider } from "../src/app/depot.ts";
 import {
+  type Catalogue,
+  type Scope,
   affiliations,
   catalogue,
   catalogueVisible,
@@ -17,6 +19,7 @@ import {
   renommer,
   theme,
 } from "../src/app/domaines.ts";
+import { nomPerimetre } from "../src/app/vues/commun.ts";
 import { lireInstance } from "../src/app/instance.ts";
 import {
   indexer,
@@ -85,6 +88,8 @@ test("migration des matières : métadonnées intactes, thèmes homonymes sépar
       "0028_connexions.sql",
       "0029_images_revision.sql",
       "0030_images_numero.sql",
+      "0031_genres.sql",
+      "0032_index.sql",
     ]);
     assertEquals(migrer(db), []);
     const sources = db.prepare("SELECT * FROM sources ORDER BY id").all();
@@ -553,4 +558,20 @@ test("ordre de lecture : le front matter range le thème, l'enseignant le change
     db.close();
     await rm(dir, { recursive: true });
   }
+});
+
+test("périmètre : un thème nommé d'après son cours n'est pas répété", () => {
+  const cat = {
+    matieres: [{ id: "m", nom: "Développement" }],
+    cours: [{ id: "c", matiere_id: "m", nom: "Lire une codebase" }],
+    themes: [
+      { id: "t", cours_id: "c", nom: "Lire une codebase" },
+      { id: "u", cours_id: "c", nom: "Les tests" },
+    ],
+  } as unknown as Catalogue;
+  const termes = { matiere: "Matière", cours: "Cours", regroupement: "Thème" };
+  const nom = (theme_id: string) =>
+    nomPerimetre(cat, { matiere_id: "", cours_id: "", theme_id } as Scope, termes);
+  assertEquals(nom("t"), "Développement / Lire une codebase");
+  assertEquals(nom("u"), "Développement / Lire une codebase / Les tests");
 });

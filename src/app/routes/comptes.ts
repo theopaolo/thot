@@ -11,7 +11,14 @@ import {
   lireCompte,
   TropDEssais,
 } from "../comptes.ts";
-import { enregistrerReglages, libelles, lireInstance, type Reglages, TERMES } from "../instance.ts";
+import {
+  enregistrerReglages,
+  GENRES,
+  libelles,
+  lireInstance,
+  type Reglages,
+  TERMES,
+} from "../instance.ts";
 import { administration } from "../vues/administration.ts";
 import { connexion as formulaireConnexion, inscription, motDePasse } from "../vues/comptes.ts";
 import * as Domaines from "../domaines.ts";
@@ -116,10 +123,11 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
     const champ = (n: string) => String(b[n] ?? "").trim();
     const saisie: Reglages = {
       nom: champ("nom"),
-      ...(Object.fromEntries(TERMES.flat().map((t) => [t, champ(t)])) as Omit<
-        Reglages,
-        "nom" | "lecteurs"
-      >),
+      ...(Object.fromEntries([
+        ...TERMES.flat().map((t) => [t, champ(t)]),
+        // Un genre absent du formulaire garde celui de l'instance.
+        ...GENRES.map((g) => [g, champ(g) || lireInstance(db)[g]]),
+      ]) as Omit<Reglages, "nom" | "lecteurs">),
       // Le mode personnel ne montre pas ce choix : un dépôt n'y a qu'un lecteur.
       lecteurs: String(b.lecteurs ?? lireInstance(db).lecteurs) as Reglages["lecteurs"],
     };
@@ -141,8 +149,13 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
   ) => {
     const jeton = c.req.param("jeton")!;
     const cours = coursDuLien(db, jeton);
+    const fc = libelles(db).formes.cours;
     return c.html(
-      rendre(c, "Rejoindre un cours", inscription(jeton, cours, c.get("compte"), erreur, saisie)),
+      rendre(
+        c,
+        `Rejoindre ${fc.un}`,
+        inscription(jeton, cours, c.get("compte"), fc, erreur, saisie),
+      ),
       cours.length ? statut : 404,
     );
   };

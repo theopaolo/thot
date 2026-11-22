@@ -1,5 +1,7 @@
 import { CHAMPS, type Champ, champsVerrouilles, type Profil, PROFILS } from "../../core/profils.ts";
 import type { Db } from "../db.ts";
+import { majuscule } from "../../core/accords.ts";
+import { libelles } from "../termes.ts";
 
 export const texte = (s: string, max = 200) => {
   if (!s.trim() || s.trim().length > max) throw new Error(`Texte attendu : 1 à ${max} caractères.`);
@@ -32,7 +34,10 @@ export function champsMatiere(db: Db, matiereId: string | null, profil: Profil):
  */
 export function enregistrerChamps(db: Db, matiereId: string, cles: string[], version: number) {
   const m = db.prepare("SELECT profil FROM matieres WHERE id = ?").get(matiereId);
-  if (!m) throw new Error("Matière inconnue.");
+  if (!m)
+    throw new Error(
+      `${majuscule(libelles(db).formes.matiere.nom)} inconnu${libelles(db).formes.matiere.e}.`,
+    );
   const choisis = new Set([...champsVerrouilles(m.profil as Profil), ...cles]);
   const connus = catalogueChamps(db).map((c) => c.cle);
   if ([...choisis].some((c) => !connus.includes(c))) throw new Error("Champ inconnu.");

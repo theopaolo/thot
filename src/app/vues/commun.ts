@@ -110,7 +110,8 @@ export const nombre = (n: number, mot: string) => `${n} ${mot}${n > 1 ? "s" : ""
 const LISTE = new Intl.ListFormat("fr");
 /**
  * « Arts appliqués / STD2A / Bauhaus », en nommant le niveau qui a disparu. Vide : tout. Une
- * comparaison nomme ses matières : « Histoire de l'art et Physique ».
+ * comparaison nomme ses matières : « Histoire de l'art et Physique ». Un niveau qui porte le nom
+ * du précédent, comme un thème nommé d'après son cours, ne se répète pas.
  */
 export const nomPerimetre = (
   cat: Catalogue,
@@ -132,7 +133,7 @@ export const nomPerimetre = (
     c?.nom ?? (p.cours_id ? `${l.cours} indisponible` : ""),
     t?.nom ?? (p.theme_id ? `${l.regroupement} indisponible` : ""),
   ]
-    .filter(Boolean)
+    .filter((nom, i, niveaux) => nom && nom !== niveaux[i - 1])
     .join(" / ");
 };
 

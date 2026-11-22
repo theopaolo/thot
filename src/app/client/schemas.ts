@@ -28,6 +28,8 @@ mermaid.initialize({
     "fontFamily",
   ],
   theme: "base",
+  // Mermaid pose le fond d'une étiquette à 50 % d'opacité : le trait se lirait à travers le mot.
+  themeCSS: ".edgeLabel rect { opacity: 1; }",
   fontFamily: '"Atkinson Hyperlegible", system-ui, sans-serif',
   themeVariables: {
     fontFamily: '"Atkinson Hyperlegible", system-ui, sans-serif',

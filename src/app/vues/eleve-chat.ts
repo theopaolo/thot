@@ -154,6 +154,8 @@ export const chat = (f: Fil) => {
                       m.avis,
                       i === f.messages.length - 1 ? f.idees : [],
                       i === derniere,
+                      "",
+                      f.libelles.formes.cours,
                     )
                   : attente(m.id, m.etape)
               }
@@ -218,7 +220,7 @@ export const chat = (f: Fil) => {
           }
         </div>
       </section>
-      <div class="colonne-source">${panneauSource()}</div>
+      <div class="colonne-source">${panneauSource(undefined, undefined, undefined, f.libelles.formes.cours)}</div>
     </div>
   `;
 };

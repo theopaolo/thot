@@ -52,17 +52,27 @@ export const memePerimetre = (a: Scope, b: Scope) =>
   a.matieres === b.matieres;
 
 // La relecture d'une réponse revérifie ses preuves avec les droits de `p`, dans la révision
-// qu'elle cite.
-// ponytail: une révision qui ne sert plus se relit et se redécoupe à chaque affichage. Garder ses
-// chunks en mémoire si le chat ralentit.
-export const resultatActuel = (db: Db, resultat: Resultat, p: Perimetre) =>
-  actualiserResultat(db, resultat, p, (id, n) => chunksSource(db, id, n));
+// qu'elle cite. `chunksSource` garde en mémoire le découpage des anciennes révisions ; `echanges`
+// mémoïse aussi les métadonnées par `(sourceId, revision)` le temps d'un affichage.
+export const resultatActuel = (
+  db: Db,
+  resultat: Resultat,
+  p: Perimetre,
+  ancienne = (id: string, n: number) => chunksSource(db, id, n),
+) => actualiserResultat(db, resultat, p, ancienne);
 
-const relu = (db: Db, compte: Compte, texte: string) =>
-  resultatActuel(db, JSON.parse(texte), {
-    schoolId: lireInstance(db).school_id,
-    lecteur: lecteur(compte),
-  });
+const relu = (
+  db: Db,
+  compte: Compte,
+  texte: string,
+  ancienne?: (id: string, n: number) => ReturnType<typeof chunksSource>,
+) =>
+  resultatActuel(
+    db,
+    JSON.parse(texte),
+    { schoolId: lireInstance(db).school_id, lecteur: lecteur(compte) },
+    ancienne,
+  );
 
 export const conversationDe = (db: Db, compte: Compte, id: string) =>
   db.prepare("SELECT * FROM conversations WHERE id = ? AND compte_id = ?").get(id, compte.id) as
@@ -129,9 +139,16 @@ export function echanges(db: Db, compte: Compte, conversationId: string): Echang
        FROM messages WHERE conversation_id = ? AND compte_id = ? ORDER BY rang`,
     )
     .all(conversationId, compte.id) as (Echange & { resultat: string | null })[];
+  const anciennes = new Map<string, ReturnType<typeof chunksSource>>();
+  const lireAncienne = (id: string, n: number) => {
+    const cle = `${id}:${n}`;
+    let c = anciennes.get(cle);
+    if (!c) anciennes.set(cle, (c = chunksSource(db, id, n)));
+    return c;
+  };
   return lignes.map((m) => {
     if (!m.resultat) return { ...m, resultat: null };
-    const r = relu(db, compte, m.resultat);
+    const r = relu(db, compte, m.resultat, lireAncienne);
     return { ...m, etat: r.etat, resultat: r };
   });
 }
@@ -363,7 +380,7 @@ const QUESTION_LUE = `c.role = 'eleve' AND ($administrateur OR CASE
              ON lui.cours_id = moi.cours_id WHERE moi.compte_id = $lecteur AND lui.compte_id = m.compte_id)
          END)`;
 
-export const questionsDesEleves = (db: Db, l: Lecteur) =>
+export const questionsDesEleves = (db: Db, l: Lecteur, limite?: number) =>
   db
     .prepare(
       `SELECT m.id, m.question, m.etat, m.avis, m.cree_le, c.nom,
@@ -376,9 +393,62 @@ export const questionsDesEleves = (db: Db, l: Lecteur) =>
        LEFT JOIN sources s2 ON s2.id = json_extract(m.journal, '$.candidats[0].source_id')
          AND ${filtreAcces("s2")}
        WHERE ${QUESTION_LUE}
-       ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC`,
+       ORDER BY (m.etat = 'out_of_corpus') DESC, (m.avis = 'faux') DESC, m.cree_le DESC
+       LIMIT $limite`,
     )
-    .all(parametresAcces(l)) as QuestionDesEleves[];
+    .all({ ...parametresAcces(l), limite: limite ?? -1 }) as QuestionDesEleves[];
+
+export type ResumeQuestions = {
+  total: number;
+  semaine: number;
+  sansReponse: number;
+  dernieres: Pick<QuestionDesEleves, "id" | "question" | "etat" | "nom">[];
+};
+
+/**
+ * Synthèse pour l'en-tête de la bibliothèque : compte de la semaine et trois dernières questions,
+ * sans charger ni joindre tous les échanges de l'instance.
+ */
+export function resumeQuestionsDesEleves(
+  db: Db,
+  l: Lecteur,
+  maintenantMs = Date.now(),
+): ResumeQuestions {
+  const acces = parametresAcces(l);
+  const semaine = maintenant(maintenantMs - 7 * 86_400_000);
+  const comptes = db
+    .prepare(
+      `SELECT count(*) AS total,
+         count(*) FILTER (WHERE m.cree_le >= $semaine) AS semaine,
+         count(*) FILTER (WHERE m.cree_le >= $semaine AND m.etat = 'out_of_corpus') AS sans_reponse
+       FROM messages m JOIN comptes c ON c.id = m.compte_id
+       WHERE ${QUESTION_LUE}`,
+    )
+    .get({ administrateur: acces.administrateur, lecteur: acces.lecteur, semaine }) as {
+    total: number;
+    semaine: number;
+    sans_reponse: number;
+  };
+  const dernieres = comptes.total
+    ? (db
+        .prepare(
+          `SELECT m.id, m.question, m.etat, c.nom
+           FROM messages m JOIN comptes c ON c.id = m.compte_id
+           WHERE ${QUESTION_LUE}
+           ORDER BY m.cree_le DESC, m.rowid DESC LIMIT 3`,
+        )
+        .all({ administrateur: acces.administrateur, lecteur: acces.lecteur }) as Pick<
+        QuestionDesEleves,
+        "id" | "question" | "etat" | "nom"
+      >[])
+    : [];
+  return {
+    total: comptes.total,
+    semaine: comptes.semaine,
+    sansReponse: comptes.sans_reponse,
+    dernieres,
+  };
+}
 
 /**
  * Un échange de `questionsDesEleves`, sans sa conversation : ni son titre ni ses autres échanges.

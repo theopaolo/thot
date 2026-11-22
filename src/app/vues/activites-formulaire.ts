@@ -183,7 +183,7 @@ export const formulaire = (d: DetailProf, e: Edition, rang: number, avant?: Ques
         ${
           d.images.length
             ? html`<div class="champ">
-              <label for="f-media">Ou une image d'une source du cours</label>
+              <label for="f-media">Ou une image d'une source ${d.libelles.formes.cours.du}</label>
               <select id="f-media" name="image_media">${[
                 option(
                   "",

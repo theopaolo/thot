@@ -31,7 +31,11 @@ export const lien = (c: Cite) =>
     : `/eleve/sources/${c.source_id}?debut=${c.debut}&fin=${c.fin}&revision=${c.revision}#passage`;
 
 /** Les passages d'un champ. Avec `servies`, une citation qui ne tient plus le dit. */
-export const passages = (ch: { citations: Cite[] }, servies?: Map<string, number | undefined>) =>
+export const passages = (
+  ch: { citations: Cite[] },
+  servies?: Map<string, number | undefined>,
+  ceCours = "ce cours",
+) =>
   ch.citations.length
     ? html`<ul class="discret">${ch.citations.map((c) => {
         const servie = servies?.get(c.source_id);
@@ -39,7 +43,7 @@ export const passages = (ch: { citations: Cite[] }, servies?: Map<string, number
           servies && servie !== c.revision
             ? html` <span class="statut failed">${
                 servie === undefined
-                  ? "source plus citable dans ce cours"
+                  ? `source plus citable dans ${ceCours}`
                   : `version ${c.revision} citée, la source sert la version ${servie}`
               }</span>`
             : "";
@@ -105,7 +109,7 @@ export const listeProf = ({ liste, cat, filtre, libelles: l }: Liste) => html`
   <div class="barre">
     <a class="bouton principal" href="/prof/activites/nouvelle">Préparer une activité</a>
     <a class="bouton" href="/prof/activites/importer">Importer un quiz</a>
-    <p class="aide">Chaque activité part d'un objectif de cours. <a href="/prof/objectifs">Renommer ou fusionner les objectifs</a></p>
+    <p class="aide">Chaque activité part d'un objectif ${l.formes.cours.de}. <a href="/prof/objectifs">Renommer ou fusionner les objectifs</a></p>
   </div>
   <div class="barre">
     <nav class="segments" aria-label="État">${FILTRES_ETAT.map(([v, t]) => {
@@ -135,7 +139,7 @@ export const listeProf = ({ liste, cat, filtre, libelles: l }: Liste) => html`
       </table>`
       : filtre.coursId || filtre.matiereId || filtre.etat
         ? html`<p>Aucune activité ne correspond à ce filtre.</p>`
-        : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'un cours.</p>`
+        : html`<p>Aucune activité. Un exercice ou une explication part d'un objectif et de sources certifiées d'${l.formes.cours.un}.</p>`
   }
 `;
 
@@ -169,7 +173,7 @@ export const objectifs = (liste: LigneObjectif[], l: Libelles, erreur?: string) 
                   )}</select>
                   <button data-confirmer="Fusionner « ${o.intitule} » dans l'objectif choisi ? Ses activités passent à cet objectif, puis il disparaît.">Fusionner</button>
                 </form>`
-                : html`<span class="discret">Seul objectif de ce ${minuscule(l.cours)}</span>`
+                : html`<span class="discret">Seul objectif de ${l.formes.cours.ce}</span>`
             }</td>
           </tr>`;
         })}</tbody>

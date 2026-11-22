@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { Lecteur } from "../../core/recherche.ts";
 import { config } from "../config.ts";
 import { type Db, maintenant } from "../db.ts";
+import { libelles } from "../termes.ts";
 import { inscrire } from "../domaines.ts";
 
 export type Role = "enseignant" | "eleve";
@@ -62,7 +63,7 @@ export async function creerCompte(
   // Vérifiés avant l'insertion : creerAdministrateur appelle cette fonction dans sa transaction.
   for (const coursId of cours) {
     if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
-      throw new Error(`Cours inconnu : ${coursId}.`);
+      throw new Error(`${libelles(db).cours} inconnu${libelles(db).formes.cours.e} : ${coursId}.`);
     }
   }
   const motDePasse = hex(crypto.getRandomValues(new Uint8Array(6)));

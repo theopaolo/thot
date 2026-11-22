@@ -72,7 +72,8 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     const siens = Domaines.coursDuCompte(db, c.get("compte").id);
     return cours.length && cours.every((id) => siens.has(id)) ? cours : undefined;
   };
-  const REFUS_COURS = "Inscription refusée : cochez un ou plusieurs de vos cours.";
+  const refusCours = () =>
+    `Inscription refusée : cochez un ou plusieurs de vos ${libelles(db).formes.cours.noms}.`;
   /** Crée les élèves et montre une seule fois leurs identifiants à remettre. */
   const remettre = async (c: Context<Env>, creer: () => ReturnType<typeof creerEleves>) => {
     try {
@@ -93,14 +94,14 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
       return c.text("Fichier CSV invalide (100 Ko maximum).", 400);
     }
     const cours = coursCoches(c, b);
-    if (!cours) return c.html(pageEleves(c, REFUS_COURS), 400);
+    if (!cours) return c.html(pageEleves(c, refusCours()), 400);
     const csv = await fichier.text();
     return remettre(c, () => importerEleves(db, csv, cours));
   });
   app.post("/prof/eleves/ajouter", async (c) => {
     const b = await c.req.parseBody({ all: true });
     const cours = coursCoches(c, b);
-    if (!cours) return c.html(pageEleves(c, REFUS_COURS), 400);
+    if (!cours) return c.html(pageEleves(c, refusCours()), 400);
     const eleve = compteSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
     if (!eleve) {
       return c.html(
@@ -117,7 +118,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     if (lireInstance(db).mode === "personal") return c.notFound();
     const b = await c.req.parseBody({ all: true });
     const cours = coursCoches(c, b);
-    if (!cours?.length) return c.html(pageEleves(c, REFUS_COURS), 400);
+    if (!cours?.length) return c.html(pageEleves(c, refusCours()), 400);
     try {
       creerLien(db, c.get("compte").id, cours, Number(b.jours), Number(b.places));
     } catch (e) {

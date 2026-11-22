@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import type { Catalogue } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
+import { majuscule } from "../../core/accords.ts";
 import * as Domaines from "./domaines.ts";
 import { type Eleve, tableEleves } from "./prof-eleves.ts";
 
@@ -17,12 +18,12 @@ export const mesCours = (
   erreur?: string,
 ) =>
   html`
-    <h1>Mes cours</h1>
+    <h1>Mes ${l.formes.cours.noms}</h1>
     ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
-    <p>Les enseignants d'un cours lisent et modifient ses ressources qui ne sont pas privées, lisent les questions de ses élèves, gèrent ses élèves et ses liens d'inscription. Un administrateur crée les matières et supprime les cours.</p>
+    <p>Les enseignants d'${l.formes.cours.un} lisent et modifient ses ressources qui ne sont pas privées, lisent les questions de ses élèves, gèrent ses élèves et ses liens d'inscription. Un administrateur crée les ${l.formes.matiere.noms} et supprime les ${l.formes.cours.noms}.</p>
     ${
       !cat.cours.length
-        ? html`<p>Vous n'avez pas encore de cours. Créez-en un, ou demandez à un collègue de vous ajouter aux siens.</p>`
+        ? html`<p>Vous n'avez pas encore ${l.formes.cours.de}. Créez-en ${l.formes.cours.selon("un", "une")}, ou demandez à un collègue de vous ajouter ${l.formes.cours.selon("aux siens", "aux siennes")}.</p>`
         : collegues.length
           ? html`
           <h2>Ajouter un collègue</h2>
@@ -35,8 +36,8 @@ export const mesCours = (
               </select>
             </div>
             <fieldset>
-              <legend>Cours à partager</legend>
-              <p class="discret">Votre collègue lit et modifie les ressources non privées de ces cours, lit les questions de leurs élèves, gère ces élèves, mots de passe compris, et leurs liens d'inscription.</p>
+              <legend>${l.cours_pluriel} à partager</legend>
+              <p class="discret">Votre collègue lit et modifie les ressources non privées de ces ${l.formes.cours.noms}, lit les questions de leurs élèves, gère ces élèves, mots de passe compris, et leurs liens d'inscription.</p>
               ${cat.cours.map(
                 (c) =>
                   html`<label><input type="checkbox" name="cours" value="${c.id}"> ${
@@ -44,21 +45,21 @@ export const mesCours = (
                   } / ${c.nom}</label>`,
               )}
             </fieldset>
-            <button class="principal">Ajouter aux cours cochés</button>
+            <button class="principal">Ajouter aux ${l.formes.cours.noms} coché${l.formes.cours.e}s</button>
           </form>
         `
           : html`<p class="discret">Aucun autre compte enseignant. Un administrateur crée les comptes enseignants.</p>`
     }
     <details ${cat.cours.length ? "" : "open"}>
-      <summary>Créer un cours</summary>
+      <summary>Créer ${l.formes.cours.un}</summary>
       ${
         cat.matieres.length
-          ? html`<p class="discret">Vous devenez membre du cours créé.</p>${Domaines.nouveauCours(
+          ? html`<p class="discret">Vous devenez membre ${l.formes.cours.du} créé${l.formes.cours.e}.</p>${Domaines.nouveauCours(
               cat.matieres,
               l,
               "/prof/cours/creer",
             )}`
-          : html`<p class="discret">Aucune matière. Un administrateur crée les matières.</p>`
+          : html`<p class="discret">${majuscule(l.formes.matiere.aucun)}. Un administrateur crée les ${l.formes.matiere.noms}.</p>`
       }
     </details>
     ${cat.cours.map((cours) => {
@@ -70,7 +71,7 @@ export const mesCours = (
             ? html`<p class="discret">${[cours.public, cours.objectif].filter(Boolean).join(" : ")}</p>`
             : ""
         }
-        ${Domaines.ligne("cours", cours.id, cours.nom, "", "cours", "", "/prof/cours")}
+        ${Domaines.ligne("cours", cours.id, cours.nom, "", l.formes.cours.nom, "", "/prof/cours")}
         <h3>${l.regroupements}</h3>
         ${cat.themes
           .filter((t) => t.cours_id === cours.id)
@@ -90,15 +91,15 @@ export const mesCours = (
                     <input type="hidden" name="cours_id" value="${cours.id}"><input type="hidden" name="compte_id" value="${e.id}">
                     ${
                       e.id === moi
-                        ? html`<button aria-label="Quitter ${cours.nom}" data-confirmer="Quitter ${cours.nom} ? Vous ne gérez plus ses élèves et ne lisez plus leurs questions. Un collègue du cours ou un administrateur peut vous y ajouter à nouveau.">Quitter le cours</button>`
-                        : html`<button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? Son compte et ses ressources restent.">Retirer du cours</button>`
+                        ? html`<button aria-label="Quitter ${cours.nom}" data-confirmer="Quitter ${cours.nom} ? Vous ne gérez plus ses élèves et ne lisez plus leurs questions. Un collègue ${l.formes.cours.du} ou un administrateur peut vous y ajouter à nouveau.">Quitter ${l.formes.cours.le}</button>`
+                        : html`<button aria-label="Retirer ${e.nom} de ${cours.nom}" data-confirmer="Retirer ${e.nom} de ${cours.nom} ? Son compte et ses ressources restent.">Retirer ${l.formes.cours.du}</button>`
                     }
                   </form>
                 `,
                 undefined,
                 "Enseignant",
               )
-            : html`<p class="discret">Aucun enseignant dans ce cours.</p>`
+            : html`<p class="discret">Aucun enseignant dans ${l.formes.cours.ce}.</p>`
         }
       `;
     })}

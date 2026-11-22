@@ -3,6 +3,7 @@ import type { Contenu, Explication, Question } from "../../core/activite.ts";
 import { refusee, valeur } from "../../core/questions.ts";
 import * as Activites from "../activites.ts";
 import { secretSession } from "../comptes.ts";
+import { libelles } from "../instance.ts";
 import * as PratiqueVue from "../vues/pratique.ts";
 import { lettre } from "../vues/questions.ts";
 import type { Env, Web } from "./web.ts";
@@ -76,7 +77,11 @@ export function routesPratique(app: Hono<Env>, w: Web) {
       return rendre(
         c,
         a.titre,
-        PratiqueVue.explication({ ...commun, contenu: JSON.parse(a.contenu) as Explication }),
+        PratiqueVue.explication({
+          ...commun,
+          contenu: JSON.parse(a.contenu) as Explication,
+          fc: libelles(db).formes.cours,
+        }),
       );
     }
     const contenu = JSON.parse(a.contenu) as Contenu;

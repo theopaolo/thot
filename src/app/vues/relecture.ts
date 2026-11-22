@@ -5,13 +5,19 @@ import { texteDocument } from "./document.ts";
 import { jour } from "./commun.ts";
 
 /** Un titre de groupe par cours : une ressource de plusieurs cours se range sous le premier. */
-const groupes = (liste: Attente[]) =>
-  [...Map.groupBy(liste, (a) => a.cours[0] ?? "Sans cours")].map(([cours, items]) => ({
+const groupes = (liste: Attente[], sans: string) =>
+  [...Map.groupBy(liste, (a) => a.cours[0] ?? sans)].map(([cours, items]) => ({
     cours,
     items,
   }));
 
-export const pageRelecture = (liste: Attente[], choisie?: Attente, blocs: Bloc[] = []) =>
+export const pageRelecture = (
+  liste: Attente[],
+  choisie?: Attente,
+  blocs: Bloc[] = [],
+  /** le titre du groupe des ressources sans cours */
+  sans = "Sans cours",
+) =>
   !choisie
     ? html`
         <h1>Relecture</h1>
@@ -23,7 +29,7 @@ export const pageRelecture = (liste: Attente[], choisie?: Attente, blocs: Bloc[]
         <div class="relecture-sources">
           <nav class="relecture-liste" aria-label="Ressources à relire">
             <p class="discret"><a href="/prof">Bibliothèque</a>, ${liste.length} à relire</p>
-            ${groupes(liste).map(
+            ${groupes(liste, sans).map(
               (g) => html`
                 <h2>${g.cours}</h2>
                 <ul>

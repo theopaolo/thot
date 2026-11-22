@@ -64,7 +64,7 @@ export const lecteur = (d: Apercu | undefined, l: Libelles) =>
           )}Lire le document</a>
           <form method="post" action="/eleve/questions">
             ${cleEnvoi()}
-            <input type="hidden" name="texte" value="Que dit le cours sur « ${d.titre} » ?">
+            <input type="hidden" name="texte" value="Que dit ${l.formes.cours.le} sur « ${d.titre} » ?">
             <input type="hidden" name="theme_id" value="${d.theme_id}">
             <button>${icone("chat-circle")}Poser une question dessus</button>
           </form>

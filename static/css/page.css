@@ -137,7 +137,8 @@ textarea {
   width: 100%;
   min-height: 44px;
   padding: var(--s2) var(--s3);
-  border: 1px solid var(--line);
+  /* Un champ se repère par son bord : le graphite atteint 3:1 sur le papier et sur la feuille. */
+  border: 1px solid var(--ink-muted);
   border-radius: var(--radius);
   background: var(--surface);
   color: inherit;
@@ -194,6 +195,15 @@ form.etroit {
 }
 .reglages > fieldset > legend {
   font-size: 1.125rem;
+}
+/* Le genre d'un terme : ses deux choix sur une ligne, sous les champs du terme. */
+.reglages .genre {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--s5);
+}
+.reglages .genre legend {
+  margin-bottom: 0;
 }
 .reglages .champ > label {
   display: block;

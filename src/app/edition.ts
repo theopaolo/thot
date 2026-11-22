@@ -22,6 +22,7 @@ import {
   sourcesCitables,
 } from "./activites.ts";
 import type { Db } from "./db.ts";
+import { libelles } from "./termes.ts";
 
 /** Les langages proposés pour une réponse en code, que Shiki colore. */
 export const LANGAGES = [
@@ -155,7 +156,10 @@ async function image(
   }
   if (media) {
     const i = imagesCitables(db, a).find((x) => x.id === media);
-    if (!i) throw new Error("Image : choisissez une image d'une source citable de ce cours.");
+    if (!i)
+      throw new Error(
+        `Image : choisissez une image d'une source citable de ${libelles(db).formes.cours.ce}.`,
+      );
     return { media: i.id, source: i.source_id, alt };
   }
   return { fichier: avant!.fichier, alt };
@@ -192,7 +196,9 @@ export async function lireQuestion(
   const indice = texte(un(b, "indice"), "Indice", 500, false);
   const ou = un(b, "ou");
   if (ou && !sourcesCitables(db, a).some((s) => s.id === ou)) {
-    throw new Error("Où chercher : choisissez une source citable de ce cours.");
+    throw new Error(
+      `Où chercher : choisissez une source citable de ${libelles(db).formes.cours.ce}.`,
+    );
   }
   const commun = {
     id,

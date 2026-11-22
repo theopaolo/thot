@@ -9,6 +9,7 @@ import {
   type Question,
 } from "../../core/activite.ts";
 import { essaisMax, juste, melanger, points } from "../../core/questions.ts";
+import type { Formes } from "../../core/accords.ts";
 import { type Activite, corrigee, type Tentative } from "../activites.ts";
 import { icone } from "../icones.ts";
 import { passages, TYPES } from "./activites.ts";
@@ -435,11 +436,14 @@ export const explication = ({
   contenu,
   relecteur,
   apercu,
+  fc,
 }: {
   a: Activite;
   contenu: Explication;
   relecteur?: string;
   apercu?: boolean;
+  /** le terme de cours de l'instance */
+  fc?: Formes;
 }) => html`
   <div class="mur-lecteur" data-feuille>
     <div>
@@ -451,9 +455,10 @@ export const explication = ({
         [],
         false,
         `/${apercu ? "prof" : "eleve"}/activites/${a.id}/citations`,
+        fc,
       )}
     </div>
-    <div class="colonne-source">${panneauSource()}</div>
+    <div class="colonne-source">${panneauSource(undefined, undefined, undefined, fc)}</div>
   </div>
 `;
 

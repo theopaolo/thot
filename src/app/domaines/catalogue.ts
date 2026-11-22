@@ -1,6 +1,8 @@
 import { type Profil, PROFILS } from "../../core/profils.ts";
 import { FILTRE_ACCES, type Lecteur, parametresAcces, transaction } from "../../core/recherche.ts";
+import { majuscule, minuscule } from "../../core/accords.ts";
 import type { Db } from "../db.ts";
+import { libelles, profilInstance } from "../termes.ts";
 import { nomChamp, ressourcesAvec, texte } from "./champs.ts";
 import { coursDuCompte, type Membre, MES_COURS, mesCours } from "./membres.ts";
 
@@ -27,17 +29,22 @@ export const catalogue = (db: Db): Catalogue => ({
   themes: db.prepare("SELECT * FROM themes ORDER BY nom").all() as Theme[],
 });
 
-/** Le profil commun des matières et des ressources, absent tant que l'instance est vide. */
-export const profilInstance = (db: Db) =>
-  db.prepare("SELECT profil FROM matieres UNION SELECT profil FROM sources LIMIT 1").get()
-    ?.profil as Profil | undefined;
+export { profilInstance };
+
+/** « Matière inconnue. », avec le terme et le genre de l'instance. */
+export const inconnue = (db: Db) => {
+  const fm = libelles(db).formes.matiere;
+  return `${majuscule(fm.nom)} inconnu${fm.e}.`;
+};
 
 /** Une instance garde un seul profil, partagé par ses matières et ses ressources. */
 function garderProfil(db: Db, profil: string) {
   if (!Object.hasOwn(PROFILS, profil)) throw new Error("Profil inconnu.");
   const autres = db.prepare("SELECT profil FROM matieres UNION SELECT profil FROM sources").all();
   if (autres.some((l) => l.profil !== profil)) {
-    throw new Error("L'instance garde un seul profil, partagé par ses matières et ses ressources.");
+    throw new Error(
+      `L'instance garde un seul profil, partagé par ses ${libelles(db).formes.matiere.noms} et ses ressources.`,
+    );
   }
 }
 
@@ -54,7 +61,7 @@ export function cours(db: Db, matiereId: string, nom: string, publicCible = "", 
     throw new Error("Public ou objectif trop long.");
   }
   if (!db.prepare("SELECT 1 FROM matieres WHERE id = ?").get(matiereId)) {
-    throw new Error("Matière inconnue.");
+    throw new Error(inconnue(db));
   }
   db.prepare("INSERT INTO cours VALUES (?, ?, ?, ?, ?)").run(
     id,
@@ -79,19 +86,20 @@ export function coursDuDepot(
     profil?: string;
   },
 ) {
-  if (compte.administrateur !== 1) throw new Error("Seul un administrateur crée un cours.");
+  if (compte.administrateur !== 1)
+    throw new Error(`Seul un administrateur crée ${libelles(db).formes.cours.un}.`);
   const nomCours = (v.nouveau_cours ?? "").trim();
-  if (!nomCours) throw new Error("Nommez le cours à créer.");
+  if (!nomCours) throw new Error(`Nommez ${libelles(db).formes.cours.le} à créer.`);
   return transaction(db, () => {
     let matiereId = v.nouveau_matiere ?? "";
     if (matiereId === "nouvelle") {
       const nom = (v.nouvelle_matiere ?? "").trim();
-      if (!nom) throw new Error("Nommez la matière à créer.");
+      if (!nom) throw new Error(`Nommez ${libelles(db).formes.matiere.le} à créer.`);
       matiereId =
         (db.prepare("SELECT id FROM matieres WHERE nom = ?").get(nom)?.id as string) ??
         matiere(db, nom, v.profil || undefined);
     } else if (!db.prepare("SELECT 1 FROM matieres WHERE id = ?").get(matiereId)) {
-      throw new Error("Matière inconnue.");
+      throw new Error(inconnue(db));
     }
     return (
       (db.prepare("SELECT id FROM cours WHERE matiere_id = ? AND nom = ?").get(matiereId, nomCours)
@@ -125,7 +133,9 @@ export function changerProfil(db: Db, profil: string) {
     throw new Error("Des ressources sont déjà déposées : le profil de l'instance ne change plus.");
   }
   if (!db.prepare("UPDATE matieres SET profil = ?").run(profil).changes) {
-    throw new Error("Aucune matière : le profil se choisit à la création de la première.");
+    throw new Error(
+      `${majuscule(libelles(db).formes.matiere.aucun)} : le profil se choisit à la création ${libelles(db).formes.matiere.selon("du premier", "de la première")}.`,
+    );
   }
 }
 
@@ -138,7 +148,10 @@ const TABLES: Record<string, string> = {
 function nomEntree(db: Db, genre: string, id: string) {
   if (!Object.hasOwn(TABLES, genre)) throw new Error("Type inconnu.");
   const ligne = db.prepare(`SELECT nom FROM ${TABLES[genre]} WHERE id = ?`).get(id);
-  if (!ligne) throw new Error("Matière, cours, thème ou champ inconnu.");
+  if (!ligne)
+    throw new Error(
+      `${libelles(db).matiere}, ${libelles(db).formes.cours.nom}, ${minuscule(libelles(db).regroupement)} ou champ inconnu.`,
+    );
   return ligne.nom as string;
 }
 /** L'identifiant reste: les rattachements et les valeurs d'un champ suivent le nouveau nom. */
@@ -170,7 +183,7 @@ export function supprimer(db: Db, genre: string, id: string) {
       const n = ressourcesAvec(db, id);
       if (n) {
         throw new Error(
-          `« ${nom} » est rempli sur ${n} ressource${n > 1 ? "s" : ""}. Retirez-le des matières pour le masquer.`,
+          `« ${nom} » est rempli sur ${n} ressource${n > 1 ? "s" : ""}. Retirez-le des ${libelles(db).formes.matiere.noms} pour le masquer.`,
         );
       }
       db.prepare("DELETE FROM champs_personnalises WHERE id = ?").run(id);
@@ -243,7 +256,7 @@ export function domaineSource(db: Db, champs: Record<string, string>) {
     m = db.prepare("SELECT * FROM matieres WHERE id = ?").get(champs.matiere_id) as
       | Matiere
       | undefined;
-    if (!m) throw new Error("Matière inconnue.");
+    if (!m) throw new Error(inconnue(db));
   } else if (champs.matiere?.trim()) {
     const cle = champs.matiere.trim();
     const nom = MATIERES.find((x) => x.value === cle)?.label ?? cle;

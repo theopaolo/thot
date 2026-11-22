@@ -9,7 +9,6 @@ import {
 } from "../../core/activite.ts";
 import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
 import { icone } from "../icones.ts";
-import { minuscule } from "../instance.ts";
 import { enrichi, enrichiLigne, imageQuestion, NOMS_TYPE } from "./questions.ts";
 import { avis, etat, option, passages, pluriel, typeDe } from "./activites.ts";
 import { type DetailProf, formulaire } from "./activites-formulaire.ts";
@@ -25,23 +24,25 @@ const ACTIONS: Record<string, string> = {
 };
 
 type Servies = DetailProf["servies"];
+/** Ce qu'un champ lit du détail : les versions servies et les termes de l'instance. */
+type Vu = Pick<DetailProf, "servies" | "libelles">;
 
 const VIDE_SOURCE = "Vide : sa source a été supprimée.";
 
 /** Le texte d'un champ, puis ses preuves. Sans passage, il est rédigé par l'enseignant. */
-const champ = (ch: Champ, servies: Servies, vide: string, signer: boolean) =>
+const champ = (ch: Champ, d: Vu, vide: string, signer: boolean) =>
   ch.texte
     ? html`${enrichi(ch.texte)}${
         ch.citations.length
-          ? html`${avis(ch)}${passages(ch, servies)}`
+          ? html`${avis(ch)}${passages(ch, d.servies, d.libelles.formes.cours.ce)}`
           : signer
             ? html`<p class="discret">Rédigé par l'enseignant</p>`
             : ""
       }`
-    : html`<p class="discret">${vide}</p>${passages(ch, servies)}`;
+    : html`<p class="discret">${vide}</p>${passages(ch, d.servies, d.libelles.formes.cours.ce)}`;
 
 /** Le contenu propre au type : réponse attendue et critères, options, ou réponses acceptées. */
-const corpsType = (q: Question, servies: Servies, signer: boolean) => {
+const corpsType = (q: Question, d: Vu, signer: boolean) => {
   if (q.type === "redigee") {
     const code = q.langage && q.attendu.texte && !q.attendu.texte.includes("```");
     return html`
@@ -50,17 +51,17 @@ const corpsType = (q: Question, servies: Servies, signer: boolean) => {
         code
           ? html`<pre data-langage="${q.langage}"><code>${q.attendu.texte}</code></pre>${
               q.attendu.citations.length
-                ? html`${avis(q.attendu)}${passages(q.attendu, servies)}`
+                ? html`${avis(q.attendu)}${passages(q.attendu, d.servies, d.libelles.formes.cours.ce)}`
                 : signer
                   ? html`<p class="discret">Rédigé par l'enseignant</p>`
                   : ""
             }`
-          : champ(q.attendu, servies, "Vide.", signer)
+          : champ(q.attendu, d, "Vide.", signer)
       }
       ${
         q.criteres.length
           ? html`<h4>Critères</h4><ol>${q.criteres.map(
-              (ch) => html`<li>${champ(ch, servies, VIDE_SOURCE, signer)}</li>`,
+              (ch) => html`<li>${champ(ch, d, VIDE_SOURCE, signer)}</li>`,
             )}</ol>`
           : ""
       }`;
@@ -73,13 +74,13 @@ const corpsType = (q: Question, servies: Servies, signer: boolean) => {
     (o) =>
       html`<li>${o.texte.texte ? enrichiLigne(o.texte.texte) : html`<span class="discret">${VIDE_SOURCE}</span>`}${
         o.juste ? html` <span class="statut certifiee">Bonne réponse</span>` : ""
-      }${o.texte.citations.length ? html`${avis(o.texte)}${passages(o.texte, servies)}` : ""}</li>`,
+      }${o.texte.citations.length ? html`${avis(o.texte)}${passages(o.texte, d.servies, d.libelles.formes.cours.ce)}` : ""}</li>`,
   )}</ol>`;
 };
 
 /** Une question en lecture, avec ses actions. */
 const lecture = (d: DetailProf, n: number, q: Question, i: number) => {
-  const { a, servies } = d;
+  const { a } = d;
   // Une question sans aucun passage le dit une fois, pas sous chaque champ.
   // Une consigne vide vient d'une source supprimée, pas de l'enseignant.
   const enseignant = !!q.consigne.texte && champsQuestion(q).every((ch) => !ch.citations.length);
@@ -88,13 +89,13 @@ const lecture = (d: DetailProf, n: number, q: Question, i: number) => {
       q.type === "redigee" && q.langage ? `, ${q.langage}` : ""
     }${enseignant ? ", rédigée par l'enseignant" : ""}</span></h3>
     ${imageQuestion(a.id, q.image)}
-    ${champ(q.consigne, servies, VIDE_SOURCE, !enseignant)}
-    ${corpsType(q, servies, !enseignant)}
+    ${champ(q.consigne, d, VIDE_SOURCE, !enseignant)}
+    ${corpsType(q, d, !enseignant)}
     ${q.indice ? html`<p><strong>Indice :</strong> ${enrichiLigne(q.indice)}</p>` : ""}
     ${q.ou ? html`<p><strong>Où chercher :</strong> ${d.titres.get(q.ou) ?? "source supprimée"}</p>` : ""}
     ${
       q.retour.texte || q.retour.citations.length
-        ? html`<h4>Retour</h4>${champ(q.retour, servies, VIDE_SOURCE, !enseignant)}`
+        ? html`<h4>Retour</h4>${champ(q.retour, d, VIDE_SOURCE, !enseignant)}`
         : html`<p class="discret">Pas de retour.</p>`
     }
     ${actions(d, n, q, i)}
@@ -211,7 +212,7 @@ const questions = (d: DetailProf, contenu: Contenu) => {
 };
 
 /** Les phrases d'une explication et leurs preuves. L'aperçu élève les montre rangées en blocs. */
-const corpsExplication = (e: Explication, servies: Servies) => html`
+const corpsExplication = (e: Explication, d: Vu) => html`
   ${
     e.juge_indisponible
       ? html`<p><span class="statut a_relire">Juge indisponible</span> <span class="discret">Une phrase au moins est passée sans l'avis du juge de soutien.</span></p>`
@@ -227,7 +228,7 @@ const corpsExplication = (e: Explication, servies: Servies) => html`
     e.affirmations.length
       ? html`<ol>${e.affirmations.map(
           (x) =>
-            html`<li><p>${x.texte}</p>${passages({ citations: [{ ...x, revision: x.revision ?? 1 }] }, servies)}</li>`,
+            html`<li><p>${x.texte}</p>${passages({ citations: [{ ...x, revision: x.revision ?? 1 }] }, d.servies, d.libelles.formes.cours.ce)}</li>`,
         )}</ol>`
       : html`<p class="discret">Vide : ses sources ont été supprimées.</p>`
   }
@@ -302,7 +303,7 @@ const reglages = (d: DetailProf) => {
             )}</ul>
             ${
               d.autres.length
-                ? html`<label for="ajout-cours">Ajouter à un ${minuscule(l.cours)}</label>
+                ? html`<label for="ajout-cours">Ajouter à ${l.formes.cours.un}</label>
                   <select id="ajout-cours" name="cours_id">${[
                     option("", "Aucun", ""),
                     ...d.autres.map((c) => option(c.id, c.nom, "")),
@@ -353,7 +354,7 @@ export const detailProf = (d: DetailProf) => {
           }. ${
             explication
               ? "Les élèves ne reçoivent plus cette explication. Préparez-en une autre."
-              : "Les élèves ne reçoivent plus cet exercice. Cherchez ses passages dans la version actuelle des sources, modifiez les questions qui ne tiennent plus ou retirez le cours fautif."
+              : `Les élèves ne reçoivent plus cet exercice. Cherchez ses passages dans la version actuelle des sources, modifiez les questions qui ne tiennent plus ou retirez ${d.libelles.formes.cours.le} fauti${d.libelles.formes.cours.selon("f", "ve")}.`
           }</p>${
             explication
               ? ""
@@ -377,7 +378,7 @@ export const detailProf = (d: DetailProf) => {
         a.etat === "relue"
           ? html`<form method="post" action="/prof/activites/${a.id}/publier">
             <input type="hidden" name="revision" value="${a.revision}">
-            <button class="principal">${personnel ? "Publier pour m'entraîner" : "Publier aux élèves du cours"}</button>
+            <button class="principal">${personnel ? "Publier pour m'entraîner" : `Publier aux élèves ${d.libelles.formes.cours.du}`}</button>
           </form>`
           : ""
       }
@@ -400,7 +401,7 @@ export const detailProf = (d: DetailProf) => {
       }
     </div>
     ${reglages(d)}
-    ${explication ? corpsExplication(contenu, d.servies) : questions(d, contenu)}
+    ${explication ? corpsExplication(contenu, d) : questions(d, contenu)}
     ${
       d.suivi && !explication
         ? html`<h2>Réponses</h2>

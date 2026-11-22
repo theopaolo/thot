@@ -22,7 +22,7 @@ const choixCours = (cat: Catalogue, l: Libelles, actuel?: Cours) => {
   const autres = cat.cours.filter((c) => c.id !== actuel.id);
   return html`<input type="hidden" name="cours" value="${actuel.id}">${
     autres.length
-      ? html`<details class="cours-ajout"><summary>Aussi dans d'autres ${l.cours_pluriel.toLowerCase()}</summary>${autres.map(
+      ? html`<details class="cours-ajout"><summary>Aussi dans d'autres ${l.formes.cours.noms}</summary>${autres.map(
           (c) =>
             html`<label><input type="checkbox" name="cours" value="${c.id}"> ${nomCours(cat, c)}</label>`,
         )}</details>`
@@ -39,13 +39,14 @@ export const tableEleves = (
   action: (e: Eleve) => unknown,
   cours?: (e: Eleve) => unknown,
   entete = "Élève",
+  enteteCours = "Cours",
 ) =>
   html`
     <table class="eleves">
       <thead>
         <tr>
           <th>${entete}</th>
-          ${cours ? html`<th class="cours-eleve">Cours</th>` : ""}
+          ${cours ? html`<th class="cours-eleve">${enteteCours}</th>` : ""}
           <th><span class="visuellement-cache">Actions</span></th>
         </tr>
       </thead>
@@ -74,7 +75,13 @@ export type Lien = {
  * Les liens actifs. Un cours du lien ne se nomme qu'à ses enseignants, et l'adresse du lien, dont
  * la page nomme tous ses cours, ne se copie que par les enseignants de tous ses cours.
  */
-const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Cours) =>
+const liensActifs = (
+  cat: Catalogue,
+  fc: Libelles["formes"]["cours"],
+  liens: Lien[],
+  adresse: string,
+  actuel?: Cours,
+) =>
   html`
     <h3 id="liens">Liens actifs</h3>
     ${
@@ -90,7 +97,7 @@ const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Co
               ${
                 l.jeton
                   ? ""
-                  : html`<p class="discret">Ce lien ouvre aussi un cours dont vous n'êtes pas membre. Les enseignants de tous ses cours copient son adresse.</p>`
+                  : html`<p class="discret">Ce lien ouvre aussi ${fc.un} dont vous n'êtes pas membre. Les enseignants de ${fc.selon("tous", "toutes")} ses ${fc.noms} copient son adresse.</p>`
               }
               <div class="barre">
                 ${
@@ -99,7 +106,7 @@ const liensActifs = (cat: Catalogue, liens: Lien[], adresse: string, actuel?: Co
                     : ""
                 }
                 <form method="post" action="/prof/eleves/liens/${l.cle}/revoquer">
-                  <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs cours.">Révoquer</button>
+                  <button aria-label="Révoquer le lien pour ${noms}" data-confirmer="Révoquer ce lien ? Les élèves qu'il a inscrits restent dans leurs ${fc.noms}.">Révoquer</button>
                 </form>
               </div>
             </li>`;
@@ -135,18 +142,18 @@ const ajoutEleves = (
     return html`
     <section class="ajout" aria-labelledby="titre-ajout">
       <h2 id="titre-ajout">Ajouter des élèves</h2>
-      <p class="aide">Choisissez le cours qui accueille les élèves.</p>
+      <p class="aide">Choisissez ${l.formes.cours.le} qui accueille les élèves.</p>
       ${pleins.length ? html`<ul class="cours-eleves">${pleins.map(ligne)}</ul>` : ""}
       ${
         !vides.length
           ? ""
           : pleins.length
             ? html`<details><summary>${vides.length} ${
-                vides.length > 1 ? l.cours_pluriel.toLowerCase() : l.cours.toLowerCase()
+                vides.length > 1 ? l.formes.cours.noms : l.formes.cours.nom
               } sans élève</summary>${listeVides}</details>`
             : listeVides
       }
-      ${liens ? liensActifs(cat, liens, adresse) : ""}
+      ${liens ? liensActifs(cat, l.formes.cours, liens, adresse) : ""}
     </section>
   `;
   }
@@ -186,7 +193,7 @@ const ajoutEleves = (
         <details name="ajout">
           <summary>Un lien d'inscription</summary>
           <form method="post" action="/prof/eleves/liens">
-            <p class="aide">L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint le cours. Retirez ensuite les comptes qui ne sont pas ceux de vos élèves.</p>
+            <p class="aide">L'élève qui ouvre le lien crée son compte, ou se connecte au sien, et rejoint ${l.formes.cours.le}. Retirez ensuite les comptes qui ne sont pas ceux de vos élèves.</p>
             <div class="deux">
               <div class="champ">
                 <label for="jours">Jours de validité</label>
@@ -201,7 +208,7 @@ const ajoutEleves = (
             <button class="principal">Créer le lien</button>
           </form>
         </details>
-        ${liensActifs(cat, liens, adresse, actuel)}
+        ${liensActifs(cat, l.formes.cours, liens, adresse, actuel)}
       `
           : ""
       }
@@ -248,7 +255,10 @@ export const eleves = (o: {
           "/prof/eleves",
           l,
           {},
-          { tout: `Tous les ${l.cours_pluriel.toLowerCase()}`, themes: false },
+          {
+            tout: `${l.formes.cours.selon("Tous", "Toutes")} les ${l.formes.cours.noms}`,
+            themes: false,
+          },
         )
       : "";
   // Un enseignant inscrit chaque élève qu'il crée à un de ses cours. Un administrateur peut
@@ -256,16 +266,16 @@ export const eleves = (o: {
   if (!cat.cours.length && !o.sansCours) {
     return html`
       <h1>Élèves</h1>
-      <p>Vous n'avez pas encore de cours. Créez-en un dans <a href="/prof/cours">Mes cours</a>, ou demandez à un collègue de vous ajouter aux siens, puis ajoutez-y vos élèves.</p>
+      <p>Vous n'avez pas encore ${l.formes.cours.de}. Créez-en ${l.formes.cours.selon("un", "une")} dans <a href="/prof/cours">Mes ${l.formes.cours.noms}</a>, ou demandez à un collègue de vous ajouter ${l.formes.cours.selon("aux siens", "aux siennes")}, puis ajoutez-y vos élèves.</p>
     `;
   }
   const vide = html`
     <div class="vide">
-      <p><strong>${actuel ? `Aucun élève dans ${nomCours(cat, actuel)}.` : "Aucun élève dans vos cours."}</strong></p>
+      <p><strong>${actuel ? `Aucun élève dans ${nomCours(cat, actuel)}.` : `Aucun élève dans vos ${l.formes.cours.noms}.`}</strong></p>
       <p>${
         // Hors d'un cours, les formulaires attendent qu'on en choisisse un.
         !actuel && cat.cours.length
-          ? "Choisissez un cours sous « Ajouter des élèves », puis créez"
+          ? `Choisissez ${l.formes.cours.un} sous « Ajouter des élèves », puis créez`
           : "Créez"
       } les comptes un par un, importez la classe depuis un CSV${o.liens && (actuel || cat.cours.length) ? " ou partagez un lien d'inscription" : ""}.</p>
     </div>
@@ -289,6 +299,8 @@ export const eleves = (o: {
               (c, i) =>
                 html`${i ? ", " : ""}<a href="/prof/eleves?cours_id=${c.id}">${nomCours(cat, c)}</a>`,
             ),
+        "Élève",
+        l.cours_pluriel,
       );
   return html`
     ${choix}
@@ -298,7 +310,7 @@ export const eleves = (o: {
         ? html`<p class="sous-titre">${compte} ${
             actuel
               ? `dans ${nomCours(cat, actuel)}`
-              : `dans ${o.groupes.filter((g) => g.eleves.length).length} ${l.cours_pluriel.toLowerCase()}`
+              : `dans ${o.groupes.filter((g) => g.eleves.length).length} ${l.formes.cours.noms}`
           }.</p>`
         : ""
     }
@@ -309,8 +321,8 @@ export const eleves = (o: {
         ${
           !actuel && o.sansCours?.length
             ? html`
-            <h2>Sans cours</h2>
-            <p class="aide">Ces élèves ne lisent que les ressources sans cours. Seuls les administrateurs les voient et les gèrent.</p>
+            <h2>Sans ${l.formes.cours.nom}</h2>
+            <p class="aide">Ces élèves ne lisent que les ressources sans ${l.formes.cours.nom}. Seuls les administrateurs les voient et les gèrent.</p>
             ${tableEleves(o.sansCours, reinitialiser)}
           `
             : ""

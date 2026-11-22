@@ -175,7 +175,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
                   <a href="/prof?statut=a_relire">Relire et certifier</a> : Thot ne cite que les
                   ressources certifiées.</p>`
                 : Object.values(scope(c)).some(Boolean)
-                  ? html`<p>Aucune ressource dans ce cours pour l'instant.</p>`
+                  ? html`<p>Aucune ressource dans ${libelles(db).formes.cours.ce} pour l'instant.</p>`
                   : html`<p>Aucune ressource publiée pour l'instant.</p>`
           }`,
         ),
@@ -407,7 +407,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
             scope(c),
             "/eleve/recherche",
             libelles(db),
-          )}${EleveRessources.recherche("", [], scope(c))}`,
+          )}${EleveRessources.recherche("", [], scope(c), false, libelles(db).formes.cours)}`,
         ),
       );
     }
@@ -467,7 +467,13 @@ export function routesEleve(app: Hono<Env>, w: Web) {
           "/eleve/recherche",
           libelles(db),
           { q },
-        )}${EleveRessources.recherche(q, trouves, scope(c), !!r.panneTraduction)}`,
+        )}${EleveRessources.recherche(
+          q,
+          trouves,
+          scope(c),
+          !!r.panneTraduction,
+          libelles(db).formes.cours,
+        )}`,
       ),
     );
   });

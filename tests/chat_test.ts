@@ -1,6 +1,11 @@
+import { rm } from "node:fs/promises";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { relireLegende, statuer } from "../src/app/ingestion.ts";
+import { lecteur, lireCompte } from "../src/app/comptes.ts";
+import { contenu } from "../src/app/config.ts";
+import { resumeQuestionsDesEleves } from "../src/app/conversations.ts";
+import { maintenant } from "../src/app/db.ts";
+import { chunksSource, relireLegende, statuer, supprimerSource } from "../src/app/ingestion.ts";
 import { affiliations, cours, theme } from "../src/app/domaines.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 import { CHAMPS, poserQuestion, REPONSE_CITEE, sourceTraitee } from "./source_outils.ts";
@@ -265,5 +270,97 @@ test("les réponses conservées et leurs panneaux revérifient la preuve actuell
     } finally {
       db.close();
     }
+  }
+});
+
+test("suivi des questions : synthèse sur /prof et liste /prof/questions bornée à 100 avec ?toutes=1", async () => {
+  const { db } = await environnement();
+  try {
+    const prof = await session(db, fauxModeles().modeles, "enseignant");
+    const eleve = await session(db, fauxModeles().modeles, "eleve");
+    const sourceId = await sourceTraitee(db, undefined, undefined, prof);
+    statuer(db, sourceId, "certifiee", "Prof");
+    const eleveId = db.prepare("SELECT id FROM comptes WHERE role = 'eleve'").get()!.id as string;
+    const profCompte = lireCompte(
+      db,
+      db.prepare("SELECT id FROM comptes WHERE role = 'enseignant'").get()!.id as string,
+    )!;
+    const matiereId = db.prepare("SELECT id FROM matieres LIMIT 1").get()!.id as string;
+    const coursId = cours(db, matiereId, "Design");
+    db.prepare("INSERT OR IGNORE INTO membres_cours VALUES (?, ?)").run(coursId, profCompte.id);
+    const convId = crypto.randomUUID();
+    const tNow = Date.now();
+    const recent = maintenant(tNow - 3_600_000);
+    const ancien = maintenant(tNow - 10 * 86_400_000);
+    db.prepare(
+      `INSERT INTO conversations (id, compte_id, titre, matiere_id, cours_id, theme_id, matieres, active_le, cree_le)
+       VALUES (?, ?, 'Conv', '', '', '', '', ?, ?)`,
+    ).run(convId, eleveId, recent, ancien);
+    const ins = db.prepare(
+      `INSERT INTO messages (id, compte_id, conversation_id, rang, question, matiere_id, cours_id, theme_id, matieres, etat, cree_le, maj_le)
+       VALUES (?, ?, ?, ?, ?, '', '', '', '', ?, ?, ?)`,
+    );
+    // 102 questions : 2 récentes (dont 1 hors corpus) et 100 anciennes.
+    for (let i = 1; i <= 100; i++) {
+      ins.run(`m-${i}`, eleveId, convId, i, `Question ancienne ${i}`, "answered", ancien, ancien);
+    }
+    ins.run("m-101", eleveId, convId, 101, "Question récente 1", "answered", recent, recent);
+    ins.run(
+      "m-102",
+      eleveId,
+      convId,
+      102,
+      "Question récente hors cours",
+      "out_of_corpus",
+      maintenant(tNow - 1000),
+      maintenant(tNow - 1000),
+    );
+
+    const resume = resumeQuestionsDesEleves(db, lecteur(profCompte), tNow);
+    assertEquals(resume.total, 102);
+    assertEquals(resume.semaine, 2);
+    assertEquals(resume.sansReponse, 1);
+    assertEquals(
+      resume.dernieres.map((d) => d.id),
+      ["m-102", "m-101", "m-100"],
+    );
+
+    const bibliotheque = await (await prof.requete("/prof")).text();
+    assertStringIncludes(bibliotheque, "2 cette semaine");
+    assertStringIncludes(bibliotheque, "dont 1 sans passage");
+    assertStringIncludes(bibliotheque, "Question récente hors cours");
+
+    const bornee = await (await prof.requete("/prof/questions")).text();
+    assertEquals((bornee.match(/href="\/prof\/questions\/m-/g) ?? []).length, 100);
+    assertStringIncludes(bornee, 'href="/prof/questions?toutes=1"');
+
+    const toutes = await (await prof.requete("/prof/questions?toutes=1")).text();
+    assertEquals((toutes.match(/href="\/prof\/questions\/m-/g) ?? []).length, 102);
+    assert(!toutes.includes("?toutes=1"));
+    assert(eleve.requete);
+  } finally {
+    db.close();
+  }
+});
+
+test("anciennes révisions : les chunks découpés restent en cache mémoire et suivent les métadonnées", async () => {
+  const { db } = await environnement();
+  try {
+    const id = await sourceTraitee(db);
+    statuer(db, id, "certifiee", "Prof");
+    // Passe la source en révision 2 pour que la révision 1 soit une ancienne révision immuable.
+    db.prepare("UPDATE sources SET revision = 2 WHERE id = ?").run(id);
+    const premier = chunksSource(db, id, 1);
+    assert(premier.length > 0);
+    // Supprimer les fichiers de révision 1 prouve que le second appel lit le cache mémoire.
+    await rm(contenu(id, "document.txt"));
+    db.prepare("UPDATE sources SET titre = 'Titre renommé' WHERE id = ?").run(id);
+    const second = chunksSource(db, id, 1);
+    assertEquals(second.length, premier.length);
+    assertStringIncludes(second[0].titre, "Titre renommé");
+    // Supprimer la source vide aussi son entrée en cache.
+    await supprimerSource(db, id);
+  } finally {
+    db.close();
   }
 });

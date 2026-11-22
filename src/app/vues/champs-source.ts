@@ -3,6 +3,7 @@ import type { Champ } from "../../core/profils.ts";
 import type { Affiliation, Catalogue, Cours } from "../domaines.ts";
 import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
+import { majuscule } from "../../core/accords.ts";
 import { options, selectionProfil } from "./commun.ts";
 
 /**
@@ -51,12 +52,12 @@ export const rangementDepot = (
         ? html`<p class="aide">${
             o.personnel
               ? ""
-              : "Les membres du cours lisent ses ressources, dans la limite des lecteurs de l'étape suivante. "
-          }D'autres cours s'ajoutent ensuite sur la page de la ressource.</p>`
+              : `Les membres ${l.formes.cours.du} lisent ses ressources, dans la limite des lecteurs de l'étape suivante. `
+          }D'autres ${l.formes.cours.noms} s'ajoutent ensuite sur la page de la ressource.</p>`
         : o.creer
-          ? html`<p class="aide">Aucun cours pour l'instant. Créez le premier : il rangera ces
+          ? html`<p class="aide">${majuscule(l.formes.cours.aucun)} pour l'instant. Créez ${l.formes.cours.selon("le premier", "la première")} : ${l.formes.cours.selon("il", "elle")} rangera ces
             ressources.</p>`
-          : html`<p>Vous n'êtes membre d'aucun cours. Un administrateur crée les cours et vous y
+          : html`<p>Vous n'êtes membre d'${l.formes.cours.aucun}. Un administrateur crée les ${l.formes.cours.noms} et vous y
             inscrit. En attendant, ces ressources restent non classées.</p>`
     }
     <fieldset class="rangement">
@@ -71,7 +72,7 @@ export const rangementDepot = (
           <div class="nouveau-cours">
             <label><input type="radio" name="cours" value="nouveau" required ${
               nouveau ? "checked" : ""
-            }> ${icone("plus")}Créer un cours</label>
+            }> ${icone("plus")}Créer ${l.formes.cours.un}</label>
             <div class="nouveau-cours-champs">
               ${
                 cat.matieres.length
@@ -80,7 +81,7 @@ export const rangementDepot = (
                       v.nouveau_matiere,
                     )}<option value="nouvelle" ${
                       v.nouveau_matiere === "nouvelle" ? "selected" : ""
-                    }>Créer une matière</option></select></label>`
+                    }>Créer ${l.formes.matiere.un}</option></select></label>`
                   : html`<input type="hidden" name="nouveau_matiere" value="nouvelle">`
               }
               <div class="nouvelle-matiere ${cat.matieres.length ? "selon-choix" : ""}">
@@ -100,7 +101,7 @@ export const rangementDepot = (
 };
 /** Les cours rangés par matière. Le thème d'un cours ne s'affiche qu'une fois le cours coché. */
 export const liens = (cat: Catalogue, l: Libelles, valeurs: Affiliation[] = []) =>
-  html`<fieldset class="rattachement"><legend><strong>${l.cours_pluriel} de rattachement</strong></legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des cours cochés lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins un cours.</p>${cat.matieres.map(
+  html`<fieldset class="rattachement"><legend><strong>${l.cours_pluriel} de rattachement</strong></legend><input type="hidden" name="affiliations_presentes" value="1"><p class="aide">Les membres des ${l.formes.cours.noms} coché${l.formes.cours.e}s lisent la ressource, dans la limite de ses lecteurs. Une ressource rattachée garde au moins ${l.formes.cours.un}.</p>${cat.matieres.map(
     (m) => {
       const cours = cat.cours.filter((c) => c.matiere_id === m.id);
       return cours.length

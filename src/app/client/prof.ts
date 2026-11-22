@@ -68,7 +68,7 @@ export function installerProf() {
       if (
         n > 1 &&
         !confirm(
-          `Certifier ${n} ressources ? Les membres de leurs cours pourront les lire et Thot les citera dans ses réponses. Relisez d'abord celles que personne n'a ouvertes.`,
+          `Certifier ${n} ressources ? Les membres de leurs ${certifier.dataset.certifierSelection || "cours"} pourront les lire et Thot les citera dans ses réponses. Relisez d'abord celles que personne n'a ouvertes.`,
         )
       ) {
         event.preventDefault();

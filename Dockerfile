@@ -7,6 +7,8 @@ RUN npm install -g "$(node -p 'require("./package.json").packageManager')" \
   && pnpm install --frozen-lockfile
 COPY vite.config.ts tsconfig.json ./
 COPY src/ src/
+COPY static/css/ static/css/
+COPY static/fonts/ static/fonts/
 RUN pnpm exec vp build
 # Une installation --prod par-dessus la complète garde les dépendances de développement.
 RUN rm -rf node_modules && pnpm install --frozen-lockfile --prod

@@ -38,7 +38,7 @@ export const selectsPerimetre = (cat: Catalogue, p: Scope, l: Libelles) =>
       }
   `;
 
-/** Un terme réglé n'a pas de genre : « tous les cours » ne s'accorderait pas avec « matière ». */
+/** Le choix sans cours ni matière, quel que soit le terme réglé. */
 const TOUT = "Toutes les ressources";
 /**
  * Le choix du cours : un bouton ouvre la grille des cours, rangés par matière, chaque thème sous

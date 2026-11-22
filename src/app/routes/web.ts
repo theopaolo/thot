@@ -4,7 +4,7 @@ import type { Modeles } from "../../core/modeles.ts";
 import type { Affirmation } from "../../core/reponse.ts";
 import { CITABLE, type Lecteur, parametresCitable } from "../../core/recherche.ts";
 import { type Compte, lecteur } from "../comptes.ts";
-import { lireInstance } from "../instance.ts";
+import { libelles, lireInstance } from "../instance.ts";
 import type { Db } from "../db.ts";
 import { lireDocument, nombreLegendes } from "../ingestion.ts";
 import { boucleReponses } from "../reponses.ts";
@@ -58,6 +58,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
       getCookie(c, "rail") === "replie",
       lireInstance(db),
       compte?.role === "enseignant" ? nombreLegendes(db, compte) : 0,
+      libelles(db).formes.cours,
     );
   };
 
@@ -67,7 +68,7 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
     lireInstance(db).mode === "personal"
       ? ""
       : Domaines.coursDuCompte(db, c.get("compte").id).size
-        ? "Les enseignants de tes cours lisent tes questions."
+        ? `Les enseignants de tes ${libelles(db).formes.cours.noms} lisent tes questions.`
         : "Les enseignants lisent tes questions.";
   /** Une page ou un lien d'avant les thèmes nomme encore un chapitre : son thème le remplace. */
   const scopeChapitre = (c: Context<Env>, champs: Record<string, unknown>) => {
@@ -112,10 +113,13 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
     const n = Number(c.req.param("n"));
     const a = affirmations[n];
     const source = a && sourceCertifiee(a.source_id, lu(c));
-    if (!a || !source) return c.html(Echange.panneauSource(undefined, undefined, tete));
+    const fc = libelles(db).formes.cours;
+    if (!a || !source) return c.html(Echange.panneauSource(undefined, undefined, tete, fc));
     const suite = { id, n, total: affirmations.length };
     if (a.debut === undefined || a.fin === undefined) {
-      return c.html(Echange.panneauSource({ ...a, enseignant: source.enseignant }, suite, tete));
+      return c.html(
+        Echange.panneauSource({ ...a, enseignant: source.enseignant }, suite, tete, fc),
+      );
     }
     const revision = a.revision ?? 1;
     const { debut, fin } = a;
@@ -124,7 +128,12 @@ export function contexteWeb(db: Db, modeles: Modeles, reponses: Reponses) {
       (b) => b.debut < fin && b.fin > debut,
     );
     return c.html(
-      Echange.panneauSource({ ...a, revision, enseignant: source.enseignant, blocs }, suite, tete),
+      Echange.panneauSource(
+        { ...a, revision, enseignant: source.enseignant, blocs },
+        suite,
+        tete,
+        fc,
+      ),
     );
   };
   return {

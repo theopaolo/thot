@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import { AUDIENCES } from "../depot.ts";
 import {
+  GENRES,
   type Instance,
   type Libelles,
   minuscule,
@@ -40,8 +41,25 @@ export const administration = (
   const erreurs = e.erreurs ?? {};
   const premiere = Object.keys(erreurs)[0];
   const preset = PROFILS[profil ?? "general"];
+  const genre = (nom: (typeof GENRES)[number], terme: string) =>
+    html`
+      <fieldset class="genre">
+        <legend>${terme}, son genre</legend>
+        ${(
+          [
+            ["m", "Masculin"],
+            ["f", "Féminin"],
+          ] as const
+        ).map(
+          ([valeur, label]) =>
+            html`<label><input type="radio" name="${nom}" value="${valeur}" ${
+              v[nom] === valeur ? "checked" : ""
+            }> ${label}</label>`,
+        )}
+      </fieldset>
+    `;
   const texte = (
-    nom: Exclude<keyof Reglages, "lecteurs">,
+    nom: Exclude<keyof Reglages, "lecteurs" | (typeof GENRES)[number]>,
     label: string,
     max: number,
     aide = "",
@@ -86,7 +104,7 @@ export const administration = (
             ? html`${
                 profil
                   ? "Il se change jusqu'au premier dépôt"
-                  : "Vous le choisirez avec la première matière"
+                  : `Vous le choisirez avec ${l.formes.matiere.selon("le premier", "la première")} ${l.formes.matiere.nom}`
               }, dans <a href="/administration/domaines">${domainesDe(l)}</a>.`
             : "Il ne change plus depuis le premier dépôt."
         }</span></p>
@@ -106,15 +124,17 @@ export const administration = (
       </section>
       <fieldset aria-describedby="vocabulaire-aide">
         <legend>Vocabulaire</legend>
-        <p class="aide" id="vocabulaire-aide">Thot emploie ces mots dans toutes ses pages. Un champ vide garde le mot du profil ${preset.nom}, écrit en gris.</p>
+        <p class="aide" id="vocabulaire-aide">Thot emploie ces mots dans toutes ses pages. Un champ vide garde le mot du profil ${preset.nom}, écrit en gris. Le genre accorde un mot que vous réglez dans les phrases : « un cours », « une unité ».</p>
         <div class="deux">
           ${texte("matiere", "Matière, au singulier", 40)}
           ${texte("matieres", "Matière, au pluriel", 40)}
         </div>
+        ${genre("matiere_genre", "Matière")}
         <div class="deux">
           ${texte("cours", "Cours, au singulier", 40)}
           ${texte("cours_pluriel", "Cours, au pluriel", 40)}
         </div>
+        ${genre("cours_genre", "Cours")}
         ${texte("niveau", "Niveau", 40)}
         <div class="deux">
           ${texte("regroupement", "Partie d'un cours, au singulier", 40)}

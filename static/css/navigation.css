@@ -272,9 +272,10 @@ button.rail-bascule:hover {
 .rail-pied > a:hover {
   background: var(--surface);
 }
-/* Le jaune pâle marque la page courante, le blanc du survol ne s'y confond pas. */
+/* Le liseré d'encre marque la page courante sans la couleur, le jaune pâle la double. */
 .rail nav a[aria-current="page"] {
   background: var(--yellow-surface);
+  box-shadow: inset 3px 0 0 var(--ink);
 }
 .rail-pied {
   display: flex;

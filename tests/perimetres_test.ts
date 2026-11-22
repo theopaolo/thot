@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { filtre } from "../src/app/vues/perimetre.ts";
 import { cours, matiere, theme } from "../src/app/domaines.ts";
 import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
+import { formes } from "../src/core/accords.ts";
 import { PROFILS } from "../src/core/profils.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
 
@@ -168,13 +169,18 @@ test("dépôt web et questions : périmètres par identifiants conservés jusqu�
   }
 });
 
+const GENERAL = {
+  ...PROFILS.general,
+  formes: { matiere: formes("Matière", "Matières", "f"), cours: formes("Cours", "Cours", "m") },
+};
+
 test("filtre : la grille des cours applique le choix par un lien qui garde les paramètres de la page", async () => {
   const sans = String(
     await filtre(
       { matieres: [], cours: [], themes: [] },
       { matiere_id: "", cours_id: "", theme_id: "" },
       "/prof",
-      PROFILS.general,
+      GENERAL,
     ),
   );
   assert(!sans.includes("grille-cours"));
@@ -188,7 +194,7 @@ test("filtre : la grille des cours applique le choix par un lien qui garde les p
       } as never,
       { matiere_id: "", cours_id: "c1", theme_id: "" },
       "/prof",
-      { ...PROFILS.general, cours: "Chapitre", cours_pluriel: "Chapitres" },
+      { ...GENERAL, cours: "Chapitre", cours_pluriel: "Chapitres" },
       { statut: "a_relire", vue: "" },
     ),
   );

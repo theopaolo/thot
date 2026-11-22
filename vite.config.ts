@@ -33,6 +33,7 @@ export default defineConfig({
   ],
   build: {
     outDir: "static/dist",
+    manifest: true,
     sourcemap: true,
     // Sans préchargement, app.js ne porte pas la liste des morceaux de Mermaid.
     modulePreload: false,
@@ -40,8 +41,11 @@ export default defineConfig({
     // chargent que pour un schéma qui les demande.
     chunkSizeWarningLimit: 1500,
     rolldownOptions: {
-      input: "src/app/client/index.ts",
-      output: { entryFileNames: "app.js" },
+      input: {
+        app: "src/app/client/index.ts",
+        styles: "src/app/client/styles.css",
+      },
+      output: { entryFileNames: "[name].js" },
     },
   },
   // Les tests de déploiement lancent des processus et dépassent le délai de 5 s par défaut.

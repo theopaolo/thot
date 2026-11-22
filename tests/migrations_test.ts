@@ -5,7 +5,31 @@ import { environnement } from "./outils.ts";
 
 test("les migrations se rejouent sans effet", async () => {
   const { db } = await environnement();
-  assertEquals(migrer(db), []);
+  try {
+    assertEquals(migrer(db), []);
+    const index = new Set(
+      db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index'")
+        .all()
+        .map((r) => r.name as string),
+    );
+    for (const nom of [
+      "ingestion_jobs_source",
+      "source_cours_cours",
+      "source_cours_theme",
+      "relectures_activite",
+      "tentatives_compte",
+      "tentatives_cree",
+      "messages_cree",
+      "lectures_lu",
+      "sources_ecole_statut",
+      "activites_etat",
+    ]) {
+      assertEquals(index.has(nom), true, `index ${nom} manquant`);
+    }
+  } finally {
+    db.close();
+  }
 });
 
 test("la migration efface les jugements anciens et ne se rejoue pas", async () => {

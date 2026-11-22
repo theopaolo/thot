@@ -15,6 +15,8 @@ import { transaction } from "../../core/recherche.ts";
 import { texte } from "../../core/texte.ts";
 import type { Compte } from "../comptes.ts";
 import { type Db, maintenant } from "../db.ts";
+import { majuscule } from "../../core/accords.ts";
+import { libelles } from "../termes.ts";
 import { catalogueDe } from "../domaines.ts";
 import { type Activite, bloquantes, cibleDe, lireContenu, preuvesValides } from "./acces.ts";
 import { dossierActivite } from "./images.ts";
@@ -225,7 +227,9 @@ export function regler(db: Db, a: Activite, titre: string, aRendreLe: string) {
  */
 export function ajouterCours(db: Db, compte: Compte, a: Activite, coursId: string) {
   if (!catalogueDe(db, compte).cours.some((c) => c.id === coursId)) {
-    throw new Error("Choisissez un de vos cours.");
+    throw new Error(
+      `Choisissez ${libelles(db).formes.cours.selon("un", "une")} de vos ${libelles(db).formes.cours.noms}.`,
+    );
   }
   const manque = bloquantes(db, a, coursId);
   if (!manque.length) {
@@ -237,7 +241,9 @@ export function ajouterCours(db: Db, compte: Compte, a: Activite, coursId: strin
 /** Retire un cours de l'activité. Le cours d'origine porte l'objectif et reste. */
 export function retirerCours(db: Db, compte: Compte, a: Activite, coursId: string) {
   if (coursId === a.cours_id) {
-    throw new Error("Le cours d'origine porte l'objectif de l'activité : il reste.");
+    throw new Error(
+      `${majuscule(libelles(db).formes.cours.le)} d'origine porte l'objectif de l'activité : ${libelles(db).formes.cours.selon("il", "elle")} reste.`,
+    );
   }
   db.prepare("DELETE FROM activite_cours WHERE activite_id = ? AND cours_id = ?").run(
     a.id,

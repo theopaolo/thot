@@ -442,6 +442,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
           niveau: "",
           matiere: "Sujet",
           matieres: "Sujets",
+          matiere_genre: "m",
           cours: "Chapitre",
           cours_pluriel: "Chapitres",
           regroupement: "Module",
@@ -459,6 +460,7 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
     const erreurs = await invalide.text();
     assertStringIncludes(erreurs, "Rien n'a été enregistré. Corrigez les champs signalés.");
     assertStringIncludes(erreurs, 'value="Module"');
+    assertEquals((await reglages({ matiere_genre: "neutre" })).status, 400);
     assertEquals(lireInstance(db).version, 0);
 
     const ok = await reglages({});
@@ -484,6 +486,15 @@ test("réglages de l'instance : « Module » change les pages, pas les consignes
       [admin, "/administration/domaines", "<h3>Modules</h3>"],
       [admin, "/administration/domaines", "Chapitre à créer"],
       [admin, "/administration", ">Sujets et chapitres</a>"],
+      // Les phrases prennent le terme réglé, accordé au genre réglé avec lui.
+      [admin, "/administration", 'name="matiere_genre" value="m" checked'],
+      [admin, "/prof/depot", "Créer un sujet</option>"],
+      [admin, "/prof/depot", "Choisissez vos fichiers et leur chapitre."],
+      [admin, "/administration/domaines", "Renommer ou supprimer ce chapitre"],
+      [admin, "/administration/domaines", "partagé par tous ses sujets."],
+      [admin, "/prof", "<span>Mes chapitres</span>"],
+      [eleve, "/eleve", 'aria-label="Chercher dans le chapitre"'],
+      [eleve, `/eleve/sources/${id}`, "Que dit le chapitre sur «"],
       [admin, "/prof/depot", "</span></span>Chapitre</li>"],
       [admin, "/prof", '<span class="etiquette" id="etiquette-cours">Chapitre</span>'],
       [admin, "/prof", 'aria-label="Modules"'],

@@ -378,6 +378,51 @@ test("Markdown: le code en ligne garde sa plage, un gras qui l'entoure tombe", (
   assertEquals(codes(tableau), ["id"]);
 });
 
+test("Markdown: le gras garde sa plage et un titre son niveau, sans changer le texte", () => {
+  const ext = extraireMarkdown(
+    [
+      "# T",
+      "",
+      "## Les   rôles",
+      "",
+      "Un **agent  lit** le `code`, __puis__ il",
+      "**écrit `x`**. Un ** seul ne compte pas.",
+      "",
+      "### Le harness ###",
+      "",
+      "| **Clé** | Rôle |",
+      "|---|---|",
+      "| id | **relie** |",
+    ].join("\n"),
+    "T",
+  );
+  const blocs = assembler(ext.parties).blocs;
+  assertEquals(
+    blocs.map((b) => [b.texte, b.niveau]),
+    [
+      ["T", undefined],
+      ["Les rôles", 2],
+      ["Un agent lit le code, puis il écrit x. Un ** seul ne compte pas.", undefined],
+      ["Le harness", 3],
+      ["Clé | Rôle\nid | relie", undefined],
+    ],
+  );
+  const gras = (b: (typeof blocs)[0]) => b.gras?.map(([a, z]) => tranche(b.texte, a, z));
+  assertEquals(gras(blocs[2]), ["agent lit", "puis", "écrit x"]);
+  assertEquals(
+    blocs[2].codes?.map(([a, z]) => tranche(blocs[2].texte, a, z)),
+    ["code", "x"],
+  );
+  assertEquals(gras(blocs[4]), ["Clé", "relie"]);
+  assertEquals(gras(blocs[1]), undefined);
+  // Un gras dont la borne changerait le texte lu, ici après un `\`, n'est pas noté.
+  const [, p] = extraireMarkdown(
+    "**Story :** en tant que \\___, je veux \\___ afin de \\___.",
+    "T",
+  ).parties;
+  assertEquals([p.texte, p.gras], ["Story : en tant que , je veux \\ afin de _.", undefined]);
+});
+
 test("Markdown: les offsets assemblés retrouvent chaque bloc", () => {
   const doc = assembler(extraireMarkdown(COURS_MD, "repli").parties);
   for (const b of doc.blocs) assertEquals(tranche(doc.texte, b.debut, b.fin), b.texte);

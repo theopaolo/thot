@@ -3,6 +3,7 @@ import { type Context, Hono } from "hono";
 import { html } from "hono/html";
 import { bodyLimit } from "hono/body-limit";
 import { csrf } from "hono/csrf";
+import { etag } from "hono/etag";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -10,6 +11,7 @@ import type { Modeles } from "../core/modeles.ts";
 import { MAX_IMAGE } from "./activites.ts";
 import { config } from "./config.ts";
 import type { Db } from "./db.ts";
+import { libelles } from "./instance.ts";
 import { boucleReponses } from "./reponses.ts";
 import { routesActivites } from "./routes/activites.ts";
 import { routesPratique } from "./routes/pratique.ts";
@@ -85,10 +87,23 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
     await next();
   });
 
-  // Sous pnpm dev, une page rechargée relit aussi la feuille de style, pas sa copie en cache.
-  app.use(config.dev ? "/static/*" : "/static/dist/*", async (c, next) => {
+  // Les fichiers cachés (`.vite/manifest.json`) ne se servent pas. Sous `pnpm dev`, chaque fichier
+  // statique se relit sans cache. En production, les ressources hachées (`static/dist/assets/`) et
+  // les polices sont immuables ; le reste (`app.js`, vendor) se revalide par ETag (304).
+  const IMMUABLE = /^\/static\/(?:dist\/assets|fonts)\//;
+  const verifierEtag = etag();
+  app.use("/static/*", async (c, next) => {
+    if (c.req.path.includes("/.")) return c.notFound();
+    if (config.dev) {
+      c.header("Cache-Control", "no-cache");
+      return next();
+    }
+    if (IMMUABLE.test(c.req.path)) {
+      c.header("Cache-Control", "public, max-age=31536000, immutable");
+      return next();
+    }
     c.header("Cache-Control", "no-cache");
-    await next();
+    return verifierEtag(c, next);
   });
   app.use("/static/*", serveStatic({ root: "./" }));
   if (config.dev) routesRechargement(app);
@@ -155,7 +170,7 @@ export function creerApp(db: Db, modeles: Modeles, reponses = boucleReponses(db,
             : html`<h1>Erreur du serveur</h1>
               <p>${
                 tu
-                  ? "Une erreur de Thot a interrompu la page. Ce n'est pas une limite du cours. Réessaie dans un instant."
+                  ? `Une erreur de Thot a interrompu la page. Ce n'est pas une limite ${libelles(db).formes.cours.du}. Réessaie dans un instant.`
                   : "Une erreur du serveur a interrompu la page. Réessayez dans un instant. Si elle revient, le journal du serveur en donne la cause."
               }</p>
               <p><a class="bouton" href="/">${icone("arrow-left")}Retour à l'accueil</a></p>`,

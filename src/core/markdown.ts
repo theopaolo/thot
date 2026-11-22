@@ -27,29 +27,34 @@ const RE_SOULIGNE = /(?<![\p{L}\p{N}])_(?=\S)(.+?)(?:(?<=\S)(_)(?![\p{L}\p{N}])|
 /** Le contenu d'une occurrence fermée, sinon le texte pris tel quel. */
 const sinonTel = (tout: string, contenu: string, ferme?: string) => (ferme ? contenu : tout);
 
-/** Le texte d'un titre ATX sans ses `#` de fermeture, `undefined` pour une autre ligne. */
+/** Le niveau d'un titre ATX et son texte sans ses `#` de fermeture, `undefined` pour une autre ligne. */
 function titreAtx(ligne: string) {
-  const m = ligne.match(/^ {0,3}#{1,6}[ \t]+(.*)/);
+  const m = ligne.match(/^ {0,3}(#{1,6})[ \t]+(.*)/);
   if (!m || m[0].length < ligne.length) return undefined;
-  const texte = rogner(m[1], " \t");
+  const texte = rogner(m[2], " \t");
   const sansDieses = rogner(texte, "#");
   const sansFermeture = rogner(sansDieses, " \t");
   const fermeture = sansDieses.length < texte.length && sansFermeture.length < sansDieses.length;
-  return fermeture ? sansFermeture : texte;
+  return { niveau: m[1].length, texte: fermeture ? sansFermeture : texte };
 }
 
-type Lisible = { texte: string; codes: [number, number][] };
+type Plage = [number, number];
+type Lisible = { texte: string; codes: Plage[]; gras: Plage[] };
+const VIDE = (): Lisible => ({ texte: "", codes: [], gras: [] });
 
 // Bornes d'un code en ligne pendant la réduction, dans la zone d'usage privé d'Unicode.
 const OUVRE = "";
 const FERME = "";
+// Bornes d'un gras, de la même zone.
+const GRAS = "\uE002";
+const FIN_GRAS = "\uE003";
 const BLANC = /[ \t  ]/;
 
 /**
  * Le texte qu'un lecteur voit: liens, emphases et code en ligne réduits à leur contenu, balises
  * HTML retirées (une cellule de tableau devient « | »), échappements et entités résolus. Le code
- * en ligne garde sa plage. Il est mis de côté avant les emphases, pour que `**` autour d'un code
- * tombe aussi et que le contenu du code reste tel quel.
+ * en ligne et le gras gardent leur plage. Le code est mis de côté avant les emphases, pour que
+ * `**` autour d'un code tombe aussi et que le contenu du code reste tel quel.
  */
 function lisible(s: string, images: string[]): Lisible {
   const sansLiens = s
@@ -62,38 +67,57 @@ function lisible(s: string, images: string[]): Lisible {
     .replace(RE_LIEN, sinonTel)
     .replace(RE_REFERENCE, sinonTel);
   const codes: string[] = [];
-  const reduit = decoder(
-    sansLiens
-      .replace(/`([^`]+)`/g, (_, c: string) => `${OUVRE}${codes.push(c) - 1}${FERME}`)
-      .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, " | ")
-      .replace(RE_COMMENTAIRE_OU_BALISE, (tout, finCommentaire?: string, finBalise?: string) => {
-        if (finCommentaire || finBalise) return " ";
-        if (!tout.startsWith("<!--")) return tout;
-        // Après un `<!--` sans fin, la ligne n'a plus de commentaire, ses balises restent à lire.
-        // ponytail: une balise qui y commence et se ferme après un U+2028 reste du texte. La
-        // lire demande de parcourir la ligne à la main.
-        return `<!--${tout.slice(4).replace(RE_BALISE, (b, fin) => (fin ? " " : b))}`;
-      })
-      .replace(RE_GRAS, (tout, marque: "**" | "__", contenu: string, ferme?: string) =>
-        // Après un gras sans fin, seule l'autre marque peut encore se fermer sur la ligne.
-        ferme
-          ? contenu
-          : marque + tout.slice(2).replace(RE_GRAS_SEUL[marque === "**" ? "__" : "**"], sinonTel),
-      )
-      .replace(RE_BARRE, sinonTel)
-      .replace(RE_ITALIQUE, sinonTel)
-      .replace(RE_SOULIGNE, sinonTel)
-      .replace(/\\([!-/:-@[-`{-~])/g, "$1"),
-  ).replace(new RegExp(`${OUVRE}(\\d+)${FERME}`, "g"), (_, i) => OUVRE + codes[i] + FERME);
-  // Les blancs se réduisent à une espace, bornes comprises, et tombent aux deux bouts.
+  const sansBalises = sansLiens
+    .replace(/`([^`]+)`/g, (_, c: string) => `${OUVRE}${codes.push(c) - 1}${FERME}`)
+    .replace(/<\/t[dh]>\s*<t[dh]\b[^>]*>/gi, " | ")
+    .replace(RE_COMMENTAIRE_OU_BALISE, (tout, finCommentaire?: string, finBalise?: string) => {
+      if (finCommentaire || finBalise) return " ";
+      if (!tout.startsWith("<!--")) return tout;
+      // Après un `<!--` sans fin, la ligne n'a plus de commentaire, ses balises restent à lire.
+      // ponytail: une balise qui y commence et se ferme après un U+2028 reste du texte. La
+      // lire demande de parcourir la ligne à la main.
+      return `<!--${tout.slice(4).replace(RE_BALISE, (b, fin) => (fin ? " " : b))}`;
+    });
+  // Le texte réduit, un gras fermé entre `ouvre` et `ferme`.
+  const reduire = (ouvre: string, ferme: string) =>
+    blancs(
+      decoder(
+        sansBalises
+          .replace(RE_GRAS, (tout, marque: "**" | "__", contenu: string, fin?: string) =>
+            // Après un gras sans fin, seule l'autre marque peut encore se fermer sur la ligne.
+            fin
+              ? ouvre + contenu + ferme
+              : marque +
+                tout.slice(2).replace(RE_GRAS_SEUL[marque === "**" ? "__" : "**"], sinonTel),
+          )
+          .replace(RE_BARRE, sinonTel)
+          .replace(RE_ITALIQUE, sinonTel)
+          .replace(RE_SOULIGNE, sinonTel)
+          .replace(/\\([!-/:-@[-`{-~])/g, "$1"),
+      ).replace(new RegExp(`${OUVRE}(\\d+)${FERME}`, "g"), (_, i) => OUVRE + codes[i] + FERME),
+    );
+  const sans = reduire("", "");
+  if (!/\*\*|__/.test(sansBalises)) return sans;
+  // Une borne de gras peut changer ce que lisent les motifs suivants, après un `\` par exemple.
+  // Le texte de preuve ne dépend pas d'elle : le gras ne se note que s'il le laisse intact.
+  const avec = reduire(GRAS, FIN_GRAS);
+  return avec.texte === sans.texte ? { ...sans, gras: avec.gras } : sans;
+}
+
+/** Les blancs réduits à une espace, bornes comprises, et tombés aux deux bouts. */
+function blancs(reduit: string): Lisible {
   const sortie: string[] = [];
-  const plages: [number, number][] = [];
-  let debut = -1;
+  const plages = { codes: [] as Plage[], gras: [] as Plage[] };
+  const debuts = { codes: -1, gras: -1 };
   let blanc = false;
   for (const c of reduit) {
-    if (c === OUVRE) debut = sortie.length + (blanc && sortie.length ? 1 : 0);
-    else if (c === FERME) {
-      if (debut < sortie.length) plages.push([debut, sortie.length]);
+    const sorte = c === OUVRE || c === FERME ? "codes" : c === GRAS || c === FIN_GRAS ? "gras" : "";
+    if (sorte && (c === OUVRE || c === GRAS)) {
+      debuts[sorte] = sortie.length + (blanc && sortie.length ? 1 : 0);
+    } else if (sorte) {
+      if (debuts[sorte] >= 0 && debuts[sorte] < sortie.length) {
+        plages[sorte].push([debuts[sorte], sortie.length]);
+      }
     } else if (BLANC.test(c)) blanc = true;
     else {
       if (blanc && sortie.length) sortie.push(" ");
@@ -101,7 +125,7 @@ function lisible(s: string, images: string[]): Lisible {
       sortie.push(c);
     }
   }
-  return { texte: sortie.join(""), codes: plages };
+  return { texte: sortie.join(""), ...plages };
 }
 
 /**
@@ -109,15 +133,17 @@ function lisible(s: string, images: string[]): Lisible {
  * au fil des morceaux : mesurer le texte déjà joint à chaque tour le relirait en entier.
  */
 function joindre(morceaux: Lisible[], separateur: string): Lisible {
-  const codes: [number, number][] = [];
+  const joint = VIDE();
   const pas = longueur(separateur);
   let n = 0;
   for (const [i, m] of morceaux.entries()) {
     if (i) n += pas;
-    for (const [a, z] of m.codes) codes.push([a + n, z + n]);
+    for (const [a, z] of m.codes) joint.codes.push([a + n, z + n]);
+    for (const [a, z] of m.gras) joint.gras.push([a + n, z + n]);
     n += longueur(m.texte);
   }
-  return { texte: morceaux.map((m) => m.texte).join(separateur), codes };
+  joint.texte = morceaux.map((m) => m.texte).join(separateur);
+  return joint;
 }
 
 /**
@@ -133,15 +159,20 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
   const parties: Partie[] = [{ texte: titre, section: titre }];
   const images: string[] = [];
   let section = titre;
-  let bloc: Lisible = { texte: "", codes: [] };
+  let bloc = VIDE();
   // La longueur du bloc en points de code, tenue à jour : la mesurer à chaque ligne ajoutée
   // relirait tout le bloc.
   let taille = 0;
   const fermer = () => {
     if (bloc.texte) {
-      parties.push({ texte: bloc.texte, section, ...(bloc.codes.length && { codes: bloc.codes }) });
+      parties.push({
+        texte: bloc.texte,
+        section,
+        ...(bloc.codes.length && { codes: bloc.codes }),
+        ...(bloc.gras.length && { gras: bloc.gras }),
+      });
     }
-    bloc = { texte: "", codes: [] };
+    bloc = VIDE();
     taille = 0;
   };
   // Une ligne de plus dans le bloc courant, ou la suite de la dernière quand `nouvelle` est faux.
@@ -152,6 +183,7 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
     if (bloc.texte) bloc.texte += (nouvelle ? "\n" : " ") + l.texte;
     else bloc.texte = l.texte;
     for (const [a, z] of l.codes) bloc.codes.push([a + decalage, z + decalage]);
+    for (const [a, z] of l.gras) bloc.gras.push([a + decalage, z + decalage]);
     taille = decalage + longueur(l.texte);
   };
 
@@ -177,9 +209,11 @@ export function extraireMarkdown(md: string, titreParDefaut: string): Extraction
       parties.push({ texte: code.join("\n"), section, code: true, ...(langage && { langage }) });
     } else if (titreLigne !== undefined) {
       fermer();
-      section = lisible(titreLigne, images).texte;
+      section = lisible(titreLigne.texte, images).texte;
       // Le premier titre qui répète le titre du document n'est pas redit.
-      if (parties.length > 1 || section !== titre) parties.push({ texte: section, section });
+      if (parties.length > 1 || section !== titre) {
+        parties.push({ texte: section, section, niveau: titreLigne.niveau });
+      }
     } else if (/^ {0,3}([-*_])( *\1){2,} *$/.test(ligne)) fermer();
     else if (/^[\s|:-]+$/.test(t) && t.includes("|") && t.includes("-")) continue;
     else if (/^ {0,3}\[[^\]]+\]:\s*\S/.test(ligne)) continue;

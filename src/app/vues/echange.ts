@@ -1,10 +1,14 @@
 import { html } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import type { BlocReponse, Resultat } from "../../core/reponse.ts";
+import { type Formes, formes } from "../../core/accords.ts";
 import { formules, LIENS, texteMermaid } from "../../core/notation.ts";
 import { type Icone, icone } from "../icones.ts";
 import { texteDocument } from "./document.ts";
 import { fermer, idee } from "./eleve-commun.ts";
+
+/** Le terme de cours du profil, pour un appel qui ne connaît pas l'instance. */
+const COURS = formes("Cours", "Cours", "m");
 
 export const question = (texte: string) =>
   html`
@@ -59,6 +63,7 @@ export const reponse = (
    * l'adresse de ses passages, sans avis
    */
   citations = "",
+  fc: Formes = COURS,
 ) => {
   if (r.etat === "answered") {
     // Une ligne par intertitre cité: deux sections d'un même document restent distinctes.
@@ -137,7 +142,7 @@ export const reponse = (
     };
     return html`
       <article class="reponse" id="reponse-${id}">
-        ${(notes.length ? notes : ["Réponse vérifiée dans les cours validés"]).map(
+        ${(notes.length ? notes : [`Réponse vérifiée dans les ${fc.noms} validé${fc.e}s`]).map(
           (note) => html`<p class="reponse-note">${note}</p>`,
         )}
         <div class="texte-reponse">${(
@@ -175,14 +180,14 @@ export const reponse = (
   if (r.etat === "out_of_corpus") {
     return html`
       <article class="reponse hors-corpus" id="reponse-${id}">
-        <p><strong>Je ne trouve pas la réponse dans les documents du cours.</strong></p>
+        <p><strong>Je ne trouve pas la réponse dans les documents ${fc.du}.</strong></p>
         <p>
           Aucun passage publié par tes enseignants ne répond à cette question. Reformule-la avec d'autres
           mots, ou pose-la à ton professeur.
         </p>
         ${
           idees.length
-            ? html`<div class="idees-reponse"><strong>Ce que ton cours couvre</strong>${idees.map(
+            ? html`<div class="idees-reponse"><strong>Ce que ${fc.ton} couvre</strong>${idees.map(
                 (q) => idee(q, true),
               )}</div>`
             : ""
@@ -210,7 +215,7 @@ export const reponse = (
             ? "Ta question est conservée. Réessaie ou demande à ton professeur."
             : r.code === "CANCELLED"
               ? "Ta question est conservée."
-              : "Ce n'est pas une limite du cours. Ta question est conservée."
+              : `Ce n'est pas une limite ${fc.du}. Ta question est conservée.`
       }</p>
       <button
         hx-post="/eleve/messages/${id}/relancer"
@@ -236,14 +241,15 @@ export const panneauSource = (
     enseignant?: string;
   },
   suite?: { id: string; n: number; total: number },
-  /** l'enseignant qui relit un échange est vouvoyé */
-  tete = "Dans ton cours",
+  /** l'enseignant qui relit un échange est vouvoyé. Sans titre : « Dans ton cours ». */
+  tete?: string,
+  fc: Formes = COURS,
 ) =>
   a
     ? html`
       <aside id="source" class="feuille" aria-labelledby="source-titre">
         <div class="feuille-tete">
-          <h2>${tete}</h2>
+          <h2>${tete ?? `Dans ${fc.ton}`}</h2>
           ${fermer}
         </div>
         <div>
@@ -305,9 +311,9 @@ export const panneauSource = (
     `
     : html`
       <aside id="source" class="feuille" aria-labelledby="source-vide">
-        <h2 id="source-vide">${tete}</h2>
+        <h2 id="source-vide">${tete ?? `Dans ${fc.ton}`}</h2>
         <p class="discret">
-          Les numéros dans une réponse ouvrent ici le passage du cours sur lequel repose chaque phrase.
+          Les numéros dans une réponse ouvrent ici le passage ${fc.du} sur lequel repose chaque phrase.
         </p>
       </aside>
     `;

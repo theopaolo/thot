@@ -1,6 +1,11 @@
+import { rm } from "node:fs/promises";
 import { test } from "vite-plus/test";
+import { formes } from "../src/core/accords.ts";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { config } from "../src/app/config.ts";
+import { creerApp } from "../src/app/routes.ts";
 import { page } from "../src/app/vues/page.ts";
+import { environnement, fauxModeles } from "./outils.ts";
 import { sources } from "../src/app/vues/prof-bibliotheque.ts";
 import { depot } from "../src/app/vues/prof-depot.ts";
 import { eleves } from "../src/app/vues/prof-eleves.ts";
@@ -28,6 +33,7 @@ const LIBELLES = {
   regroupements: "Séquences",
   sousRegroupement: "Sous-matière",
   seance: "Séance",
+  formes: { matiere: formes("Matière", "Matières", "f"), cours: formes("Cours", "Cours", "m") },
 };
 
 test("les vues partagent le bundle et gardent leurs contrats de fragments et d'échappement", async () => {
@@ -192,6 +198,58 @@ test("le code en ligne se rend en code, un passage qui le traverse s'y coupe san
   assertStringIncludes(String(await texteDocument([bloc])[0]), "Garde tool_calls en");
 });
 
+test("une formule d'une source se rend entière sous la marque, un code en ligne garde ses dollars", async () => {
+  const texte = "La loi d'Ohm s'écrit $U = R \\times I$ pour un conducteur.";
+  const a = texte.indexOf("$");
+  const z = texte.lastIndexOf("$") + 1;
+  const bloc = { id: "b1", texte, section: "", debut: 0, fin: texte.length };
+  const formule = '<span class="formule" data-tex="U = R \\times I">$U = R \\times I$</span>';
+  assertStringIncludes(
+    String(await texteDocument([bloc])[0]),
+    `<p id="b1">La loi d&#39;Ohm s&#39;écrit ${formule} pour un conducteur.</p>`,
+  );
+  // Le passage s'arrête au milieu de la formule : la marque la prend entière.
+  assertStringIncludes(
+    String(await texteDocument([bloc], [a - 8, a + 4])[0]),
+    `<mark id="passage">s&#39;écrit </mark><mark>${formule}</mark> pour`,
+  );
+  const [code] = texteDocument([{ ...bloc, codes: [[a, z]] }]);
+  assertEquals(String(await code).includes("data-tex"), false);
+  assertEquals(
+    String(await texteDocument([{ ...bloc, texte: "Entre 5 $ et 10 $ la place." }])[0]).includes(
+      "data-tex",
+    ),
+    false,
+  );
+});
+
+test("le gras et le niveau d'un titre se rendent, un passage qui coupe un gras reste surligné", () => {
+  const texte = "Un agent lit le code.";
+  const a = texte.indexOf("agent");
+  const blocs = [
+    { id: "b0", texte: "Rôles", section: "Rôles", debut: 0, fin: 5, niveau: 2 },
+    { id: "b1", texte: "Harness", section: "Harness", debut: 7, fin: 14, niveau: 3 },
+    { id: "b2", texte, section: "Harness", debut: 16, fin: 16 + texte.length, gras: [[a, a + 9]] },
+    { id: "b3", texte: "Fond", section: "Fond", debut: 40, fin: 44, niveau: 6 },
+  ] satisfies Parameters<typeof texteDocument>[0];
+  const eleve = texteDocument(blocs, [16 + a + 6, 16 + a + 16], 2).join("");
+  assertStringIncludes(eleve, '<h2 class="intertitre" id="b0">Rôles</h2>');
+  assertStringIncludes(eleve, '<h3 class="intertitre" id="b1">Harness</h3>');
+  assertStringIncludes(
+    eleve,
+    '<p id="b2">Un <strong>agent </strong><mark id="passage"><strong>lit</strong></mark><mark> le cod</mark>e.</p>',
+  );
+  // Sous « Texte extrait », un cran plus bas, sans dépasser h6.
+  const prof = texteDocument(blocs).join("");
+  assertStringIncludes(prof, '<h4 id="b1">Harness</h4>');
+  assertStringIncludes(prof, '<h6 id="b3">Fond</h6>');
+  assertEquals(sections(blocs), [
+    { titre: "Rôles", ancre: "b0", niveau: 2 },
+    { titre: "Harness", ancre: "b1", niveau: 3 },
+    { titre: "Fond", ancre: "b3", niveau: 6 },
+  ]);
+});
+
 test("le panneau de vérification rend le passage dans son tableau, la ligne citée surlignée", async () => {
   const texte = "Problème | Mécanisme\nPlusieurs destinataires | Observer";
   const debut = 40 + texte.indexOf("Plusieurs");
@@ -265,7 +323,7 @@ test("un schéma du lecteur devient une figure légendée, le sommaire ancre cha
     { titre: "Couches", ancre: "b1" },
     { titre: "Pages", ancre: "s-b3" },
   ]);
-  assertStringIncludes(rendu, '<h2 class="intertitre"  id="s-b3">Pages</h2>');
+  assertStringIncludes(rendu, '<h2 class="intertitre" id="s-b3">Pages</h2>');
   assertEquals(legendeSchema("graph TD\n  accDescr {\n  Deux\n  lignes\n  }"), {
     titre: undefined,
     description: "Deux lignes",
@@ -569,4 +627,48 @@ test("une recherche sans résultat le dit et s'efface sans perdre les autres fil
   // Sans recherche, une bibliothèque vide invite au premier dépôt.
   const neuve = String(await sources([], { ...f, q: "", statut: "" }, [], LIBELLES, true));
   assertStringIncludes(neuve, "Déposer le premier");
+});
+
+test("ressources statiques : feuille réunie, cache immuable sur les assets hachés, ETag/304 ailleurs", async () => {
+  const { db, dir } = await environnement();
+  const app = creerApp(db, fauxModeles().modeles);
+  const dev = config.dev;
+  try {
+    config.dev = false;
+    const htmlProd = String(page("Titre", null, ""));
+    const liensProd = [...htmlProd.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)].map(
+      (m) => m[1],
+    );
+    assertEquals(liensProd.length, 1);
+    assert(liensProd[0].startsWith("/static/dist/assets/styles-"), liensProd[0]);
+
+    const css = await app.request(liensProd[0]);
+    assertEquals(css.status, 200);
+    assertEquals(css.headers.get("cache-control"), "public, max-age=31536000, immutable");
+
+    const police = await app.request("/static/fonts/atkinson-hyperlegible-latin-400-normal.woff2");
+    assertEquals(police.status, 200);
+    assertEquals(police.headers.get("cache-control"), "public, max-age=31536000, immutable");
+
+    const js = await app.request("/static/dist/app.js");
+    assertEquals(js.status, 200);
+    assertEquals(js.headers.get("cache-control"), "no-cache");
+    const tag = js.headers.get("etag");
+    assert(tag, "ETag attendu sur app.js");
+    const revalidate = await app.request("/static/dist/app.js", {
+      headers: { "if-none-match": tag },
+    });
+    assertEquals(revalidate.status, 304);
+
+    assertEquals((await app.request("/static/dist/.vite/manifest.json")).status, 404);
+
+    config.dev = true;
+    const htmlDev = String(page("Titre", null, ""));
+    const liensDev = [...htmlDev.matchAll(/<link rel="stylesheet" href="\/static\/css\/[^"]+">/g)];
+    assertEquals(liensDev.length, 16);
+  } finally {
+    config.dev = dev;
+    db.close();
+    await rm(dir, { recursive: true });
+  }
 });

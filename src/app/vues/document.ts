@@ -1,16 +1,17 @@
 import { html, raw } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
+import { formules } from "../../core/notation.ts";
 import { longueur, tranche } from "../../core/texte.ts";
 
-/** Intertitre de section: h2 sous le titre de la page élève, h3 sous « Texte extrait » côté enseignant. */
-const intertitre = (texte: string, niveau: 2 | 3, id?: string) => {
+/**
+ * Intertitre de section : h2 sous le titre de la page élève, h3 sous « Texte extrait » côté
+ * enseignant. Un titre Markdown de `niveau` 3 ou plus descend d'autant, jusqu'à h6.
+ */
+const intertitre = (texte: string, base: 2 | 3, id?: string, niveau = 2) => {
+  const h = `h${Math.min(6, base + Math.max(0, niveau - 2))}`;
   // Les identifiants de bloc sont générés à l'ingestion (« blk_9 »): pas de texte d'élève ici.
-  const ancre = raw(id ? ` id="${id}"` : "");
-  return niveau === 2
-    ? html`
-      <h2 class="intertitre" ${ancre}>${texte}</h2>
-    `
-    : html`<h3${ancre}>${texte}</h3>`;
+  const attributs = `${base === 2 ? ' class="intertitre"' : ""}${id ? ` id="${id}"` : ""}`;
+  return html`${raw(`<${h}${attributs}>`)}${texte}${raw(`</${h}>`)}`;
 };
 
 /**
@@ -62,17 +63,46 @@ function cellules(texte: string) {
   );
 }
 
+type FormuleBloc = { debut: number; fin: number; tex: string; bloc: boolean };
+
+/**
+ * Les formules `$…$` d'un bloc, en offsets du bloc. Le texte d'une source est sa propre preuve :
+ * il s'appuie lui-même. Un bloc de code et un code en ligne gardent leurs `$`.
+ */
+function formulesBloc(b: Bloc) {
+  const liste: FormuleBloc[] = [];
+  if (b.code || !b.texte.includes("$")) return liste;
+  let p = 0;
+  for (const m of formules(b.texte, b.texte)) {
+    const fin = p + longueur(typeof m === "string" ? m : m.source);
+    if (typeof m !== "string" && !b.codes?.some(([c, d]) => c < fin && d > p)) {
+      liste.push({ debut: p, fin, tex: m.tex, bloc: m.bloc });
+    }
+    p = fin;
+  }
+  return liste;
+}
+
 // Un bloc de code dont le texte répète sa section reste du code. Un intertitre généré porte
 // l'ancre `s-` de son premier bloc, un titre extrait celle de son bloc.
 const intitule = (b: Bloc) => b.texte === b.section && !b.code;
 const ancre = (b: Bloc) => (intitule(b) ? b.id : `s-${b.id}`);
 
-/** Les sections du document dans l'ordre de lecture, avec l'ancre de leur intertitre. */
+/**
+ * Les sections du document dans l'ordre de lecture, avec l'ancre de leur intertitre et le niveau
+ * de leur titre quand l'extraction le note.
+ */
 export function sections(blocs: Bloc[], depuis = "") {
-  const liste: { titre: string; ancre: string }[] = [];
+  const liste: { titre: string; ancre: string; niveau?: number }[] = [];
   let section = depuis;
   for (const b of blocs) {
-    if (b.section && b.section !== section) liste.push({ titre: b.section, ancre: ancre(b) });
+    if (b.section && b.section !== section) {
+      liste.push({
+        titre: b.section,
+        ancre: ancre(b),
+        ...(intitule(b) && b.niveau && { niveau: b.niveau }),
+      });
+    }
     section = b.section;
   }
   return liste;
@@ -94,22 +124,45 @@ export const texteDocument = (
   let ancrePosee = !avecAncre;
   // Le texte du bloc entre `debut` et `fin`, avec la part du passage `m` et le code en ligne qui
   // s'y trouvent. Un passage à cheval sur plusieurs cellules ou sur un code a une marque par
-  // morceau, l'ancre sur la première.
+  // morceau, l'ancre sur la première. formules.ts remplace le contenu d'une formule par son rendu :
+  // la marque l'entoure, et un passage qui coupe une formule la prend entière.
   const marquer = (
     t: string,
     debut: number,
     fin: number,
     m?: readonly [number, number],
     codes: readonly (readonly [number, number])[] = [],
+    toutes: FormuleBloc[] = [],
+    gras: readonly (readonly [number, number])[] = [],
   ) => {
-    const bornes = [...new Set([debut, fin, ...(m ?? []), ...codes.flat()])]
+    // Une formule à cheval sur deux cellules reste du texte.
+    const dans = toutes.filter((f) => debut <= f.debut && f.fin <= fin);
+    for (const f of dans) {
+      if (m && m[0] < f.fin && m[1] > f.debut) {
+        m = [Math.min(m[0], f.debut), Math.max(m[1], f.fin)];
+      }
+    }
+    const bornes = [
+      ...new Set([
+        debut,
+        fin,
+        ...(m ?? []),
+        ...codes.flat(),
+        ...gras.flat(),
+        ...dans.flatMap((f) => [f.debut, f.fin]),
+      ]),
+    ]
       .filter((x) => x >= debut && x <= fin)
       .sort((x, y) => x - y);
     // Les morceaux d'un même code restent dans un seul <code>, la marque se coupe à l'intérieur.
     const groupes: { code: number; morceaux: unknown[] }[] = [];
     for (const [i, a] of bornes.slice(0, -1).entries()) {
       const z = bornes[i + 1];
-      let morceau = html`${tranche(t, a, z)}`;
+      const f = dans.find((x) => x.debut === a && x.fin === z);
+      let morceau = f
+        ? html`<span class="${f.bloc ? "formule formule-bloc" : "formule"}" data-tex="${f.tex}">${tranche(t, a, z)}</span>`
+        : html`${tranche(t, a, z)}`;
+      if (gras.some(([c, d]) => c <= a && z <= d)) morceau = html`<strong>${morceau}</strong>`;
       if (m && m[0] <= a && z <= m[1]) {
         morceau = html`<mark${raw(ancrePosee ? "" : ' id="passage"')}>${morceau}</mark>`;
         ancrePosee = true;
@@ -131,7 +184,7 @@ export const texteDocument = (
       marque && marque[0] < b.fin && marque[1] > b.debut
         ? ([marque[0] - b.debut, marque[1] - b.debut] as const)
         : undefined;
-    if (intitule(b) && !m) return intertitre(b.texte, niveau, b.id);
+    if (intitule(b) && !m) return intertitre(b.texte, niveau, b.id, b.niveau);
     const fin = longueur(b.texte);
     // Pas d'espace dans le <pre>: il s'afficherait. Le code d'un schéma reste visible sous la
     // légende, et remplace le dessin si celui-ci échoue.
@@ -161,18 +214,19 @@ export const texteDocument = (
         ${titre}<pre id="${b.id}"${langage}><code>${marquer(b.texte, 0, fin, m)}</code></pre>
       `;
     }
+    const f = formulesBloc(b);
     const rangs = cellules(b.texte);
     if (rangs) {
       const [entete, ...corps] = rangs;
       return html`
         ${titre}<div class="cadre-tableau"><table id="${b.id}">
           <thead><tr>${entete.map(
-            ([a, z]) => html`<th scope="col">${marquer(b.texte, a, z, m, b.codes)}</th>`,
+            ([a, z]) => html`<th scope="col">${marquer(b.texte, a, z, m, b.codes, f, b.gras)}</th>`,
           )}</tr></thead>
           <tbody>${corps.map(
             (r) =>
               html`<tr>${r.map(
-                ([a, z]) => html`<td>${marquer(b.texte, a, z, m, b.codes)}</td>`,
+                ([a, z]) => html`<td>${marquer(b.texte, a, z, m, b.codes, f, b.gras)}</td>`,
               )}</tr>`,
           )}</tbody>
         </table></div>
@@ -181,7 +235,7 @@ export const texteDocument = (
     // Une liste extraite garde une entrée par ligne : les lignes restent des lignes à l'écran.
     const lignes = raw(b.texte.includes("\n") ? ' class="lignes"' : "");
     return html`
-      ${titre}<p id="${b.id}"${lignes}>${marquer(b.texte, 0, fin, m, b.codes)}</p>
+      ${titre}<p id="${b.id}"${lignes}>${marquer(b.texte, 0, fin, m, b.codes, f, b.gras)}</p>
     `;
   });
 };

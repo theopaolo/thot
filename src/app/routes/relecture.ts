@@ -2,6 +2,7 @@ import { type Hono } from "hono";
 import { peutModifier } from "../comptes.ts";
 import { lireDocument, statuer } from "../ingestion.ts";
 import { aRelire } from "../relecture.ts";
+import { libelles } from "../instance.ts";
 import { pageRelecture } from "../vues/relecture.ts";
 import type { Env, Web } from "./web.ts";
 
@@ -18,7 +19,13 @@ export function routesRelecture(app: Hono<Env>, w: Web) {
     } catch {
       /* pas encore extrait */
     }
-    return c.html(rendre(c, "Relecture", pageRelecture(liste, choisie, blocs)));
+    return c.html(
+      rendre(
+        c,
+        "Relecture",
+        pageRelecture(liste, choisie, blocs, `Sans ${libelles(db).formes.cours.nom}`),
+      ),
+    );
   });
 
   app.post("/prof/relecture/:id/:statut{(?:certifiee|rejetee)}", (c) => {
@@ -26,7 +33,7 @@ export function routesRelecture(app: Hono<Env>, w: Web) {
     const compte = c.get("compte");
     if (!peutModifier(db, compte, id)) {
       return c.text(
-        "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.",
+        `Seuls son propriétaire, les administrateurs et les enseignants de ses ${libelles(db).formes.cours.noms} modifient cette source.`,
         403,
       );
     }

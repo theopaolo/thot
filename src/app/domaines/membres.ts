@@ -1,5 +1,7 @@
 import type { Lecteur } from "../../core/recherche.ts";
 import type { Db } from "../db.ts";
+import { majuscule } from "../../core/accords.ts";
+import { libelles } from "../termes.ts";
 
 export type Membre = { id: string; administrateur: number };
 /** Les cours dont le compte est membre. */
@@ -19,7 +21,9 @@ export const membres = (db: Db, coursId: string) =>
     .all(coursId) as { id: string; identifiant: string; nom: string; role: string }[];
 export function inscrire(db: Db, coursId: string, compteId: string) {
   if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
-    throw new Error("Cours inconnu.");
+    throw new Error(
+      `${majuscule(libelles(db).formes.cours.nom)} inconnu${libelles(db).formes.cours.e}.`,
+    );
   }
   if (!db.prepare("SELECT 1 FROM comptes WHERE id = ?").get(compteId)) {
     throw new Error("Compte inconnu.");

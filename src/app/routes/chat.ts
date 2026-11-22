@@ -130,7 +130,8 @@ export function routesChat(app: Hono<Env>, w: Web) {
   const perimetreRefuse = (c: Context<Env>, perimetre: Perimetre) => {
     const p = Domaines.lireScope(perimetre);
     const comparees = Domaines.idsMatieres(p.matieres);
-    if (comparees.length > MAX_MATIERES) return `Compare ${MAX_MATIERES} matières au plus.`;
+    if (comparees.length > MAX_MATIERES)
+      return `Compare ${MAX_MATIERES} ${libelles(db).formes.matiere.noms} au plus.`;
     if (Object.values(p).some(Boolean)) {
       const visible = (q: Domaines.Scope) =>
         offreSourceLisible(db, {
@@ -287,7 +288,7 @@ export function routesChat(app: Hono<Env>, w: Web) {
     const b = await c.req.parseBody({ all: true });
     // Le formulaire de comparaison n'envoie que ses cases : vide, il ne vaut pas « tout ».
     if (!Object.hasOwn(b, "matiere_id") && !Object.hasOwn(b, "matieres")) {
-      return c.text("Coche les matières à comparer.", 400);
+      return c.text(`Coche les ${libelles(db).formes.matiere.noms} à comparer.`, 400);
     }
     const p = Domaines.lireScope(b);
     const refus = perimetreRefuse(c, p);
@@ -352,7 +353,9 @@ export function routesChat(app: Hono<Env>, w: Web) {
     if (Conversations.arreter(db, compte, id)) reponses.annuler(id);
     // Une réponse publiée juste avant l'arrêt s'affiche telle quelle.
     const m = Conversations.echange(db, compte, id);
-    return m?.resultat ? c.html(Echange.reponse(id, m.resultat, m.avis)) : c.notFound();
+    return m?.resultat
+      ? c.html(Echange.reponse(id, m.resultat, m.avis, [], false, "", libelles(db).formes.cours))
+      : c.notFound();
   });
 
   /**
@@ -381,6 +384,8 @@ export function routesChat(app: Hono<Env>, w: Web) {
                 null,
                 await ideesPour(lecteur(compte), r, m.question, id),
                 true,
+                "",
+                libelles(db).formes.cours,
               ),
             ).replace(/\n/g, " "),
           });

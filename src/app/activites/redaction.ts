@@ -23,6 +23,7 @@ import { texte } from "../../core/texte.ts";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
 import type { Db } from "../db.ts";
+import { libelles } from "../termes.ts";
 import { type Activite, type Cible, cibleDe, lireContenu, perimetre } from "./acces.ts";
 import { objectifChoisi } from "./objectifs.ts";
 import { enregistrer, inserer } from "./versions.ts";
@@ -144,7 +145,9 @@ export async function preparer(
   const ids = [...new Set(s.sources)];
   // Le nombre de sources borne les passages, donc la taille de l'appel.
   if (!ids.length || ids.length > MAX_SOURCES || ids.some((id) => !citables.has(id))) {
-    throw new Error(`Choisissez de 1 à ${MAX_SOURCES} sources certifiées de ce cours.`);
+    throw new Error(
+      `Choisissez de 1 à ${MAX_SOURCES} sources certifiées de ${libelles(db).formes.cours.ce}.`,
+    );
   }
   let contenu: Contenu | Explication;
   let rejets: string[] = [];
@@ -207,7 +210,7 @@ export function ancrerPassage(db: Db, a: Cible, sourceId: string, passage: strin
   );
   if (revisionCitable(db, sourceId, perimetre(db, a)) === undefined) {
     throw new Error(
-      `${nom} : « ${titre || "cette source"} » n'est pas une source citable de ce cours.`,
+      `${nom} : « ${titre || "cette source"} » n'est pas une source citable de ${libelles(db).formes.cours.ce}.`,
     );
   }
   const chunks = db
@@ -257,7 +260,8 @@ export async function regenerer(
   );
   const utiles = citables.filter((id) => citees.has(id));
   const ids = (utiles.length ? utiles : citables).slice(0, MAX_SOURCES);
-  if (!ids.length) throw new Error("Aucune source certifiée de ce cours ne sert à Thot.");
+  if (!ids.length)
+    throw new Error(`Aucune source certifiée de ${libelles(db).formes.cours.ce} ne sert à Thot.`);
   const n = rang < 0 ? contenu.questions.length + 1 : rang + 1;
   const g = await genererQuestion(modeles, type, a.intitule, passages(db, a, a.intitule, ids), {
     n,

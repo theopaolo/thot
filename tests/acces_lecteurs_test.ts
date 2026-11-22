@@ -424,6 +424,8 @@ test("migration des lecteurs : aucun accès élargi ni retiré", async () => {
       "0028_connexions.sql",
       "0029_images_revision.sql",
       "0030_images_numero.sql",
+      "0031_genres.sql",
+      "0032_index.sql",
     ]);
     assertEquals(
       db

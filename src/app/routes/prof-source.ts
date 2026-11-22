@@ -25,10 +25,9 @@ import * as ProfLegendes from "../vues/prof-legendes.ts";
 import * as ProfSource from "../vues/prof-source.ts";
 import type { Env, Web } from "./web.ts";
 
-const MODIFICATION_REFUSEE =
-  "Seuls son propriétaire, les administrateurs et les enseignants de ses cours modifient cette source.";
-
 export function routesProfSource(app: Hono<Env>, w: Web) {
+  const modificationRefusee = () =>
+    `Seuls son propriétaire, les administrateurs et les enseignants de ses ${libelles(w.db).formes.cours.noms} modifient cette source.`;
   const { db, instance, rendre } = w;
 
   const detail = (id: string, compte: Compte): ProfSource.Detail | undefined => {
@@ -119,7 +118,7 @@ export function routesProfSource(app: Hono<Env>, w: Web) {
   app.post("/prof/sources/:id/diapositives-masquees", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     if (!d || d.source.format !== "pptx") return c.notFound();
-    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    if (!d.modifiable) return c.text(modificationRefusee(), 403);
     const inclure = (await c.req.parseBody()).inclure === "1";
     if (!inclureDiapositivesMasquees(db, d.source.id, inclure)) {
       return c.text("Extraction en cours : réessayer une fois le traitement terminé.", 409);
@@ -129,7 +128,7 @@ export function routesProfSource(app: Hono<Env>, w: Web) {
   app.post("/prof/sources/:id/modifier", async (c) => {
     const d = detail(c.req.param("id"), c.get("compte"));
     if (!d) return c.notFound();
-    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    if (!d.modifiable) return c.text(modificationRefusee(), 403);
     const b = await c.req.parseBody({ all: true });
     const titre = String(b.titre ?? "").trim();
     const date = String(b.date ?? "").trim();
@@ -190,7 +189,7 @@ export function routesProfSource(app: Hono<Env>, w: Web) {
     const id = c.req.param("id");
     const d = detail(id, c.get("compte"));
     if (!d) return c.notFound();
-    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    if (!d.modifiable) return c.text(modificationRefusee(), 403);
     try {
       statuer(db, id, c.req.param("statut") as "certifiee" | "rejetee", c.get("compte").nom);
     } catch (e) {
@@ -218,7 +217,7 @@ export function routesProfSource(app: Hono<Env>, w: Web) {
     const id = c.req.param("id");
     const d = detail(id, c.get("compte"));
     if (!d) return c.notFound();
-    if (!d.modifiable) return c.text(MODIFICATION_REFUSEE, 403);
+    if (!d.modifiable) return c.text(modificationRefusee(), 403);
     const n = Number(c.req.param("n"));
     try {
       if (c.req.param("statut") === "certifiee") {
@@ -248,7 +247,7 @@ export function routesProfSource(app: Hono<Env>, w: Web) {
     const source = db.prepare("SELECT source_id FROM images WHERE id = ?").get(String(b.image))
       ?.source_id as string | undefined;
     if (!source || !peutModifier(db, c.get("compte"), source)) {
-      return c.text(MODIFICATION_REFUSEE, 403);
+      return c.text(modificationRefusee(), 403);
     }
     relireLegende(
       db,

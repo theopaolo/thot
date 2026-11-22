@@ -8,7 +8,7 @@ import { type Db, maintenant } from "../db.ts";
 import type { Audience } from "../depot.ts";
 import { type Affiliation, affiliations } from "../domaines.ts";
 import { cheminImage, lireInventaire, retirer, servirImages } from "./images.ts";
-import { reindexer } from "./indexation.ts";
+import { reindexer, viderCacheRevisions } from "./indexation.ts";
 import { lireSource, revisionEnAttente } from "./revisions.ts";
 
 /**
@@ -45,7 +45,9 @@ export function statuer(
       if (revisionEnAttente(db, sourceId)?.n !== revision) {
         throw new Error("Cette version n'attend plus de relecture.");
       }
-      // Les questions suggérées ont été vérifiées sur l'ancien texte.
+      // Les questions suggérées ont été vérifiées sur l'ancien texte : elles partent avec lui, sans
+      // attendre le worker, qui peut échouer.
+      db.prepare("DELETE FROM suggestions WHERE source_id = ?").run(sourceId);
       db.prepare("UPDATE sources SET revision = ?, suggestions_le = NULL WHERE id = ?").run(
         revision,
         sourceId,
@@ -212,5 +214,6 @@ export async function supprimerSource(db: Db, sourceId: string) {
   // Le WAL garde les anciennes pages jusqu'au point de contrôle. TRUNCATE le vide, sauf si une
   // lecture en cours l'en empêche.
   db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+  viderCacheRevisions(sourceId);
   await rm(contenu(sourceId), { recursive: true, force: true });
 }

@@ -3,6 +3,8 @@ import { TYPES_QUESTION } from "../../core/activite.ts";
 import { MAX_SERIE, MAX_SOURCES, type SourceCitable } from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
 import { type Libelles, minuscule } from "../instance.ts";
+import { majuscule } from "../../core/accords.ts";
+import { domainesDe } from "./administration.ts";
 import { NOMS_TYPE } from "./questions.ts";
 
 export type Preparation = {
@@ -51,10 +53,10 @@ export const preparation = (p: Preparation) => {
     }
     ${
       !p.catalogue.cours.length
-        ? html`<p>Aucun cours. Un objectif appartient à un cours : ${
+        ? html`<p>${majuscule(p.libelles.formes.cours.aucun)}. Un objectif appartient à ${p.libelles.formes.cours.un} : ${
             p.personnel
-              ? html`créez-en un dans <a href="/administration/domaines">Matières et cours</a>.`
-              : "un administrateur vous inscrit à un cours."
+              ? html`créez-en ${p.libelles.formes.cours.selon("un", "une")} dans <a href="/administration/domaines">${domainesDe(p.libelles)}</a>.`
+              : `un administrateur vous inscrit à ${p.libelles.formes.cours.un}.`
           }</p>`
         : html`
       <form method="get" action="/prof/activites/nouvelle" class="barre">
@@ -124,7 +126,7 @@ export const preparation = (p: Preparation) => {
           <legend><strong>Sources, de 1 à ${MAX_SOURCES}</strong></legend>
           ${
             !p.sources.length
-              ? html`<p class="discret">Aucune source certifiée de ce cours ne sert à Thot pour répondre${
+              ? html`<p class="discret">Aucune source certifiée de ${p.libelles.formes.cours.ce} ne sert à Thot pour répondre${
                   p.personnel ? "" : " et n'est publiée aux élèves"
                 }.</p>`
               : groupes.size > 1
@@ -172,7 +174,7 @@ export const importation = (p: Importation) => {
     }
     ${
       !p.catalogue.cours.length
-        ? html`<p>Aucun cours. Un objectif appartient à un cours.</p>`
+        ? html`<p>${majuscule(p.libelles.formes.cours.aucun)}. Un objectif appartient à ${p.libelles.formes.cours.un}.</p>`
         : html`
       <form method="get" action="/prof/activites/importer" class="barre">
         <label for="cours_id_choix">${p.libelles.cours}</label>

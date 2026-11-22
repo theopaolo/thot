@@ -1,10 +1,44 @@
-import { decouper } from "../../core/document.ts";
+import { type Chunk, decouper } from "../../core/document.ts";
 import { type ChunkIndexe, indexerSource, transaction } from "../../core/recherche.ts";
+import { config } from "../config.ts";
 import type { Db } from "../db.ts";
 import { renommer } from "../domaines.ts";
 import { lireDocument, lireSource, type Source } from "./revisions.ts";
 
 export type Meta = { sequence?: string; seance?: string };
+
+/**
+ * Cache borné des chunks découpés d'anciennes révisions (`n < s.revision`), immuables sur disque.
+ * Les titres, thèmes et légendes restent lus en base à chaque appel : seul le découpage du fichier
+ * est gardé. Clé préfixée par `config.donnees` pour isoler les répertoires de données.
+ */
+const MAX_CACHE_REVISIONS = 64;
+const cacheRevisions = new Map<string, Chunk[]>();
+
+function chunksRevision(sourceId: string, n: number, historique: boolean): Chunk[] {
+  if (!historique) return decouper(lireDocument(sourceId, n));
+  const cle = `${config.donnees}\0${sourceId}\0${n}`;
+  const connu = cacheRevisions.get(cle);
+  if (connu) {
+    cacheRevisions.delete(cle);
+    cacheRevisions.set(cle, connu);
+    return connu;
+  }
+  const decoupes = decouper(lireDocument(sourceId, n));
+  cacheRevisions.set(cle, decoupes);
+  if (cacheRevisions.size > MAX_CACHE_REVISIONS) {
+    cacheRevisions.delete(cacheRevisions.keys().next().value!);
+  }
+  return decoupes;
+}
+
+/** Retire du cache mémoire les anciennes révisions d'une source supprimée. */
+export function viderCacheRevisions(sourceId: string) {
+  const prefixe = `${config.donnees}\0${sourceId}\0`;
+  for (const cle of cacheRevisions.keys()) {
+    if (cle.startsWith(prefixe)) cacheRevisions.delete(cle);
+  }
+}
 
 /**
  * Ce qui range la source : les noms de ses thèmes, tous, par ordre alphabétique. Une source dans
@@ -55,7 +89,7 @@ export function chunksSource(db: Db, sourceId: string, revision?: number): Chunk
      WHERE source_id = ? AND legende IS NOT NULL AND legende_statut != 'rejected' ORDER BY position`,
     )
     .all(sourceId) as { legende: string; legende_statut: string; section: string | null }[];
-  const chunks = decouper(lireDocument(sourceId, n));
+  const chunks = chunksRevision(sourceId, n, n < s.revision);
   // Une image accompagne le premier passage de sa section, une diapositive par exemple. Sans
   // section connue, ou si la révision n'a plus cette section, le premier passage du document.
   const place = (section: string | null) =>

@@ -1,6 +1,7 @@
 import { html } from "hono/html";
 import type { Compte } from "../comptes.ts";
 import { config } from "../config.ts";
+import type { Formes } from "../../core/accords.ts";
 
 export const connexion = (erreur?: string, identifiant = "", retour = "") =>
   html`
@@ -48,6 +49,7 @@ export const inscription = (
   jeton: string,
   cours: { nom: string; matiere: string; createur: string }[],
   compte: Compte | undefined,
+  fc: Formes,
   erreur?: string,
   saisie: { nom?: unknown; identifiant?: unknown } = {},
 ) =>
@@ -60,13 +62,13 @@ export const inscription = (
     `
     : html`
       <form method="post" action="/inscription/${jeton}" class="etroit">
-        <h1>Rejoindre ${cours.length > 1 ? "des cours" : "un cours"}</h1>
+        <h1>Rejoindre ${cours.length > 1 ? `des ${fc.noms}` : fc.un}</h1>
         <p>${cours[0].createur} t'invite à rejoindre :</p>
         <ul>${cours.map((c) => html`<li>${c.matiere} / ${c.nom}</li>`)}</ul>
         ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
         ${
           compte?.role === "enseignant"
-            ? html`<p>Ce lien inscrit des élèves. Un enseignant de ces cours vous y ajoute depuis « Mes cours ».</p>`
+            ? html`<p>Ce lien inscrit des élèves. Un enseignant de ces ${fc.noms} vous y ajoute depuis « Mes ${fc.noms} ».</p>`
             : compte
               ? html`
                 <p>Tu es connecté avec le compte ${compte.nom}.</p>

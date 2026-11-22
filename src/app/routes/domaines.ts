@@ -145,7 +145,10 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
               ProfEleves.feuilleIdentifiants(
                 [{ ...saisi, motDePasse }],
                 config.origine || new URL(c.req.url).origin,
-                ["/administration/domaines", "Retour aux matières et cours"],
+                [
+                  "/administration/domaines",
+                  `Retour aux ${libelles(db).formes.matiere.noms} et ${libelles(db).formes.cours.noms}`,
+                ],
               ),
             ),
           );

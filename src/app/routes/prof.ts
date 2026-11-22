@@ -4,7 +4,11 @@ import { LISIBLE, parametresLisible } from "../../core/recherche.ts";
 import { filtreModification, parametresModification, peutModifier } from "../comptes.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { audience } from "../depot.ts";
-import { questionDesEleves, questionsDesEleves } from "../conversations.ts";
+import {
+  questionDesEleves,
+  questionsDesEleves,
+  resumeQuestionsDesEleves,
+} from "../conversations.ts";
 import { changerLecteurs, refusCertification, statuer } from "../ingestion.ts";
 import * as ProfBibliotheque from "../vues/prof-bibliotheque.ts";
 import * as ProfLignes from "../vues/prof-lignes.ts";
@@ -19,7 +23,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
   const lignes = (c: Context<Env>, statut: string, theme: string, lot = c.req.query("lot") ?? "") =>
     db
       .prepare(
-        `SELECT s.id, s.titre, s.profil, ${Domaines.nomTheme("s")} AS theme, s.format, s.statut,
+        `SELECT s.id, s.titre, s.profil, s.lot_id, ${Domaines.nomTheme("s")} AS theme, s.format, s.statut,
          s.audience, coalesce(${filtreModification()}, 0) AS modifiable,
          j.etat, j.erreur,
          (SELECT count(*) FROM images i WHERE i.source_id = s.id AND i.legende_statut = 'unreviewed') AS images_a_relire,
@@ -44,7 +48,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
         theme,
         lot,
         lot,
-      ) as unknown as ProfLignes.LigneSource[];
+      ) as unknown as (ProfLignes.LigneSource & { lot_id: string | null })[];
   /** Sans accents ni casse : « algebre » trouve « Algèbre ». */
   const plier = (t: string) =>
     t
@@ -173,7 +177,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const f = filtres(c);
     // La prise en main compte toute la bibliothèque, pas seulement le lot affiché.
     const toutes = lignes(c, "", "", "");
-    const ressources = lignesVisibles(c, f.lot ? lignes(c, "", "") : toutes);
+    const ressources = lignesVisibles(c, f.lot ? toutes.filter((s) => s.lot_id === f.lot) : toutes);
     const cat = Domaines.catalogueDe(db, c.get("compte"));
     const personnel = lireInstance(db).mode === "personal";
     // Une nouvelle version à relire compte avec les sources à relire.
@@ -210,7 +214,10 @@ export function routesProf(app: Hono<Env>, w: Web) {
             certifiee: toutes.some((s) => s.statut === "certifiee"),
             administrateur: c.get("compte").administrateur === 1,
             personnel,
-            questions: personnel ? [] : questionsDesEleves(db, lu(c)),
+            activite:
+              !personnel && cat.cours.length > 0 && toutes.some((s) => s.statut === "certifiee")
+                ? resumeQuestionsDesEleves(db, lu(c))
+                : undefined,
           },
           bureau?.rangement,
           // Les sources que l'action groupée n'a pas certifiées. Seules celles que le compte lit
@@ -232,11 +239,18 @@ export function routesProf(app: Hono<Env>, w: Web) {
       ),
     );
   });
-  app.get("/prof/questions", (c) =>
-    c.html(
-      rendre(c, "Questions des élèves", ProfQuestions.questionsProf(questionsDesEleves(db, lu(c)))),
-    ),
-  );
+  app.get("/prof/questions", (c) => {
+    const toutes = c.req.query("toutes") === "1";
+    const liste = questionsDesEleves(db, lu(c), toutes ? undefined : 101);
+    const plus = !toutes && liste.length > 100;
+    return c.html(
+      rendre(
+        c,
+        "Questions des élèves",
+        ProfQuestions.questionsProf(plus ? liste.slice(0, 100) : liste, libelles(db), plus),
+      ),
+    );
+  });
   // Un échange de la liste, sans sa conversation. Hors de la liste, il répond 404.
   const echange = (c: Context<Env>) =>
     questionDesEleves(db, c.get("compte"), c.req.param("echange")!);
@@ -252,7 +266,12 @@ export function routesProf(app: Hono<Env>, w: Web) {
     const e = echange(c);
     if (!e) return c.notFound();
     const r = e.resultat;
-    return feuilleCitation(c, r?.etat === "answered" ? r.affirmations : [], e.id, "Dans le cours");
+    return feuilleCitation(
+      c,
+      r?.etat === "answered" ? r.affirmations : [],
+      e.id,
+      `Dans ${libelles(db).formes.cours.le}`,
+    );
   });
   app.get("/prof/lignes", (c) => {
     const f = filtres(c);

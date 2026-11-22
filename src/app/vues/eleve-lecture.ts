@@ -1,4 +1,4 @@
-import { html } from "hono/html";
+import { html, raw } from "hono/html";
 import type { Bloc } from "../../core/document.ts";
 import { estAnglais } from "../../core/recherche.ts";
 import { icone } from "../icones.ts";
@@ -145,7 +145,7 @@ export const lectureSource = (
         ${cartel(s, l)}
         <form method="post" action="/eleve/questions">
           ${cleEnvoi()}
-          <input type="hidden" name="texte" value="Que dit le cours sur « ${s.titre} » ?">
+          <input type="hidden" name="texte" value="Que dit ${l.formes.cours.le} sur « ${s.titre} » ?">
           <input type="hidden" name="theme_id" value="${s.theme_id}">
           <button>${icone("chat-circle")}Poser une question dessus</button>
         </form>
@@ -197,7 +197,10 @@ export const lectureSource = (
         ? html`
           <nav class="sommaire" aria-labelledby="sommaire-titre">
             <h2 id="sommaire-titre">Sommaire</h2>
-            <ol>${plan.map((p) => html`<li><a href="#${p.ancre}">${p.titre}</a></li>`)}</ol>
+            <ol>${plan.map(
+              (p) =>
+                html`<li${raw(p.niveau && p.niveau > 2 ? ` data-niveau="${Math.min(p.niveau, 4)}"` : "")}><a href="#${p.ancre}">${p.titre}</a></li>`,
+            )}</ol>
           </nav>
         `
         : ""

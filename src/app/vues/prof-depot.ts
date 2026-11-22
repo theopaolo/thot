@@ -93,7 +93,7 @@ export const depot = (s: {
   let n = 0;
   return html`
     <h1>Déposer des ressources</h1>
-    <p class="sous-titre">Choisissez vos fichiers et leur cours. Thot en extrait le texte, puis vous
+    <p class="sous-titre">Choisissez vos fichiers et leur ${s.libelles.formes.cours.nom}. Thot en extrait le texte, puis vous
     les relisez et les certifiez dans la bibliothèque avant qu'il s'en serve.</p>
     ${s.depose ? bilanDepot(s.depose) : ""}
     <form method="post" action="/prof/depot" enctype="multipart/form-data" class="etroit" data-depot>
@@ -134,7 +134,7 @@ export const depot = (s: {
             })}<input type="hidden" name="matiere_id" value="${c.matiere_id ?? ""}">`
           : champ({
               nom: "matiere",
-              label: "Matière",
+              label: s.libelles.matiere,
               options: MATIERES,
               valeur: c.matiere,
               erreur: e.matiere,
@@ -157,7 +157,7 @@ export const depot = (s: {
         ++n,
         "Vérifier et déposer",
         html`
-          <p data-recap hidden></p>
+          <p data-recap data-accord="${s.libelles.formes.cours.e}" hidden></p>
           <details class="ajout" ${["type_document", "classe"].some((k) => e[k]) ? "open" : ""}>
           <summary>Ajouter des informations (facultatif)</summary>
           <p class="aide">Elles valent pour tous les fichiers du dépôt et se complètent ensuite sur

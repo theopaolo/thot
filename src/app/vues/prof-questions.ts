@@ -3,6 +3,7 @@ import type { Resultat } from "../../core/reponse.ts";
 import { icone } from "../icones.ts";
 import type { Catalogue, Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
+import type { Formes } from "../../core/accords.ts";
 import { jour, nomPerimetre } from "./commun.ts";
 import { panneauSource, question, reponse } from "./echange.ts";
 
@@ -39,26 +40,26 @@ const ECHECS: Record<string, [string, string, string]> = {
   ],
   CANCELLED: ["Arrêtée", "L'élève a arrêté la réponse.", "Sa question est conservée."],
 };
-const PANNE: [string, string, string] = [
+const panne = (fc: Formes): [string, string, string] => [
   "Panne",
   "Thot n'a pas pu répondre, à cause d'une panne technique.",
-  "Ce n'est pas une limite du cours. L'élève garde sa question et peut la relancer.",
+  `Ce n'est pas une limite ${fc.du}. L'élève garde sa question et peut la relancer.`,
 ];
-const echec = (code: string | null | undefined) => ECHECS[code ?? ""] ?? PANNE;
+const echec = (code: string | null | undefined, fc: Formes) => ECHECS[code ?? ""] ?? panne(fc);
 
 /** L'état d'une question en mots, le même dans la liste et sur la page de l'échange. */
-const etatQuestion = (etat: string, code: string | null | undefined) =>
+const etatQuestion = (etat: string, code: string | null | undefined, fc: Formes) =>
   etat === "answered"
     ? "Répondue"
     : etat === "out_of_corpus"
-      ? "Sans passage dans le cours"
+      ? `Sans passage dans ${fc.le}`
       : etat === "failed"
-        ? echec(code)[0]
+        ? echec(code, fc)[0]
         : etat === "annule"
           ? "Arrêtée"
           : "En cours";
 
-const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
+const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean, fc: Formes) =>
   html`
     <table>
       <thead>
@@ -85,7 +86,7 @@ const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
               ${
                 avecEtat
                   ? html`
-                  <td>${etatQuestion(m.etat, m.code)}</td>
+                  <td>${etatQuestion(m.etat, m.code, fc)}</td>
                   <td>${
                     AVIS[m.avis ?? ""] ??
                     html`<span aria-hidden="true">–</span><span class="visuellement-cache">Pas d'avis</span>`
@@ -102,7 +103,8 @@ const tableQuestions = (lignes: QuestionProf[], avecEtat: boolean) =>
     </table>
   `;
 
-export const questionsProf = (messages: QuestionProf[]) => {
+export const questionsProf = (messages: QuestionProf[], l: Libelles, plus = false) => {
+  const fc = l.formes.cours;
   const refus = messages.filter((m) => m.etat === "out_of_corpus");
   const groupes = Map.groupBy(
     messages.filter((m) => m.etat !== "out_of_corpus"),
@@ -113,15 +115,15 @@ export const questionsProf = (messages: QuestionProf[]) => {
     ${
       messages.length
         ? ""
-        : html`<p>Les questions que les élèves de vos cours posent à Thot s'affichent ici, et aucun n'en a encore posé.</p>`
+        : html`<p>Les questions que les élèves de vos ${fc.noms} posent à Thot s'affichent ici, et aucun n'en a encore posé.</p>`
     }
     ${
       refus.length
         ? html`
         <section class="questions-prof">
-          <h2>Hors cours</h2>
-          <p class="discret">Thot n'a pas trouvé de réponse dans vos cours. Ces questions signalent peut-être un point à couvrir.</p>
-          ${tableQuestions(refus, false)}
+          <h2>Hors ${fc.nom}</h2>
+          <p class="discret">Thot n'a pas trouvé de réponse dans vos ${fc.noms}. Ces questions signalent peut-être un point à couvrir.</p>
+          ${tableQuestions(refus, false, fc)}
         </section>
       `
         : ""
@@ -131,10 +133,11 @@ export const questionsProf = (messages: QuestionProf[]) => {
         html`
         <section class="questions-prof">
           <h2>${chapitre}</h2>
-          ${tableQuestions(lignes, true)}
+          ${tableQuestions(lignes, true, fc)}
         </section>
       `,
     )}
+    ${plus ? html`<p><a href="/prof/questions?toutes=1">Afficher toutes les questions</a></p>` : ""}
   `;
 };
 
@@ -152,7 +155,8 @@ export const echangeProf = (e: EchangeProf, cat: Catalogue, l: Libelles) => {
   const code = r?.etat === "failed" ? r.code : null;
   // Le dépôt coche le cours de l'échange, ou celui de son thème.
   const coursId = e.cours_id || cat.themes.find((t) => t.id === e.theme_id)?.cours_id || "";
-  const [, cause, suite] = echec(code);
+  const fc = l.formes.cours;
+  const [, cause, suite] = echec(code, fc);
   const enCours = etat === "en_attente" || etat === "en_cours";
   return html`
     <p><a href="/prof/questions">Questions des élèves</a></p>
@@ -164,6 +168,7 @@ export const echangeProf = (e: EchangeProf, cat: Catalogue, l: Libelles) => {
           <dd><span class="statut ${etat === "failed" ? "failed" : enCours ? "en-cours" : ""}">${etatQuestion(
             etat,
             code,
+            fc,
           )}</span></dd>
           <dt>Dans</dt>
           <dd>${nomPerimetre(cat, e, l) || "toutes ses ressources"}</dd>
@@ -178,12 +183,12 @@ export const echangeProf = (e: EchangeProf, cat: Catalogue, l: Libelles) => {
         ${question(e.question)}
         ${
           r?.etat === "answered"
-            ? reponse(e.id, r, null, [], false, `/prof/questions/${e.id}/citations`)
+            ? reponse(e.id, r, null, [], false, `/prof/questions/${e.id}/citations`, fc)
             : etat === "out_of_corpus"
               ? html`<article class="reponse hors-corpus" id="reponse-${e.id}">
                 <p><strong>Aucun passage certifié ne répond à cette question.</strong></p>
                 <p>Thot n'a rien trouvé d'assez proche dans les ressources que l'élève peut lire, et
-                  lui a répondu que le cours ne la couvre pas. Si ce point fait partie du cours,
+                  lui a répondu que ${fc.le} ne la couvre pas. Si ce point fait partie ${fc.du},
                   déposez le document qui le traite.</p>
                 <a class="bouton principal" href="/prof/depot${coursId ? `?cours=${coursId}` : ""}"
                   >${icone("upload-simple")}Déposer un document</a>
@@ -198,7 +203,7 @@ export const echangeProf = (e: EchangeProf, cat: Catalogue, l: Libelles) => {
       </div>
       ${
         r?.etat === "answered"
-          ? html`<div class="colonne-source">${panneauSource(undefined, undefined, "Dans le cours")}</div>`
+          ? html`<div class="colonne-source">${panneauSource(undefined, undefined, `Dans ${fc.le}`, fc)}</div>`
           : ""
       }
     </div>

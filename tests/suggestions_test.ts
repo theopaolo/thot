@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
@@ -8,15 +9,15 @@ import {
   questionsProches,
   renvoie,
 } from "../src/core/suggestions.ts";
-import { config } from "../src/app/config.ts";
-import { statuer } from "../src/app/ingestion.ts";
+import { config, contenu } from "../src/app/config.ts";
+import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import {
   faitAuHasard,
   genererSuggestions,
   suggestionsDuPerimetre,
 } from "../src/app/suggestions.ts";
 import { environnement, fauxModeles, session } from "./outils.ts";
-import { ELEVE, sourceTraitee } from "./source_outils.ts";
+import { ELEVE, PAGE, sourceTraitee } from "./source_outils.ts";
 
 test("une suggestion qui renvoie à une image absente est écartée, une question qui la nomme passe", () => {
   for (const q of [
@@ -125,6 +126,27 @@ test("une question proposée n'est gardée que si Thot y répond avec une citati
     0,
     "une source rejetée ne propose plus rien",
   );
+});
+
+test("certifier une nouvelle version retire les questions vérifiées sur l'ancienne", async () => {
+  const { db } = await environnement();
+  const id = await sourceTraitee(db);
+  statuer(db, id, "certifiee", "test");
+  db.prepare("INSERT INTO suggestions VALUES ('sg', ?, 'Qui est Gaudí ?', 'faux', 'test')").run(id);
+  assertEquals(suggestionsDuPerimetre(db, ELEVE, new Set([id])).length, 1);
+
+  // Le texte change : une version à relire, que l'enseignant certifie avant le passage du worker.
+  const html = new TextDecoder().decode(PAGE).replace("Gaudí refuse", "L'architecte refuse");
+  writeFileSync(contenu(id, "original", "casa.html"), html);
+  db.prepare("UPDATE ingestion_jobs SET etat = 'received' WHERE source_id = ?").run(id);
+  await traiter(db, revendiquer(db)!, fauxModeles().modeles);
+  assertEquals(
+    suggestionsDuPerimetre(db, ELEVE, new Set([id])).length,
+    1,
+    "l'ancienne sert encore",
+  );
+  statuer(db, id, "certifiee", "test", 2);
+  assertEquals(suggestionsDuPerimetre(db, ELEVE, new Set([id])), []);
 });
 
 test("le saviez-vous recopie une phrase certifiée et pointe sa position exacte", async () => {
