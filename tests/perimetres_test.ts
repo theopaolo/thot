@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { test } from "vite-plus/test";
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "node:path";
-import { filtre } from "../src/app/vues/domaines.ts";
+import { filtre } from "../src/app/vues/perimetre.ts";
 import { cours, matiere, theme } from "../src/app/domaines.ts";
 import { revendiquer, statuer, traiter } from "../src/app/ingestion.ts";
 import { PROFILS } from "../src/core/profils.ts";

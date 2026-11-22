@@ -4,7 +4,7 @@ import { SEUIL_SOUTIEN } from "../../core/reponse.ts";
 import type { Activite, ActiviteListee, FiltreActivites, suiviObjectifs } from "../activites.ts";
 import type { Catalogue } from "../domaines.ts";
 import { type Libelles, minuscule } from "../instance.ts";
-import { filtre as filtreCours } from "./domaines.ts";
+import { filtre as filtreCours } from "./perimetre.ts";
 import { jour } from "./commun.ts";
 import { ongletsBibliotheque } from "./prof-bibliotheque.ts";
 

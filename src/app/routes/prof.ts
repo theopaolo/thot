@@ -36,7 +36,7 @@ import * as ProfLignes from "../vues/prof-lignes.ts";
 import * as ProfQuestions from "../vues/prof-questions.ts";
 import * as ProfSource from "../vues/prof-source.ts";
 import * as Domaines from "../domaines.ts";
-import * as DomaineVue from "../vues/domaines.ts";
+import * as Perimetre from "../vues/perimetre.ts";
 import type { Env, Web } from "./web.ts";
 
 const MODIFICATION_REFUSEE =
@@ -222,7 +222,7 @@ export function routesProf(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Bibliothèque",
-        html`${DomaineVue.filtre(cat, scope(c), "/prof", libelles(db), {
+        html`${Perimetre.filtre(cat, scope(c), "/prof", libelles(db), {
           statut: f.statut,
           vue: f.vue,
         })}${ProfBibliotheque.sources(

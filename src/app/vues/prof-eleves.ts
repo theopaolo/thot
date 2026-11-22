@@ -1,7 +1,7 @@
 import { html } from "hono/html";
 import type { Catalogue } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
-import * as Domaines from "./domaines.ts";
+import * as Perimetre from "./perimetre.ts";
 import { champFichier, jour, nombre } from "./commun.ts";
 
 export type Eleve = { id: string; identifiant: string; nom: string };
@@ -241,7 +241,7 @@ export const eleves = (o: {
   const compte = `${n} élève${n > 1 ? "s" : ""}`;
   const choix =
     cat.cours.length > 1
-      ? Domaines.filtre(
+      ? Perimetre.filtre(
           cat,
           { matiere_id: o.matiere ?? "", cours_id: actuel?.id ?? "", theme_id: "" },
           "/prof/eleves",

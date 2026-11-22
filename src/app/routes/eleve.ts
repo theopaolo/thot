@@ -19,7 +19,7 @@ import * as EleveCommun from "../vues/eleve-commun.ts";
 import * as EleveLecture from "../vues/eleve-lecture.ts";
 import * as EleveRessources from "../vues/eleve-ressources.ts";
 import * as Domaines from "../domaines.ts";
-import * as DomaineVue from "../vues/domaines.ts";
+import * as Perimetre from "../vues/perimetre.ts";
 import * as Activites from "../activites.ts";
 import * as PratiqueVue from "../vues/pratique.ts";
 import * as Lectures from "../lectures.ts";
@@ -112,7 +112,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
     );
     const prenom = c.get("compte").nom.split(" ")[0];
     const cat = Domaines.catalogueVisible(db, lu(c));
-    const filtresDomaines = DomaineVue.filtre(cat, scope(c), "/eleve", libelles(db), {
+    const filtresDomaines = Perimetre.filtre(cat, scope(c), "/eleve", libelles(db), {
       vue: c.req.query("vue") ?? "",
     });
     const generique =
@@ -148,7 +148,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
               : "Les ressources publiées par tes enseignants. Thot répond à tes questions en citant uniquement ces ressources."
           }</p>${filtresDomaines}
           <form method="post" action="/eleve/questions" class="question-rapide">
-            ${DomaineVue.champsScope(scope(c))}${EleveCommun.cleEnvoi()}
+            ${Perimetre.champsScope(scope(c))}${EleveCommun.cleEnvoi()}
             <label for="texte">Une question sur ces ressources ?</label>
             <div class="saisie"><input type="text" id="texte" name="texte" required maxlength="1000"><button>Demander</button></div>
             ${mention ? html`<small>${mention}</small>` : ""}
@@ -402,7 +402,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
         rendre(
           c,
           "Chercher",
-          html`${DomaineVue.filtre(
+          html`${Perimetre.filtre(
             Domaines.catalogueVisible(db, lu(c)),
             scope(c),
             "/eleve/recherche",
@@ -461,7 +461,7 @@ export function routesEleve(app: Hono<Env>, w: Web) {
       rendre(
         c,
         "Chercher",
-        html`${DomaineVue.filtre(
+        html`${Perimetre.filtre(
           Domaines.catalogueVisible(db, lu(c)),
           scope(c),
           "/eleve/recherche",

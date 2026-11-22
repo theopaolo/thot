@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import { icone } from "../icones.ts";
 import type { Profil } from "../../core/profils.ts";
 import type { Scope } from "../domaines.ts";
-import { champsScope } from "./domaines.ts";
+import { champsScope } from "./perimetre.ts";
 
 export type ChapitreVue = {
   nom: string;

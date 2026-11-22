@@ -5,7 +5,7 @@ import type { Affiliation, Catalogue } from "../domaines.ts";
 import type { imagesEnAttente } from "../ingestion.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import type { Libelles } from "../instance.ts";
-import * as Domaines from "./domaines.ts";
+import * as Champs from "./champs-source.ts";
 import { texteDocument } from "./document.ts";
 import { champ, jour, lecteurs } from "./commun.ts";
 import { ETATS_JOB, JOBS_ACTIFS, STATUTS } from "./prof-lignes.ts";
@@ -150,7 +150,7 @@ export const detailSource = (d: Detail) => {
       }
       <div class="deux">
         ${champ({ nom: "titre", label: "Titre", valeur: d.source.titre, requis: true })}
-        ${Domaines.informations(d.informations, d.meta, propositions)}
+        ${Champs.informations(d.informations, d.meta, propositions)}
       </div>
       <div class="deux">
         <div class="champ">
@@ -169,8 +169,8 @@ export const detailSource = (d: Detail) => {
           ? html`<p class="aide">Le quiz élève accepte l'artiste ou le mouvement.</p>`
           : ""
       }
-      ${d.catalogue ? Domaines.liens(d.catalogue, d.libelles, d.affiliations) : ""}
-      ${Domaines.langue(d.source.langue)}
+      ${d.catalogue ? Champs.liens(d.catalogue, d.libelles, d.affiliations) : ""}
+      ${Champs.langue(d.source.langue)}
       ${lecteurs(d.source.audience, d.source.reponses === 1)}
       <button>Enregistrer</button>
     </form>`

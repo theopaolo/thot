@@ -4,7 +4,7 @@ import { icone } from "../icones.ts";
 import { type Catalogue, MATIERES } from "../domaines.ts";
 import type { Champ, Profil } from "../../core/profils.ts";
 import type { Libelles } from "../instance.ts";
-import * as Domaines from "./domaines.ts";
+import * as Champs from "./champs-source.ts";
 import { champ, champFichier, lecteurs, nombre } from "./commun.ts";
 
 /** Le sort d'un fichier déposé: reçu, doublon d'une source que le compte lit, ou refusé. */
@@ -125,7 +125,7 @@ export const depot = (s: {
         ++n,
         "Où les ranger ?",
         s.catalogue
-          ? html`${Domaines.rangementDepot(s.catalogue, s.libelles, {
+          ? html`${Champs.rangementDepot(s.catalogue, s.libelles, {
               saisie: c,
               creer: Boolean(s.administrateur),
               sansProfil: Boolean(s.sansProfil),
@@ -179,8 +179,8 @@ export const depot = (s: {
               erreur: e.classe,
             })}
           </div>
-          ${Domaines.langue(c.langue)}
-          <div class="deux">${Domaines.informations(s.informations, c)}</div>
+          ${Champs.langue(c.langue)}
+          <div class="deux">${Champs.informations(s.informations, c)}</div>
           ${champ({ nom: "resume", label: "Résumé", zone: true, valeur: c.resume })}
           ${champ({ nom: "objectifs", label: "Objectifs pédagogiques", zone: true, valeur: c.objectifs })}
           <div class="deux">

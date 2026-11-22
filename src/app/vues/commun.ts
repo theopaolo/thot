@@ -3,6 +3,7 @@ import { AUDIENCES } from "../depot.ts";
 import { icone } from "../icones.ts";
 import { type Catalogue, type Scope, idsMatieres } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
+import { PROFILS } from "../../core/profils.ts";
 
 type Option = { value: string; label: string };
 
@@ -134,3 +135,12 @@ export const nomPerimetre = (
     .filter(Boolean)
     .join(" / ");
 };
+
+export const options = (liste: { id: string; nom: string }[], valeur = "") =>
+  liste.map(
+    (m) => html`<option value="${m.id}" ${m.id === valeur ? "selected" : ""}>${m.nom}</option>`,
+  );
+export const selectionProfil = (valeur = "general") =>
+  html`<label>Profil <select name="profil">${Object.entries(PROFILS).map(
+    ([id, p]) => html`<option value="${id}" ${id === valeur ? "selected" : ""}>${p.nom}</option>`,
+  )}</select></label>`;

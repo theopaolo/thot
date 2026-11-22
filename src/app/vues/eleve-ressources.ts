@@ -3,7 +3,7 @@ import { icone } from "../icones.ts";
 import type { Profil } from "../../core/profils.ts";
 import { idsMatieres, type Scope } from "../domaines.ts";
 import { type Activite, type Avancement, couvre } from "../activites.ts";
-import { champsScope } from "./domaines.ts";
+import { champsScope } from "./perimetre.ts";
 import { type Etape, dossier, fichier, fil } from "./bureau.ts";
 import {
   type ChapitreVue,

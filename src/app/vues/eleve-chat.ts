@@ -2,7 +2,7 @@ import { html } from "hono/html";
 import { icone } from "../icones.ts";
 import { type Catalogue, idsMatieres, type Scope } from "../domaines.ts";
 import type { Libelles } from "../instance.ts";
-import { champsScope, selectsPerimetre } from "./domaines.ts";
+import { champsScope, selectsPerimetre } from "./perimetre.ts";
 import { nomPerimetre } from "./commun.ts";
 import { attente, panneauSource, question, reponse } from "./echange.ts";
 import { cleEnvoi, idee } from "./eleve-commun.ts";
