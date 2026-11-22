@@ -62,7 +62,9 @@ export default defineConfig({
   lint: {
     ignorePatterns: ignores,
     options: { typeAware: true, typeCheck: true },
+    plugins: ["typescript", "unicorn", "oxc", "import"],
     rules: {
+      "import/no-cycle": "error",
       // parseBody type chaque champ string | File. Un fichier dans un champ texte devient
       // "[object File]", un texte que la validation traite comme les autres.
       "typescript/no-base-to-string": "off",

@@ -3,7 +3,6 @@ import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import type { Cache } from "../core/modeles.ts";
 import { config, RACINE } from "./config.ts";
-import { initialiserInstance } from "./instance.ts";
 
 export type Db = DatabaseSync;
 
@@ -36,6 +35,28 @@ export function connexion(chemin = join(config.donnees, "state.sqlite3")): Db {
     "PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA secure_delete = ON;",
   );
   return db;
+}
+
+/** La ligne unique de `instance`, créée à la première migration. */
+function initialiserInstance(db: Db) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    if (!db.prepare("SELECT id FROM instance").get()) {
+      const ecoles = db.prepare("SELECT DISTINCT school_id FROM sources").all();
+      if (ecoles.length > 1) {
+        throw new Error(
+          "Plusieurs établissements dans la base : séparer leurs données avant migration.",
+        );
+      }
+      db.prepare(
+        "INSERT INTO instance (singleton, id, school_id, nom, mode) VALUES (1, ?, ?, 'Thot', 'shared')",
+      ).run(crypto.randomUUID(), ecoles[0]?.school_id ?? config.schoolId);
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
 }
 
 /** Applique les fichiers `migrations/*.sql` non encore appliqués, dans l'ordre. */

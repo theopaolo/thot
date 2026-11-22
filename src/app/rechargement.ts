@@ -1,9 +1,8 @@
 import { watch } from "node:fs";
 import { join } from "node:path";
-import type { Hono } from "hono";
+import type { Env, Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { RACINE } from "./config.ts";
-import type { Env } from "./routes/web.ts";
 
 /** Change à chaque relance du serveur par `node --watch`. */
 const DEMARRAGE = String(Date.now());
@@ -13,7 +12,7 @@ const DEMARRAGE = String(Date.now());
  * recharger la page. Un fichier reconstruit sous `static/dist/` recharge la page. Un serveur
  * relancé coupe le flux : le navigateur se reconnecte, lit un autre démarrage et recharge.
  */
-export function routesRechargement(app: Hono<Env>) {
+export function routesRechargement<E extends Env>(app: Hono<E>) {
   const abonnes = new Set<(evenement: "css" | "page") => void>();
   let feuilleSeule = true;
   let attente: ReturnType<typeof setTimeout> | undefined;

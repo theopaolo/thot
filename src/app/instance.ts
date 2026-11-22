@@ -21,27 +21,6 @@ export type Instance = {
   version: number;
 };
 
-export function initialiserInstance(db: Db) {
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    if (!db.prepare("SELECT id FROM instance").get()) {
-      const ecoles = db.prepare("SELECT DISTINCT school_id FROM sources").all();
-      if (ecoles.length > 1) {
-        throw new Error(
-          "Plusieurs établissements dans la base : séparer leurs données avant migration.",
-        );
-      }
-      db.prepare(
-        "INSERT INTO instance (singleton, id, school_id, nom, mode) VALUES (1, ?, ?, 'Thot', 'shared')",
-      ).run(crypto.randomUUID(), ecoles[0]?.school_id ?? config.schoolId);
-    }
-    db.exec("COMMIT");
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
-  }
-}
-
 export const lireInstance = (db: Db) =>
   db
     .prepare(
