@@ -13,28 +13,34 @@ import { sansAccents } from "./texte.ts";
 
 /**
  * Les mots d'une réponse, en minuscules, sans accents ni ponctuation : « Loi de Jakob ! » devient
- * loi, de, jakob. Le signe moins collé devant un chiffre fait partie du nombre : « -1 » ne vaut
- * pas « 1 », alors que « Jean-Paul » se lit comme deux mots.
+ * loi, de, jakob. Les élisions françaises (`c'`, `d'`, `l'`) s'effacent avant la découpe pour que
+ * les lettres seules `c`, `d` et `l` restent significatives. Le signe moins collé devant un chiffre
+ * et les signes `#` ou `+` collés à la fin d'un mot font partie du mot : « -1 » ne vaut pas « 1 »
+ * et « C# » ne vaut pas « C », alors que « Jean-Paul » se lit comme deux mots.
  */
 const mots = (s: string) =>
   sansAccents(s)
     .toLowerCase()
     .replace(/\u2212/g, "-")
-    .match(/(?:(?<![a-z0-9])-(?=\d))?[a-z0-9]+/g) ?? [];
+    .replace(/(?<![a-z0-9])[cdl]['’](?=[a-z])/g, "")
+    .match(/(?:(?<![a-z0-9])-(?=\d))?[a-z0-9]+[#+]*/g) ?? [];
 
 /** Mots qui entourent la réponse sans la changer : « c'est la loi de Jakob » se compare comme « jakob ». */
 const FILLERS = new Set(
-  "c est ce cest le la les l un une des de du d loi lois principe effet regle the a an of law effect principle".split(
+  "est ce cest le la les un une des de du loi lois principe effet regle the an of law effect principle".split(
     " ",
   ),
 );
 /**
  * Un mot de liaison ne s'efface que devant un autre mot. Le dernier mot reste : dans « balise a »
- * ou « la loi », il est la réponse.
+ * ou « la loi », il est la réponse. L'article anglais « a » ne s'efface qu'en tête, pour qu'une
+ * lettre seule au milieu (« touche A du clavier ») ne disparaisse pas.
  */
 const noyau = (s: string) => {
   const liste = mots(s);
-  return liste.filter((m, i) => i === liste.length - 1 || !FILLERS.has(m));
+  return liste.filter(
+    (m, i) => i === liste.length - 1 || (!FILLERS.has(m) && !(m === "a" && i === 0)),
+  );
 };
 
 function distance(a: string, b: string): number {
@@ -53,9 +59,9 @@ function distance(a: string, b: string): number {
   return prec[b.length];
 }
 
-/** Les fautes de frappe tolérées dans un mot. Aucune dès qu'il porte un chiffre : « 1798 » est une autre date que « 1789 ». */
+/** Les fautes de frappe tolérées dans un mot. Aucune dès qu'il porte un chiffre ou un signe : « 1798 » n'est pas « 1789 », « notepad+ » n'est pas « notepad++ ». */
 const tolerance = (attendu: string, saisi: string) =>
-  /\d/.test(attendu + saisi) ? 0 : attendu.length >= 10 ? 2 : attendu.length >= 5 ? 1 : 0;
+  /[\d#+-]/.test(attendu + saisi) ? 0 : attendu.length >= 10 ? 2 : attendu.length >= 5 ? 1 : 0;
 
 /**
  * Une saisie est juste si, mots de liaison retirés, chacun de ses mots vaut le mot de même rang

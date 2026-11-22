@@ -64,6 +64,19 @@ test("réponses tapées : une réponse fausse à une lettre, un chiffre ou un si
   assert(!correspond("du bit", ["du but"]));
   assert(!correspond("jak0b", ["Jakob"]));
   assert(correspond("architectre", ["architecture"]));
+  // Une lettre seule au milieu de la réponse compte ; seules les élisions (c', d', l') s'effacent.
+  assert(!correspond("touche D du clavier", ["touche C du clavier"]));
+  assert(!correspond("touche L du clavier", ["touche C du clavier"]));
+  assert(!correspond("touche du clavier", ["touche A du clavier"]));
+  assert(correspond("C’est la loi de Jakob", ["Jakob"]));
+  assert(correspond("d'un arbre", ["arbre"]));
+  assert(correspond("a law of proximity", ["proximity"]));
+  // Les signes # et + collés à un mot en font partie, sans tolérance de frappe.
+  assert(!correspond("C", ["C#"]));
+  assert(correspond("C'est du C# !", ["C#"]));
+  assert(!correspond("C+", ["C++"]));
+  assert(!correspond("Notepad+", ["Notepad++"]));
+  assert(correspond("C++", ["C++"]));
 });
 
 test("réponse tapée acceptée avec une différence : tout sauf la casse et les espaces", () => {
