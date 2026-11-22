@@ -92,11 +92,21 @@ test("connexion : les échecs se comptent aussi par adresse, celle que donne le 
       (await entrer(motDePasse, "lea", depuis("203.0.113.9, 198.51.100.7"))).status,
       302,
     );
-    // Un échec compte pour l'adresse, une réussite ne lui coûte rien.
+    // Un échec compte pour l'adresse, une réussite ne lui coûte rien et ne laisse pas de ligne à 0.
+    assertEquals(essais(db, "adresse:198.51.100.7"), undefined);
     assertEquals((await entrer("faux", "noe", depuis("198.51.100.7"))).status, 401);
     assertEquals(essais(db, "adresse:198.51.100.7"), 1);
     assertEquals((await entrer(motDePasse, "lea", depuis("198.51.100.7"))).status, 302);
     assertEquals(essais(db, "adresse:198.51.100.7"), 1);
+
+    // Une adresse bloquée n'incrémente pas les comptes visés ; un compte bloqué n'épuise pas l'adresse.
+    assertEquals(essais(db, "identifiant:lea"), undefined);
+    for (let i = 0; i < ECHECS_IDENTIFIANT; i++) {
+      await entrer("faux", "bloque", depuis("198.51.100.7"));
+    }
+    const avantAdresse = essais(db, "adresse:198.51.100.7");
+    assertEquals((await entrer("faux", "bloque", depuis("198.51.100.7"))).status, 429);
+    assertEquals(essais(db, "adresse:198.51.100.7"), avantAdresse);
 
     // Sans proxy déclaré, l'en-tête ne compte pas : n'importe quel client peut l'écrire.
     config.proxies = 0;

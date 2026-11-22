@@ -446,12 +446,13 @@ export function openrouter(config: ConfigModeles, cache?: Cache): Modeles {
           top_logprobs: 10,
           // Sans `require_parameters`, un hébergeur sans logprobs répond quand même, sans elles.
           // Mistral sert GLM 5.3 en UE: 316 ms de médiane contre 1 s chez Modal, que `throughput`
-          // choisissait. `order` garde la relève des autres hébergeurs.
+          // choisissait. En relève d'un appel direct à Mistral qui vient d'échouer ou de dépasser
+          // 2,5 s, OpenRouter écarte Mistral pour joindre un autre hébergeur dans le délai restant.
           provider: {
             require_parameters: true,
             zdr: true,
             data_collection: "deny",
-            order: ["Mistral"],
+            ...(config.cleMistral ? { ignore: ["Mistral"] } : { order: ["Mistral"] }),
           },
         },
         false,

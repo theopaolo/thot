@@ -144,6 +144,28 @@ test("annuler le juge interrompt la requête et interdit les reprises et la rel�
   }
 });
 
+test("juge : OpenRouter préfère Mistral seul, mais l'écarte après un échec direct chez Mistral", async () => {
+  const fetch = globalThis.fetch;
+  try {
+    const fournisseurs: unknown[] = [];
+    globalThis.fetch = (url, init) => {
+      if (String(url).includes("api.mistral.ai")) {
+        return Promise.resolve(new Response("surcharge", { status: 503 }));
+      }
+      fournisseurs.push(JSON.parse(init!.body as string).provider);
+      return Promise.resolve(Response.json({ choices: [{ message: { content: "oui" } }] }));
+    };
+    await openrouter(config).soutenir("phrase", "citation", "titre");
+    await openrouter({ ...config, cleMistral: "test" }).soutenir("phrase", "citation", "titre");
+    assertEquals(fournisseurs, [
+      { require_parameters: true, zdr: true, data_collection: "deny", order: ["Mistral"] },
+      { require_parameters: true, zdr: true, data_collection: "deny", ignore: ["Mistral"] },
+    ]);
+  } finally {
+    globalThis.fetch = fetch;
+  }
+});
+
 test("la reformulation et la traduction ne raisonnent pas, quel que soit l'effort du générateur", async () => {
   const fetch = globalThis.fetch;
   try {

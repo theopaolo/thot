@@ -26,25 +26,27 @@ export const cleIdentifiant = (identifiant: string) =>
   `identifiant:${identifiant.trim().toLowerCase().slice(0, 100)}`;
 
 /**
- * Compte un essai pour chaque clé avant toute dérivation, et lève `TropDEssais` au-delà de son
- * seuil. Compter d'abord tient le seuil quand des essais arrivent ensemble : une connexion
- * réussie retire ensuite le sien.
+ * Contrôle les seuils avant toute dérivation, puis compte un essai pour chaque clé. Vérifier avant
+ * d'incrémenter évite qu'un compte déjà bloqué n'épuise le quota de l'adresse partagée (NAT
+ * d'établissement), ou qu'une adresse bloquée ne bloque les comptes visés. Une connexion réussie
+ * retire ensuite son essai.
  */
 function compterEssai(db: Db, cles: [cle: string, seuil: number][], ms = Date.now()) {
   db.prepare("DELETE FROM connexions WHERE debut_le <= ?").run(maintenant(ms - FENETRE_ECHECS_MS));
   let attente = 0;
+  const lire = db.prepare("SELECT echecs, debut_le FROM connexions WHERE cle = ?");
   for (const [cle, seuil] of cles) {
-    const l = db
-      .prepare(
-        `INSERT INTO connexions (cle, echecs, debut_le) VALUES (?, 1, ?)
-         ON CONFLICT (cle) DO UPDATE SET echecs = echecs + 1 RETURNING echecs, debut_le`,
-      )
-      .get(cle, maintenant(ms)) as { echecs: number; debut_le: string };
-    if (l.echecs > seuil) {
+    const l = lire.get(cle) as { echecs: number; debut_le: string } | undefined;
+    if (l && l.echecs >= seuil) {
       attente = Math.max(attente, 1, Date.parse(l.debut_le) + FENETRE_ECHECS_MS - ms);
     }
   }
   if (attente) throw new TropDEssais(Math.ceil(attente / 1000));
+  const compter = db.prepare(
+    `INSERT INTO connexions (cle, echecs, debut_le) VALUES (?, 1, ?)
+     ON CONFLICT (cle) DO UPDATE SET echecs = echecs + 1`,
+  );
+  for (const [cle] of cles) compter.run(cle, maintenant(ms));
 }
 
 /**
@@ -78,6 +80,7 @@ export async function authentifier(db: Db, identifiant: string, motDePasse: stri
     db.prepare("DELETE FROM connexions WHERE cle = ?").run(cles[0][0]);
     if (cles[1]) {
       db.prepare("UPDATE connexions SET echecs = echecs - 1 WHERE cle = ?").run(cles[1][0]);
+      db.prepare("DELETE FROM connexions WHERE cle = ? AND echecs <= 0").run(cles[1][0]);
     }
   }
   return {
