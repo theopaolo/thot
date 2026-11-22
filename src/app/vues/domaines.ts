@@ -10,7 +10,7 @@ import {
 } from "../domaines.ts";
 import { icone } from "../icones.ts";
 import { type Libelles, minuscule } from "../instance.ts";
-import { ongletsAdministration } from "./page.ts";
+import { ongletsAdministration } from "./administration.ts";
 
 const options = (liste: { id: string; nom: string }[], valeur = "") =>
   liste.map(

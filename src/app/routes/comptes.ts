@@ -12,12 +12,8 @@ import {
   TropDEssais,
 } from "../comptes.ts";
 import { enregistrerReglages, libelles, lireInstance, type Reglages, TERMES } from "../instance.ts";
-import {
-  administration,
-  connexion as formulaireConnexion,
-  inscription,
-  motDePasse,
-} from "../vues/page.ts";
+import { administration } from "../vues/administration.ts";
+import { connexion as formulaireConnexion, inscription, motDePasse } from "../vues/comptes.ts";
 import * as Domaines from "../domaines.ts";
 import { adresseClient, type Session } from "./session.ts";
 import type { Env, Web } from "./web.ts";

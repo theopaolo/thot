@@ -1,6 +1,6 @@
 import { type Context, Hono } from "hono";
 import { libelles, lireInstance } from "../instance.ts";
-import { domainesDe } from "../vues/page.ts";
+import { domainesDe } from "../vues/administration.ts";
 import { renommerEntree } from "../ingestion.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
