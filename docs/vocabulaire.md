@@ -118,8 +118,14 @@ Collection de ressources, avec un public et un objectif facultatifs. Une ressour
 
 **Membre d'un cours**
 Enseignant ou élève inscrit à un cours. Un membre lit les ressources que le cours partage ou
-publie. L'administrateur inscrit et retire les membres. Un enseignant ajoute de nouveaux élèves à
-ses cours et les en retire. Un élève peut aussi rejoindre un cours par un lien d'inscription.
+publie. L'administrateur inscrit et retire les membres. Un enseignant ajoute de nouveaux élèves et
+des collègues à ses cours, et les en retire. Un élève peut aussi rejoindre un cours par un lien
+d'inscription.
+
+**Collègue**
+Autre enseignant de l'instance. Dans « Mes cours », un enseignant ajoute un collègue aux cours
+qu'il coche. Les enseignants d'un cours partagent ses ressources non privées, les questions de
+ses élèves, ses élèves et ses liens d'inscription.
 
 **Lien d'inscription**
 Adresse qu'un enseignant partage pour faire rejoindre ses cours à des élèves. L'élève qui l'ouvre

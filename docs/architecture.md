@@ -231,7 +231,10 @@ L'autorité d'administration est accordée explicitement par l'opérateur, jamai
 Une instance a un seul profil d'import, partagé par ses matières et ses ressources. Un
 établissement qui a besoin des deux profils fait tourner deux instances. Un cours regroupe des ressources avec un public et un
 objectif facultatifs. Un thème appartient à un cours. Les identifiants, jamais les libellés,
-séparent les thèmes homonymes. Renommer garde les identifiants, donc les rattachements. Une
+séparent les thèmes homonymes. Renommer garde les identifiants, donc les rattachements.
+Les administrateurs créent les matières. Un enseignant crée un cours dans une matière existante
+et en devient membre dans la même transaction. Il renomme ses cours, crée et renomme leurs
+thèmes. Seuls les administrateurs suppriment. Une
 matière, un cours ou un thème ne se supprime que si ni une ressource, ni une question d'élève,
 ni un objectif d'apprentissage ne l'utilise. Les anciennes matières et séquences gardent leurs métadonnées,
 leurs sources et leurs citations. Une matière absente reste non classée.
@@ -353,7 +356,7 @@ matières. Un échange sans cours va aux enseignants qui partagent un
 cours avec l'élève, ou à tous s'il n'en a aucun. Un enseignant ne voit et ne réinitialise que les
 élèves qui partagent un de ses cours. Seuls les administrateurs gèrent les élèves sans cours. Un
 enseignant crée les élèves de ses cours, chacun inscrit à au moins un, et les en retire. Il
-n'inscrit pas un compte existant :
+n'inscrit pas un élève existant :
 l'inscription lui donnerait la réinitialisation de son mot de passe, donc le compte. Un élève qui a
 déjà un compte rejoint un cours en ouvrant lui-même un lien d'inscription. Le lien inscrit des
 élèves seulement, aux cours dont son créateur est encore membre. Sa page nomme ces cours à
@@ -363,6 +366,17 @@ L'inscription refuse un identifiant déjà pris avec le message d'un identifiant
 ne dit pas quels comptes existent. Après la connexion, l'adresse de retour n'accepte qu'un lien
 d'inscription. Les administrateurs lisent tout. Une image se revalide à chaque affichage : un accès
 retiré s'applique aussitôt.
+
+Les enseignants membres d'un cours forment son équipe, sans autre table que `membres_cours`. Un
+enseignant ajoute un collègue à un ou plusieurs de ses cours en une action, et retire un
+enseignant de ses cours, lui-même compris. Le collègue ajouté lit et modifie les ressources non
+privées de ces cours, lit les questions de leurs élèves, gère ces élèves, réinitialisation des
+mots de passe comprise, et leurs liens d'inscription. Seul un compte enseignant s'ajoute ainsi :
+un élève existant est refusé pour la raison donnée plus haut. L'application ne réinitialise pas
+le mot de passe d'un enseignant, seul `thot reinitialiser` le fait, donc l'ajout n'ouvre pas le
+compte du collègue. Un enseignant retiré perd ces accès à la prochaine requête et garde les
+ressources dont il est propriétaire. Les administrateurs créent les comptes enseignants, depuis
+l'administration ou la CLI.
 
 Un élève choisit son mot de passe. Celui qu'un enseignant lui remet, à la création du compte ou
 après une réinitialisation, est un code provisoire. La première connexion le consomme et impose

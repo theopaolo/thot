@@ -128,6 +128,9 @@ export function cours(db: Db, matiereId: string, nom: string, publicCible = "", 
   if (publicCible.trim().length > 200 || objectif.trim().length > 4000) {
     throw new Error("Public ou objectif trop long.");
   }
+  if (!db.prepare("SELECT 1 FROM matieres WHERE id = ?").get(matiereId)) {
+    throw new Error("Matière inconnue.");
+  }
   db.prepare("INSERT INTO cours VALUES (?, ?, ?, ?, ?)").run(
     id,
     matiereId,
@@ -175,9 +178,19 @@ export const matiereDuCours = (db: Db, coursId: string) =>
   db.prepare("SELECT matiere_id FROM cours WHERE id = ?").get(coursId)?.matiere_id as
     | string
     | undefined;
+export const coursDuTheme = (db: Db, themeId: string) =>
+  db.prepare("SELECT cours_id FROM themes WHERE id = ?").get(themeId)?.cours_id as
+    | string
+    | undefined;
 export function theme(db: Db, coursId: string, nom: string) {
   const id = crypto.randomUUID();
-  db.prepare("INSERT INTO themes VALUES (?, ?, ?)").run(id, coursId, texte(nom));
+  const n = texte(nom);
+  try {
+    db.prepare("INSERT INTO themes VALUES (?, ?, ?)").run(id, coursId, n);
+  } catch (e) {
+    if (!(e as Error).message.includes("UNIQUE")) throw e;
+    throw new Error(`« ${n} » existe déjà.`);
+  }
   return id;
 }
 /** Change le profil de toutes les matières d'un coup, tant qu'aucune ressource n'a un autre profil. */

@@ -37,6 +37,7 @@ Depuis l’administration, configurer les matières, les cours et leurs thèmes.
 l’instance, général ou arts appliqués, fournit les termes et les champs du dépôt par défaut.
 L’administration règle aussi le nom, les termes, les lecteurs par défaut et les champs de chaque
 matière. Une ressource peut appartenir à plusieurs cours : les membres de ces cours la lisent.
+Un enseignant crée aussi ses cours et y ajoute ses collègues depuis « Mes cours ».
 
 En production, suivre le [provisionnement par instance](docs/exploitation.md).
 

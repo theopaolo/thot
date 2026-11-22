@@ -1,6 +1,9 @@
 export {
+  colleguesDe,
   type Compte,
   creerCompte,
+  estEnseignant,
+  estEnseignantDuCours,
   lecteur,
   lireCompte,
   type Role,
@@ -15,9 +18,9 @@ export {
 } from "./comptes/connexion.ts";
 export { filtreModification, parametresModification, peutModifier } from "./comptes/droits.ts";
 export {
+  compteSaisi,
   creerEleves,
   eleveGere,
-  eleveSaisi,
   elevesSansCours,
   estEleveDuCours,
   importerEleves,

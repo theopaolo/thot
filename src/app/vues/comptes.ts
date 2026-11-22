@@ -66,7 +66,7 @@ export const inscription = (
         ${erreur ? html`<p role="alert">${erreur}</p>` : ""}
         ${
           compte?.role === "enseignant"
-            ? html`<p>Ce lien inscrit des élèves. Un administrateur inscrit les enseignants à un cours.</p>`
+            ? html`<p>Ce lien inscrit des élèves. Un enseignant de ces cours vous y ajoute depuis « Mes cours ».</p>`
             : compte
               ? html`
                 <p>Tu es connecté avec le compte ${compte.nom}.</p>

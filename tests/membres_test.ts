@@ -4,7 +4,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { connexion } from "../src/app/db.ts";
 import { cours, coursDuCompte, inscrire, matiere } from "../src/app/domaines.ts";
 import { configurerInstance } from "../src/app/instance.ts";
-import { environnement, fauxModeles, session } from "./outils.ts";
+import { environnement, fauxModeles, ORIGINE, session } from "./outils.ts";
 import { administrateur } from "./domaines_outils.ts";
 
 async function enseignantDe(db: ReturnType<typeof connexion>, cours_id: string[]) {
@@ -65,6 +65,62 @@ test("membres d'un cours : l'administrateur inscrit et retire, les autres compte
       303,
     );
     assertEquals(coursDuCompte(db, eleveId).size, 0);
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("comptes enseignants : l'administrateur en crée un et voit son mot de passe une fois, un enseignant reçoit 403", async () => {
+  const { db, dir } = await environnement();
+  try {
+    const admin = await administrateur(db);
+    const prof = await session(db, fauxModeles().modeles, "enseignant", false);
+    const comptes = () => db.prepare("SELECT count(*) n FROM comptes").get()!.n as number;
+    const avant = comptes();
+    const jeanne = { identifiant: "Jeanne.Roy", nom: "Jeanne Roy" };
+    const refus = await prof.requete("/administration/domaines/enseignant", {
+      method: "POST",
+      body: new URLSearchParams(jeanne),
+    });
+    assertEquals(refus.status, 403);
+    assertEquals(comptes(), avant);
+
+    const page = await (await admin.requete("/administration/domaines")).text();
+    assertStringIncludes(page, 'action="/administration/domaines/enseignant"');
+    const feuille = await admin.poster("enseignant", jeanne);
+    assertEquals(feuille.status, 200);
+    assertEquals(feuille.headers.get("cache-control"), "no-store");
+    const texte = await feuille.text();
+    assertStringIncludes(texte, '<a href="/administration/domaines">Retour aux matières et cours');
+    const motDePasse = texte.match(/Mot de passe : <strong>([0-9a-f]+)</)![1];
+    assertEquals(
+      {
+        ...db
+          .prepare("SELECT role, administrateur FROM comptes WHERE identifiant = 'jeanne.roy'")
+          .get(),
+      },
+      { role: "enseignant", administrateur: 0 },
+    );
+    const connexion = (mot_de_passe: string) =>
+      admin.app.request("/connexion", {
+        method: "POST",
+        headers: { origin: ORIGINE },
+        body: new URLSearchParams({ identifiant: "jeanne.roy", mot_de_passe }),
+      });
+    assertEquals((await connexion("mauvais")).status, 401);
+    assertEquals((await connexion(motDePasse)).status, 302);
+
+    // Un identifiant pris ou mal formé ne crée rien.
+    for (const champs of [
+      { identifiant: "jeanne.roy", nom: "Autre" },
+      { identifiant: "J R", nom: "Jeanne" },
+      { identifiant: "jr", nom: "Jeanne" },
+    ]) {
+      const r = await admin.poster("enseignant", champs);
+      assertEquals(r.status, 400);
+    }
+    assertEquals(comptes(), avant + 1);
   } finally {
     db.close();
     await rm(dir, { recursive: true });

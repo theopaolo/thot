@@ -10,7 +10,14 @@ import { type Audience } from "../src/app/depot.ts";
 import { lireInstance } from "../src/app/instance.ts";
 import { chercherFts } from "../src/core/recherche.ts";
 import { faitAuHasard, suggestionsDuPerimetre } from "../src/app/suggestions.ts";
-import { affiliations, cours, desinscrire, matiere, theme } from "../src/app/domaines.ts";
+import {
+  affiliations,
+  cours,
+  coursDuCompte,
+  desinscrire,
+  matiere,
+  theme,
+} from "../src/app/domaines.ts";
 import { fauxModeles } from "./outils.ts";
 import {
   administrateur,
@@ -604,6 +611,114 @@ test("ancienne séquence : son adresse ne mène qu'à un thème que le lecteur p
     assertEquals(await mene(eleveA, "Renaissance"), "/eleve/sans-sequence");
     assertEquals(await mene(eleveB, "Corrigés"), "/eleve/sans-sequence");
     assertEquals(await mene(eleveA, "Inconnue"), "/eleve/sans-sequence");
+  } finally {
+    db.close();
+    await rm(dir, { recursive: true });
+  }
+});
+
+test("équipe : un enseignant crée ses cours, y ajoute un collègue d'un coup et ne touche qu'aux siens", async () => {
+  const { db, dir, m, c1, c2, profA, profB, profC, eleveA, eleveB } = await deuxCours();
+  try {
+    const membres = (coursId: string) =>
+      db
+        .prepare("SELECT compte_id FROM membres_cours WHERE cours_id = ? ORDER BY rowid")
+        .all(coursId)
+        .map((l) => l.compte_id);
+    const nom = (table: string, id: string) =>
+      db.prepare(`SELECT nom FROM ${table} WHERE id = ?`).get(id)!.nom;
+    const collegue = (qui: Qui, compteId: string, cours: string[]) => {
+      const corps = new URLSearchParams({ compte_id: compteId });
+      for (const id of cours) corps.append("cours", id);
+      return statut(qui.requete("/prof/cours/collegue", { method: "POST", body: corps }));
+    };
+
+    // Le créateur devient membre du cours, dans une matière existante seulement.
+    const cree = await envoyer(profB, "/prof/cours/creer", { matiere_id: m, nom: "Typographie" });
+    assertEquals(cree.status, 303);
+    const c3 = db.prepare("SELECT id FROM cours WHERE nom = 'Typographie'").get()!.id as string;
+    assertEquals(cree.headers.get("location"), `/prof/cours#cours-${c3}`);
+    assertEquals(membres(c3), [profB.id]);
+    const refus = await envoyer(profB, "/prof/cours/creer", { matiere_id: "absente", nom: "X" });
+    assertEquals(refus.status, 400);
+    assertStringIncludes(await refus.text(), "Matière inconnue");
+    assertEquals(
+      await statut(envoyer(profB, "/prof/cours/creer", { matiere_id: m, nom: " " })),
+      400,
+    );
+
+    // Il crée et renomme les thèmes de ses cours, et renomme ses cours.
+    const nouveau = { cours_id: c3, nom: "Caractères" };
+    assertEquals(await statut(envoyer(profB, "/prof/cours/theme", nouveau)), 303);
+    assertEquals(await statut(envoyer(profB, "/prof/cours/theme", nouveau)), 400);
+    const t3 = db.prepare("SELECT id FROM themes WHERE cours_id = ?").get(c3)!.id as string;
+    const renommer = (qui: Qui, genre: string, id: string, n: string) =>
+      statut(envoyer(qui, "/prof/cours/renommer", { genre, id, nom: n }));
+    assertEquals(await renommer(profB, "theme", t3, "Fontes"), 303);
+    assertEquals(await renommer(profB, "cours", c3, "Typographie 1"), 303);
+    assertEquals([nom("themes", t3), nom("cours", c3)], ["Fontes", "Typographie 1"]);
+    let page = await texteDe(profB, "/prof/cours");
+    for (const id of [c2, c3]) assertStringIncludes(page, `id="cours-${id}"`);
+    assert(!page.includes(c1));
+    assert(!page.includes("/supprimer"));
+
+    // Un collègue rejoint deux cours d'une seule action et gère aussitôt leurs élèves.
+    const identifiantB = db.prepare("SELECT identifiant FROM comptes WHERE id = ?").get(eleveB.id)!
+      .identifiant as string;
+    assert(!(await texteDe(profC, "/prof/eleves")).includes(identifiantB));
+    assertEquals(await collegue(profB, profC.id, [c2, c3]), 303);
+    assertEquals(
+      [membres(c2), membres(c3)],
+      [
+        [profB.id, eleveB.id, profC.id],
+        [profB.id, profC.id],
+      ],
+    );
+    assertStringIncludes(await texteDe(profC, "/prof/eleves"), identifiantB);
+
+    // Un élève existant ne s'inscrit pas ainsi : ses enseignants réinitialisent son mot de passe.
+    const eleve = await profB.requete("/prof/cours/collegue", {
+      method: "POST",
+      body: new URLSearchParams({ compte_id: eleveA.id, cours: c2 }),
+    });
+    assertEquals(eleve.status, 400);
+    assertStringIncludes(await eleve.text(), "lien d&#39;inscription");
+    assertEquals(await collegue(profB, "inconnu", [c2]), 400);
+    assert(!coursDuCompte(db, eleveA.id).has(c2));
+
+    // Hors de ses cours, rien ne change : une case cochée rend 400, le reste 404.
+    const t1 = theme(db, c1, "Couleur");
+    assertEquals(await collegue(profB, profB.id, [c1]), 400);
+    assertEquals(await collegue(profB, profC.id, []), 400);
+    assertEquals(await renommer(profB, "cours", c1, "Pris"), 404);
+    assertEquals(await renommer(profB, "theme", t1, "Pris"), 404);
+    assertEquals(await renommer(profB, "matiere", m, "Pris"), 404);
+    assertEquals(
+      await statut(envoyer(profB, "/prof/cours/theme", { cours_id: c1, nom: "X" })),
+      404,
+    );
+    const retirer = (qui: Qui, coursId: string, compteId: string) =>
+      statut(envoyer(qui, "/prof/cours/retirer", { cours_id: coursId, compte_id: compteId }));
+    assertEquals(await retirer(profB, c1, profA.id), 404);
+    // Les élèves se retirent depuis /prof/eleves.
+    assertEquals(await retirer(profA, c1, eleveA.id), 404);
+    assertEquals(membres(c1), [profA.id, profC.id, eleveA.id]);
+    assertEquals([nom("cours", c1), nom("themes", t1)], ["Design", "Couleur"]);
+
+    // Il retire un collègue de ses cours, puis quitte lui-même un cours.
+    assertEquals(await retirer(profB, c2, profC.id), 303);
+    assert(!(await texteDe(profC, "/prof/eleves")).includes(identifiantB));
+    assertEquals(await retirer(profC, c3, profC.id), 303);
+    assertEquals([membres(c2), membres(c3)], [[profB.id, eleveB.id], [profB.id]]);
+    assert(!(await texteDe(profC, "/prof/cours")).includes(c3));
+    assertEquals(await retirer(profC, c3, profB.id), 404);
+
+    // Un élève n'a pas cette page. Un administrateur y voit et gère tous les cours.
+    assertEquals(await statut(eleveA.requete("/prof/cours")), 403);
+    const admin = await administrateur(db);
+    page = await texteDe(admin, "/prof/cours");
+    for (const id of [c1, c2, c3]) assertStringIncludes(page, `id="cours-${id}"`);
+    assertEquals(await renommer(admin, "cours", c1, "Design graphique"), 303);
   } finally {
     db.close();
     await rm(dir, { recursive: true });

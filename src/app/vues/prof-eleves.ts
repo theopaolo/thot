@@ -34,16 +34,17 @@ const reinitialiser = (e: Eleve) =>
   html`<form method="post" action="/prof/eleves/${e.id}/reinitialiser"><button aria-label="Nouveau mot de passe pour ${e.nom}">Nouveau mot de passe</button></form>`;
 
 /** Le nom se lit, l'identifiant se recopie : chasse fixe pour distinguer l, I et 1. */
-const tableEleves = (
+export const tableEleves = (
   liste: Eleve[],
   action: (e: Eleve) => unknown,
   cours?: (e: Eleve) => unknown,
+  entete = "Élève",
 ) =>
   html`
     <table class="eleves">
       <thead>
         <tr>
-          <th>Élève</th>
+          <th>${entete}</th>
           ${cours ? html`<th class="cours-eleve">Cours</th>` : ""}
           <th><span class="visuellement-cache">Actions</span></th>
         </tr>
@@ -255,7 +256,7 @@ export const eleves = (o: {
   if (!cat.cours.length && !o.sansCours) {
     return html`
       <h1>Élèves</h1>
-      <p>Vous n'avez pas encore de cours. Un administrateur vous inscrit à un cours, puis vous y ajoutez vos élèves.</p>
+      <p>Vous n'avez pas encore de cours. Créez-en un dans <a href="/prof/cours">Mes cours</a>, ou demandez à un collègue de vous ajouter aux siens, puis ajoutez-y vos élèves.</p>
     `;
   }
   const vide = html`
@@ -323,6 +324,7 @@ export const eleves = (o: {
 export const feuilleIdentifiants = (
   liste: { identifiant: string; nom: string; motDePasse: string }[],
   adresse: string,
+  [retour, libelle] = ["/prof/eleves", "Retour aux élèves"],
 ) =>
   html`
     <div
@@ -340,5 +342,5 @@ export const feuilleIdentifiants = (
         </section>
       `,
     )}</div>
-    <p class="sans-impression"><a href="/prof/eleves">Retour aux élèves</a></p>
+    <p class="sans-impression"><a href="${retour}">${libelle}</a></p>
   `;

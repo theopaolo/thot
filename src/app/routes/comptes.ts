@@ -3,9 +3,9 @@ import {
   authentifier,
   choisirMotDePasse,
   type Compte,
+  compteSaisi,
   consommerProvisoire,
   coursDuLien,
-  eleveSaisi,
   IDENTIFIANT_REFUSE,
   inscrireParLien,
   lireCompte,
@@ -155,7 +155,7 @@ export function routesComptes(app: Hono<Env>, w: Web, session: Session) {
     try {
       if (compte) id = await inscrireParLien(db, c.req.param("jeton"), compte.id);
       else {
-        const eleve = eleveSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
+        const eleve = compteSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
         if (!eleve) throw new Error(IDENTIFIANT_REFUSE);
         const motDePasse = String(b.mot_de_passe ?? "");
         id = await inscrireParLien(db, c.req.param("jeton"), { ...eleve, motDePasse });

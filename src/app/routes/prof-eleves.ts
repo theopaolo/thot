@@ -1,10 +1,10 @@
 import { type Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import {
+  compteSaisi,
   creerEleves,
   creerLien,
   eleveGere,
-  eleveSaisi,
   elevesSansCours,
   estEleveDuCours,
   importerEleves,
@@ -101,7 +101,7 @@ export function routesProfEleves(app: Hono<Env>, w: Web) {
     const b = await c.req.parseBody({ all: true });
     const cours = coursCoches(c, b);
     if (!cours) return c.html(pageEleves(c, REFUS_COURS), 400);
-    const eleve = eleveSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
+    const eleve = compteSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
     if (!eleve) {
       return c.html(
         pageEleves(

@@ -7,29 +7,40 @@ import { ongletsAdministration } from "./administration.ts";
 import { options, selectionProfil } from "./commun.ts";
 
 const LIBELLES = { matiere: "matière", cours: "cours", theme: "thème", champ: "champ" };
-/** `ouvert` : le cours que la page rouvre après l'envoi. */
-const ligne = (
+const ADMINISTRATION = "/administration/domaines";
+/** Renommer une entrée. Seule l'administration montre « Supprimer ». `ouvert` : le cours à rouvrir. */
+export const ligne = (
   genre: keyof typeof LIBELLES,
   id: string,
   nom: string,
   contexte = "",
   terme = LIBELLES[genre],
   ouvert = "",
+  action = ADMINISTRATION,
 ) => {
   const libelle = `Nom (${terme})`;
   return html`
-    <form method="post" action="/administration/domaines/renommer" class="barre">
+    <form method="post" action="${action}/renommer" class="barre">
       <input type="hidden" name="genre" value="${genre}"><input type="hidden" name="id" value="${id}">
       ${ouvert ? html`<input type="hidden" name="ouvert" value="${ouvert}">` : ""}
       <input type="text" name="nom" value="${nom}" required maxlength="${
         genre === "champ" ? 60 : 200
       }" aria-label="${libelle}">
       <button>Renommer</button>
-      <button formaction="/administration/domaines/supprimer" formnovalidate>Supprimer</button>
+      ${
+        action === ADMINISTRATION
+          ? html`<button formaction="${ADMINISTRATION}/supprimer" formnovalidate>Supprimer</button>`
+          : ""
+      }
       ${contexte ? html`<span class="discret">${contexte}</span>` : ""}
     </form>
   `;
 };
+export const nouveauCours = (matieres: Matiere[], l: Libelles, action: string) =>
+  html`<form method="post" action="${action}"
+      class="etroit"><label>${l.matiere} <select name="matiere_id" required>${options(
+        matieres,
+      )}</select></label><label>Nom du cours <input type="text" name="nom" required maxlength="200"></label><label>${l.niveau} <input type="text" name="public" maxlength="200"></label><label>Objectif (facultatif) <textarea name="objectif" maxlength="4000"></textarea></label><button>Créer le cours</button></form>`;
 export type Inscrit = { id: string; identifiant: string; nom: string; role: string };
 /**
  * `ouvert` : le cours ou la matière que la page déplie. `etape` : l'étape suivante de la création
@@ -377,6 +388,18 @@ export const gestion = (
     <p>L'instance garde un seul profil d'import, partagé par toutes ses matières. Il se change tant
     qu'aucune ressource n'est déposée. La recherche est prise en charge en français uniquement.</p>
     ${controleProfil}
+    ${
+      personnel
+        ? ""
+        : html`
+          <h3>Comptes enseignants</h3>
+          <p>Un enseignant crée ses cours et y ajoute ses collègues depuis « Mes cours ». L'identifiant
+          prend des minuscules, des chiffres, le point, le tiret ou le tiret bas. Le mot de passe du
+          nouveau compte s'affiche une seule fois.</p>
+          <form method="post" action="${ADMINISTRATION}/enseignant"
+            class="etroit"><label>Identifiant <input type="text" name="identifiant" required minlength="3" maxlength="40" pattern="[a-z0-9._\\-]+" autocomplete="off" spellcheck="false"></label><label>Nom <input type="text" name="nom" required maxlength="100" autocomplete="off"></label><button>Créer et afficher le mot de passe</button></form>
+        `
+    }
     <h3>Champs personnalisés</h3>
     <p>Un champ se coche ensuite dans les champs du dépôt de chaque matière. Renommer garde ses
     valeurs. Son type ne change plus après sa création.</p>

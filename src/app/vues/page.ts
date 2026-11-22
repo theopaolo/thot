@@ -211,6 +211,7 @@ const rail = (
         ${
           instance.mode === "shared"
             ? html`
+            ${lienNav("/prof/cours", "Mes cours", "squares-four", chemin.startsWith("/prof/cours"))}
             ${lienNav("/prof/eleves", "Élèves", "users", chemin.startsWith("/prof/eleves"))}
             ${lienNav(
               "/prof/questions",

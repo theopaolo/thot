@@ -1,9 +1,12 @@
 import { type Context, Hono } from "hono";
+import { compteSaisi, creerCompte } from "../comptes.ts";
+import { config } from "../config.ts";
 import { libelles, lireInstance } from "../instance.ts";
 import { domainesDe } from "../vues/administration.ts";
 import { renommerEntree } from "../ingestion.ts";
 import * as Domaines from "../domaines.ts";
 import * as DomaineVue from "../vues/domaines.ts";
+import * as ProfEleves from "../vues/prof-eleves.ts";
 import type { Env, Web } from "./web.ts";
 
 export function routesDomaines(app: Hono<Env>, w: Web) {
@@ -125,6 +128,28 @@ export function routesDomaines(app: Hono<Env>, w: Web) {
         case "desinscrire":
           Domaines.desinscrire(db, String(b.cours_id ?? ""), String(b.compte_id ?? ""));
           break;
+        // Le mot de passe du nouveau compte s'affiche une seule fois, comme celui d'un élève.
+        case "enseignant": {
+          const saisi = compteSaisi(String(b.identifiant ?? ""), String(b.nom ?? ""));
+          if (!saisi) {
+            throw new Error(
+              "Compte refusé : un identifiant de 3 à 40 caractères parmi a-z, 0-9, point, tiret et tiret bas, et un nom de 100 caractères au maximum.",
+            );
+          }
+          const motDePasse = await creerCompte(db, saisi.identifiant, saisi.nom, "enseignant");
+          c.header("Cache-Control", "no-store");
+          return c.html(
+            rendre(
+              c,
+              "Identifiants enseignant",
+              ProfEleves.feuilleIdentifiants(
+                [{ ...saisi, motDePasse }],
+                config.origine || new URL(c.req.url).origin,
+                ["/administration/domaines", "Retour aux matières et cours"],
+              ),
+            ),
+          );
+        }
         default:
           return c.notFound();
       }

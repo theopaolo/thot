@@ -3,8 +3,8 @@ import { type Db, maintenant } from "../db.ts";
 import { inscrire } from "../domaines.ts";
 import { type Compte, deriver, hex } from "./compte.ts";
 
-/** Un élève saisi par un enseignant, au format du CSV, ou `undefined` s'il est invalide. */
-export function eleveSaisi(identifiant = "", nom = "") {
+/** Un compte saisi dans un formulaire ou le CSV des élèves, ou `undefined` s'il est invalide. */
+export function compteSaisi(identifiant = "", nom = "") {
   identifiant = identifiant.trim().toLowerCase();
   nom = nom.trim();
   if (!/^[a-z0-9._-]{3,40}$/.test(identifiant) || !nom || nom.length > 100) return undefined;
@@ -62,7 +62,7 @@ export function lireListe(csv: string): { identifiant: string; nom: string }[] {
     throw new Error("Le CSV doit contenir de 1 à 100 élèves.");
   }
   const comptes = lignes.map(([identifiant, nom], i) => {
-    const eleve = lignes[i].length === 2 ? eleveSaisi(identifiant, nom) : undefined;
+    const eleve = lignes[i].length === 2 ? compteSaisi(identifiant, nom) : undefined;
     if (!eleve) throw new Error(`Ligne ${i + 2}: identifiant ou nom invalide.`);
     return eleve;
   });

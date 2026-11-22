@@ -55,6 +55,10 @@ export async function creerCompte(
   if (!identifiant.trim() || !nom.trim() || identifiant.length > 100 || nom.length > 100) {
     throw new Error("Identifiant et nom requis, 100 caractères au maximum.");
   }
+  identifiant = identifiant.trim().toLowerCase();
+  if (db.prepare("SELECT 1 FROM comptes WHERE identifiant = ?").get(identifiant)) {
+    throw new Error(`Identifiant déjà utilisé : ${identifiant}.`);
+  }
   // Vérifiés avant l'insertion : creerAdministrateur appelle cette fonction dans sa transaction.
   for (const coursId of cours) {
     if (!db.prepare("SELECT 1 FROM cours WHERE id = ?").get(coursId)) {
@@ -66,18 +70,31 @@ export async function creerCompte(
   const id = crypto.randomUUID();
   db.prepare(
     "INSERT INTO comptes (id, identifiant, nom, role, sel, empreinte, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(
-    id,
-    identifiant.trim().toLowerCase(),
-    nom.trim(),
-    role,
-    sel,
-    await deriver(motDePasse, sel),
-    maintenant(),
-  );
+  ).run(id, identifiant, nom.trim(), role, sel, await deriver(motDePasse, sel), maintenant());
   for (const coursId of cours) inscrire(db, coursId, id);
   return motDePasse;
 }
+
+/** Les autres comptes enseignants de l'instance, pour composer l'équipe d'un cours. */
+export const colleguesDe = (db: Db, id: string) =>
+  db
+    .prepare(
+      "SELECT id, identifiant, nom FROM comptes WHERE role = 'enseignant' AND id != ? ORDER BY nom",
+    )
+    .all(id) as { id: string; identifiant: string; nom: string }[];
+
+/** Vrai si le compte donné existe et porte le rôle enseignant. */
+export const estEnseignant = (db: Db, id: string) =>
+  db.prepare("SELECT 1 FROM comptes WHERE id = ? AND role = 'enseignant'").get(id) !== undefined;
+
+/** Vrai si le compte est enseignant membre du cours donné. */
+export const estEnseignantDuCours = (db: Db, coursId: string, compteId: string) =>
+  db
+    .prepare(
+      `SELECT 1 FROM membres_cours m JOIN comptes a ON a.id = m.compte_id
+       WHERE m.cours_id = ? AND m.compte_id = ? AND a.role = 'enseignant'`,
+    )
+    .get(coursId, compteId) !== undefined;
 
 export const lireCompte = (db: Db, id: string) =>
   db
